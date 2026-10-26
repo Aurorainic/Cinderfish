@@ -6,7 +6,7 @@
 
 ## 1. 定位一句话
 
-单二进制的个人/极小规模联邦社交实例：Misskey 兼容 API 为后端契约，ActivityPub 联邦为通信层，Firefish 风格为自建前端的体验基线。实现语言为 Go 或 Rust（待定，见 D9），架构设计语言无关。
+Go 单二进制的个人/极小规模联邦社交实例：Misskey 兼容 API 为后端契约，ActivityPub 联邦为通信层，Firefish 风格（Vue 3）为自建前端的体验基线。
 
 ## 2. 已定案的核心决策
 
@@ -22,7 +22,7 @@
 | D6 数据迁移 | 不迁移朋友私有项目数据，空实例起步 | 该项目未发布、无源码可访问 |
 | D7 Relay | 首版不做，列入后续路线 | 与白名单模式语义需先定义清楚 |
 | D8 技术参考 | 只参考协议与 API 契约，不抄任何项目代码；Pleroma/Akkoma 代码明确排除 | 用户明确要求 |
-| D9 实现语言 | **待定：Go（推荐）或 Rust（备选）**，见 `2026-10-26-tech-stack-comparison.md` 第 4 节；其余架构设计与语言无关 | 广泛调研后推荐 Go：同形态先例（GoToSocial）、单二进制、协议栈完备、单人可维护；Rust 资源画像最优但迭代慢 |
+| D9 实现语言 | **Go（已定案，2026-10-26 用户确认）**；AP 词汇库用 go-ap，HTTP Signatures 用 go-fed/httpsig 或自实现 | 调研见 `2026-10-26-tech-stack-comparison.md`：同形态先例（GoToSocial）、单二进制、协议栈完备、单人可维护 |
 
 ## 3. 模块结构
 
@@ -138,7 +138,7 @@ Storage 接口（语言无关语义）:
 
 ## 8. 质量与验证
 
-- 单体跑对应语言的标准 vet/clippy 与测试工具链；API 契约测试以 Misskey 官方文档+真实响应 fixture 为基准
+- 单体跑 `go vet` / `go test`；API 契约测试以 Misskey 官方文档+真实响应 fixture 为基准
 - ActivityPub：fixture 驱动的入站测试（Mastodon/Misskey 真实 payload 样例）+ 双实例 smoke test（本实例 ↔ 常见远端）
 - 联邦模式测试矩阵：3 模式 × (WebFinger/Inbox/出站/媒体)
 - 前端：TypeScript 严格模式，与后端类型契约由手写 types 包约束（Vue 3 生态，可参考 misskey-js 类型定义）
@@ -146,7 +146,7 @@ Storage 接口（语言无关语义）:
 
 ## 9. 里程碑
 
-1. **M1 骨架**：仓库结构（语言定案后初始化）、config、db 迁移、`meta`/`ping`、单测跑通
+1. **M1 骨架**：仓库结构（Go module）、config、db 迁移、`meta`/`ping`、单测跑通
 2. **M2 账户与认证**：注册三模式、signin、MiAuth、token、`i`、users/show
 3. **M3 笔记与时间线**：notes/create/show/delete、四时间线、反应、通知、Drive+Storage 双实现
 4. **M4 Streaming**：WS 端点、频道、事件广播（Postgres 事件表 + LISTEN/NOTIFY；Redis 可选实现）
@@ -162,4 +162,3 @@ Storage 接口（语言无关语义）:
 - HTTP Signatures 草案各家实现有差异，需用 Mastodon + Misskey + GoToSocial 三方实测
 - LISTEN/NOTIFY 在连接闪断时会丢唤醒（不丢数据，靠表轮询兜底），需实现断线重订阅；Redis 模式下由 Redis Pub/Sub 替代唤醒通道，持久表兜底逻辑不变
 - 自建前端工作量大，M6 前先以 API 完成度为先；可临时用现成 Misskey Web 客户端连本实例做冒烟（依赖端点兼容度）
-- 语言选型（D9）未定案前，M1 不得启动

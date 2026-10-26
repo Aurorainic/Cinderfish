@@ -25,7 +25,8 @@ The intended product is a personal or very small-user federated social instance:
 
 ## Engineering Defaults
 
-- Do not add product code before the written scope and architecture are reviewed in the conversation.
+- Do not add product code before the written scope and architecture are reviewed in the conversation. The architecture baseline lives at `docs/superpowers/specs/2026-10-26-milnfish-architecture-v0.md`.
+- Implementation language is Go (decided 2026-10-26). The frontend is Vue 3 + TypeScript. PostgreSQL is the only mandatory datastore; Redis is optional behind the queue abstraction. Mastodon API compatibility is explicitly out of scope, including reserved routes.
 - Prefer a small Go service with explicit interfaces for persistence, media storage, federation, and background work.
 - Keep the frontend and backend compatibility boundaries explicit.
 - Use the repository's existing conventions once implementation begins.

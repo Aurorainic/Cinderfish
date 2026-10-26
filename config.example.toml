@@ -1,0 +1,33 @@
+# MilnFish configuration example.
+# Copy to config.toml and adjust. Every key can be overridden by the
+# environment variable MILNFISH_<UPPER_SNAKE_KEY> (e.g. MILNFISH_DATABASE_URL).
+
+host = "127.0.0.1"
+port = 3000
+
+# Public domain users will see (used for WebFinger and ActivityPub ids).
+domain = "example.com"
+
+# PostgreSQL is the only mandatory dependency.
+database_url = "postgres://milnfish:milnfish@localhost:5432/milnfish"
+
+# open | invite | admin
+registration_mode = "admin"
+
+# public | allowlist | none
+federation_mode = "none"
+
+[media]
+# local | s3
+backend = "local"
+local_path = "./data/files"
+
+[media.s3]
+endpoint = ""
+bucket = ""
+region = ""
+access_key = ""
+secret_key = ""
+use_ssl = true
+# Base URL objects are served from; leave empty to use presigned GETs.
+public_base_url = ""
