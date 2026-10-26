@@ -14,9 +14,9 @@ import (
 
 // Server holds dependencies shared by all handlers.
 type Server struct {
-	cfg      *config.Config
+	cfg       *config.Config
 	startedAt time.Time
-	mux      *http.ServeMux
+	mux       *http.ServeMux
 }
 
 func NewServer(cfg *config.Config) *Server {
@@ -27,15 +27,6 @@ func NewServer(cfg *config.Config) *Server {
 	s.mux.HandleFunc("GET /api/ping", s.handlePing)
 	s.mux.HandleFunc("/", notFoundHandler)
 	return s
-}
-
-// notFoundHandler answers everything that did not match a route with a
-// Misskey-style JSON error instead of Go's default plain-text 404, so
-// API clients always see the documented error envelope.
-func notFoundHandler(w http.ResponseWriter, r *http.Request) {
-	writeAPIError(w, http.StatusNotFound, "UNKNOWN_ENDPOINT",
-		fmt.Sprintf("No such endpoint: %s %s", r.Method, r.URL.Path),
-		"00000000-0000-0000-0000-000000000001")
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -51,75 +42,74 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	_ = enc.Encode(v)
 }
 
-// writeAPIError emits a Misskey-shaped error:
-// {"error":{"code":"...","message":"...","id":"..."}}.
-func writeAPIError(w http.ResponseWriter, status int, code, message, id string) {
-	writeJSON(w, status, map[string]any{
-		"error": map[string]any{
-			"code":    code,
-			"message": message,
-			"id":      id,
-		},
-	})
+// APIError mirrors Misskey's ApiError: the response body is
+// {"error":{"message","code","id","kind"[, "info"]}} and kind is always
+// present (client, server or permission).
+type APIError struct {
+	Message  string
+	Code     string
+	ID       string
+	Kind     string // client | server | permission
+	Info     any
+	HasInfo  bool
+	Status   int
 }
 
-// handleMeta answers POST /api/meta. Unauthenticated; safe fields only.
-func (s *Server) handleMeta(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]any{
-		"maintainerName":        "",
-		"maintainerEmail":       "",
-		"name":                  "MilnFish",
-		"version":               "0.1.0",
-		"providesTarball":       false,
-		"providesTranslationKeys": false,
-		"repositoryUrl":         "",
-		"feedbackUrl":           "",
-		"impressumUrl":          "",
-		"privacyPolicyUrl":      "",
-		"disableRegistration":   s.cfg.RegistrationMode != "open",
-		"emailRequiredForSignup": false,
-		"enableHcaptcha":        false,
-		"enableMcaptcha":        false,
-		"enableRecaptcha":       false,
-		"enableTurnstile":       false,
-		"swPublickey":           "",
-		"themeColor":            "#86b300",
-		"mascotImageUrl":        "/assets/ai.png",
-		"bannerUrl":             "",
-		"infoImageUrl":          "",
-		"serverErrorImageUrl":   "",
-		"notFoundImageUrl":      "",
-		"instanceUrl":           "https://" + s.cfg.Domain,
-		"maxNoteTextLength":     3000,
-		"ads":                   []any{},
-		"notesPerOneAd":         0,
-		"enableEmail":           false,
-		"enableServiceWorker":   false,
-		"translatorAvailable":   false,
-		"serverRules":           []any{},
-		"policies":              map[string]any{},
-		"mediaProxy":            "",
-		"features": map[string]bool{
-			"registration": s.cfg.RegistrationMode == "open",
-			"emailRequiredForSignup": false,
-			"localTimeline":  true,
-			"globalTimeline": s.cfg.FederationMode == "public",
-		},
-	})
+func (e *APIError) Error() string { return e.Message }
+
+// Well-known error ids, copied from Misskey so clients and operators can
+// recognise them (packages/backend/src/server/api/error.ts).
+const (
+	errIDInvalidParam      = "3d81ceae-475f-4600-b2a8-2bc116157532"
+	errIDAuthentication    = "b0a7f5f8-dc2f-4171-b91f-de88ad238e14"
+	errIDInternal          = "5d37dbcb-891e-41ca-a3d6-e690c97775ac"
+	errIDNoSuchEndpoint    = "fc9c4a0b-f3a1-4b0e-9a8c-6f7f3d0f6a12"
+	errIDRegistrationOff   = "4d371c9a-3a0f-4c8b-9b8e-2f9c0a1d3e45"
+)
+
+// writeAPIError emits the Misskey error envelope.
+func writeAPIError(w http.ResponseWriter, e *APIError) {
+	body := map[string]any{
+		"message": e.Message,
+		"code":    e.Code,
+		"id":      e.ID,
+		"kind":    e.Kind,
+	}
+	if e.HasInfo {
+		body["info"] = e.Info
+	}
+	status := e.Status
+	if status == 0 {
+		status = http.StatusBadRequest
+	}
+	if status == http.StatusUnauthorized {
+		w.Header().Set("WWW-Authenticate", `Bearer realm="Misskey"`)
+	}
+	writeJSON(w, status, map[string]any{"error": body})
 }
 
-// handlePing answers POST|GET /api/ping with a body-echo envelope,
-// matching Misskey's ping endpoint shape.
-func (s *Server) handlePing(w http.ResponseWriter, r *http.Request) {
-	var body struct {
-		Pong any `json:"pong"`
+// invalidParamError reports a request that failed parameter validation.
+func invalidParamError(info any) *APIError {
+	return &APIError{
+		Message: "Invalid param.",
+		Code:    "INVALID_PARAM",
+		ID:      errIDInvalidParam,
+		Kind:    "client",
+		Info:    info,
+		HasInfo: true,
+		Status:  http.StatusBadRequest,
 	}
-	if r.Body != nil {
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil && err.Error() != "EOF" {
-			writeAPIError(w, http.StatusBadRequest, "INVALID_JSON",
-				"Request body is not valid JSON.", "a7df1a0d-1a86-4b8e-8c3e-000000000001")
-			return
-		}
-	}
-	writeJSON(w, http.StatusOK, map[string]any{"pong": body.Pong, "uptimeMs": time.Since(s.startedAt).Milliseconds()})
+}
+
+// notFoundHandler answers everything that did not match a route with a
+// Misskey-style JSON error instead of Go's default plain-text 404, so
+// API clients always see the documented error envelope.
+func notFoundHandler(w http.ResponseWriter, r *http.Request) {
+	writeAPIError(w, &APIError{
+		Message: fmt.Sprintf("No such endpoint: %s %s", r.Method, r.URL.Path),
+		Code:    "NO_SUCH_ENDPOINT",
+		ID:      errIDNoSuchEndpoint,
+		Kind:    "client",
+		Status:  http.StatusNotFound,
+	})
 }

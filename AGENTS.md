@@ -19,6 +19,8 @@ The intended product is a personal or very small-user federated social instance:
 
 - Keep research notes and source links in the repository so decisions remain auditable.
 - Prefer primary sources: official Misskey, Firefish, ActivityPub, and relevant standards documentation.
+- **The Misskey source tree is the authoritative API contract.** Before implementing an endpoint, read its `paramDef` and `res` schema in `packages/backend/src/server/api/endpoints/`, and the type definitions in `packages/misskey-js/src/api.types.ts`. Documents are secondary; source wins. A local shallow sparse clone is kept outside the repository for this purpose.
+- Read source to determine behavior and field names. Do not translate implementation code line by line: Misskey is AGPL-3.0-only, and a line-by-line port would make this project a derivative work. Data structures, enum values and field names are factual contracts and may be reproduced; expressions are to be rewritten in idiomatic Go.
 - Do not claim compatibility without identifying the concrete API, protocol behavior, or test evidence.
 - GitHub network access must use the user's proxy at `127.0.0.1:19823`.
 - Avoid reading or transmitting secrets, credentials, private repositories, or unpublished code.
