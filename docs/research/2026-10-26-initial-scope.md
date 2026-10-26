@@ -2,6 +2,9 @@
 
 - 记录日期：2026-10-26
 - 项目名：暂用 MilnFish，不是最终命名
+- 状态：文末五个待确认项已在同日的补充调研与架构设计中裁决，见
+  `2026-10-26-go-ecosystem-and-dependency-decisions.md` 第 5 节与
+  `../superpowers/specs/2026-10-26-milnfish-architecture-v0.md` 第 2 节
 
 ## 已确认
 
@@ -35,13 +38,13 @@
 - 首版不承诺朋友 Go 重构表格中的所有性能数值。
 - 首版不默认实现完整 Mastodon API；若需要，应单独列为兼容层范围。
 
-## 仍需确认的关键决定
+## 仍需确认的关键决定（已裁决，2026-10-26）
 
-1. 首版前端是否必须直接运行现有 Firefish 构建产物，还是允许新建 Firefish 风格前端。
-2. 是否把 Mastodon API/OAuth 兼容列入首版，而不只是 Misskey API/MiAuth。
-3. PostgreSQL 与 Redis 是否都必须作为正式部署依赖，还是允许单机低依赖模式。
-4. 首版是否需要迁移朋友私有 Go 重构的数据，还是从空实例开始。
-5. 是否需要 relay 支持；基础 ActivityPub 互联与 relay 是两个不同的工作量。
+1. 前端：自建 Firefish 风格前端，不运行 Firefish 构建产物。
+2. Mastodon API/OAuth 兼容层：首版不做 Misskey API 之外的 Mastodon 兼容；OAuth 2.0 PKCE 作为 Misskey 官方认证方式仍实现。
+3. Redis：不强制，首版零 Redis，队列与广播由 PostgreSQL 承载。
+4. 朋友私有 Go 重构的数据迁移：不做，空实例起步。
+5. ActivityPub relay：首版不做，列入后续路线。
 
 ## 研究判断
 
