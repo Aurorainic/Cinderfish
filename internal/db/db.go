@@ -174,6 +174,62 @@ CREATE TABLE events (
 );
 CREATE INDEX idx_events_recent ON events (created_at DESC);
 `,
+
+	// v2: account and authentication support for M2.
+	2: `
+ALTER TABLE users
+    ADD COLUMN username_lower TEXT NOT NULL DEFAULT '',
+    ADD COLUMN token TEXT,
+    ADD COLUMN is_suspended BOOLEAN NOT NULL DEFAULT FALSE;
+UPDATE users SET username_lower = lower(username) WHERE username_lower = '';
+CREATE UNIQUE INDEX idx_users_username_lower ON users (username_lower);
+CREATE UNIQUE INDEX idx_users_token ON users (token) WHERE token IS NOT NULL;
+
+ALTER TABLE user_profiles
+    ADD COLUMN email TEXT;
+
+-- Registration tickets back the invite-only registration mode.
+CREATE TABLE registration_tickets (
+    id         TEXT PRIMARY KEY,
+    code       TEXT NOT NULL UNIQUE,
+    used_by_id TEXT REFERENCES users (id) ON DELETE SET NULL,
+    used_at    TIMESTAMPTZ,
+    expires_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+ALTER TABLE access_tokens
+    ADD COLUMN token TEXT,
+    ADD COLUMN session TEXT,
+    ADD COLUMN name TEXT,
+    ADD COLUMN description TEXT,
+    ADD COLUMN icon_url TEXT,
+    ADD COLUMN last_used_at TIMESTAMPTZ;
+CREATE INDEX idx_access_tokens_user ON access_tokens (user_id);
+
+-- Login history, used by the signin flow and the admin panel.
+CREATE TABLE signins (
+    id         TEXT PRIMARY KEY,
+    user_id    TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    ip         TEXT,
+    success    BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_signins_user ON signins (user_id, created_at DESC);
+
+-- OAuth 2.0 authorization codes. Codes are single use; the row is
+-- deleted or marked used once redeemed.
+CREATE TABLE oauth_grant_codes (
+    code          TEXT PRIMARY KEY,
+    client_id     TEXT NOT NULL,
+    user_id       TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    redirect_uri  TEXT NOT NULL,
+    code_challenge TEXT NOT NULL,
+    scopes        JSONB NOT NULL DEFAULT '[]'::jsonb,
+    used          BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+`,
 }
 
 // Migrate applies pending migrations in order and returns the version

@@ -46,7 +46,7 @@ func main() {
 
 	srv := &http.Server{
 		Addr:              cfg.Addr(),
-		Handler:           httpapi.NewServer(cfg),
+		Handler:           httpapi.NewServerWithDB(cfg, pool),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 
