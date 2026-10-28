@@ -2,8 +2,8 @@
 
 - 最后更新：2026-10-28（M5 联邦完成）
 - 项目名 **Cinderfish**（2026-10-28 定名，Go module `github.com/Aurorainic/cinderfish`）
-- 仓库：当前目录 `/home/lainsaka/文档/MilnFish`，分支 `main`；远程 `origin`
-  仍为 `https://github.com/Aurorainic/MilnFish.git`（GitHub 仓库与本地目录改名待办）
+- 仓库：当前目录 `/home/lainsaka/文档/MilnFish`，分支 `main`；远程 `origin` 为
+  `https://github.com/Aurorainic/Cinderfish.git`（GitHub 仓库已更名，本地目录改名待办）
 
 ## 1. 一句话说明
 
