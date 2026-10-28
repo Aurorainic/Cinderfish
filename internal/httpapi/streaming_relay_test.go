@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -107,5 +108,47 @@ func TestStreamingCrossProcessRelayLargePayload(t *testing.T) {
 	}
 	if env.Body.Text != text {
 		t.Errorf("relayed text is %d bytes, want %d", len(env.Body.Text), len(text))
+	}
+}
+
+// TestStreamingRelayDoesNotLoop publishes on a bus that is also the
+// listener's bus, which is how a single process wires itself in main. A
+// relayed event must be delivered locally exactly once: re-relaying it
+// would feed the listener again and amplify forever.
+func TestStreamingRelayDoesNotLoop(t *testing.T) {
+	pool := testPool(t)
+
+	bus := streaming.NewBus()
+	bus.SetPublisher(streaming.NewPublisher(pool))
+
+	var (
+		mu    sync.Mutex
+		count int
+	)
+	bus.Subscribe(func(subject string, msg streaming.Message) {
+		if subject != "loop-check" {
+			return
+		}
+		mu.Lock()
+		count++
+		mu.Unlock()
+	})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() { _ = streaming.Listen(ctx, pool, bus, t.Logf) }()
+	time.Sleep(300 * time.Millisecond)
+
+	bus.Publish("loop-check", streaming.Message{Type: nil, Body: []byte(`{"ok":true}`)})
+
+	// A single event is allowed to arrive once. Give an amplification
+	// loop a full second to make itself obvious.
+	time.Sleep(time.Second)
+
+	mu.Lock()
+	got := count
+	mu.Unlock()
+	if got != 1 {
+		t.Fatalf("event delivered %d times, want 1", got)
 	}
 }

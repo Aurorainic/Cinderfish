@@ -17,6 +17,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -70,20 +71,32 @@ func NullMessage(typ string) Message {
 // Handler receives every published event.
 type Handler func(subject string, msg Message)
 
+// Relay forwards one event to the other processes of the instance.
+type Relay interface {
+	// Notify publishes the event, tagging it with the origin process so
+	// the sender does not receive its own event back.
+	Notify(ctx context.Context, origin, subject string, msg Message) error
+}
+
 // Bus fans events out to subscribers.
 //
 // Delivery is synchronous and must not block: subscribers hand events to
 // a per-connection queue, so a slow client never stalls a publisher.
 type Bus struct {
-	mu        sync.RWMutex
-	subs      map[int]Handler
-	next      int
-	publisher *Publisher
+	// id identifies this bus among the processes sharing the relay. It
+	// lets the listener recognise -- and drop -- the echo of an event
+	// this process published itself.
+	id string
+
+	mu    sync.RWMutex
+	subs  map[int]Handler
+	next  int
+	relay Relay
 }
 
 // NewBus returns an in-process event bus.
 func NewBus() *Bus {
-	return &Bus{subs: make(map[int]Handler)}
+	return &Bus{id: newID(), subs: make(map[int]Handler)}
 }
 
 // Subscribe registers a handler and returns a function that removes it.
@@ -116,38 +129,56 @@ func (b *Bus) SubscriberCount() int {
 // SetPublisher installs the cross-process relay. Publish calls it after
 // local delivery so other processes of the instance receive the event
 // too. A nil publisher (the default) keeps the bus single-process.
-func (b *Bus) SetPublisher(p *Publisher) {
+func (b *Bus) SetPublisher(r Relay) {
 	b.mu.Lock()
-	b.publisher = p
+	b.relay = r
 	b.mu.Unlock()
 }
 
-// Publish delivers a message to every local subscriber and, when a
-// publisher is installed, relays it to other processes.
+// Publish delivers a message to every local subscriber and, when a relay
+// is installed, forwards it to the other processes.
 func (b *Bus) Publish(subject string, msg Message) {
-	b.mu.RLock()
-	subs := make([]Handler, 0, len(b.subs))
-	for _, h := range b.subs {
-		subs = append(subs, h)
-	}
-	pub := b.publisher
-	b.mu.RUnlock()
-
+	subs, relay := b.snapshot()
 	for _, h := range subs {
 		h(subject, msg)
 	}
 
-	if pub != nil {
+	if relay != nil {
 		// Relay in the background: a slow database must never stall the
 		// HTTP handler that produced the event. A failure is logged: the
 		// event then stays visible only on this process, which must not
 		// happen quietly.
+		origin := b.id
 		go func() {
-			if err := pub.Notify(context.Background(), subject, msg); err != nil {
+			if err := relay.Notify(context.Background(), origin, subject, msg); err != nil {
 				log.Printf("streaming: relaying %s to other processes failed: %v", subject, err)
 			}
 		}()
 	}
+}
+
+// deliver publishes a message to local subscribers only.
+//
+// Listen uses it for events that arrived from another process: that
+// process already relayed the event, and relaying it again here would feed
+// the listener with its own echo, forever.
+func (b *Bus) deliver(subject string, msg Message) {
+	subs, _ := b.snapshot()
+	for _, h := range subs {
+		h(subject, msg)
+	}
+}
+
+// snapshot copies the subscriber list and the relay so the fanout runs
+// without holding the lock.
+func (b *Bus) snapshot() ([]Handler, Relay) {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	subs := make([]Handler, 0, len(b.subs))
+	for _, h := range b.subs {
+		subs = append(subs, h)
+	}
+	return subs, b.relay
 }
 
 // PublishTyped publishes an event whose body is value encoded as JSON.
@@ -243,6 +274,9 @@ type wireMessage struct {
 	Subject string  `json:"s"`
 	Type    *string `json:"t,omitempty"`
 	Body    string  `json:"b,omitempty"`
+	// Origin identifies the bus that published the event, so that bus can
+	// drop the echo of its own notification.
+	Origin string `json:"o,omitempty"`
 	// RelayID identifies the event a chunk belongs to.
 	RelayID string `json:"i,omitempty"`
 	// Index is the 0-based position of this chunk.
@@ -253,8 +287,8 @@ type wireMessage struct {
 }
 
 // Notify publishes one event for other processes.
-func (p *Publisher) Notify(ctx context.Context, subject string, msg Message) error {
-	payloads, err := wireMessages(subject, msg)
+func (p *Publisher) Notify(ctx context.Context, origin, subject string, msg Message) error {
+	payloads, err := wireMessages(origin, subject, msg)
 	if err != nil {
 		return err
 	}
@@ -280,8 +314,8 @@ func (p *Publisher) Notify(ctx context.Context, subject string, msg Message) err
 // carries it intact: one payload when the body fits, several when it does
 // not. It returns an error rather than a body-less placeholder when the
 // body is too large to relay at all.
-func wireMessages(subject string, msg Message) ([]wireMessage, error) {
-	w := wireMessage{Subject: subject, Type: msg.Type}
+func wireMessages(origin, subject string, msg Message) ([]wireMessage, error) {
+	w := wireMessage{Subject: subject, Type: msg.Type, Origin: origin}
 	if json.Valid(msg.Body) {
 		w.Body = string(msg.Body)
 	}
@@ -297,15 +331,13 @@ func wireMessages(subject string, msg Message) ([]wireMessage, error) {
 	if err != nil {
 		return nil, err
 	}
-	id, err := newRelayID()
-	if err != nil {
-		return nil, err
-	}
+	id := newID()
 	out := make([]wireMessage, len(chunks))
 	for i, chunk := range chunks {
 		out[i] = wireMessage{
 			Subject: subject,
 			Type:    msg.Type,
+			Origin:  origin,
 			RelayID: id,
 			Index:   i,
 			Total:   len(chunks),
@@ -336,13 +368,16 @@ func splitBody(body string) ([]string, error) {
 	return chunks, nil
 }
 
-// newRelayID returns a random identifier grouping one event's chunks.
-func newRelayID() (string, error) {
+// newID returns a random 8 byte identifier: the origin of a relayed event
+// or the grouping key of its chunks.
+func newID() string {
 	var b [8]byte
 	if _, err := rand.Read(b[:]); err != nil {
-		return "", err
+		// Only uniqueness matters here, and a timestamp still
+		// distinguishes two processes well enough.
+		return strconv.FormatInt(time.Now().UnixNano(), 16)
 	}
-	return hex.EncodeToString(b[:]), nil
+	return hex.EncodeToString(b[:])
 }
 
 // Listen subscribes to events published by other processes and feeds
@@ -403,11 +438,18 @@ func listenOnce(ctx context.Context, pool *pgxpool.Pool, bus *Bus, logf func(str
 			logf("streaming: malformed notification: %v", err)
 			continue
 		}
+		if w.Origin == bus.id {
+			// This process published the event and has already delivered
+			// it locally; the notification is its own echo.
+			continue
+		}
 		subject, msg, ready := pending.consume(w)
 		if !ready {
 			continue
 		}
-		bus.Publish(subject, msg)
+		// Local fanout only: the producing process is responsible for
+		// relaying, so relaying again here would loop without end.
+		bus.deliver(subject, msg)
 	}
 }
 

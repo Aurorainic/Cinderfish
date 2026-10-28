@@ -151,7 +151,7 @@ GET  /streaming                         （WebSocket 升级）
 5. **未实现的频道静默忽略**，与上游"构造器抛错但被消息队列吞掉"的可观测行为一致。
 6. **上限**：每连接 32 频道、1536 条 subNote（LRU 淘汰）、256 条发送队列（对应上游 8 MiB bufferedAmount 阈值；溢出时关闭 socket，读取循环随之退出并释放全部订阅）。心跳 60s ping / 120s 无 pong 断开。
 7. **事件**：`notesStream`（进程内 fanout 到所有时间线频道）、`mainStream:<userId>`（notification / mention / reply / renote / readAllNotifications）、`noteStream:<noteId>`（reacted / unreacted / deleted）。
-8. **跨进程**：`LISTEN/NOTIFY`（channel `milnfish_stream`）中继，为多进程部署预留；单进程下语义正确。NOTIFY payload 有 8000 字节硬上限，超出的事件体先 base64 再分片、接收端重组（单事件上限约 384 KiB 正文），不会退化成"只发 subject 的空唤醒"。
+8. **跨进程**：`LISTEN/NOTIFY`（channel `milnfish_stream`）中继，为多进程部署预留；单进程下语义正确。NOTIFY payload 有 8000 字节硬上限，超出的事件体先 base64 再分片、接收端重组（单事件上限约 384 KiB 正文），不会退化成"只发 subject 的空唤醒"。**转发规则**：只有产出事件的进程负责中继；监听器收到其他进程的事件后只做本地分发（`deliver`），并用事件里的 `origin` 丢弃自己发布的回声——否则同一个 bus 同时发布和监听会形成无限放大（实测一次事件 1 秒内投递上万次）。
 
 ### 9.1 M4 已知缺口（不是 bug，是后续里程碑的范围）
 

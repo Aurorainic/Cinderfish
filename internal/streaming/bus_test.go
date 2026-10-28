@@ -1,9 +1,11 @@
 package streaming
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -78,7 +80,7 @@ func TestWireMessagesChunkLargeBody(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	payloads, err := wireMessages("mainStream:alice", msg)
+	payloads, err := wireMessages("other-process", "mainStream:alice", msg)
 	if err != nil {
 		t.Fatalf("wireMessages: %v", err)
 	}
@@ -86,6 +88,9 @@ func TestWireMessagesChunkLargeBody(t *testing.T) {
 		t.Fatalf("payloads = %d, want the body split across several", len(payloads))
 	}
 	for i, p := range payloads {
+		if p.Origin != "other-process" {
+			t.Fatalf("payload %d origin = %q, want other-process", i, p.Origin)
+		}
 		encoded, err := json.Marshal(p)
 		if err != nil {
 			t.Fatalf("payload %d: %v", i, err)
@@ -130,7 +135,7 @@ func TestWireMessagesRejectsOversizedBody(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := wireMessages("mainStream:alice", msg); err == nil {
+	if _, err := wireMessages("other-process", "mainStream:alice", msg); err == nil {
 		t.Fatal("an unrelayable body must produce an error, not a body-less wakeup")
 	}
 }
@@ -191,5 +196,71 @@ func TestReassemblerDropsMalformedChunks(t *testing.T) {
 	}
 	if got := len(r.pending); got != 0 {
 		t.Errorf("pending assemblies = %d, want 0", got)
+	}
+}
+
+// countingRelay records relayed events instead of writing to PostgreSQL.
+type countingRelay struct {
+	mu   sync.Mutex
+	sent []relayedEvent
+}
+
+type relayedEvent struct {
+	origin  string
+	subject string
+	msg     Message
+}
+
+func (c *countingRelay) Notify(_ context.Context, origin, subject string, msg Message) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.sent = append(c.sent, relayedEvent{origin: origin, subject: subject, msg: msg})
+	return nil
+}
+
+func (c *countingRelay) events() []relayedEvent {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return append([]relayedEvent(nil), c.sent...)
+}
+
+// TestDeliverDoesNotRelay pins the property that keeps the relay from
+// feeding itself: events the listener receives are delivered locally and
+// never relayed again.
+func TestDeliverDoesNotRelay(t *testing.T) {
+	bus := NewBus()
+	relay := &countingRelay{}
+	bus.SetPublisher(relay)
+
+	var delivered int
+	bus.Subscribe(func(string, Message) { delivered++ })
+
+	bus.deliver("notesStream", Message{Body: json.RawMessage("null")})
+
+	if delivered != 1 {
+		t.Errorf("local deliveries = %d, want 1", delivered)
+	}
+	time.Sleep(50 * time.Millisecond) // the relay is asynchronous
+	if got := len(relay.events()); got != 0 {
+		t.Errorf("deliver relayed %d events, want 0", got)
+	}
+}
+
+// TestPublishRelaysOwnOriginOnce checks a published event is relayed once,
+// tagged with this bus, which is what lets the listener drop its echo.
+func TestPublishRelaysOwnOriginOnce(t *testing.T) {
+	bus := NewBus()
+	relay := &countingRelay{}
+	bus.SetPublisher(relay)
+
+	bus.Publish("notesStream", Message{Body: json.RawMessage("null")})
+
+	waitFor(t, "the event to be relayed", func() bool { return len(relay.events()) > 0 })
+	events := relay.events()
+	if len(events) != 1 {
+		t.Fatalf("relayed %d events, want 1", len(events))
+	}
+	if events[0].origin != bus.id {
+		t.Errorf("origin = %q, want this bus (%q)", events[0].origin, bus.id)
 	}
 }
