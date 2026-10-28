@@ -1,3 +1,5 @@
 # AGENT.md
 
-项目协作规则见 [`AGENTS.md`](./AGENTS.md)。本文件保留为用户要求的单数命名入口；后续以 `AGENTS.md` 为规范来源。
+项目协作规则的唯一来源是 [`AGENTS.md`](./AGENTS.md)。本文件只作为单数命名的入口存在，请勿在此维护内容。
+
+给接手者的完整说明见 [`docs/HANDOVER.md`](./docs/HANDOVER.md)。

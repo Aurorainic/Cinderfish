@@ -28,11 +28,13 @@ Go 单二进制的个人/极小规模联邦社交实例。后端契约是 **Miss
 `misskey-dev/misskey` 是 **AGPL-3.0-only**。用户已明确表示开源许可无所谓，因此：
 
 - **实现任何端点前，先读源码**：`packages/backend/src/server/api/endpoints/<name>.ts` 的 `paramDef`（参数 JSON Schema）和 `res`（响应 schema），再查 `packages/misskey-js/src/api.types.ts` 的类型定义。
-- 本地已备好浅克隆：`/tmp/refcheck/misskey`（不入库）。若被清理，用 `https_proxy=http://127.0.0.1:19823` 重新拉取：
+- 本地已备好浅克隆：`/tmp/refcheck/misskey`（不入库，**重启后会丢失**）。若被清理，用代理重建：
   ```bash
+  export https_proxy=http://127.0.0.1:19823 http_proxy=http://127.0.0.1:19823
   git clone --depth 1 --filter=blob:none --sparse https://github.com/misskey-dev/misskey.git /tmp/refcheck/misskey
   cd /tmp/refcheck/misskey && git sparse-checkout set packages/backend/src packages/misskey-js/src
   ```
+  后端源码全量约 11 MB；Streaming 实现在 `packages/backend/src/server/api/stream/`。
 - **文档是二手的，源码是一手的。** 实际已发现文档与源码有多处出入（`instanceUrl` vs `uri`、`ping` 语义、错误信封结构、`features` 键集等）。
 
 ### 3.2 关键上游细节（踩过的坑，别再踩）
@@ -76,6 +78,7 @@ Go 单二进制的个人/极小规模联邦社交实例。后端契约是 **Miss
   - 角色 `milnfish` / 密码 `milnfish`
 - **访问 GitHub 必须走代理** `127.0.0.1:19823`（http 与 socks5h 均可）
 - `dl.min.io` 被代理拦截，MinIO 二进制下不下来；S3 后端**尚未做真实服务端验证**（只验证了编译与接口）
+- S3 客户端用的是 `github.com/minio/minio-go/v7`，不是 AWS SDK——AWS SDK v2 的依赖树太大，走现有镜像下载极慢（6 分钟只拉了 2MB 后被中止）。minio-go 对 AWS S3、Cloudflare R2、Backblaze B2、MinIO 都通用。
 
 ## 6. 怎么跑
 
@@ -93,7 +96,7 @@ go build -o milnfish ./cmd/milnfish
 ./milnfish --config config.toml
 ```
 
-数据库迁移在启动时自动执行（不可变的版本化脚本，已应用版本不再改动，新功能一律追加新版本号）。
+数据库迁移在启动时自动执行（不可变的版本化脚本，已应用版本不再改动，新功能一律追加新版本号）。当前 schema 版本为 **3**。
 
 配置项可用 `MILNFISH_*` 环境变量覆盖，例如 `MILNFISH_PORT`、`MILNFISH_DOMAIN`、`MILNFISH_REGISTRATION_MODE`、`MILNFISH_FEDERATION_MODE`、`MILNFISH_MEDIA_BACKEND`、`MILNFISH_MEDIA_LOCAL_PATH`。
 
