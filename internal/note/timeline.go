@@ -208,3 +208,44 @@ SELECT id FROM notes WHERE created_at >= $1 AND deleted_at IS NULL ORDER BY id A
 	}
 	return id, nil
 }
+
+// UserNotes returns a user's publicly federable notes, newest first.
+//
+// This is the outbox query: public and home visibility only, local-only
+// notes excluded, and cursor-bounded the same way the timeline is so
+// peers see a stable order across pages.
+func (s *TimelineService) UserNotes(ctx context.Context, userID string, limit int, sinceID, untilID string) ([]*Note, error) {
+	if limit <= 0 || limit > 100 {
+		limit = 20
+	}
+	q := &queryBuilder{}
+	q.add("n.user_id = %s", userID)
+	q.add("n.user_host IS NULL")
+	q.add("n.deleted_at IS NULL", nil)
+	q.add("n.local_only = FALSE", nil)
+	q.add("n.visibility IN ('public','home')", nil)
+	if sinceID != "" {
+		q.add("n.id > %s", sinceID)
+	}
+	if untilID != "" {
+		q.add("n.id < %s", untilID)
+	}
+	query := noteSelect + " WHERE " + strings.Join(q.conds, " AND ") +
+		" ORDER BY n.id DESC LIMIT " + strconv.Itoa(limit)
+
+	rows, err := s.pool.Query(ctx, query, q.args...)
+	if err != nil {
+		return nil, fmt.Errorf("note: user notes query: %w", err)
+	}
+	defer rows.Close()
+
+	out := []*Note{}
+	for rows.Next() {
+		n, err := scanNote(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, n)
+	}
+	return out, rows.Err()
+}

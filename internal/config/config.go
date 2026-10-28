@@ -11,13 +11,25 @@ import (
 )
 
 type Config struct {
-	Host             string `toml:"host"`
-	Port             int    `toml:"port"`
-	Domain           string `toml:"domain"`
-	DatabaseURL      string `toml:"database_url"`
-	RegistrationMode string `toml:"registration_mode"`
-	FederationMode   string `toml:"federation_mode"`
-	Media            Media  `toml:"media"`
+	Host             string     `toml:"host"`
+	Port             int        `toml:"port"`
+	Domain           string     `toml:"domain"`
+	DatabaseURL      string     `toml:"database_url"`
+	RegistrationMode string     `toml:"registration_mode"`
+	FederationMode   string     `toml:"federation_mode"`
+	Federation       Federation `toml:"federation"`
+	Media            Media      `toml:"media"`
+}
+
+// Federation groups the ActivityPub settings.
+type Federation struct {
+	// PublicURL overrides the scheme://host derived from domain and
+	// port. Set it when the instance sits behind a reverse proxy.
+	PublicURL string `toml:"public_url"`
+
+	// AllowlistHosts seeds federation_allowlist on first start; after
+	// that the table is authoritative.
+	AllowlistHosts []string `toml:"allowlist_hosts"`
 }
 
 type Media struct {

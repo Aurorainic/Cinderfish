@@ -1,0 +1,529 @@
+package federation
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"log"
+	"strings"
+	"time"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+
+	"milnfish/internal/idgen"
+)
+
+// Store persists remote actors and notes. It is the only part of the
+// federation package that touches the database directly.
+type Store struct {
+	pool *pgxpool.Pool
+}
+
+// NewStore returns a store over pool.
+func NewStore(pool *pgxpool.Pool) *Store { return &Store{pool: pool} }
+
+// ErrRemoteNotFound is returned when a remote object cannot be resolved
+// or stored.
+var ErrRemoteNotFound = errors.New("federation: remote object not found")
+
+// RemoteUser is a remote actor as stored in the users table.
+type RemoteUser struct {
+	ID           string
+	Username     string
+	Host         string
+	URI          string
+	Inbox        string
+	SharedInbox  string
+	FollowersURI string
+	FeaturedURI  string
+	KeyID        string
+	PublicKeyPEM string
+	Name         string
+	Description  string
+	AvatarURL    string
+	BannerURL    string
+	IsLocked     bool
+	IsBot        bool
+	IsDeleted    bool
+	Fields       []ProfileField
+}
+
+// UpsertRemoteUser inserts or updates a remote actor keyed by its AP id.
+// Re-fetching an actor refreshes the mutable fields and leaves follow
+// relationships alone.
+func (s *Store) UpsertRemoteUser(ctx context.Context, u RemoteUser) (*RemoteUser, error) {
+	if u.URI == "" || u.Host == "" || u.Username == "" {
+		return nil, fmt.Errorf("federation: remote actor is missing uri, host or username")
+	}
+	usernameLower := strings.ToLower(u.Username)
+
+	var id string
+	err := s.pool.QueryRow(ctx, "SELECT id FROM users WHERE uri = $1", u.URI).Scan(&id)
+	switch {
+	case errors.Is(err, pgx.ErrNoRows):
+		id = idgen.New()
+		_, err = s.pool.Exec(ctx, `
+INSERT INTO users (id, username, username_lower, host, uri, inbox, shared_inbox,
+                   followers_uri, featured_uri, key_id, public_key_pem,
+                   is_locked, is_bot, is_deleted, last_fetched_at, created_at)
+VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,now(),now())
+		`, id, u.Username, usernameLower, u.Host, u.URI, u.Inbox, u.SharedInbox,
+			u.FollowersURI, u.FeaturedURI, u.KeyID, u.PublicKeyPEM,
+			u.IsLocked, u.IsBot, u.IsDeleted)
+		if err != nil {
+			return nil, fmt.Errorf("federation: insert remote user: %w", err)
+		}
+	case err != nil:
+		return nil, fmt.Errorf("federation: look up remote user: %w", err)
+	default:
+		_, err = s.pool.Exec(ctx, `
+UPDATE users SET inbox = $2, shared_inbox = $3, followers_uri = $4, featured_uri = $5,
+                 key_id = $6, public_key_pem = $7, is_locked = $8, is_bot = $9,
+                 is_deleted = $10, last_fetched_at = now()
+WHERE id = $1
+		`, id, u.Inbox, u.SharedInbox, u.FollowersURI, u.FeaturedURI,
+			u.KeyID, u.PublicKeyPEM, u.IsLocked, u.IsBot, u.IsDeleted)
+		if err != nil {
+			return nil, fmt.Errorf("federation: update remote user: %w", err)
+		}
+	}
+
+	fields := marshalFields(u.Fields)
+	if _, err := s.pool.Exec(ctx, `
+INSERT INTO user_profiles (user_id, name, description, avatar_url, banner_url, fields)
+VALUES ($1,$2,$3,$4,$5,$6)
+ON CONFLICT (user_id) DO UPDATE SET
+    name = EXCLUDED.name, description = EXCLUDED.description,
+    avatar_url = EXCLUDED.avatar_url, banner_url = EXCLUDED.banner_url,
+    fields = EXCLUDED.fields
+	`, id, nullIfEmpty(u.Name), nullIfEmpty(u.Description), nullIfEmpty(u.AvatarURL), nullIfEmpty(u.BannerURL), fields); err != nil {
+		return nil, fmt.Errorf("federation: upsert remote profile: %w", err)
+	}
+
+	u.ID = id
+	return &u, nil
+}
+
+// UserByURI loads a remote user by its AP id.
+func (s *Store) UserByURI(ctx context.Context, uri string) (*RemoteUser, error) {
+	u := &RemoteUser{}
+	var name, desc, avatar, banner *string
+	err := s.pool.QueryRow(ctx, `
+SELECT u.id, u.username, COALESCE(u.host, ''), u.uri, COALESCE(u.inbox, ''),
+       COALESCE(u.shared_inbox, ''), COALESCE(u.followers_uri, ''),
+       COALESCE(u.featured_uri, ''), COALESCE(u.key_id, ''),
+       COALESCE(u.public_key_pem, ''), p.name, p.description, p.avatar_url, p.banner_url,
+       u.is_locked, u.is_bot, u.is_deleted
+FROM users u LEFT JOIN user_profiles p ON p.user_id = u.id
+WHERE u.uri = $1
+	`, uri).Scan(&u.ID, &u.Username, &u.Host, &u.URI, &u.Inbox, &u.SharedInbox,
+		&u.FollowersURI, &u.FeaturedURI, &u.KeyID, &u.PublicKeyPEM,
+		&name, &desc, &avatar, &banner, &u.IsLocked, &u.IsBot, &u.IsDeleted)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, ErrRemoteNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("federation: load remote user: %w", err)
+	}
+	u.Name = deref(name)
+	u.Description = deref(desc)
+	u.AvatarURL = deref(avatar)
+	u.BannerURL = deref(banner)
+	return u, nil
+}
+
+// LocalUserByID resolves a local user id to the data the inbox needs.
+func (s *Store) LocalUserByID(ctx context.Context, id string) (*localActor, error) {
+	var locked bool
+	err := s.pool.QueryRow(ctx, "SELECT is_locked FROM users WHERE id = $1 AND host IS NULL", id).Scan(&locked)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, ErrRemoteNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("federation: load local user: %w", err)
+	}
+	return &localActor{id: id, locked: locked}, nil
+}
+
+// LocalUserOfAPID maps a note id or actor id belonging to this instance
+// to the local user that owns it.
+func (s *Store) LocalUserOfAPID(ctx context.Context, apID, baseURL string) (string, error) {
+	if rest, ok := strings.CutPrefix(apID, baseURL+"/notes/"); ok {
+		if id := lastPathSegment(rest); id != "" {
+			var userID string
+			if err := s.pool.QueryRow(ctx, "SELECT user_id FROM notes WHERE id = $1 AND user_host IS NULL", id).Scan(&userID); err == nil {
+				return userID, nil
+			}
+		}
+	}
+	if rest, ok := strings.CutPrefix(apID, baseURL+"/users/"); ok {
+		if id := lastPathSegment(rest); id != "" {
+			var n int
+			if err := s.pool.QueryRow(ctx, "SELECT 1 FROM users WHERE id = $1 AND host IS NULL", id).Scan(&n); err == nil {
+				return id, nil
+			}
+		}
+	}
+	return "", ErrRemoteNotFound
+}
+
+// NoteOwnerByAPID returns the local owner of a note addressed by its AP
+// id, plus the note author's host (nil for a local note).
+func (s *Store) NoteOwnerByAPID(ctx context.Context, apID string) (string, *string, error) {
+	var userID string
+	var host *string
+	err := s.pool.QueryRow(ctx, "SELECT user_id, user_host FROM notes WHERE ap_id = $1 OR uri = $1", apID).Scan(&userID, &host)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", nil, ErrRemoteNotFound
+	}
+	if err != nil {
+		return "", nil, fmt.Errorf("federation: note owner: %w", err)
+	}
+	return userID, host, nil
+}
+
+// MarkUserDeleted flags a remote actor deleted after an inbound Delete.
+func (s *Store) MarkUserDeleted(ctx context.Context, id string) error {
+	if _, err := s.pool.Exec(ctx, "UPDATE users SET is_deleted = TRUE WHERE id = $1", id); err != nil {
+		return fmt.Errorf("federation: mark user deleted: %w", err)
+	}
+	return nil
+}
+
+// RecordBlock stores an inbound Block and removes any follow between the
+// two users in either direction.
+func (s *Store) RecordBlock(ctx context.Context, blockerID, blockeeID string) error {
+	if _, err := s.pool.Exec(ctx, `
+INSERT INTO blocks (id, blocker_id, blockee_id) VALUES ($1,$2,$3)
+ON CONFLICT (blocker_id, blockee_id) DO NOTHING
+	`, idgen.New(), blockerID, blockeeID); err != nil {
+		return fmt.Errorf("federation: record block: %w", err)
+	}
+	if _, err := s.pool.Exec(ctx, `
+DELETE FROM followings WHERE (follower_id = $1 AND followee_id = $2)
+                          OR (follower_id = $2 AND followee_id = $1)
+	`, blockerID, blockeeID); err != nil {
+		return fmt.Errorf("federation: remove follows after block: %w", err)
+	}
+	return nil
+}
+
+// RecordActivity appends an inbound or outbound activity to the audit
+// table.
+func (s *Store) RecordActivity(ctx context.Context, direction, actorURI string, activity Object) error {
+	body, err := json.Marshal(activity)
+	if err != nil {
+		return fmt.Errorf("federation: encode activity: %w", err)
+	}
+	if _, err := s.pool.Exec(ctx, `
+INSERT INTO ap_activities (id, direction, activity, actor_uri) VALUES ($1,$2,$3,$4)
+	`, idgen.New(), direction, body, nullIfEmpty(actorURI)); err != nil {
+		return fmt.Errorf("federation: record activity: %w", err)
+	}
+	return nil
+}
+
+// LocalKey returns a local user's stored keypair.
+func (s *Store) LocalKey(ctx context.Context, userID string) (publicPEM, privatePEM string, err error) {
+	err = s.pool.QueryRow(ctx, `
+SELECT public_key_pem, private_key_pem FROM ap_keys WHERE user_id = $1
+	`, userID).Scan(&publicPEM, &privatePEM)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", "", fmt.Errorf("federation: no key pair for user %s", userID)
+	}
+	if err != nil {
+		return "", "", fmt.Errorf("federation: load key pair: %w", err)
+	}
+	return publicPEM, privatePEM, nil
+}
+
+// EnsureLocalKey creates and stores a keypair for a local user that has
+// none and returns whatever ends up stored.
+func (s *Store) EnsureLocalKey(ctx context.Context, userID string) (*Keypair, error) {
+	if pub, priv, err := s.LocalKey(ctx, userID); err == nil {
+		return &Keypair{PublicPEM: pub, PrivatePEM: priv}, nil
+	}
+	kp, err := GenerateKeypair()
+	if err != nil {
+		return nil, err
+	}
+	if _, err := s.pool.Exec(ctx, `
+INSERT INTO ap_keys (user_id, public_key_pem, private_key_pem) VALUES ($1,$2,$3)
+ON CONFLICT (user_id) DO NOTHING
+	`, userID, kp.PublicPEM, kp.PrivatePEM); err != nil {
+		return nil, fmt.Errorf("federation: store key pair: %w", err)
+	}
+	if pub, priv, err := s.LocalKey(ctx, userID); err == nil {
+		return &Keypair{PublicPEM: pub, PrivatePEM: priv}, nil
+	}
+	return kp, nil
+}
+
+// NoteExists reports whether a note with this AP id is already stored.
+func (s *Store) NoteExists(ctx context.Context, apID string) (bool, error) {
+	var n int
+	err := s.pool.QueryRow(ctx, "SELECT 1 FROM notes WHERE ap_id = $1 OR uri = $1 LIMIT 1", apID).Scan(&n)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("federation: check note: %w", err)
+	}
+	return true, nil
+}
+
+// RemoteNote is a note received over ActivityPub.
+type RemoteNote struct {
+	APID        string
+	ActivityURI string
+	UserID      string
+	UserHost    string
+	Visibility  string
+	Text        string
+	CW          string
+	ReplyAPID   string
+	QuoteAPID   string
+	Tags        []string
+	Sensitive   bool
+	CreatedAt   time.Time
+}
+
+// InsertRemoteNote stores a received note. Reply and renote targets are
+// resolved to local note ids when they are already known.
+func (s *Store) InsertRemoteNote(ctx context.Context, n RemoteNote) (string, error) {
+	id := idgen.New()
+
+	var replyID, renoteID, renoteUserID *string
+	if n.ReplyAPID != "" {
+		var rid string
+		if err := s.pool.QueryRow(ctx, "SELECT id FROM notes WHERE ap_id = $1 OR uri = $1", n.ReplyAPID).Scan(&rid); err == nil {
+			replyID = &rid
+		}
+	}
+	if n.QuoteAPID != "" {
+		var rid, ruid string
+		if err := s.pool.QueryRow(ctx, "SELECT id, user_id FROM notes WHERE ap_id = $1 OR uri = $1", n.QuoteAPID).Scan(&rid, &ruid); err == nil {
+			renoteID, renoteUserID = &rid, &ruid
+		}
+	}
+
+	tags := n.Tags
+	if tags == nil {
+		tags = []string{}
+	}
+
+	_, err := s.pool.Exec(ctx, `
+INSERT INTO notes (id, user_id, user_host, visibility, local_only, cw, text,
+                   reply_id, renote_id, renote_user_id, ap_id, activity_uri,
+                   tags, mentions, emojis, is_sensitive, created_at)
+VALUES ($1,$2,$3,$4,FALSE,$5,$6,$7,$8,$9,$10,$11,$12,'[]'::jsonb,'[]'::jsonb,$13,$14)
+	`, id, n.UserID, n.UserHost, n.Visibility, nullIfEmpty(n.CW), nullIfEmpty(n.Text),
+		replyID, renoteID, renoteUserID, n.APID, n.ActivityURI,
+		marshalStrings(tags), n.Sensitive, n.CreatedAt)
+	if err != nil {
+		return "", fmt.Errorf("federation: insert remote note: %w", err)
+	}
+	return id, nil
+}
+
+// FollowRequest records an inbound Follow from a remote actor to a local
+// user who manually approves followers.
+func (s *Store) FollowRequest(ctx context.Context, uri, followerID, followeeID string) error {
+	if _, err := s.pool.Exec(ctx, `
+INSERT INTO follow_requests (id, follower_id, followee_id, uri)
+VALUES ($1,$2,$3,$4) ON CONFLICT (follower_id, followee_id) DO NOTHING
+	`, idgen.New(), followerID, followeeID, nullIfEmpty(uri)); err != nil {
+		return fmt.Errorf("federation: record follow request: %w", err)
+	}
+	return nil
+}
+
+// Follow records an accepted Follow.
+func (s *Store) Follow(ctx context.Context, uri, followerID, followeeID string) error {
+	if _, err := s.pool.Exec(ctx, `
+INSERT INTO followings (id, follower_id, followee_id, uri, created_via)
+VALUES ($1,$2,$3,$4,'activitypub') ON CONFLICT (follower_id, followee_id) DO NOTHING
+	`, idgen.New(), followerID, followeeID, nullIfEmpty(uri)); err != nil {
+		return fmt.Errorf("federation: record follow: %w", err)
+	}
+	_, _ = s.pool.Exec(ctx, "UPDATE users SET followers_count = (SELECT count(*) FROM followings WHERE followee_id = $1) WHERE id = $1", followeeID)
+	_, _ = s.pool.Exec(ctx, "UPDATE users SET following_count = (SELECT count(*) FROM followings WHERE follower_id = $1) WHERE id = $1", followerID)
+	return nil
+}
+
+// Unfollow removes a follow and any pending request.
+func (s *Store) Unfollow(ctx context.Context, followerID, followeeID string) error {
+	if _, err := s.pool.Exec(ctx, `
+DELETE FROM followings WHERE follower_id = $1 AND followee_id = $2
+	`, followerID, followeeID); err != nil {
+		return fmt.Errorf("federation: unfollow: %w", err)
+	}
+	_, _ = s.pool.Exec(ctx, "DELETE FROM follow_requests WHERE follower_id = $1 AND followee_id = $2", followerID, followeeID)
+	return nil
+}
+
+// HasFollowing reports whether follower follows followee.
+func (s *Store) HasFollowing(ctx context.Context, followerID, followeeID string) bool {
+	var n int
+	err := s.pool.QueryRow(ctx, `
+SELECT count(*) FROM followings WHERE follower_id = $1 AND followee_id = $2
+	`, followerID, followeeID).Scan(&n)
+	return err == nil && n > 0
+}
+
+// DeleteNoteByAPID soft deletes a received note.
+func (s *Store) DeleteNoteByAPID(ctx context.Context, apID, actorUserID string) error {
+	ct, err := s.pool.Exec(ctx, `
+UPDATE notes SET deleted_at = now() WHERE (ap_id = $1 OR uri = $1) AND user_id = $2 AND deleted_at IS NULL
+	`, apID, actorUserID)
+	if err != nil {
+		return fmt.Errorf("federation: delete remote note: %w", err)
+	}
+	if ct.RowsAffected() == 0 {
+		return ErrRemoteNotFound
+	}
+	return nil
+}
+
+// React stores a reaction from a remote actor.
+func (s *Store) React(ctx context.Context, noteAPID, userID, reaction string) error {
+	var noteID string
+	err := s.pool.QueryRow(ctx, "SELECT id FROM notes WHERE ap_id = $1 OR uri = $1", noteAPID).Scan(&noteID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ErrRemoteNotFound
+	}
+	if err != nil {
+		return fmt.Errorf("federation: find note: %w", err)
+	}
+	if _, err := s.pool.Exec(ctx, `
+INSERT INTO note_reactions (id, note_id, user_id, emoji, host)
+VALUES ($1,$2,$3,$4,(SELECT host FROM users WHERE id = $3))
+ON CONFLICT (note_id, user_id, emoji) DO NOTHING
+	`, idgen.New(), noteID, userID, reaction); err != nil {
+		return fmt.Errorf("federation: store reaction: %w", err)
+	}
+	return nil
+}
+
+// Unreact removes a reaction from a remote actor.
+func (s *Store) Unreact(ctx context.Context, noteAPID, userID string) error {
+	_, err := s.pool.Exec(ctx, `
+DELETE FROM note_reactions WHERE user_id = $2
+  AND note_id = (SELECT id FROM notes WHERE ap_id = $1 OR uri = $1)
+	`, noteAPID, userID)
+	if err != nil {
+		return fmt.Errorf("federation: remove reaction: %w", err)
+	}
+	return nil
+}
+
+// Notification creates a notification row for a remote actor's action.
+func (s *Store) Notification(ctx context.Context, recipientID, typ, notifierID, noteID string) (string, error) {
+	id := idgen.New()
+	_, err := s.pool.Exec(ctx, `
+INSERT INTO notifications (id, recipient_id, type, notifier_id, note_id) VALUES ($1,$2,$3,$4,$5)
+	`, id, recipientID, typ, notifierID, nullIfEmpty(noteID))
+	if err != nil {
+		return "", fmt.Errorf("federation: create notification: %w", err)
+	}
+	return id, nil
+}
+
+// NoteOwner returns the local user id that owns a note and its host.
+func (s *Store) NoteOwner(ctx context.Context, noteID string) (userID string, userHost *string, err error) {
+	err = s.pool.QueryRow(ctx, "SELECT user_id, user_host FROM notes WHERE id = $1", noteID).Scan(&userID, &userHost)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", nil, ErrRemoteNotFound
+	}
+	if err != nil {
+		return "", nil, fmt.Errorf("federation: note owner: %w", err)
+	}
+	return userID, userHost, nil
+}
+
+// logf is the package's diagnostic hook; tests may replace it.
+var logf = log.Printf
+
+func nullIfEmpty(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
+}
+
+func deref(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
+}
+
+func marshalFields(f []ProfileField) []byte {
+	if f == nil {
+		f = []ProfileField{}
+	}
+	b, _ := json.Marshal(f)
+	return b
+}
+
+func marshalStrings(s []string) []byte {
+	b, _ := json.Marshal(s)
+	return b
+}
+
+// FollowCount returns how many followers or followees a user has.
+func (s *Store) FollowCount(ctx context.Context, userID string, followers bool) (int, error) {
+	var n int
+	var err error
+	if followers {
+		err = s.pool.QueryRow(ctx, "SELECT count(*) FROM followings WHERE followee_id = $1", userID).Scan(&n)
+	} else {
+		err = s.pool.QueryRow(ctx, "SELECT count(*) FROM followings WHERE follower_id = $1", userID).Scan(&n)
+	}
+	if err != nil {
+		return 0, fmt.Errorf("federation: count follows: %w", err)
+	}
+	return n, nil
+}
+
+// FollowRefs returns the actor URLs of a user's followers or followees,
+// newest follow first, at most limit, skipping anything at or after
+// cursor.
+func (s *Store) FollowRefs(ctx context.Context, userID string, followers bool, limit int, cursor string) ([]string, error) {
+	if limit <= 0 {
+		limit = 10
+	}
+	var rows pgx.Rows
+	var err error
+	if followers {
+		rows, err = s.pool.Query(ctx, `
+SELECT COALESCE(u.uri, ''), u.id, f.id FROM followings f JOIN users u ON u.id = f.follower_id
+WHERE f.followee_id = $1 AND ($2 = '' OR f.id < $2)
+ORDER BY f.id DESC LIMIT $3
+		`, userID, cursor, limit)
+	} else {
+		rows, err = s.pool.Query(ctx, `
+SELECT COALESCE(u.uri, ''), u.id, f.id FROM followings f JOIN users u ON u.id = f.followee_id
+WHERE f.follower_id = $1 AND ($2 = '' OR f.id < $2)
+ORDER BY f.id DESC LIMIT $3
+		`, userID, cursor, limit)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("federation: list follows: %w", err)
+	}
+	defer rows.Close()
+	var out []string
+	for rows.Next() {
+		var uri, id, followID string
+		if err := rows.Scan(&uri, &id, &followID); err != nil {
+			return nil, err
+		}
+		if uri == "" {
+			uri = "" + id
+		}
+		out = append(out, uri)
+	}
+	return out, rows.Err()
+}

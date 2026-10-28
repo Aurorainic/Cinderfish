@@ -68,6 +68,15 @@ func main() {
 		}
 	}()
 
+	// ActivityPub: policy, renderer, remote store, inbox and the delivery
+	// worker. The worker runs in this process; the queue is a table, so a
+	// crash resumes pending deliveries on the next start.
+	api.AttachFederation()
+	api.StartFederationWorkers(notifyCtx)
+	if mode := cfg.FederationMode; mode == "none" {
+		log.Printf("milnfish: federation is off; AP routes answer 403")
+	}
+
 	srv := &http.Server{
 		Addr:              cfg.Addr(),
 		Handler:           api,

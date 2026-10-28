@@ -14,6 +14,7 @@ import (
 
 	"milnfish/internal/account"
 	"milnfish/internal/config"
+	"milnfish/internal/federation"
 	"milnfish/internal/media"
 	"milnfish/internal/note"
 	"milnfish/internal/streaming"
@@ -42,6 +43,15 @@ type Server struct {
 	// server is attached to a running listener.
 	streamBus *streaming.Bus
 	stream    *streaming.Server
+
+	// ActivityPub. federationPolicy, fedRenderer and federationStore are
+	// populated by AttachFederation; the greenlet handlers check for nil.
+	federationPolicy  *federation.Policy
+	fedRenderer       *federation.Renderer
+	federationStore   *federation.Store
+	federationClient  *federation.Client
+	federationInbox   *federation.Inbox
+	federationDeliver *federation.Deliverer
 }
 
 // NewServer returns a Server with no database backing. It serves the
@@ -108,6 +118,29 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("POST /api/drive/files/show", s.handleDriveFilesShow)
 	s.mux.HandleFunc("POST /api/drive/files/delete", s.handleDriveFilesDelete)
 	s.mux.HandleFunc("GET /media/{path...}", s.handleMediaServe)
+
+	s.mux.HandleFunc("GET /.well-known/webfinger", s.handleWebFinger)
+	s.mux.HandleFunc("GET /.well-known/host-meta", s.handleHostMetaXML)
+	s.mux.HandleFunc("GET /.well-known/host-meta.json", s.handleHostMeta)
+	s.mux.HandleFunc("GET /.well-known/nodeinfo", s.handleNodeInfo)
+	s.mux.HandleFunc("GET /nodeinfo/2.1", s.handleNodeInfo21)
+	s.mux.HandleFunc("GET /nodeinfo/2.0", s.handleNodeInfo20)
+	s.mux.HandleFunc("OPTIONS /.well-known/", s.handleWellKnownOptions)
+
+	s.mux.HandleFunc("POST /inbox", s.handleInbox)
+	s.mux.HandleFunc("GET /users/{id}", s.handleActor)
+	s.mux.HandleFunc("GET /users/{id}/inbox", s.handleUserInbox)
+	s.mux.HandleFunc("POST /users/{id}/inbox", s.handleInbox)
+	s.mux.HandleFunc("GET /users/{id}/publickey", s.handlePublicKey)
+	s.mux.HandleFunc("GET /users/{id}/outbox", s.handleUserOutbox)
+	s.mux.HandleFunc("GET /users/{id}/followers", s.handleUserFollowers)
+	s.mux.HandleFunc("GET /users/{id}/following", s.handleUserFollowing)
+	s.mux.HandleFunc("GET /users/{id}/collections/featured", s.handleUserFeatured)
+	// Go patterns require a wildcard to start a path segment, so the
+	// @handle route is matched as /{acct} and filtered in the handler.
+	s.mux.HandleFunc("GET /{acct}", s.handleActorByAcct)
+	s.mux.HandleFunc("GET /notes/{id}", s.handleNote)
+	s.mux.HandleFunc("GET /notes/{id}/activity", s.handleNoteActivity)
 
 	s.mux.HandleFunc("GET /streaming", s.handleStreaming)
 
