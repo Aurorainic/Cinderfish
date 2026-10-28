@@ -14,6 +14,8 @@ import (
 
 	"milnfish/internal/account"
 	"milnfish/internal/config"
+	"milnfish/internal/media"
+	"milnfish/internal/note"
 )
 
 // Server holds dependencies shared by all handlers.
@@ -25,6 +27,14 @@ type Server struct {
 	pool     *pgxpool.Pool
 	accounts *account.Service
 	tokens   *account.TokenService
+
+	notes         *note.Service
+	timeline      *note.TimelineService
+	noteReactions *note.ReactionService
+	notifications *note.NotificationService
+
+	storage media.Storage
+	drive   *media.DriveService
 }
 
 // NewServer returns a Server with no database backing. It serves the
@@ -42,7 +52,19 @@ func NewServerWithDB(cfg *config.Config, pool *pgxpool.Pool) *Server {
 	s.pool = pool
 	s.accounts = account.NewService(pool)
 	s.tokens = account.NewTokenService(pool)
+	s.notes = note.NewService(pool)
+	s.timeline = note.NewTimelineService(pool)
+	s.noteReactions = note.NewReactionService(pool)
+	s.notifications = note.NewNotificationService(pool)
 	return s
+}
+
+// SetStorage attaches the media backend and the drive service.
+func (s *Server) SetStorage(storage media.Storage) {
+	s.storage = storage
+	if s.pool != nil {
+		s.drive = media.NewDriveService(s.pool, storage)
+	}
 }
 
 func (s *Server) registerRoutes() {
@@ -60,6 +82,25 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("GET /.well-known/oauth-authorization-server", s.handleOAuthMetadata)
 	s.mux.HandleFunc("GET /oauth/authorize", s.handleOAuthAuthorize)
 	s.mux.HandleFunc("POST /oauth/token", s.handleOAuthToken)
+
+	s.mux.HandleFunc("POST /api/notes/create", s.handleNotesCreate)
+	s.mux.HandleFunc("POST /api/notes/show", s.handleNotesShow)
+	s.mux.HandleFunc("POST /api/notes/delete", s.handleNotesDelete)
+	s.mux.HandleFunc("POST /api/notes/reactions/create", s.handleNotesReactionsCreate)
+	s.mux.HandleFunc("POST /api/notes/reactions/delete", s.handleNotesReactionsDelete)
+	s.mux.HandleFunc("POST /api/notes/local-timeline", s.handleLocalTimeline)
+	s.mux.HandleFunc("POST /api/notes/hybrid-timeline", s.handleHybridTimeline)
+	s.mux.HandleFunc("POST /api/notes/global-timeline", s.handleGlobalTimeline)
+	s.mux.HandleFunc("POST /api/notes/timeline", s.handleHomeTimeline)
+
+	s.mux.HandleFunc("POST /api/notifications", s.handleNotifications)
+	s.mux.HandleFunc("POST /api/notifications/mark-all-as-read", s.handleNotificationsMarkAllAsRead)
+
+	s.mux.HandleFunc("POST /api/drive/files/create", s.handleDriveFilesCreate)
+	s.mux.HandleFunc("POST /api/drive/files", s.handleDriveFilesList)
+	s.mux.HandleFunc("POST /api/drive/files/show", s.handleDriveFilesShow)
+	s.mux.HandleFunc("POST /api/drive/files/delete", s.handleDriveFilesDelete)
+	s.mux.HandleFunc("GET /media/{path...}", s.handleMediaServe)
 
 	s.mux.HandleFunc("/", notFoundHandler)
 }

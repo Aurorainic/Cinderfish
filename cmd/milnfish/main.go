@@ -17,6 +17,7 @@ import (
 	"milnfish/internal/config"
 	"milnfish/internal/db"
 	"milnfish/internal/httpapi"
+	"milnfish/internal/media"
 )
 
 func main() {
@@ -50,6 +51,14 @@ func main() {
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 
+	// Media storage: local filesystem or an S3 compatible object store.
+	storage, err := openStorage(ctx, cfg)
+	if err != nil {
+		log.Fatalf("milnfish: storage: %v", err)
+	}
+	srv.Handler.(*httpapi.Server).SetStorage(storage)
+	log.Printf("milnfish: media backend is %s", storage.Backend())
+
 	errCh := make(chan error, 1)
 	go func() {
 		log.Printf("milnfish: listening on %s (domain %s, federation %s, registration %s)",
@@ -79,4 +88,22 @@ func openDB(ctx context.Context, cfg *config.Config) (*pgxpool.Pool, error) {
 	}
 	poolCfg.MaxConns = 10
 	return pgxpool.NewWithConfig(ctx, poolCfg)
+}
+
+// openStorage builds the media backend named by the configuration.
+func openStorage(ctx context.Context, cfg *config.Config) (media.Storage, error) {
+	switch cfg.Media.Backend {
+	case "s3":
+		return media.NewS3Storage(media.S3Options{
+			Endpoint:      cfg.Media.S3.Endpoint,
+			Bucket:        cfg.Media.S3.Bucket,
+			Region:        cfg.Media.S3.Region,
+			AccessKey:     cfg.Media.S3.AccessKey,
+			SecretKey:     cfg.Media.S3.SecretKey,
+			UseSSL:        cfg.Media.S3.UseSSL,
+			PublicBaseURL: cfg.Media.S3.PublicBaseURL,
+		})
+	default:
+		return media.NewLocalStorage(cfg.Media.LocalPath, "/media")
+	}
 }

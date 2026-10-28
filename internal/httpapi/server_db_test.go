@@ -19,6 +19,7 @@ import (
 	"milnfish/internal/config"
 	"milnfish/internal/db"
 	"milnfish/internal/httpapi"
+	"milnfish/internal/media"
 )
 
 func testPool(t *testing.T) *pgxpool.Pool {
@@ -51,14 +52,55 @@ func newTestServer(t *testing.T, mode string) *httptest.Server {
 		RegistrationMode: mode, FederationMode: "public",
 		Media: config.Media{Backend: "local"},
 	}
-	ts := httptest.NewServer(httpapi.NewServerWithDB(cfg, pool))
+	srv := httpapi.NewServerWithDB(cfg, pool)
+	storage, err := media.NewLocalStorage(t.TempDir(), "/media")
+	if err != nil {
+		t.Fatalf("local storage: %v", err)
+	}
+	srv.SetStorage(storage)
+
+	ts := httptest.NewServer(srv)
 	t.Cleanup(ts.Close)
 	return ts
 }
 
 func post(t *testing.T, ts *httptest.Server, path string, body any) (*http.Response, map[string]any) {
 	t.Helper()
-	return postWithType(t, ts, path, body, "application/json")
+	resp, decoded := postRaw(t, ts, path, body)
+	out, _ := decoded.(map[string]any)
+	return resp, out
+}
+
+// postRaw posts a JSON body and decodes the response into a generic
+// value, so tests can assert on array responses too.
+func postRaw(t *testing.T, ts *httptest.Server, path string, body any) (*http.Response, any) {
+	t.Helper()
+	var buf bytes.Buffer
+	switch v := body.(type) {
+	case string:
+		buf.WriteString(v)
+	case nil:
+	default:
+		if err := json.NewEncoder(&buf).Encode(v); err != nil {
+			t.Fatalf("encode body: %v", err)
+		}
+	}
+	req, err := http.NewRequest(http.MethodPost, ts.URL+path, &buf)
+	if err != nil {
+		t.Fatalf("new request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := ts.Client().Do(req)
+	if err != nil {
+		t.Fatalf("do request: %v", err)
+	}
+	t.Cleanup(func() { resp.Body.Close() })
+
+	var decoded any
+	if err := json.NewDecoder(resp.Body).Decode(&decoded); err != nil {
+		t.Fatalf("decode %s response: %v", path, err)
+	}
+	return resp, decoded
 }
 
 func postWithType(t *testing.T, ts *httptest.Server, path string, body any, contentType string) (*http.Response, map[string]any) {

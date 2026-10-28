@@ -230,6 +230,58 @@ CREATE TABLE oauth_grant_codes (
     created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 `,
+
+	// v3: notes, reactions and notifications.
+	3: `
+-- notes.user_host marks the origin host of the note's author; it is
+-- NULL for local notes and drives the local timeline filter.
+ALTER TABLE notes
+    ADD COLUMN user_host TEXT,
+    ADD COLUMN reply_user_id TEXT REFERENCES users (id) ON DELETE SET NULL,
+    ADD COLUMN renote_user_host TEXT,
+    ADD COLUMN name TEXT,
+    ADD COLUMN url TEXT,
+    ADD COLUMN renote_count INT NOT NULL DEFAULT 0,
+    ADD COLUMN replies_count INT NOT NULL DEFAULT 0,
+    ADD COLUMN clipped_count INT NOT NULL DEFAULT 0,
+    ADD COLUMN is_sensitive BOOLEAN NOT NULL DEFAULT FALSE,
+    ADD COLUMN reaction_acceptance TEXT,
+    ADD COLUMN file_ids TEXT[] NOT NULL DEFAULT '{}';
+
+-- The inline poll column is superseded by the polls table.
+ALTER TABLE notes DROP COLUMN IF EXISTS poll;
+
+CREATE INDEX idx_notes_user_host ON notes (user_host);
+CREATE INDEX idx_notes_reply ON notes (reply_id);
+CREATE INDEX idx_notes_renote ON notes (renote_id);
+
+-- Polls live in their own table so votes can be counted efficiently.
+CREATE TABLE polls (
+    id         TEXT PRIMARY KEY REFERENCES notes (id) ON DELETE CASCADE,
+    choices    JSONB NOT NULL,
+    multiple   BOOLEAN NOT NULL DEFAULT FALSE,
+    expires_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE poll_votes (
+    note_id   TEXT NOT NULL REFERENCES notes (id) ON DELETE CASCADE,
+    user_id   TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    choice    INT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (note_id, user_id, choice)
+);
+
+-- Reactions are stored per emoji so counts can be aggregated.
+ALTER TABLE note_reactions
+    ADD COLUMN host TEXT;
+CREATE INDEX idx_note_reactions_note ON note_reactions (note_id);
+
+-- Notifications carry the note and the actor that triggered them.
+ALTER TABLE notifications
+    ADD COLUMN reaction TEXT;
+CREATE INDEX idx_notifications_type ON notifications (recipient_id, type, created_at DESC);
+`,
 }
 
 // Migrate applies pending migrations in order and returns the version
