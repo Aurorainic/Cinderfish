@@ -10,9 +10,9 @@ import (
 
 	"github.com/gorilla/websocket"
 
-	"milnfish/internal/config"
-	"milnfish/internal/httpapi"
-	"milnfish/internal/media"
+	"github.com/Aurorainic/cinderfish/internal/config"
+	"github.com/Aurorainic/cinderfish/internal/httpapi"
+	"github.com/Aurorainic/cinderfish/internal/media"
 )
 
 // wsURL converts an httptest server URL to its WebSocket form.

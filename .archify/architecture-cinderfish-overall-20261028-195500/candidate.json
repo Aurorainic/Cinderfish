@@ -2,8 +2,8 @@
   "schema_version": 1,
   "diagram_type": "architecture",
   "meta": {
-    "title": "MilnFish 项目整体结构",
-    "output": ".archify/architecture-milnfish-overall-20261028-195500/milnfish-overall.html",
+    "title": "Cinderfish 项目整体结构",
+    "output": ".archify/architecture-cinderfish-overall-20261028-195500/cinderfish-overall.html",
     "locale": "zh-CN",
     "quality_profile": "showcase"
   },
@@ -53,7 +53,7 @@
     {
       "id": "main",
       "type": "backend",
-      "label": "cmd/milnfish",
+      "label": "cmd/cinderfish",
       "sublabel": "入口 · 配置 · 迁移 · 优雅关闭",
       "pos": [
         280,

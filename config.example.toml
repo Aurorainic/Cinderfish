@@ -1,6 +1,6 @@
-# MilnFish configuration example.
+# Cinderfish configuration example.
 # Copy to config.toml and adjust. Every key can be overridden by the
-# environment variable MILNFISH_<UPPER_SNAKE_KEY> (e.g. MILNFISH_DATABASE_URL).
+# environment variable CINDERFISH_<UPPER_SNAKE_KEY> (e.g. CINDERFISH_DATABASE_URL).
 
 host = "127.0.0.1"
 port = 3000
@@ -9,7 +9,7 @@ port = 3000
 domain = "example.com"
 
 # PostgreSQL is the only mandatory dependency.
-database_url = "postgres://milnfish:milnfish@localhost:5432/milnfish"
+database_url = "postgres://cinderfish:cinderfish@localhost:5432/cinderfish"
 
 # open | invite | admin
 registration_mode = "admin"

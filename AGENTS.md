@@ -4,7 +4,7 @@
 
 ## Project Status
 
-This repository is an exploratory project inspired by a private Go reimplementation of Misskey. `MilnFish` is a temporary working name and must not be treated as the final product name.
+This repository is an exploratory project inspired by a private Go reimplementation of Misskey. `Cinderfish` is the project name (adopted 2026-10-28).
 
 The intended product is a personal or very small-user federated social instance:
 
@@ -51,13 +51,13 @@ These decisions are settled; do not reopen them without an explicit request.
 
 ## Engineering Defaults
 
-- The architecture baseline lives at `docs/superpowers/specs/2026-10-26-milnfish-architecture-v0.md`. Read it before changing module boundaries or the data model.
+- The architecture baseline lives at `docs/superpowers/specs/2026-10-26-cinderfish-architecture-v0.md`. Read it before changing module boundaries or the data model.
 - Prefer a small Go service with explicit interfaces for persistence, media storage, federation, and background work.
 - Keep the frontend and backend compatibility boundaries explicit.
 - Use the repository's existing conventions once implementation begins.
 - Add tests when the project has a test suite; do not create unrelated scaffolding.
 - **Commit each finished piece of work to git as soon as it is done.** Do not leave a finished milestone or task sitting uncommitted, and do not batch several unrelated finished tasks into one late commit. Verify `go vet` and the tests pass, update `docs/HANDOVER.md` if the milestone state changed, then commit with a message that says what was done and what evidence backs it.
-- Keep database migrations immutable: an applied version is never edited, new changes go into a new version number. The current schema version is 3.
+- Keep database migrations immutable: an applied version is never edited, new changes go into a new version number. The current schema version is 4.
 - The S3 client is `github.com/minio/minio-go/v7`, not the AWS SDK. The AWS SDK v2 dependency tree is large and downloaded very slowly through the available proxy; minio-go works with AWS S3, Cloudflare R2, Backblaze B2 and MinIO alike.
 - When building SQL dynamically, collect conditions and their arguments together. Building placeholder strings and passing them as values silently shifts the argument list and produces errors such as "could not determine data type of parameter".
 
@@ -70,10 +70,10 @@ These decisions are settled; do not reopen them without an explicit request.
 ```bash
 go vet ./...
 go test ./...
-MILNFISH_TEST_DATABASE_URL="postgres://milnfish:milnfish@localhost:5432/milnfish_test" go test ./...
+CINDERFISH_TEST_DATABASE_URL="postgres://cinderfish:cinderfish@localhost:5432/cinderfish_test" go test ./...
 ```
 
-Database tests skip themselves when `MILNFISH_TEST_DATABASE_URL` is unset.
+Database tests skip themselves when `CINDERFISH_TEST_DATABASE_URL` is unset.
 
 ## Work Records
 

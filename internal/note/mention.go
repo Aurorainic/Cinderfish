@@ -7,7 +7,7 @@ import (
 
 // Mentions
 //
-// MilnFish stores note text as MFM and needs the local users a note
+// Cinderfish stores note text as MFM and needs the local users a note
 // mentions so it can create mention notifications and address the note
 // when it federates. Until now notes.Mentions was always empty, which
 // left the Streaming API's mention event and the remote audience without

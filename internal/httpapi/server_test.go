@@ -7,7 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"milnfish/internal/config"
+	"github.com/Aurorainic/cinderfish/internal/config"
 )
 
 func testServer(t *testing.T) *Server {
@@ -39,7 +39,7 @@ func TestMetaDetailed(t *testing.T) {
 	}
 	m := decodeJSON(t, rec)
 
-	if m["name"] != "MilnFish" {
+	if m["name"] != "CinderFish" {
 		t.Errorf("meta.name = %v", m["name"])
 	}
 	// Misskey names the instance URL `uri`, not `instanceUrl`.

@@ -1,4 +1,4 @@
-// Package httpapi assembles MilnFish's HTTP surface: the Misskey-style
+// Package httpapi assembles CinderFish's HTTP surface: the Misskey-style
 // RPC endpoints under /api, ActivityPub endpoints, and static frontend
 // serving. M1 covers /api/meta and /api/ping.
 package httpapi
@@ -12,12 +12,12 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"milnfish/internal/account"
-	"milnfish/internal/config"
-	"milnfish/internal/federation"
-	"milnfish/internal/media"
-	"milnfish/internal/note"
-	"milnfish/internal/streaming"
+	"github.com/Aurorainic/cinderfish/internal/account"
+	"github.com/Aurorainic/cinderfish/internal/config"
+	"github.com/Aurorainic/cinderfish/internal/federation"
+	"github.com/Aurorainic/cinderfish/internal/media"
+	"github.com/Aurorainic/cinderfish/internal/note"
+	"github.com/Aurorainic/cinderfish/internal/streaming"
 )
 
 // Server holds dependencies shared by all handlers.

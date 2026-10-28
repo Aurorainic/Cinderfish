@@ -11,12 +11,12 @@ import (
 	"strings"
 	"testing"
 
-	"milnfish/internal/config"
-	"milnfish/internal/federation"
-	"milnfish/internal/httpapi"
+	"github.com/Aurorainic/cinderfish/internal/config"
+	"github.com/Aurorainic/cinderfish/internal/federation"
+	"github.com/Aurorainic/cinderfish/internal/httpapi"
 )
 
-// instance is one federating MilnFish server in a two-instance test.
+// instance is one federating Cinderfish server in a two-instance test.
 type instance struct {
 	name   string
 	srv    *httpapi.Server
@@ -221,7 +221,7 @@ func TestInboxRejectsTamperedBody(t *testing.T) {
 	}
 }
 
-// TestTwoInstanceFollow is the M5 smoke test: two MilnFish instances
+// TestTwoInstanceFollow is the M5 smoke test: two Cinderfish instances
 // exchange a Follow over real HTTP with real RSA signatures. Beta
 // resolves alpha's actor to verify the signature, exactly as a peer
 // would, and ends up with the follow recorded.

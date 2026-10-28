@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"milnfish/internal/streaming"
+	"github.com/Aurorainic/cinderfish/internal/streaming"
 )
 
 // relayed is one event as a second process would see it.

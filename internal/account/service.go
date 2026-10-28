@@ -10,8 +10,8 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"milnfish/internal/auth"
-	"milnfish/internal/idgen"
+	"github.com/Aurorainic/cinderfish/internal/auth"
+	"github.com/Aurorainic/cinderfish/internal/idgen"
 )
 
 // RegistrationMode controls who may create an account.

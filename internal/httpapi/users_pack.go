@@ -3,7 +3,7 @@ package httpapi
 import (
 	"time"
 
-	"milnfish/internal/account"
+	"github.com/Aurorainic/cinderfish/internal/account"
 )
 
 // packUserLite renders a user in the UserLite schema, the shape used by

@@ -9,8 +9,8 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"milnfish/internal/federation"
-	"milnfish/internal/note"
+	"github.com/Aurorainic/cinderfish/internal/federation"
+	"github.com/Aurorainic/cinderfish/internal/note"
 )
 
 // AttachFederation wires the ActivityPub surface: policy, renderer,

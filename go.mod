@@ -1,4 +1,4 @@
-module milnfish
+module github.com/Aurorainic/cinderfish
 
 go 1.26.0
 

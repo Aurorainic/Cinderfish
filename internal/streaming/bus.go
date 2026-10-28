@@ -1,4 +1,4 @@
-// Package streaming implements MilnFish's Misskey-compatible Streaming
+// Package streaming implements CinderFish's Misskey-compatible Streaming
 // API: the /streaming WebSocket endpoint, the per-connection channel
 // registry and the event bus that carries note, reaction and
 // notification events to subscribed clients.
@@ -227,7 +227,7 @@ func (b *Bus) PublishNoteStream(noteID, authorID, visibility string, visibleUser
 
 // pgNotifyChannel is the single PostgreSQL channel used to wake other
 // processes of the same instance.
-const pgNotifyChannel = "milnfish_stream"
+const pgNotifyChannel = "cinderfish_stream"
 
 // NotifyPayloadLimit is PostgreSQL's NOTIFY payload cap in bytes.
 // pg_notify rejects anything larger outright.

@@ -16,7 +16,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"milnfish/internal/idgen"
+	"github.com/Aurorainic/cinderfish/internal/idgen"
 )
 
 // DefaultMaxFileSize is the upload limit used when none is configured.
@@ -75,7 +75,7 @@ func (s *DriveService) Save(ctx context.Context, userID, name string, r io.Reade
 
 	// The upload is buffered in a temporary file so the hash is known
 	// before the final storage key is chosen.
-	tmp, err := os.CreateTemp("", "milnfish-upload-*")
+	tmp, err := os.CreateTemp("", "cinderfish-upload-*")
 	if err != nil {
 		return nil, fmt.Errorf("media: create temp file: %w", err)
 	}

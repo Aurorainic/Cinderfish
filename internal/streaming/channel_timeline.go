@@ -86,13 +86,13 @@ func (t *timelineChannel) filesAllowed(note PackedNote) bool {
 }
 
 // hasChannelID reports whether the note belongs to a Misskey "channel".
-// MilnFish does not model channels yet, so this is always false.
+// Cinderfish does not model channels yet, so this is always false.
 func hasChannelID(note PackedNote) bool {
 	v, ok := note["channelId"]
 	return ok && v != nil
 }
 
-// isNoteMutedOrBlocked mirrors Misskey's filter. MilnFish has no mute or
+// isNoteMutedOrBlocked mirrors Misskey's filter. Cinderfish has no mute or
 // block data yet, so it always allows the note; keeping the call site
 // identical to upstream means the filter can be filled in without
 // touching channel logic.

@@ -3,8 +3,8 @@ package httpapi
 import (
 	"context"
 
-	"milnfish/internal/account"
-	"milnfish/internal/streaming"
+	"github.com/Aurorainic/cinderfish/internal/account"
+	"github.com/Aurorainic/cinderfish/internal/streaming"
 )
 
 // streamingAuth adapts the token service to the streaming Authenticator.

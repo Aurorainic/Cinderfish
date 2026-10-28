@@ -41,7 +41,7 @@ func (h *homeTimelineChannel) onNote(note PackedNote) {
 	}
 
 	// A channel post is only visible to followers of that channel, which
-	// MilnFish does not model yet.
+	// Cinderfish does not model yet.
 	if hasChannelID(note) {
 		return
 	}
@@ -83,7 +83,7 @@ func (l *localTimelineChannel) Init(params map[string]json.RawMessage) bool {
 	l.withReplies = boolParam(params, "withReplies", false)
 	l.withFiles = boolParam(params, "withFiles", false)
 	l.filter = l.onNote
-	// Misskey checks the ltlAvailable user policy here. MilnFish grants
+	// Misskey checks the ltlAvailable user policy here. Cinderfish grants
 	// it unconditionally; per-user policies arrive with roles.
 	return true
 }

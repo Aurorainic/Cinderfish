@@ -1,5 +1,5 @@
 // Package db provides the PostgreSQL connection pool and embedded
-// schema migrations for MilnFish.
+// schema migrations for Cinderfish.
 package db
 
 import (
@@ -13,7 +13,7 @@ import (
 
 // migrations maps version number to SQL script. Scripts run in ascending
 // order inside a single transaction each; applied versions are recorded in
-// schema_migrations. Kept in code so a MilnFish deployment is one binary.
+// schema_migrations. Kept in code so a Cinderfish deployment is one binary.
 var migrations = map[int]string{
 	1: `
 CREATE TABLE instance_meta (

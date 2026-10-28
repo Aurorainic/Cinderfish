@@ -15,18 +15,18 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"milnfish/internal/auth"
-	"milnfish/internal/config"
-	"milnfish/internal/db"
-	"milnfish/internal/httpapi"
-	"milnfish/internal/media"
+	"github.com/Aurorainic/cinderfish/internal/auth"
+	"github.com/Aurorainic/cinderfish/internal/config"
+	"github.com/Aurorainic/cinderfish/internal/db"
+	"github.com/Aurorainic/cinderfish/internal/httpapi"
+	"github.com/Aurorainic/cinderfish/internal/media"
 )
 
 func testPool(t *testing.T) *pgxpool.Pool {
 	t.Helper()
-	url := os.Getenv("MILNFISH_TEST_DATABASE_URL")
+	url := os.Getenv("CINDERFISH_TEST_DATABASE_URL")
 	if url == "" {
-		t.Skip("MILNFISH_TEST_DATABASE_URL is not set; skipping database test")
+		t.Skip("CINDERFISH_TEST_DATABASE_URL is not set; skipping database test")
 	}
 	pool, err := pgxpool.New(context.Background(), url)
 	if err != nil {

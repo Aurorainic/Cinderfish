@@ -1,7 +1,7 @@
 # 公开资料调研记录
 
 - 调研日期：2026-10-26
-- 项目暂用名：MilnFish
+- 项目名：Cinderfish（记录时为暂用名）
 - 范围：Misskey API、Misskey Streaming API、ActivityPub/WebFinger、Firefish 前端与维护状态
 - 排除项：Pleroma/Akkoma 仅作为产品定位参照，不作为代码或架构参考
 

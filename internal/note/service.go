@@ -1,4 +1,4 @@
-// Package note implements MilnFish's note (post) model: creation with
+// Package note implements CinderFish's note (post) model: creation with
 // the four visibility levels, the local-only flag, replies, renotes,
 // reactions and polls.
 //
@@ -20,7 +20,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"milnfish/internal/idgen"
+	"github.com/Aurorainic/cinderfish/internal/idgen"
 )
 
 // Visibility levels.

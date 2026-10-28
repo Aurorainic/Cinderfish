@@ -13,7 +13,7 @@ type channelSpec struct {
 }
 
 // channelSpecs is the registry of supported channels. Channels Misskey
-// also defines but MilnFish does not implement yet (userList, clip,
+// also defines but Cinderfish does not implement yet (userList, clip,
 // hashtag, antenna, drive, serverStats, admin, chat*, reversi*, ...)
 // are deliberately absent: connecting to them is silently ignored, which
 // is what upstream clients observe when the constructor throws.

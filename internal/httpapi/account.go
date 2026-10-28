@@ -4,8 +4,8 @@ import (
 	"errors"
 	"net/http"
 
-	"milnfish/internal/account"
-	"milnfish/internal/auth"
+	"github.com/Aurorainic/cinderfish/internal/account"
+	"github.com/Aurorainic/cinderfish/internal/auth"
 )
 
 // Error ids used by the account endpoints. Misskey's signin flow returns

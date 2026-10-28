@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"milnfish/internal/note"
-	"milnfish/internal/streaming"
+	"github.com/Aurorainic/cinderfish/internal/note"
+	"github.com/Aurorainic/cinderfish/internal/streaming"
 )
 
 // To satisfy the packer interface, note entities are rendered with the

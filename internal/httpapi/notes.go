@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"time"
 
-	"milnfish/internal/note"
+	"github.com/Aurorainic/cinderfish/internal/note"
 )
 
 // Error ids for the note endpoints, copied from Misskey.

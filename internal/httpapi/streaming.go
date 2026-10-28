@@ -4,7 +4,7 @@ import (
 	"context"
 	"net/http"
 
-	"milnfish/internal/streaming"
+	"github.com/Aurorainic/cinderfish/internal/streaming"
 )
 
 // AttachStreaming installs and starts the Streaming API endpoint.

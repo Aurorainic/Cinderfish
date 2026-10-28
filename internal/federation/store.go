@@ -12,7 +12,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"milnfish/internal/idgen"
+	"github.com/Aurorainic/cinderfish/internal/idgen"
 )
 
 // Store persists remote actors and notes. It is the only part of the

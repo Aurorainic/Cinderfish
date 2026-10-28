@@ -5,7 +5,7 @@ import (
 	"log"
 	"net/http"
 
-	"milnfish/internal/federation"
+	"github.com/Aurorainic/cinderfish/internal/federation"
 )
 
 // Misskey error ids for the following endpoints, copied from

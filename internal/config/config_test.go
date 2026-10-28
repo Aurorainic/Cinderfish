@@ -36,9 +36,9 @@ federation_mode = "allowlist"
 }
 
 func TestEnvOverride(t *testing.T) {
-	t.Setenv("MILNFISH_PORT", "5555")
-	t.Setenv("MILNFISH_DOMAIN", "env.example")
-	t.Setenv("MILNFISH_REGISTRATION_MODE", "invite")
+	t.Setenv("CINDERFISH_PORT", "5555")
+	t.Setenv("CINDERFISH_DOMAIN", "env.example")
+	t.Setenv("CINDERFISH_REGISTRATION_MODE", "invite")
 
 	c, err := Load("")
 	require.NoError(t, err)
@@ -48,19 +48,19 @@ func TestEnvOverride(t *testing.T) {
 }
 
 func TestValidation(t *testing.T) {
-	t.Setenv("MILNFISH_REGISTRATION_MODE", "nonsense")
+	t.Setenv("CINDERFISH_REGISTRATION_MODE", "nonsense")
 	_, err := Load("")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "registration_mode")
 }
 
 func TestS3BackendValidation(t *testing.T) {
-	t.Setenv("MILNFISH_MEDIA_BACKEND", "s3")
+	t.Setenv("CINDERFISH_MEDIA_BACKEND", "s3")
 	_, err := Load("")
 	require.Error(t, err)
 
-	t.Setenv("MILNFISH_MEDIA_S3_ENDPOINT", "http://localhost:9000")
-	t.Setenv("MILNFISH_MEDIA_S3_BUCKET", "milnfish")
+	t.Setenv("CINDERFISH_MEDIA_S3_ENDPOINT", "http://localhost:9000")
+	t.Setenv("CINDERFISH_MEDIA_S3_BUCKET", "cinderfish")
 	_, err = Load("")
 	require.Error(t, err, "secret key check not enforced yet, but endpoint/bucket should pass; only other invalid fields fail")
 }

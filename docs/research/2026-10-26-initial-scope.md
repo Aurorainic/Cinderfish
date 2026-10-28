@@ -1,10 +1,10 @@
 # 首版研究约束与待确认范围
 
 - 记录日期：2026-10-26
-- 项目名：暂用 MilnFish，不是最终命名
+- 项目名：Cinderfish（记录时为暂用名，2026-10-28 定名）
 - 状态：文末五个待确认项已在同日的补充调研与架构设计中裁决，见
   `2026-10-26-go-ecosystem-and-dependency-decisions.md` 第 5 节与
-  `../superpowers/specs/2026-10-26-milnfish-architecture-v0.md` 第 2 节
+  `../superpowers/specs/2026-10-26-cinderfish-architecture-v0.md` 第 2 节
 
 ## 已确认
 

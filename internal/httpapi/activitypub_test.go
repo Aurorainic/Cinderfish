@@ -9,11 +9,11 @@ import (
 	"strings"
 	"testing"
 
-	"milnfish/internal/config"
-	"milnfish/internal/httpapi"
+	"github.com/Aurorainic/cinderfish/internal/config"
+	"github.com/Aurorainic/cinderfish/internal/httpapi"
 )
 
-// fedInstance is a MilnFish instance with ActivityPub wired up.
+// fedInstance is a Cinderfish instance with ActivityPub wired up.
 type fedInstance struct {
 	ts     *httptest.Server
 	srv    *httpapi.Server

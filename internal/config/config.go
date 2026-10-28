@@ -1,5 +1,5 @@
-// Package config loads MilnFish configuration from a TOML file with
-// MILNFISH_ environment variable overrides.
+// Package config loads CinderFish configuration from a TOML file with
+// CINDERFISH_ environment variable overrides.
 package config
 
 import (
@@ -57,13 +57,13 @@ var validFederation = map[string]bool{"public": true, "allowlist": true, "none":
 var validMediaBackend = map[string]bool{"local": true, "s3": true}
 
 // Load reads the TOML file at path (optional; defaults apply otherwise),
-// then applies MILNFISH_* environment overrides and validates the result.
+// then applies CINDERFISH_* environment overrides and validates the result.
 func Load(path string) (*Config, error) {
 	c := &Config{
 		Host:             "127.0.0.1",
 		Port:             3000,
 		Domain:           "example.com",
-		DatabaseURL:      "postgres://milnfish:milnfish@localhost:5432/milnfish",
+		DatabaseURL:      "postgres://cinderfish:cinderfish@localhost:5432/cinderfish",
 		RegistrationMode: "admin",
 		FederationMode:   "none",
 		Media:            Media{Backend: "local", LocalPath: "./data/files"},
@@ -82,14 +82,14 @@ func Load(path string) (*Config, error) {
 }
 
 func applyEnv(c *Config) {
-	setStr("MILNFISH_HOST", &c.Host)
-	setStr("MILNFISH_DOMAIN", &c.Domain)
-	setStr("MILNFISH_DATABASE_URL", &c.DatabaseURL)
-	setStr("MILNFISH_REGISTRATION_MODE", &c.RegistrationMode)
-	setStr("MILNFISH_FEDERATION_MODE", &c.FederationMode)
-	setStr("MILNFISH_MEDIA_BACKEND", &c.Media.Backend)
-	setStr("MILNFISH_MEDIA_LOCAL_PATH", &c.Media.LocalPath)
-	setInt("MILNFISH_PORT", &c.Port)
+	setStr("CINDERFISH_HOST", &c.Host)
+	setStr("CINDERFISH_DOMAIN", &c.Domain)
+	setStr("CINDERFISH_DATABASE_URL", &c.DatabaseURL)
+	setStr("CINDERFISH_REGISTRATION_MODE", &c.RegistrationMode)
+	setStr("CINDERFISH_FEDERATION_MODE", &c.FederationMode)
+	setStr("CINDERFISH_MEDIA_BACKEND", &c.Media.Backend)
+	setStr("CINDERFISH_MEDIA_LOCAL_PATH", &c.Media.LocalPath)
+	setInt("CINDERFISH_PORT", &c.Port)
 }
 
 func setStr(key string, dst *string) {

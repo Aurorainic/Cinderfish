@@ -1,6 +1,6 @@
 # 项目整体结构图（随进度更新）
 
-- 产出：`milnfish-overall.html`
+- 产出：`cinderfish-overall.html`
 - 源：`candidate.json`（Archify architecture schema v1）
 - 绘制时基线：`db44d20` 之后的 M1–M4 完成状态
 
@@ -8,7 +8,7 @@
 
 这张图表达的是**项目整体**，但 M5（联邦）、M6（前端）、M7（打磨）尚无可运行代码。如果把规划中的模块画成和已实现模块一样，图就会撒谎。因此：
 
-- **已实现（M1–M4）**区域：`cmd/milnfish`、`httpapi`、`account/auth`、`note`、`streaming`、`media`、`config/idgen`、PostgreSQL、媒体后端——都有 `go list ./...` 可验证的包。
+- **已实现（M1–M4）**区域：`cmd/cinderfish`、`httpapi`、`account/auth`、`note`、`streaming`、`media`、`config/idgen`、PostgreSQL、媒体后端——都有 `go list ./...` 可验证的包。
 - **规划中（M5–M7）**区域：`federation`、`deliver`、`queue`、`web`——**目录尚不存在**。指向它们的连线一律用虚线。
 - 状态靠**区域边界**区分，不靠颜色（架构 schema 的 component type 没有"未实现"这一类）。
 
@@ -21,7 +21,7 @@
 
 ```bash
 node ~/.agents/skills/archify/bin/archify.mjs finalize architecture \
-  <本目录>/candidate.json <本目录>/milnfish-overall.html \
+  <本目录>/candidate.json <本目录>/cinderfish-overall.html \
   --quality showcase --json
 ```
 

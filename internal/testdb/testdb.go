@@ -20,7 +20,7 @@ import (
 
 // EnvVar names the test database URL. Database tests skip themselves when
 // it is unset.
-const EnvVar = "MILNFISH_TEST_DATABASE_URL"
+const EnvVar = "CINDERFISH_TEST_DATABASE_URL"
 
 // lockKey identifies the advisory lock guarding the shared test database.
 const lockKey int64 = 0x6d696c6e66697348

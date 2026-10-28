@@ -53,4 +53,4 @@ v2 增量迁移在 v1 基础上追加：
 - HTTP 端到端测试：`internal/httpapi`（signup→signin→i→miauth→OAuth 全链路）
 - 真实环境验证：PostgreSQL 18 实例上跑通 v1→v2 增量迁移，并用 curl 验证 7 个账户端点与完整 OAuth 授权码流程（含 code 重用被拒）
 
-测试库通过 `MILNFISH_TEST_DATABASE_URL` 指定，未设置时数据库测试自动跳过。
+测试库通过 `CINDERFISH_TEST_DATABASE_URL` 指定，未设置时数据库测试自动跳过。

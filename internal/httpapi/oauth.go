@@ -11,8 +11,8 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"milnfish/internal/account"
-	"milnfish/internal/auth"
+	"github.com/Aurorainic/cinderfish/internal/account"
+	"github.com/Aurorainic/cinderfish/internal/auth"
 )
 
 // OAuth error ids, mirroring Misskey's OAuth2 error responses.
@@ -96,7 +96,7 @@ func (s *Server) handleOAuthAuthorize(w http.ResponseWriter, r *http.Request) {
 	if err != nil || info == nil {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.WriteHeader(http.StatusUnauthorized)
-		_, _ = w.Write([]byte(`<!doctype html><meta charset="utf-8"><title>MilnFish</title>` +
+		_, _ = w.Write([]byte(`<!doctype html><meta charset="utf-8"><title>CinderFish</title>` +
 			`<p>Sign in to authorize this application.</p>`))
 		return
 	}

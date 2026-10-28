@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strings"
 
-	"milnfish/internal/account"
+	"github.com/Aurorainic/cinderfish/internal/account"
 )
 
 // authContextKey is the context key under which the authenticated user

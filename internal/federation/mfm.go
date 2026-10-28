@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-// MilnFish stores note text as MFM (Misskey Flavored Markdown) and has no
+// Cinderfish stores note text as MFM (Misskey Flavored Markdown) and has no
 // stored HTML yet, but ActivityPub's content field must be HTML. This file
 // renders the MFM subset the federation stream actually uses.
 //

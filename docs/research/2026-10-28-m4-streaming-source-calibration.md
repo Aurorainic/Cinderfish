@@ -80,13 +80,13 @@ JSON 对象 `{"type": string, "body": ...}`，parse 失败直接忽略。
 - `followers`：匿名 → false；作者本人 → true；是回复目标 → true；被 @ → true；否则看是否关注作者。
 - 其他（public/home）→ true。
 
-`isNoteMutedOrBlocked`：实例屏蔽、用户屏蔽/静默、renote 静默、频道静默。**MilnFish 目前没有 mute/block 数据**，此函数恒为 false，但保留接口位置。
+`isNoteMutedOrBlocked`：实例屏蔽、用户屏蔽/静默、renote 静默、频道静默。**Cinderfish 目前没有 mute/block 数据**，此函数恒为 false，但保留接口位置。
 
 ### 5.2 各频道过滤（已实现的部分）
 
 - **main**：只推送 `mainStream:<userId>` 事件。notification 事件里若 note 的 `isHidden`（CW 隐藏，需要详情重新 pack）则以 detail 重新 pack；mention 事件做可见性 + 屏蔽检查。**其他事件原样透传**（reply/renote/follow/followed/unfollow/meUpdated/readAllNotifications/unreadNotification/notificationFlushed/signin/driveFileCreated/announcementCreated/...）。
 - **homeTimeline**：`notesStream` → withFiles 过滤 → 只留 `isMe || following 里有作者` → 可见性 → reply 过滤（`following[author].withReplies` 分支：如果开了带回复，则只挡「作者的 followers-only 笔记的回复，而我不关注回复目标且不是我」；否则只留「回复我 / 我发出的回复 / 作者自回复」）→ 纯 renote 且 withRenotes=false 则丢弃（含被 renote 内容的 reply 可见性检查）→ 屏蔽 → `noteStreamingHidingService.filter`（M4 先恒真）→ 输出带 `myReaction`。
-- **localTimeline**：`ltlAvailable` 策略（MilnFish 一律 true）→ withFiles → 只留 `user.host == null` 且 `visibility == public` 且 `channelId == null` → 回复过滤（匿名时不过滤）→ renote 过滤 → 屏蔽 → 输出。
+- **localTimeline**：`ltlAvailable` 策略（Cinderfish 一律 true）→ withFiles → 只留 `user.host == null` 且 `visibility == public` 且 `channelId == null` → 回复过滤（匿名时不过滤）→ renote 过滤 → 屏蔽 → 输出。
 - **hybridTimeline**：需登录。无 `channelId` 时要求 `isMe || 关注作者 || (本地 && public)`；有 `channelId` 时要求关注该频道（M4 无频道功能 → 恒 false）→ 可见性 → 屏蔽 → 回复过滤（`following.author.withReplies || params.withReplies`）→ renote 过滤 → 输出。
 - **globalTimeline**：只留 `visibility == public` 且 `channelId == null` → renote 过滤 → 屏蔽 → 输出。
 
@@ -105,7 +105,7 @@ if (following[noteAuthor]?.withReplies || params.withReplies) {
 
 ## 6. 事件源（`GlobalEventService` 的 publish 调用点）
 
-Redis pub/sub 的 `channel` 字段充当「订阅键」，MilnFish 用同样的字符串做进程内 bus 的 key，未来接 Redis 时语义一致。
+Redis pub/sub 的 `channel` 字段充当「订阅键」，Cinderfish 用同样的字符串做进程内 bus 的 key，未来接 Redis 时语义一致。
 
 | publish 方法 | 频道键 | type | body 形状 | 调用点 |
 |--------------|--------|------|-----------|--------|
@@ -130,7 +130,7 @@ Redis pub/sub 的 `channel` 字段充当「订阅键」，MilnFish 用同样的�
 ```
 `subNote` 分发前检查（`onNoteStreamMessage`）：如果不是我自己的笔记，则 specified 要包含我、followers 要我关注作者。**注意这里用的是笔记作者，不是事件里的 userId**——事件里 userId 就是作者。
 
-## 7. 与 MilnFish 现状的差距
+## 7. 与 Cinderfish 现状的差距
 
 1. **笔记创建**：`notes.Create` 有 `notifyMentioned`，但没有 reply/renote 的 main 事件。M4 补齐。
 2. **只存 mentions 数组**：`Mentions` 目前恒为空数组（`Create` 不解析文本中的 @）。因此 mention 事件暂时不会触发。**这是已知缺口**，记录在此，不在 M4 修（属于笔记解析，和 M5 的远程解析一起做）。
@@ -149,7 +149,7 @@ Redis pub/sub 的 `channel` 字段充当「订阅键」，MilnFish 用同样的�
   - NOTIFY payload 上限 8000 字节（硬限制，`pg_notify` 直接拒绝更大的载荷）。超限的事件体先 base64 再分片，接收端重组；**不**降级成"只带 subject 的空唤醒"——那等于跨进程静默丢事件。单事件上限 128 片（约 384 KiB 正文），超过则返回错误并记日志，而不是发一个没有内容的通知。
 - **连接**：`Connection` 持有频道表、subNote 表（引用计数 + LRU，上限 1536）与缓存的 following 图。`notesStream` 在连接层面**只订阅一次**再分发到各时间线频道，比上游"每个频道各订阅一次"的 N 倍投递更省。
 - **Go 嵌入的坑（务必记住）**：`timelineChannel` 内嵌在具体频道里时，**内嵌类型的同名方法会遮蔽外层方法**，通过接口调用 `HandleNote` 命中的是内嵌的实现。因此不能靠"外层覆盖 onNote"做多态，改为把过滤函数存成字段（`timelineChannel.filter`），由各频道 `Init` 时赋值。这个 bug 第一版真实发生过：所有时间线频道都收不到笔记，单元测试暴露后才修正。
-- **上下文刷新**：每 10s 重新加载 following，与上游一致；MilnFish 没有 Redis 缓存，直接查库。
+- **上下文刷新**：每 10s 重新加载 following，与上游一致；Cinderfish 没有 Redis 缓存，直接查库。
 - **心跳**：60s ping / 120s 无 pong 断开，与上游一致。
 - **发送缓冲**：每连接 256 条发送队列，满了直接 `terminate()` 断连（对应上游的 bufferedAmount 8 MiB 阈值 + `wsConnection.terminate()`，语义一致：宁可断开重连也不无限积压）。**只关 writer 不够**：读取循环阻塞在 `ReadMessage`，它才是执行 `dispose`、释放频道与 bus 订阅的地方；只关 writer 会留下一个永不退出的连接和它持有的全部订阅（见 §10）。
 - **依赖**：`github.com/gorilla/websocket v1.5.3`（直接依赖）。
@@ -185,7 +185,7 @@ Redis pub/sub 的 `channel` 字段充当「订阅键」，MilnFish 用同样的�
 | 层次 | 命令 / 测试 | 结果 |
 |------|-------------|------|
 | 静态检查 | `go vet ./...`、`gofmt -l .` | ✅ |
-| 全量 | `MILNFISH_TEST_DATABASE_URL=... go test ./...` | ✅ |
+| 全量 | `CINDERFISH_TEST_DATABASE_URL=... go test ./...` | ✅ |
 | 并发复现 | 修复前 `go test ./internal/account ./internal/httpapi -count=8` 稳定复现失败；修复后 ✅ |
 | 竞态 | `go test -race ./internal/streaming/ ./internal/httpapi/` | ✅ |
 | 分片中继 | 48 KiB 正文经真实 `pg_notify` 分片、重组后逐字节一致 | ✅ |

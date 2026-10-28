@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"time"
 
-	"milnfish/internal/note"
-	"milnfish/internal/streaming"
+	"github.com/Aurorainic/cinderfish/internal/note"
+	"github.com/Aurorainic/cinderfish/internal/streaming"
 )
 
 // Event publishing.
@@ -22,7 +22,7 @@ import (
 //
 // Upstream publishes notesStream once, packed for an anonymous viewer,
 // and each connection decides whether it may see the note. Mentions are
-// published separately once text is parsed for @-references; MilnFish
+// published separately once text is parsed for @-references; CinderFish
 // does not parse mentions yet, so n.Mentions is empty.
 func (s *Server) publishNoteCreated(n *note.Note, authorID string) {
 	if s.streamBus == nil {

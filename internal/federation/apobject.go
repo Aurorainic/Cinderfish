@@ -174,7 +174,7 @@ var activityTypes = map[string]bool{
 	"Flag": true, "Move": true,
 }
 
-// IsActivity reports whether o is one of the activity types MilnFish
+// IsActivity reports whether o is one of the activity types Cinderfish
 // dispatches on.
 func (o Object) IsActivity() bool {
 	for _, t := range []string{"Collection", "OrderedCollection"} {
@@ -190,7 +190,7 @@ func (o Object) IsActivity() bool {
 	return false
 }
 
-// postTypes are the object types MilnFish stores as notes.
+// postTypes are the object types Cinderfish stores as notes.
 var postTypes = []string{"Note", "Question", "Article", "Page"}
 
 // IsPost reports whether o is a note-like object.
@@ -203,7 +203,7 @@ func (o Object) IsPost() bool {
 	return false
 }
 
-// actorTypes are the object types MilnFish stores as remote users.
+// actorTypes are the object types Cinderfish stores as remote users.
 var actorTypes = []string{"Person", "Service", "Application", "Group", "Organization"}
 
 // IsActor reports whether o is an actor document.

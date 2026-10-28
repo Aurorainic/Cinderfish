@@ -1,4 +1,4 @@
-// Package auth implements MilnFish's account authentication: password
+// Package auth implements Cinderfish's account authentication: password
 // hashing, token issuance and lookup, and the OAuth 2.0 PKCE helpers.
 //
 // Behaviour follows misskey-dev/misskey: bcrypt with cost 8, 16-char

@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// Renderer turns MilnFish's stored rows into ActivityPub documents. It
+// Renderer turns Cinderfish's stored rows into ActivityPub documents. It
 // holds only the instance's own identity; anything that needs the
 // database is passed in by the caller so rendering stays pure and
 // testable.
@@ -175,7 +175,7 @@ type NoteData struct {
 //
 // The visibility-to-to/cc mapping and the _misskey_content/_misskey_quote
 // extensions follow ApRendererService.renderNote. content is generated
-// from the note's MFM text (see MFMToHTML) since MilnFish has no stored
+// from the note's MFM text (see MFMToHTML) since Cinderfish has no stored
 // HTML yet.
 func (r *Renderer) RenderNote(n NoteData) Object {
 	id := n.APID

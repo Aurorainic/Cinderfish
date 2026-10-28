@@ -52,7 +52,7 @@ func (m Mode) MisskeyMode() string {
 // ErrFederationDenied is returned by a policy check that refused a host.
 var ErrFederationDenied = errors.New("federation: federation with this host is not allowed")
 
-// Policy decides whether MilnFish may exchange anything with a host.
+// Policy decides whether Cinderfish may exchange anything with a host.
 //
 // The mode may change at runtime: the architecture calls for switching
 // between public, allowlist and none without a restart, so the source is

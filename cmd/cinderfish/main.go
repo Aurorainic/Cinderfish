@@ -1,4 +1,4 @@
-// Command milnfish runs the MilnFish server: a Go single-binary
+// Command cinderfish runs the CinderFish server: a Go single-binary
 // personal federated social instance speaking the Misskey API.
 package main
 
@@ -14,11 +14,11 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"milnfish/internal/config"
-	"milnfish/internal/db"
-	"milnfish/internal/httpapi"
-	"milnfish/internal/media"
-	"milnfish/internal/streaming"
+	"github.com/Aurorainic/cinderfish/internal/config"
+	"github.com/Aurorainic/cinderfish/internal/db"
+	"github.com/Aurorainic/cinderfish/internal/httpapi"
+	"github.com/Aurorainic/cinderfish/internal/media"
+	"github.com/Aurorainic/cinderfish/internal/streaming"
 )
 
 func main() {
@@ -27,7 +27,7 @@ func main() {
 
 	cfg, err := config.Load(*configPath)
 	if err != nil {
-		log.Fatalf("milnfish: %v", err)
+		log.Fatalf("cinderfish: %v", err)
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -36,15 +36,15 @@ func main() {
 	// Database is mandatory; fail fast with a clear message.
 	pool, err := openDB(ctx, cfg)
 	if err != nil {
-		log.Fatalf("milnfish: %v", err)
+		log.Fatalf("cinderfish: %v", err)
 	}
 	defer pool.Close()
 
 	version, err := db.Migrate(ctx, pool)
 	if err != nil {
-		log.Fatalf("milnfish: migrate: %v", err)
+		log.Fatalf("cinderfish: migrate: %v", err)
 	}
-	log.Printf("milnfish: schema at version %d", version)
+	log.Printf("cinderfish: schema at version %d", version)
 
 	api := httpapi.NewServerWithDB(cfg, pool)
 
@@ -64,7 +64,7 @@ func main() {
 	bus.SetPublisher(streaming.NewPublisher(pool))
 	go func() {
 		if err := streaming.Listen(notifyCtx, pool, bus, log.Printf); err != nil {
-			log.Printf("milnfish: streaming notify listener: %v", err)
+			log.Printf("cinderfish: streaming notify listener: %v", err)
 		}
 	}()
 
@@ -73,11 +73,11 @@ func main() {
 	// crash resumes pending deliveries on the next start.
 	api.AttachFederation()
 	if err := api.ApplyFederationConfig(ctx); err != nil {
-		log.Fatalf("milnfish: %v", err)
+		log.Fatalf("cinderfish: %v", err)
 	}
 	api.StartFederationWorkers(notifyCtx)
 	if mode := cfg.FederationMode; mode == "none" {
-		log.Printf("milnfish: federation is off; AP routes answer 403")
+		log.Printf("cinderfish: federation is off; AP routes answer 403")
 	}
 
 	srv := &http.Server{
@@ -89,14 +89,14 @@ func main() {
 	// Media storage: local filesystem or an S3 compatible object store.
 	storage, err := openStorage(ctx, cfg)
 	if err != nil {
-		log.Fatalf("milnfish: storage: %v", err)
+		log.Fatalf("cinderfish: storage: %v", err)
 	}
 	srv.Handler.(*httpapi.Server).SetStorage(storage)
-	log.Printf("milnfish: media backend is %s", storage.Backend())
+	log.Printf("cinderfish: media backend is %s", storage.Backend())
 
 	errCh := make(chan error, 1)
 	go func() {
-		log.Printf("milnfish: listening on %s (domain %s, federation %s, registration %s)",
+		log.Printf("cinderfish: listening on %s (domain %s, federation %s, registration %s)",
 			cfg.Addr(), cfg.Domain, cfg.FederationMode, cfg.RegistrationMode)
 		errCh <- srv.ListenAndServe()
 	}()
@@ -104,14 +104,14 @@ func main() {
 	select {
 	case err := <-errCh:
 		if err != nil && err != http.ErrServerClosed {
-			log.Fatalf("milnfish: server: %v", err)
+			log.Fatalf("cinderfish: server: %v", err)
 		}
 	case <-ctx.Done():
-		log.Print("milnfish: shutting down")
+		log.Print("cinderfish: shutting down")
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 		if err := srv.Shutdown(shutdownCtx); err != nil {
-			log.Printf("milnfish: shutdown: %v", err)
+			log.Printf("cinderfish: shutdown: %v", err)
 		}
 	}
 }

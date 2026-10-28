@@ -4,7 +4,7 @@ import (
 	"context"
 	"net/http"
 
-	"milnfish/internal/streaming"
+	"github.com/Aurorainic/cinderfish/internal/streaming"
 )
 
 // markAllNotificationsRead marks every notification of a user read and

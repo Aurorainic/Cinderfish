@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"milnfish/internal/note"
+	"github.com/Aurorainic/cinderfish/internal/note"
 )
 
 // notePackContext carries the data the packer needs besides the note

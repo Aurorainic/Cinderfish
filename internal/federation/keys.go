@@ -1,4 +1,4 @@
-// Package federation implements MilnFish's ActivityPub server and
+// Package federation implements Cinderfish's ActivityPub server and
 // client: the WebFinger/Actor/Inbox/Outbox surface, HTTP Signatures, the
 // three-mode federation policy, and the deliver queue.
 //

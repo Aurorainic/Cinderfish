@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"strings"
 
-	"milnfish/internal/federation"
+	"github.com/Aurorainic/cinderfish/internal/federation"
 )
 
 // ApplyFederationConfig seeds the runtime federation state from the

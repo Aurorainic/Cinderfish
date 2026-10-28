@@ -10,8 +10,8 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"milnfish/internal/auth"
-	"milnfish/internal/idgen"
+	"github.com/Aurorainic/cinderfish/internal/auth"
+	"github.com/Aurorainic/cinderfish/internal/idgen"
 )
 
 // AccessToken is an issued API token.

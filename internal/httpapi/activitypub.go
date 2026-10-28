@@ -12,9 +12,9 @@ import (
 	"strings"
 	"time"
 
-	"milnfish/internal/account"
-	"milnfish/internal/federation"
-	"milnfish/internal/note"
+	"github.com/Aurorainic/cinderfish/internal/account"
+	"github.com/Aurorainic/cinderfish/internal/federation"
+	"github.com/Aurorainic/cinderfish/internal/note"
 )
 
 // baseURL is the instance's canonical scheme://host used in every
@@ -230,7 +230,7 @@ func (s *Server) serveNodeInfo(w http.ResponseWriter, r *http.Request, version s
 
 	doc := map[string]any{
 		"version":           version,
-		"software":          map[string]any{"name": "milnfish", "version": "0.0.1"},
+		"software":          map[string]any{"name": "cinderfish", "version": "0.0.1"},
 		"protocols":         []string{"activitypub"},
 		"services":          map[string]any{"inbound": []string{}, "outbound": []string{}},
 		"openRegistrations": s.cfg.RegistrationMode == "open",
@@ -607,7 +607,7 @@ func (s *Server) handleInbox(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		log.Printf("httpapi: inbox signature rejected: %v", err)
-		w.Header().Set("WWW-Authenticate", `Signature realm="MilnFish"`)
+		w.Header().Set("WWW-Authenticate", `Signature realm="Cinderfish"`)
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}

@@ -4,8 +4,8 @@
   "status": "current",
   "command": "deliver",
   "type": "architecture",
-  "input": "/home/lainsaka/文档/MilnFish/.archify/architecture-milnfish-overall-20261028-195500/candidate.json",
-  "output": "/home/lainsaka/文档/MilnFish/.archify/architecture-milnfish-overall-20261028-195500/milnfish-overall.html",
+  "input": "/home/lainsaka/文档/Cinderfish/.archify/architecture-cinderfish-overall-20261028-195500/candidate.json",
+  "output": "/home/lainsaka/文档/Cinderfish/.archify/architecture-cinderfish-overall-20261028-195500/cinderfish-overall.html",
   "specification": {
     "sha256": "6c106407ec24850d1a921b4f6c3f2bdaf4c7a8003c03f2aeb93e7fbf2abf9987",
     "bytes": 7032

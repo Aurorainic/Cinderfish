@@ -3,7 +3,7 @@ package httpapi
 import (
 	"net/http"
 
-	"milnfish/internal/note"
+	"github.com/Aurorainic/cinderfish/internal/note"
 )
 
 // timelineRequest is the shared parameter set of the timeline endpoints.

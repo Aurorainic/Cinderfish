@@ -4,7 +4,7 @@ import (
 	"os"
 	"testing"
 
-	"milnfish/internal/testdb"
+	"github.com/Aurorainic/cinderfish/internal/testdb"
 )
 
 // TestMain serialises this package against the other database-backed test
