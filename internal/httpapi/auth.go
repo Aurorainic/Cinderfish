@@ -56,3 +56,24 @@ func authFromContext(ctx context.Context) *AuthInfo {
 	info, _ := ctx.Value(authContextKey{}).(*AuthInfo)
 	return info
 }
+
+// requireAdmin authenticates the request and checks that the caller is
+// an administrator, writing the appropriate error when not.
+// errIDForbidden is Misskey's permission-denied error id.
+const errIDForbidden = "f4f0d9f1-3a2e-4a8b-9c7d-2e1b0f6a8c53"
+
+func (s *Server) requireAdmin(w http.ResponseWriter, r *http.Request) bool {
+	info, err := s.authenticate(r.Context(), r, map[string]any{})
+	if err != nil || info == nil {
+		writeAuthenticationError(w)
+		return false
+	}
+	if !info.User.IsAdmin {
+		writeAPIError(w, &APIError{
+			Message: "You are not an administrator.", Code: "FORBIDDEN",
+			ID: errIDForbidden, Kind: "permission", Status: http.StatusForbidden,
+		})
+		return false
+	}
+	return true
+}

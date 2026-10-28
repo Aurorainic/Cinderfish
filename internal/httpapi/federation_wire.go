@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgxpool"
+
 	"milnfish/internal/federation"
 	"milnfish/internal/note"
 )
@@ -119,6 +121,10 @@ func (s *Server) RenderActorTest(ctx context.Context, userID string) (federation
 	}
 	return s.renderLocalActor(ctx, u)
 }
+
+// TestPool exposes the database pool so package-external tests can
+// arrange rows the API cannot create yet.
+func (s *Server) TestPool() *pgxpool.Pool { return s.pool }
 
 // Federation exposes the federation dependencies, mainly for tests.
 func (s *Server) Federation() (*federation.Policy, *federation.Store, *federation.Inbox, *federation.Deliverer) {

@@ -101,6 +101,12 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("POST /api/following/create", s.handleFollowingCreate)
 	s.mux.HandleFunc("POST /api/following/delete", s.handleFollowingDelete)
 
+	// Federation administration. The mode and allowlist live in the
+	// database so they change at runtime without a restart.
+	s.mux.HandleFunc("POST /api/admin/federation/mode", s.handleAdminFederationMode)
+	s.mux.HandleFunc("GET /api/admin/federation/allowlist", s.handleAdminAllowlist)
+	s.mux.HandleFunc("POST /api/admin/federation/allowlist", s.handleAdminAllowlist)
+
 	s.mux.HandleFunc("GET /.well-known/oauth-authorization-server", s.handleOAuthMetadata)
 	s.mux.HandleFunc("GET /oauth/authorize", s.handleOAuthAuthorize)
 	s.mux.HandleFunc("POST /oauth/token", s.handleOAuthToken)

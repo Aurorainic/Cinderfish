@@ -72,6 +72,9 @@ func main() {
 	// worker. The worker runs in this process; the queue is a table, so a
 	// crash resumes pending deliveries on the next start.
 	api.AttachFederation()
+	if err := api.ApplyFederationConfig(ctx); err != nil {
+		log.Fatalf("milnfish: %v", err)
+	}
 	api.StartFederationWorkers(notifyCtx)
 	if mode := cfg.FederationMode; mode == "none" {
 		log.Printf("milnfish: federation is off; AP routes answer 403")
