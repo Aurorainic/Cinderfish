@@ -56,6 +56,7 @@ These decisions are settled; do not reopen them without an explicit request.
 - Keep the frontend and backend compatibility boundaries explicit.
 - Use the repository's existing conventions once implementation begins.
 - Add tests when the project has a test suite; do not create unrelated scaffolding.
+- **Commit each finished piece of work to git as soon as it is done.** Do not leave a finished milestone or task sitting uncommitted, and do not batch several unrelated finished tasks into one late commit. Verify `go vet` and the tests pass, update `docs/HANDOVER.md` if the milestone state changed, then commit with a message that says what was done and what evidence backs it.
 - Keep database migrations immutable: an applied version is never edited, new changes go into a new version number. The current schema version is 3.
 - The S3 client is `github.com/minio/minio-go/v7`, not the AWS SDK. The AWS SDK v2 dependency tree is large and downloaded very slowly through the available proxy; minio-go works with AWS S3, Cloudflare R2, Backblaze B2 and MinIO alike.
 - When building SQL dynamically, collect conditions and their arguments together. Building placeholder strings and passing them as values silently shifts the argument list and produces errors such as "could not determine data type of parameter".
