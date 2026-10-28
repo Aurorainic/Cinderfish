@@ -98,6 +98,8 @@ go build -o milnfish ./cmd/milnfish
 
 数据库迁移在启动时自动执行（不可变的版本化脚本，已应用版本不再改动，新功能一律追加新版本号）。当前 schema 版本为 **3**。
 
+数据库测试包（`internal/account`、`internal/httpapi`）都会 TRUNCATE 同一批表，因此每个包用 `internal/testdb` 在 `TestMain` 里持有 PostgreSQL advisory lock，直到该包的测试二进制退出——这样 `go test ./...` 并行跑包时不会互相清表（不加锁时会随机出现"找不到用户"之类的假失败）。
+
 配置项可用 `MILNFISH_*` 环境变量覆盖，例如 `MILNFISH_PORT`、`MILNFISH_DOMAIN`、`MILNFISH_REGISTRATION_MODE`、`MILNFISH_FEDERATION_MODE`、`MILNFISH_MEDIA_BACKEND`、`MILNFISH_MEDIA_LOCAL_PATH`。
 
 ## 7. 代码结构
@@ -147,9 +149,9 @@ GET  /streaming                         （WebSocket 升级）
 3. **频道**：`main`（需登录，可共享）、`homeTimeline`（需登录）、`localTimeline`（匿名可用）、`hybridTimeline`（需登录）、`globalTimeline`（匿名可用）。
 4. **客户端消息**：`connect` / `disconnect` / `ch`（`channel` 的别名）/ `subNote`（别名 `s`、`sr`）/ `unsubNote`（别名 `un`）/ `readNotification`。
 5. **未实现的频道静默忽略**，与上游"构造器抛错但被消息队列吞掉"的可观测行为一致。
-6. **上限**：每连接 32 频道、1536 条 subNote（LRU 淘汰）、8 MiB 发送积压（超出直接断开）。心跳 60s ping / 120s 无 pong 断开。
+6. **上限**：每连接 32 频道、1536 条 subNote（LRU 淘汰）、256 条发送队列（对应上游 8 MiB bufferedAmount 阈值；溢出时关闭 socket，读取循环随之退出并释放全部订阅）。心跳 60s ping / 120s 无 pong 断开。
 7. **事件**：`notesStream`（进程内 fanout 到所有时间线频道）、`mainStream:<userId>`（notification / mention / reply / renote / readAllNotifications）、`noteStream:<noteId>`（reacted / unreacted / deleted）。
-8. **跨进程**：`LISTEN/NOTIFY`（channel `milnfish_stream`）中继，为多进程部署预留；单进程下语义正确。NOTIFY payload 超 8000 字节时只发 subject。
+8. **跨进程**：`LISTEN/NOTIFY`（channel `milnfish_stream`）中继，为多进程部署预留；单进程下语义正确。NOTIFY payload 有 8000 字节硬上限，超出的事件体先 base64 再分片、接收端重组（单事件上限约 384 KiB 正文），不会退化成"只发 subject 的空唤醒"。
 
 ### 9.1 M4 已知缺口（不是 bug，是后续里程碑的范围）
 
@@ -158,6 +160,8 @@ GET  /streaming                         （WebSocket 升级）
 - **mute / block 过滤恒为 false**：`isNoteMutedOrBlocked` 的调用点已就位，等数据模型落地。
 - **unreadNotification 提醒未实现**：需要"最近已读通知"游标。
 - **events 表未写入**：表存在，但 M4 不做重放。
+
+第一轮审查提出的两条 P1 已修复并有回归测试：过载连接会真正关闭 socket 并释放订阅；跨进程大事件改为分片中继。P2（channel id 替换与上限）核对后判定不成立，已补回归测试钉住行为。详细对照见 `docs/research/2026-10-28-m4-streaming-source-calibration.md` §10。
 
 ## 10. 下一步：M5 联邦（ActivityPub）
 

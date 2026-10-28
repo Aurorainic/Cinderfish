@@ -57,36 +57,65 @@ func newWSConn(ws *websocket.Conn) *wsConn {
 	}
 }
 
-// close shuts the writer down. It is safe to call repeatedly.
+// close stops the writer and the heartbeat. It is safe to call
+// repeatedly and does not touch the socket, so a reader parked in
+// ReadMessage keeps waiting.
 func (c *wsConn) close() {
 	c.once.Do(func() { close(c.done) })
 }
 
+// terminate closes the socket as well, which is what actually ends an
+// overloaded connection: closing it unblocks the read loop, and the read
+// loop is the only thing that releases the connection's channels and bus
+// subscriptions. Misskey reaches the same outcome with terminate().
+func (c *wsConn) terminate() {
+	c.close()
+	if c.ws != nil {
+		_ = c.ws.Close()
+	}
+}
+
 // send queues a message. It never blocks: when the queue is full the
-// connection is closed instead, mirroring Misskey's bufferedAmount
+// connection is terminated instead, mirroring Misskey's bufferedAmount
 // guard.
 func (c *wsConn) send(typ string, body any) {
+	// Check done on its own first: a select with two ready cases picks
+	// randomly, so a closed connection could otherwise still win the
+	// queue case.
 	select {
 	case <-c.done:
 		return
+	default:
+	}
+
+	select {
 	case c.queue <- outbound{Type: typ, Body: body}:
+	case <-c.done:
 	default:
 		// The client cannot keep up; drop it so it reconnects with a
 		// fresh, empty backlog.
-		c.close()
+		c.terminate()
 	}
 }
 
 // writeLoop drains the queue onto the wire until the connection ends.
 func (c *wsConn) writeLoop() {
 	for {
+		// Once done is closed no further message may be written, so test
+		// it before the queue in its own select.
+		select {
+		case <-c.done:
+			return
+		default:
+		}
+
 		select {
 		case <-c.done:
 			return
 		case m := <-c.queue:
 			_ = c.ws.SetWriteDeadline(time.Now().Add(writeWait))
 			if err := c.ws.WriteJSON(m); err != nil {
-				c.close()
+				c.terminate()
 				return
 			}
 		}
@@ -105,13 +134,12 @@ func (c *wsConn) heartbeat(lastSeen *atomicTime) {
 			return
 		case <-ticker.C:
 			if time.Since(lastSeen.load()) > pongTimeout {
-				_ = c.ws.Close()
-				c.close()
+				c.terminate()
 				return
 			}
 			_ = c.ws.SetWriteDeadline(time.Now().Add(writeWait))
 			if err := c.ws.WriteControl(websocket.PingMessage, nil, time.Now().Add(writeWait)); err != nil {
-				c.close()
+				c.terminate()
 				return
 			}
 		}

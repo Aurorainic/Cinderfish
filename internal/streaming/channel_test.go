@@ -416,6 +416,29 @@ func TestConnectionChannelLimits(t *testing.T) {
 		}
 	})
 
+	// Reconnecting an id that is already connected replaces that channel
+	// rather than consuming another slot. The replacement has to happen
+	// before the cap check, otherwise a full connection could never
+	// reconnect one of its own channels: the old one is gone and the new
+	// one is refused. Upstream Connection.connectChannel does the same.
+	t.Run("replacing an id at the cap keeps a channel", func(t *testing.T) {
+		h := newTestConnection(t, Viewer{})
+		for i := 0; i < maxChannelsPerConnection; i++ {
+			h.conn.connectChannel(string(rune('a'+i)), "globalTimeline", nil, false)
+		}
+		if got := len(h.conn.channels); got != maxChannelsPerConnection {
+			t.Fatalf("channels = %d, want %d", got, maxChannelsPerConnection)
+		}
+
+		h.conn.connectChannel("a", "globalTimeline", nil, false)
+		if _, ok := h.conn.channels["a"]; !ok {
+			t.Fatal("replacing a channel at the cap dropped it")
+		}
+		if got := len(h.conn.channels); got != maxChannelsPerConnection {
+			t.Errorf("channels = %d, want %d", got, maxChannelsPerConnection)
+		}
+	})
+
 	t.Run("pong replies connected", func(t *testing.T) {
 		h := newTestConnection(t, Viewer{})
 		h.conn.connectChannel("a", "globalTimeline", nil, true)

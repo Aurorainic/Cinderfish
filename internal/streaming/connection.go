@@ -442,8 +442,7 @@ func (c *Connection) dispose() {
 		ch.Dispose()
 	}
 
-	c.ws.close()
-	_ = c.ws.ws.Close()
+	c.ws.terminate()
 }
 
 func removeString(list []string, want string) []string {

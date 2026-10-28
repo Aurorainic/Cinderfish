@@ -146,12 +146,12 @@ Redis pub/sub 的 `channel` 字段充当「订阅键」，MilnFish 用同样的�
   - `Subscribe(Handler) cancel` / `Publish(subject, Message)`，单会话多订阅。
   - 进程内 fanout 是**唯一**保证单实例正确性的通道。
   - 可选 `SetPublisher(*Publisher)`：每次 Publish 后异步 `pg_notify`，另一进程 `Listen` 收到后回灌本地 bus。这为多进程部署预留，不需要 Redis。
-  - NOTIFY payload 上限 8000 字节；超限时自动降级为只带 subject 的唤醒信号（不丢数据，因为弱化只影响跨进程的场景）。
+  - NOTIFY payload 上限 8000 字节（硬限制，`pg_notify` 直接拒绝更大的载荷）。超限的事件体先 base64 再分片，接收端重组；**不**降级成"只带 subject 的空唤醒"——那等于跨进程静默丢事件。单事件上限 128 片（约 384 KiB 正文），超过则返回错误并记日志，而不是发一个没有内容的通知。
 - **连接**：`Connection` 持有频道表、subNote 表（引用计数 + LRU，上限 1536）与缓存的 following 图。`notesStream` 在连接层面**只订阅一次**再分发到各时间线频道，比上游"每个频道各订阅一次"的 N 倍投递更省。
 - **Go 嵌入的坑（务必记住）**：`timelineChannel` 内嵌在具体频道里时，**内嵌类型的同名方法会遮蔽外层方法**，通过接口调用 `HandleNote` 命中的是内嵌的实现。因此不能靠"外层覆盖 onNote"做多态，改为把过滤函数存成字段（`timelineChannel.filter`），由各频道 `Init` 时赋值。这个 bug 第一版真实发生过：所有时间线频道都收不到笔记，单元测试暴露后才修正。
 - **上下文刷新**：每 10s 重新加载 following，与上游一致；MilnFish 没有 Redis 缓存，直接查库。
 - **心跳**：60s ping / 120s 无 pong 断开，与上游一致。
-- **发送缓冲**：每连接 256 条发送队列，满了直接断连（对应上游的 bufferedAmount 8 MiB 阈值，语义一致：宁可断开重连也不无限积压）。
+- **发送缓冲**：每连接 256 条发送队列，满了直接 `terminate()` 断连（对应上游的 bufferedAmount 8 MiB 阈值 + `wsConnection.terminate()`，语义一致：宁可断开重连也不无限积压）。**只关 writer 不够**：读取循环阻塞在 `ReadMessage`，它才是执行 `dispose`、释放频道与 bus 订阅的地方；只关 writer 会留下一个永不退出的连接和它持有的全部订阅（见 §10）。
 - **依赖**：`github.com/gorilla/websocket v1.5.3`（直接依赖）。
 
 ## 9. 验证记录（2026-10-28）
@@ -167,3 +167,24 @@ Redis pub/sub 的 `channel` 字段充当「订阅键」，MilnFish 用同样的�
 | 竞态 | `go test -race ./internal/streaming/ ./internal/httpapi/` | ✅ |
 
 **未做**：用 misskey-js / Misskey Web 前端实际联调；双进程真实部署联调。
+
+## 10. 第一轮审查修复（2026-10-28）
+
+对提交 `ba60daa` 的第一轮审查意见逐条核对后的结论与处理（审查内容见下表，全部记录在库内）：
+
+| 审查项 | 结论 | 处理 |
+|--------|------|------|
+| [P1] 过载保护只关 writer，读取循环仍阻塞在 `ReadMessage`，连接与订阅长期残留；`writeLoop` 在 `done` 关闭后仍可能选中队列继续发送 | 成立 | 新增 `wsConn.terminate()`（关 `done` 且关 socket），读取循环立即返回并 `dispose`；`send` / `writeLoop` 改成"先单独检查 `done`"，关闭后不再入队也不再写出。回归测试：`TestOverloadedConnectionIsTerminated`、`TestTerminatedConnectionReleasesSubscriptions`、`TestWriteLoopStopsAfterClose` |
+| [P1] 超过 8 KiB 的跨进程事件只发 subject+type，接收端拿到 null body，等于静默丢事件 | 成立 | 事件体 base64 后分片（每片 4000 字符，编码后仍远低于 8000 上限），`reassembler` 重组并校验 JSON；重组失败 / 超时 / 同时挂起的重组过多都打日志；超过 128 片返回错误由 `Publish` 记日志。测试：`TestWireMessagesChunkLargeBody`（乱序重组）、`TestWireMessagesRejectsOversizedBody`、`TestReassemblerExpiresStaleChunks`、`TestReassemblerBoundsPendingAssemblies`，以及走真实 PG 的 `TestStreamingCrossProcessRelayLargePayload` |
+| [P2] 重复 channel id 在 32 上限时"先删旧再被上限拒绝"，导致该 id 的频道消失 | **不成立** | 代码顺序与上游 `Connection.connectChannel` 一致：先删同 id 再判 `len < 32`，删除后长度已降为 31，检查通过。补回归测试 `replacing an id at the cap keeps a channel` 钉住该边界 |
+| 完整测试下 `internal/account` 两个用例失败（"找不到用户"/用户名可用性判断错），怀疑测试互相清表 | 成立，且与 M4 无关 | `internal/account` 与 `internal/httpapi` 的 setup 都 TRUNCATE 同一批表，`go test ./...` 并行跑包时互相踩。新增 `internal/testdb`：包级 `pg_advisory_lock` 持锁到测试二进制结束，两个包串行访问测试库 |
+
+复审后的验证记录：
+
+| 层次 | 命令 / 测试 | 结果 |
+|------|-------------|------|
+| 静态检查 | `go vet ./...`、`gofmt -l .` | ✅ |
+| 全量 | `MILNFISH_TEST_DATABASE_URL=... go test ./...` | ✅ |
+| 并发复现 | 修复前 `go test ./internal/account ./internal/httpapi -count=8` 稳定复现失败；修复后 ✅ |
+| 竞态 | `go test -race ./internal/streaming/ ./internal/httpapi/` | ✅ |
+| 分片中继 | 48 KiB 正文经真实 `pg_notify` 分片、重组后逐字节一致 | ✅ |
