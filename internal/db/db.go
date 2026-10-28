@@ -349,6 +349,14 @@ ALTER TABLE deliver_queue
     ADD COLUMN created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     ADD COLUMN delivered_at TIMESTAMPTZ;
 CREATE INDEX idx_deliver_queue_inbox ON deliver_queue (inbox_url) WHERE delivered_at IS NULL;
+
+-- The unique index from v2 made usernames globally unique, which is
+-- wrong once remote users live in the same table: alice@a.example and
+-- alice@b.example are different people. Uniqueness belongs on the
+-- (username, host) pair, which the original table already enforced.
+DROP INDEX IF EXISTS idx_users_username_lower;
+CREATE UNIQUE INDEX idx_users_username_lower_local ON users (username_lower) WHERE host IS NULL;
+CREATE UNIQUE INDEX idx_users_username_lower_remote ON users (username_lower, host) WHERE host IS NOT NULL;
 `,
 }
 

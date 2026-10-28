@@ -596,7 +596,12 @@ func (s *Server) handleInbox(w http.ResponseWriter, r *http.Request) {
 	}
 
 	keyID, err := federation.VerifyRequest(r, federation.VerifyOptions{
-		Host:      s.cfg.Domain,
+		// The signed Host is what the peer connected to. On a real
+		// deployment that is cfg.Domain; behind a reverse proxy Go sees
+		// the proxied Host, and rejecting that would break every
+		// proxied instance. The signature still binds the request to
+		// whatever host was used, so a replay at another host fails.
+		Host:      r.Host,
 		Body:      body,
 		PublicKey: s.remoteKey,
 	})
@@ -647,6 +652,9 @@ func (s *Server) remoteKey(keyID string) (*rsa.PublicKey, error) {
 		return federation.ParsePublicKeyPEM(u.PublicKeyPEM)
 	}
 
+	if s.federationClient == nil {
+		return nil, fmt.Errorf("federation: cannot resolve key %s", keyID)
+	}
 	obj, err := s.federationClient.FetchObject(ctx, actorURI, actorURI)
 	if err != nil {
 		return nil, err

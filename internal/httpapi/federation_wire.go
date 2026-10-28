@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rsa"
 	"log"
+	"net/http"
 	"time"
 
 	"milnfish/internal/federation"
@@ -60,6 +61,63 @@ func (s *Server) StartFederationWorkers(ctx context.Context) {
 	}
 	log.Println("httpapi: federation delivery worker started")
 	go s.federationDeliver.Run(ctx)
+}
+
+// FederationLocalKey returns a local user's keypair, creating it if
+// needed. Tests use it to sign activities as a real local actor would.
+func (s *Server) FederationLocalKey(ctx context.Context, userID string) (*federation.Keypair, error) {
+	return s.federationStore.EnsureLocalKey(ctx, userID)
+}
+
+// Federation exposes the federation dependencies to tests.
+type FederationDeps struct {
+	Policy *federation.Policy
+	Store  *federation.Store
+	Inbox  *federation.Inbox
+}
+
+// RemoteKeyForTest resolves an inbound signature key through the same
+// path the inbox uses, so a test proves the verification chain works.
+func (s *Server) RemoteKeyForTest(keyID string) (*rsa.PublicKey, error) {
+	return s.remoteKey(keyID)
+}
+
+// HasFollowingByIDs reports whether a remote actor (by URI) follows a
+// local user (by id).
+func (s *Server) HasFollowingByActorURI(ctx context.Context, followerURI, followeeID string) bool {
+	u, err := s.federationStore.UserByURI(ctx, followerURI)
+	if err != nil {
+		return false
+	}
+	return s.federationStore.HasFollowing(ctx, u.ID, followeeID)
+}
+
+// HasFollowingByActorURIIDs reports whether a local user (by id)
+// follows a remote actor (by URI).
+func (s *Server) HasFollowingByActorURIIDs(ctx context.Context, followerID, followeeURI string) bool {
+	u, err := s.federationStore.UserByURI(ctx, followeeURI)
+	if err != nil {
+		return false
+	}
+	return s.federationStore.HasFollowing(ctx, followerID, u.ID)
+}
+
+// SetFederationHTTPClient points the federation client at a custom
+// transport, which tests use to route one instance's domain to another's
+// httptest server.
+func (s *Server) SetFederationHTTPClient(c *http.Client) {
+	if s.federationClient != nil {
+		s.federationClient.SetHTTPClient(c)
+	}
+}
+
+// RenderActorTest fetches a stored user's actor document.
+func (s *Server) RenderActorTest(ctx context.Context, userID string) (federation.Object, error) {
+	u, err := s.accounts.GetByID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	return s.renderLocalActor(ctx, u)
 }
 
 // Federation exposes the federation dependencies, mainly for tests.
