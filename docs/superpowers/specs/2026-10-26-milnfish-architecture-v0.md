@@ -149,9 +149,9 @@ Storage 接口（语言无关语义）:
 1. **M1 骨架**：仓库结构（Go module）、config、db 迁移、`meta`/`ping`、单测跑通 ✅
 2. **M2 账户与认证**：注册三模式、signin、MiAuth、token、`i`、users/show、OAuth 2.0 PKCE ✅
 3. **M3 笔记与时间线**：notes/create/show/delete、四时间线、反应、通知、Drive+Storage 双实现
-4. **M4 Streaming**：WS 端点、频道、事件广播（Postgres 事件表 + LISTEN/NOTIFY；Redis 可选实现）
-5. **M5 联邦**：WebFinger/Actor/Inbox/Outbox/签名、三模式策略、deliver 队列、双实例 smoke
-6. **M6 前端 Firefish 风格**：Vue 3 时间线/发帖/反应/通知/资料/管理界面
+4. **M4 Streaming**：WS 端点、频道、事件广播（Postgres 事件表 + LISTEN/NOTIFY；Redis 可选实现） ✅
+5. **M5 联邦**：WebFinger/Actor/Inbox/Outbox/签名、三模式策略、deliver 队列、双实例 smoke ✅
+6. **M6 前端 Firefish 风格**（下一步）：Vue 3 时间线/发帖/反应/通知/资料/管理界面
 7. **M7 打磨**：媒体 S3 迁移工具、admin 面板、性能自测、部署文档
 
 里程碑顺序刻意把前端放后：API 稳定后前端才能对着契约开发，避免联调反复。
