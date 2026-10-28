@@ -1,5 +1,6 @@
 /bin/
 /data/
+.worktrees/
 *.test
 *.out
 coverage.txt
