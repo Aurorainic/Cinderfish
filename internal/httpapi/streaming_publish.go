@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"net/http"
 	"time"
 
 	"milnfish/internal/note"
@@ -96,3 +97,32 @@ func (s *Server) publishNoteDeleted(n *note.Note) {
 
 // streamingPacker returns the packer used for streaming payloads.
 func (s *Server) streamingPacker() streamingPacker { return streamingPacker{s: s} }
+
+// publishFollowEvent emits the streaming follow event.
+//
+// Misskey publishes "follow" to the followee's main channel and
+// "followed" to the follower's. Both are emitted here so a client that
+// has both channels open sees a consistent state.
+func (s *Server) publishFollowEvent(followerID, followeeID string) {
+	if s.streamBus == nil {
+		return
+	}
+	s.streamBus.PublishTyped(streaming.MainSubject(followeeID), "follow", map[string]any{"id": followerID})
+	s.streamBus.PublishTyped(streaming.MainSubject(followerID), "followed", map[string]any{"id": followeeID})
+}
+
+// publishUnfollowEvent emits the streaming unfollow event.
+func (s *Server) publishUnfollowEvent(followerID, followeeID string) {
+	if s.streamBus == nil {
+		return
+	}
+	s.streamBus.PublishTyped(streaming.MainSubject(followeeID), "unfollow", map[string]any{"id": followerID})
+}
+
+// writeInternalServerError emits the generic server-side error envelope.
+func writeInternalServerError(w http.ResponseWriter) {
+	writeAPIError(w, &APIError{
+		Message: "Internal error.", Code: "INTERNAL_ERROR",
+		ID: errIDInternal, Kind: "server", Status: http.StatusInternalServerError,
+	})
+}

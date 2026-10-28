@@ -177,6 +177,25 @@ func (s *Service) Create(ctx context.Context, p CreateParams) (*Note, error) {
 		renoteUserHost = target.UserHost
 	}
 
+	// Resolve the local users the text mentions. Remote mentions are
+	// kept for federation addressing but do not enter mentions[], which
+	// holds local user ids the way Misskey's column does.
+	mentions := []string{}
+	if p.Text != nil {
+		for _, m := range ParseMentions(*p.Text) {
+			mention := m
+			if mention.Host != "" {
+				continue
+			}
+			var id string
+			if err := tx.QueryRow(ctx, `
+SELECT id FROM users WHERE username_lower = lower($1) AND host IS NULL
+			`, mention.Username).Scan(&id); err == nil {
+				mentions = append(mentions, id)
+			}
+		}
+	}
+
 	now := time.Now()
 	if p.FileIDs == nil {
 		// The column is NOT NULL, so an empty array is needed rather
@@ -196,7 +215,7 @@ func (s *Service) Create(ctx context.Context, p CreateParams) (*Note, error) {
 		RenoteUserID:   renoteUserID,
 		RenoteUserHost: renoteUserHost,
 		Tags:           []string{},
-		Mentions:       []string{},
+		Mentions:       mentions,
 		Emojis:         []string{},
 		CreatedAt:      now,
 	}

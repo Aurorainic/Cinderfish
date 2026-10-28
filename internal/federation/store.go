@@ -527,3 +527,28 @@ ORDER BY f.id DESC LIMIT $3
 	}
 	return out, rows.Err()
 }
+
+// UserByID loads any user row, local or remote, by id.
+func (s *Store) UserByID(ctx context.Context, id string) (*RemoteUser, error) {
+	u := &RemoteUser{}
+	var host *string
+	err := s.pool.QueryRow(ctx, `
+SELECT id, username, host, COALESCE(uri, ''), COALESCE(inbox, ''),
+       COALESCE(shared_inbox, ''), COALESCE(followers_uri, ''),
+       COALESCE(featured_uri, ''), COALESCE(key_id, ''), COALESCE(public_key_pem, ''),
+       is_locked, is_bot, is_deleted
+FROM users WHERE id = $1
+	`, id).Scan(&u.ID, &u.Username, &host, &u.URI, &u.Inbox, &u.SharedInbox,
+		&u.FollowersURI, &u.FeaturedURI, &u.KeyID, &u.PublicKeyPEM,
+		&u.IsLocked, &u.IsBot, &u.IsDeleted)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, ErrRemoteNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("federation: load user: %w", err)
+	}
+	if host != nil {
+		u.Host = *host
+	}
+	return u, nil
+}
