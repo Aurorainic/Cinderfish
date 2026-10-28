@@ -1,8 +1,24 @@
 package httpapi
 
 import (
+	"context"
 	"net/http"
+
+	"milnfish/internal/streaming"
 )
+
+// markAllNotificationsRead marks every notification of a user read and
+// announces it on the user's main channel, so every open client clears
+// its unread badge without polling.
+func (s *Server) markAllNotificationsRead(ctx context.Context, userID string) error {
+	if err := s.notifications.MarkAllRead(ctx, userID); err != nil {
+		return err
+	}
+	if s.streamBus != nil {
+		s.streamBus.Publish(streaming.MainSubject(userID), streaming.NullMessage("readAllNotifications"))
+	}
+	return nil
+}
 
 // handleNotifications implements POST /api/notifications.
 func (s *Server) handleNotifications(w http.ResponseWriter, r *http.Request) {
@@ -93,7 +109,7 @@ func (s *Server) handleNotificationsMarkAllAsRead(w http.ResponseWriter, r *http
 		return
 	}
 
-	if err := s.notifications.MarkAllRead(r.Context(), info.User.ID); err != nil {
+	if err := s.markAllNotificationsRead(r.Context(), info.User.ID); err != nil {
 		writeAPIError(w, &APIError{
 			Message: "Could not mark the notifications as read.", Code: "INTERNAL_ERROR",
 			ID: errIDInternal, Kind: "server", Status: http.StatusInternalServerError,

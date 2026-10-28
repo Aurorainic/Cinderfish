@@ -99,6 +99,8 @@ func (s *Server) handleNotesCreate(w http.ResponseWriter, r *http.Request) {
 
 	// Notify the users the note is addressed to.
 	s.notifyMentioned(r, n, info.User.ID)
+	// Fan the note out to the streaming timelines and main channels.
+	s.publishNoteCreated(n, info.User.ID)
 
 	pc := s.notePackContext(r.Context(), n, info.User.ID)
 	writeJSON(w, http.StatusOK, map[string]any{
@@ -115,7 +117,12 @@ func (s *Server) notifyMentioned(r *http.Request, n *note.Note, actorID string) 
 		if target == actorID {
 			continue
 		}
-		_ = s.notifications.Create(r.Context(), target, "mention", &actorID, &n.ID, nil)
+		notificationID, err := s.notifications.CreateReturningID(r.Context(), target, "mention", &actorID, &n.ID, nil)
+		if err != nil {
+			continue
+		}
+		s.publishMentionEvent(n, target)
+		s.publishNotificationCreated(notificationID, target)
 	}
 }
 
@@ -231,6 +238,17 @@ func (s *Server) handleNotesDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Load the note first: the deletion event carries its visibility and
+	// audience, which are gone once the row is soft deleted.
+	n, err := s.notes.Get(r.Context(), body.NoteID)
+	if err != nil {
+		writeAPIError(w, &APIError{
+			Message: "No such note.", Code: "NO_SUCH_NOTE",
+			ID: errIDNoSuchNote, Kind: "client", Status: http.StatusNotFound,
+		})
+		return
+	}
+
 	if err := s.notes.Delete(r.Context(), body.NoteID, info.User.ID); err != nil {
 		writeAPIError(w, &APIError{
 			Message: "No such note.", Code: "NO_SUCH_NOTE",
@@ -238,6 +256,8 @@ func (s *Server) handleNotesDelete(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
+
+	s.publishNoteDeleted(n)
 	writeJSON(w, http.StatusOK, map[string]any{})
 }
 
@@ -287,9 +307,15 @@ func (s *Server) handleNotesReactionsCreate(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	// The reaction event goes out regardless of who reacted.
+	s.publishNoteReaction(n, "reacted", body.Emoji, info.User.ID)
+
 	// Notify the author, unless the reaction is on one's own note.
 	if n.UserID != info.User.ID {
-		_ = s.notifications.Create(r.Context(), n.UserID, "reaction", &info.User.ID, &n.ID, &body.Emoji)
+		if notificationID, err := s.notifications.CreateReturningID(
+			r.Context(), n.UserID, "reaction", &info.User.ID, &n.ID, &body.Emoji); err == nil {
+			s.publishNotificationCreated(notificationID, n.UserID)
+		}
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{})
@@ -320,12 +346,29 @@ func (s *Server) handleNotesReactionsDelete(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	if err := s.noteReactions.Remove(r.Context(), body.NoteID, info.User.ID, body.Emoji); err != nil {
+	// When the client omits the emoji, Misskey removes whatever reaction
+	// the user left, so resolve it before deleting.
+	emoji := body.Emoji
+	if emoji == "" {
+		emoji, _ = s.noteReactions.MyReaction(r.Context(), body.NoteID, info.User.ID)
+	}
+
+	if err := s.noteReactions.Remove(r.Context(), body.NoteID, info.User.ID, emoji); err != nil {
 		writeAPIError(w, &APIError{
 			Message: "Could not remove the reaction.", Code: "INTERNAL_ERROR",
 			ID: errIDInternal, Kind: "server", Status: http.StatusInternalServerError,
 		})
 		return
+	}
+
+	// Publish only when a reaction was actually named: an empty emoji
+	// means the user had none to withdraw, and the event would be a
+	// phantom. Reacting is idempotent, so no signature change is needed
+	// on Remove.
+	if emoji != "" {
+		if n, err := s.notes.Get(r.Context(), body.NoteID); err == nil {
+			s.publishNoteReaction(n, "unreacted", emoji, info.User.ID)
+		}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{})
 }

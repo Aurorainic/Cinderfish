@@ -18,6 +18,7 @@ import (
 	"milnfish/internal/db"
 	"milnfish/internal/httpapi"
 	"milnfish/internal/media"
+	"milnfish/internal/streaming"
 )
 
 func main() {
@@ -45,9 +46,31 @@ func main() {
 	}
 	log.Printf("milnfish: schema at version %d", version)
 
+	api := httpapi.NewServerWithDB(cfg, pool)
+
+	// The Streaming API shares the HTTP server: gorilla/websocket
+	// upgrades the /streaming route in place, so one port serves both
+	// the RPC endpoints and the WebSocket.
+	api.AttachStreaming(log.Printf)
+
+	// Relay events to, and receive them from, other processes of the
+	// same instance through PostgreSQL LISTEN/NOTIFY. This costs one
+	// NOTIFY per event; it is what makes a future multi-process
+	// deployment work without a Redis dependency.
+	notifyCtx, stopNotify := context.WithCancel(ctx)
+	defer stopNotify()
+
+	bus := api.StreamBus()
+	bus.SetPublisher(streaming.NewPublisher(pool))
+	go func() {
+		if err := streaming.Listen(notifyCtx, pool, bus, log.Printf); err != nil {
+			log.Printf("milnfish: streaming notify listener: %v", err)
+		}
+	}()
+
 	srv := &http.Server{
 		Addr:              cfg.Addr(),
-		Handler:           httpapi.NewServerWithDB(cfg, pool),
+		Handler:           api,
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 

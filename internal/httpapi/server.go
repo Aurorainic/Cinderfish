@@ -16,6 +16,7 @@ import (
 	"milnfish/internal/config"
 	"milnfish/internal/media"
 	"milnfish/internal/note"
+	"milnfish/internal/streaming"
 )
 
 // Server holds dependencies shared by all handlers.
@@ -35,12 +36,18 @@ type Server struct {
 
 	storage media.Storage
 	drive   *media.DriveService
+
+	// streamBus carries Streaming API events. It is always present so
+	// handlers can publish unconditionally; stream is nil until the
+	// server is attached to a running listener.
+	streamBus *streaming.Bus
+	stream    *streaming.Server
 }
 
 // NewServer returns a Server with no database backing. It serves the
 // endpoints that do not need persistence.
 func NewServer(cfg *config.Config) *Server {
-	s := &Server{cfg: cfg, startedAt: time.Now()}
+	s := &Server{cfg: cfg, startedAt: time.Now(), streamBus: streaming.NewBus()}
 	s.mux = http.NewServeMux()
 	s.registerRoutes()
 	return s
@@ -101,6 +108,8 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("POST /api/drive/files/show", s.handleDriveFilesShow)
 	s.mux.HandleFunc("POST /api/drive/files/delete", s.handleDriveFilesDelete)
 	s.mux.HandleFunc("GET /media/{path...}", s.handleMediaServe)
+
+	s.mux.HandleFunc("GET /streaming", s.handleStreaming)
 
 	s.mux.HandleFunc("/", notFoundHandler)
 }

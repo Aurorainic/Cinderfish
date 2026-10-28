@@ -2,9 +2,11 @@ package note
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -123,14 +125,38 @@ type Notification struct {
 
 // Create records a notification.
 func (s *NotificationService) Create(ctx context.Context, recipientID, notifType string, notifierID, noteID *string, reaction *string) error {
+	_, err := s.CreateReturningID(ctx, recipientID, notifType, notifierID, noteID, reaction)
+	return err
+}
+
+// CreateReturningID records a notification and returns its id, which the
+// streaming layer needs to publish the event.
+func (s *NotificationService) CreateReturningID(ctx context.Context, recipientID, notifType string, notifierID, noteID *string, reaction *string) (string, error) {
+	id := newID()
 	_, err := s.pool.Exec(ctx, `
 INSERT INTO notifications (id, recipient_id, type, notifier_id, note_id, reaction)
 VALUES ($1, $2, $3, $4, $5, $6)
-`, newID(), recipientID, notifType, notifierID, noteID, reaction)
+`, id, recipientID, notifType, notifierID, noteID, reaction)
 	if err != nil {
-		return fmt.Errorf("note: create notification: %w", err)
+		return "", fmt.Errorf("note: create notification: %w", err)
 	}
-	return nil
+	return id, nil
+}
+
+// Get loads one notification by id.
+func (s *NotificationService) Get(ctx context.Context, id string) (*Notification, error) {
+	var n Notification
+	err := s.pool.QueryRow(ctx, `
+SELECT id, recipient_id, type, notifier_id, note_id, reaction, is_read, created_at
+FROM notifications WHERE id = $1
+`, id).Scan(&n.ID, &n.RecipientID, &n.Type, &n.NotifierID, &n.NoteID, &n.Reaction, &n.IsRead, &n.CreatedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("note: scan notification: %w", err)
+	}
+	return &n, nil
 }
 
 // List returns a user's notifications, newest first.

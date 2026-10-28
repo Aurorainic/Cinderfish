@@ -1,6 +1,6 @@
 # MilnFish 交接说明
 
-- 最后更新：2026-10-28
+- 最后更新：2026-10-28（M4 Streaming 完成）
 - 项目暂用名 **MilnFish**（非最终命名，命名待定）
 - 仓库：`/home/lainsaka/文档/MilnFish`，分支 `master`，工作区干净
 
@@ -16,7 +16,7 @@ Go 单二进制的个人/极小规模联邦社交实例。后端契约是 **Miss
 | 源码校准（meta/ping/错误信封） | ✅ | `0ba974c` |
 | M2 账户与认证 | ✅ | `1a1abed` |
 | M3 笔记/时间线/反应/通知/存储 | ✅ | `f4b8508` |
-| M4 Streaming（WebSocket） | ⬜ 未开始 | — |
+| M4 Streaming（WebSocket） | ✅ | 见 git log |
 | M5 联邦（ActivityPub） | ⬜ 未开始 | — |
 | M6 前端 | ⬜ 未开始 | — |
 | M7 打磨 | ⬜ 未开始 | — |
@@ -111,10 +111,11 @@ internal/auth/            bcrypt、token 生成、PKCE S256、用户名校验
 internal/account/         账户服务（三种注册模式）、token 签发与解析
 internal/note/            笔记服务、时间线服务、反应服务、通知服务
 internal/media/           Storage 接口 + local 实现 + S3 实现 + Drive 服务
+internal/streaming/       Streaming API：事件总线、WebSocket 连接、五个频道
 internal/httpapi/         路由装配与全部端点处理器
 ```
 
-依赖方向单向：`httpapi → 领域包 → db/media(接口)`。
+依赖方向单向：`httpapi → 领域包 → db/media(接口)`。`streaming` 只定义接口（`Authenticator`、`ViewerLoader`），实现由 `httpapi` 注入，因此不反向依赖 HTTP 层。
 
 ## 8. 已实现的端点
 
@@ -134,22 +135,33 @@ POST /api/drive/files/show              POST /api/drive/files/delete
 GET  /media/{path...}
 GET  /.well-known/oauth-authorization-server
 GET  /oauth/authorize                   POST /oauth/token
+GET  /streaming                         （WebSocket 升级）
 ```
 
-## 9. 下一步：M4 Streaming API
+## 9. M4 Streaming API（已完成）
 
-按架构文档 M4 的范围：
+协议细节见 `docs/research/2026-10-28-m4-streaming-source-calibration.md`（逐条对照上游源码，含踩坑清单）。要点：
 
-1. `GET /streaming?i=<token>` WebSocket 端点
-2. 频道：`main`、`homeTimeline`、`localTimeline`、`hybridTimeline`、`globalTimeline`
-3. `connect` / `disconnect` 消息协议（上游格式：`{"type":"connect","body":{"channel":"...","id":"...","params":{}}}`）
-4. `subNote` / `unsubNote`
-5. 事件广播：PostgreSQL 事件表（持久）+ `LISTEN/NOTIFY`（唤醒）+ 进程内 fanout；Redis 可选时替换唤醒通道
-6. 事件类型：`note`、`reaction`、`follow`、`notification` 等
+1. **端点**：`GET /streaming`，与 HTTP 共用端口，用 gorilla/websocket 原地升级。
+2. **鉴权**：`Authorization: Bearer <t>` 优先，否则 query `?i=<t>`。**无 token 合法**（匿名连接）；只有 token 无效才 401（带 `WWW-Authenticate`），封禁用户 403。app token 必须含 `read:account`，原生 16 位 token 不受此限。
+3. **频道**：`main`（需登录，可共享）、`homeTimeline`（需登录）、`localTimeline`（匿名可用）、`hybridTimeline`（需登录）、`globalTimeline`（匿名可用）。
+4. **客户端消息**：`connect` / `disconnect` / `ch`（`channel` 的别名）/ `subNote`（别名 `s`、`sr`）/ `unsubNote`（别名 `un`）/ `readNotification`。
+5. **未实现的频道静默忽略**，与上游"构造器抛错但被消息队列吞掉"的可观测行为一致。
+6. **上限**：每连接 32 频道、1536 条 subNote（LRU 淘汰）、8 MiB 发送积压（超出直接断开）。心跳 60s ping / 120s 无 pong 断开。
+7. **事件**：`notesStream`（进程内 fanout 到所有时间线频道）、`mainStream:<userId>`（notification / mention / reply / renote / readAllNotifications）、`noteStream:<noteId>`（reacted / unreacted / deleted）。
+8. **跨进程**：`LISTEN/NOTIFY`（channel `milnfish_stream`）中继，为多进程部署预留；单进程下语义正确。NOTIFY payload 超 8000 字节时只发 subject。
 
-**先读源码**：`packages/backend/src/server/api/stream/` 目录（`channels.ts`、`channel.ts`、`streaming-api.ts`、`channels/` 下各频道实现），以及 `packages/backend/src/server/api/stream/../../ws/` 下的 WebSocket 处理。频道列表在 `packages/backend/src/server/api/stream/channels.ts`。
+### 9.1 M4 已知缺口（不是 bug，是后续里程碑的范围）
 
-M4 之后是 M5 联邦（WebFinger、Actor、Inbox/Outbox、HTTP Signatures、三模式策略、deliver 队列、双实例 smoke test），再是 M6 前端。
+- **mention 永远不触发**：`notes.Mentions` 恒为空（笔记文本尚未解析 @）。等 M5 的远程解析一起做。
+- **follow / followed 事件无来源**：`following/create` 端点还没实现（属于 M5）。
+- **mute / block 过滤恒为 false**：`isNoteMutedOrBlocked` 的调用点已就位，等数据模型落地。
+- **unreadNotification 提醒未实现**：需要"最近已读通知"游标。
+- **events 表未写入**：表存在，但 M4 不做重放。
+
+## 10. 下一步：M5 联邦（ActivityPub）
+
+WebFinger、Actor、Inbox/Outbox、HTTP Signatures、三模式策略、deliver 队列、双实例 smoke test。先读 `packages/backend/src/core/activitypub/` 与 `server/activitypub`，三模式拦截点见 `docs/research/2026-10-26-misskey-source-calibration.md`。
 
 ## 10. 文档索引
 
@@ -163,6 +175,7 @@ M4 之后是 M5 联邦（WebFinger、Actor、Inbox/Outbox、HTTP Signatures、�
 | `docs/research/2026-10-26-misskey-source-calibration.md` | **源码校准记录（含许可证约束与踩坑清单）** |
 | `docs/research/2026-10-26-m2-implementation-notes.md` | M2 实施记录与源码对齐细节 |
 | `docs/research/2026-10-26-initial-scope.md` | 首版范围与已裁决项 |
+| `docs/research/2026-10-28-m4-streaming-source-calibration.md` | **M4 实施记录：Streaming 协议逐条对照上游源码** |
 
 ## 11. 已知的未验证项
 
@@ -170,4 +183,5 @@ M4 之后是 M5 联邦（WebFinger、Actor、Inbox/Outbox、HTTP Signatures、�
 - **缩略图/WebP 生成未实现**：`drive_files.thumbnail_key` 字段已留，但图片处理管道还没写。
 - **联邦模式在代码里只体现了 `meta` 字段的映射**，六个拦截点尚未实现（属于 M5）。
 - **前端完全未开始**（M6）。
-- **Streaming 完全未开始**（M4）。
+- **Streaming 未做真实 Misskey 客户端联调**：已用自写 WebSocket 客户端对真实二进制验证（握手、`connect`、`connected`、笔记投递全部通过），也覆盖了 misskey-js 的频道契约，但**没有**用 misskey-js 或 Misskey Web 前端实际连过。M6 前端开发时应先做这一步。
+- **Streaming 多进程中继只手测了单连接的 LISTEN/NOTIFY 往返**，没有做真正的双进程联调；单进程部署不受影响。

@@ -27,7 +27,7 @@ go build -o milnfish ./cmd/milnfish
 | M1 骨架 | ✅ Go module、config、数据库迁移、`/api/meta`、`/api/ping` |
 | M2 账户与认证 | ✅ 注册三模式、signin、MiAuth、OAuth 2.0 PKCE、`/api/i`、`/api/users/show` |
 | M3 笔记与时间线 | ✅ 笔记 CRUD、四条时间线、反应、通知、Drive + local/S3 双存储 |
-| M4 Streaming | 未开始 |
+| M4 Streaming | ✅ WebSocket 端点、五个频道、事件广播（进程内 fanout + LISTEN/NOTIFY 跨进程中继） |
 | M5 联邦 | 未开始 |
 | M6 前端 | 未开始 |
 | M7 打磨 | 未开始 |
