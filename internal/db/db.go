@@ -282,6 +282,74 @@ ALTER TABLE notifications
     ADD COLUMN reaction TEXT;
 CREATE INDEX idx_notifications_type ON notifications (recipient_id, type, created_at DESC);
 `,
+
+	// v4: federation support for M5.
+	4: `
+-- Remote users are the same rows as local users with host set; they
+-- carry no password. uri is the ActivityPub actor id and is the join key
+-- for every inbound activity.
+ALTER TABLE users
+    ADD COLUMN uri TEXT,
+    ADD COLUMN inbox TEXT,
+    ADD COLUMN shared_inbox TEXT,
+    ADD COLUMN followers_uri TEXT,
+    ADD COLUMN featured_uri TEXT,
+    ADD COLUMN key_id TEXT,
+    ADD COLUMN public_key_pem TEXT,
+    ADD COLUMN is_locked BOOLEAN NOT NULL DEFAULT FALSE,
+    ADD COLUMN is_bot BOOLEAN NOT NULL DEFAULT FALSE,
+    ADD COLUMN is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+    ADD COLUMN last_fetched_at TIMESTAMPTZ,
+    ADD COLUMN followers_count INT NOT NULL DEFAULT 0,
+    ADD COLUMN following_count INT NOT NULL DEFAULT 0,
+    ADD COLUMN notes_count INT NOT NULL DEFAULT 0;
+CREATE UNIQUE INDEX idx_users_uri ON users (uri) WHERE uri IS NOT NULL;
+CREATE INDEX idx_users_remote ON users (host) WHERE host IS NOT NULL;
+
+-- A remote user's avatar and banner are fetched from their actor document
+-- rather than served out of our drive, so they need their own columns.
+ALTER TABLE user_profiles
+    ADD COLUMN avatar_url TEXT,
+    ADD COLUMN banner_url TEXT,
+    ADD COLUMN fields JSONB NOT NULL DEFAULT '[]'::jsonb,
+    ADD COLUMN followers_visibility TEXT NOT NULL DEFAULT 'public',
+    ADD COLUMN following_visibility TEXT NOT NULL DEFAULT 'public';
+
+-- Follow provenance carries the Follow activity id so a later Undo can be
+-- matched and so the Follow/Accept exchange stays idempotent.
+ALTER TABLE followings
+    ADD COLUMN uri TEXT,
+    ADD COLUMN created_via TEXT;
+ALTER TABLE follow_requests
+    ADD COLUMN uri TEXT;
+CREATE UNIQUE INDEX idx_follow_requests_uri ON follow_requests (uri) WHERE uri IS NOT NULL;
+
+-- Notes carry the activity id that created them (the Create id for local
+-- notes, the Announce id for remote renotes) so Undo and Delete can be
+-- matched, plus ap_id: the canonical ActivityPub object id.
+ALTER TABLE notes
+    ADD COLUMN activity_uri TEXT,
+    ADD COLUMN ap_id TEXT;
+CREATE UNIQUE INDEX idx_notes_ap_id ON notes (ap_id) WHERE ap_id IS NOT NULL;
+CREATE INDEX idx_notes_activity_uri ON notes (activity_uri) WHERE activity_uri IS NOT NULL;
+
+-- The allowlist backing federation_mode = 'allowlist'. Rows are hostnames
+-- matched by suffix; see federation.Policy.
+CREATE TABLE federation_allowlist (
+    host       TEXT PRIMARY KEY,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Deliveries are per inbox, not per activity: one note fans out to every
+-- follower's inbox and each gets its own retry schedule.
+ALTER TABLE deliver_queue
+    ADD COLUMN activity_id TEXT,
+    ADD COLUMN key_id TEXT,
+    ADD COLUMN user_id TEXT REFERENCES users (id) ON DELETE SET NULL,
+    ADD COLUMN created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    ADD COLUMN delivered_at TIMESTAMPTZ;
+CREATE INDEX idx_deliver_queue_inbox ON deliver_queue (inbox_url) WHERE delivered_at IS NULL;
+`,
 }
 
 // Migrate applies pending migrations in order and returns the version
