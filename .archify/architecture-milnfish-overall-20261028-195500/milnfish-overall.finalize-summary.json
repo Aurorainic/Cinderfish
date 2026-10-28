@@ -1,0 +1,67 @@
+{
+  "schemaVersion": 1,
+  "ok": false,
+  "command": "finalize",
+  "status": "skipped",
+  "type": "architecture",
+  "quality": "showcase",
+  "specification": {
+    "path": "/home/lainsaka/文档/MilnFish/.archify/architecture-milnfish-overall-20261028-195500/candidate.json",
+    "sha256": "6c106407ec24850d1a921b4f6c3f2bdaf4c7a8003c03f2aeb93e7fbf2abf9987",
+    "bytes": 7032
+  },
+  "artifact": {
+    "path": "/home/lainsaka/文档/MilnFish/.archify/architecture-milnfish-overall-20261028-195500/milnfish-overall.html",
+    "sha256": "9cc2f33f18bb2381233359875153e671ab6c0ee399c8a9b8aa19cbdb587fe40a",
+    "bytes": 864951
+  },
+  "gates": {
+    "validate": "pass",
+    "deliver": "pass",
+    "check": "pass",
+    "browser-check": "skipped"
+  },
+  "failedStage": "browser-check",
+  "diagnostics": [
+    {
+      "code": "viewer/chrome-unavailable",
+      "severity": "warning",
+      "message": "No supported browser found. Install Chrome/Chromium (or Microsoft Edge), or set ARCHIFY_CHROME to its executable path.",
+      "subject": {
+        "artifact": "/home/lainsaka/文档/MilnFish/.archify/architecture-milnfish-overall-20261028-195500/milnfish-overall.html"
+      },
+      "evidence": {
+        "executable": null
+      },
+      "supportedFixes": [
+        "set ARCHIFY_CHROME to a Chrome/Chromium executable (or Microsoft Edge) and rerun browser-check"
+      ]
+    }
+  ],
+  "diagnosticSummary": {
+    "total": 1,
+    "shown": 1,
+    "truncated": false
+  },
+  "evidence": {
+    "receipt": "/home/lainsaka/文档/MilnFish/.archify/architecture-milnfish-overall-20261028-195500/milnfish-overall.finalize.json",
+    "summaryReceipt": "/home/lainsaka/文档/MilnFish/.archify/architecture-milnfish-overall-20261028-195500/milnfish-overall.finalize-summary.json",
+    "browserCheckReceipt": "/home/lainsaka/文档/MilnFish/.archify/architecture-milnfish-overall-20261028-195500/milnfish-overall.browser-check.json"
+  },
+  "update": {
+    "status": "current",
+    "installedVersion": "3.2.0",
+    "availableVersion": "3.2.0",
+    "releaseNotes": null,
+    "checkedAt": "2026-10-28T11:36:52.218Z",
+    "source": "cache",
+    "noticeRequired": false,
+    "noticeText": null
+  },
+  "visualReview": "not-requested",
+  "durationMs": 821,
+  "browserCheck": {
+    "requested": true,
+    "ran": false
+  }
+}

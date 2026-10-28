@@ -1,0 +1,389 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "MilnFish 项目整体结构",
+    "output": ".archify/architecture-milnfish-overall-20261028-195500/milnfish-overall.html",
+    "locale": "zh-CN",
+    "quality_profile": "showcase"
+  },
+  "components": [
+    {
+      "id": "fediverse",
+      "type": "external",
+      "label": "Fediverse 远端实例",
+      "sublabel": "Mastodon / Misskey / GoToSocial",
+      "pos": [
+        40,
+        60
+      ],
+      "size": [
+        180,
+        64
+      ]
+    },
+    {
+      "id": "client",
+      "type": "external",
+      "label": "Misskey 客户端",
+      "sublabel": "浏览器 / misskey-js",
+      "pos": [
+        40,
+        210
+      ],
+      "size": [
+        180,
+        64
+      ]
+    },
+    {
+      "id": "browser",
+      "type": "external",
+      "label": "用户浏览器",
+      "sublabel": "Web 前端宿主",
+      "pos": [
+        40,
+        380
+      ],
+      "size": [
+        180,
+        64
+      ]
+    },
+    {
+      "id": "main",
+      "type": "backend",
+      "label": "cmd/milnfish",
+      "sublabel": "入口 · 配置 · 迁移 · 优雅关闭",
+      "pos": [
+        280,
+        210
+      ],
+      "size": [
+        200,
+        64
+      ]
+    },
+    {
+      "id": "httpapi",
+      "type": "backend",
+      "label": "httpapi",
+      "sublabel": "路由 + 全部处理器",
+      "pos": [
+        540,
+        210
+      ],
+      "size": [
+        180,
+        64
+      ]
+    },
+    {
+      "id": "account",
+      "type": "backend",
+      "label": "account / auth",
+      "sublabel": "注册三模式 · token · OAuth PKCE",
+      "pos": [
+        790,
+        60
+      ],
+      "size": [
+        210,
+        64
+      ]
+    },
+    {
+      "id": "note",
+      "type": "backend",
+      "label": "note",
+      "sublabel": "笔记 · 四时间线 · 反应 · 通知",
+      "pos": [
+        790,
+        210
+      ],
+      "size": [
+        210,
+        64
+      ]
+    },
+    {
+      "id": "streaming",
+      "type": "backend",
+      "label": "streaming",
+      "sublabel": "WS 端点 · 五频道 · 事件总线",
+      "pos": [
+        790,
+        340
+      ],
+      "size": [
+        210,
+        64
+      ]
+    },
+    {
+      "id": "media",
+      "type": "backend",
+      "label": "media",
+      "sublabel": "Drive + Storage 接口",
+      "pos": [
+        790,
+        470
+      ],
+      "size": [
+        210,
+        64
+      ]
+    },
+    {
+      "id": "config",
+      "type": "backend",
+      "label": "config / idgen",
+      "sublabel": "TOML+ENV · Misskey 风格 ID",
+      "pos": [
+        280,
+        340
+      ],
+      "size": [
+        200,
+        64
+      ]
+    },
+    {
+      "id": "db",
+      "type": "database",
+      "label": "PostgreSQL",
+      "sublabel": "迁移 v3 · 23 张表",
+      "pos": [
+        540,
+        340
+      ],
+      "size": [
+        180,
+        64
+      ]
+    },
+    {
+      "id": "storage",
+      "type": "cloud",
+      "label": "media 后端",
+      "sublabel": "local / S3 兼容",
+      "pos": [
+        540,
+        470
+      ],
+      "size": [
+        180,
+        64
+      ]
+    },
+    {
+      "id": "federation",
+      "type": "backend",
+      "label": "federation",
+      "sublabel": "WebFinger · Actor · Inbox/Outbox",
+      "pos": [
+        280,
+        620
+      ],
+      "size": [
+        200,
+        64
+      ]
+    },
+    {
+      "id": "deliver",
+      "type": "messagebus",
+      "label": "deliver",
+      "sublabel": "出站投递队列",
+      "pos": [
+        540,
+        620
+      ],
+      "size": [
+        180,
+        64
+      ]
+    },
+    {
+      "id": "queue",
+      "type": "messagebus",
+      "label": "queue",
+      "sublabel": "PG 缺省 · Redis 可选",
+      "pos": [
+        790,
+        620
+      ],
+      "size": [
+        210,
+        64
+      ]
+    },
+    {
+      "id": "web",
+      "type": "frontend",
+      "label": "web 前端",
+      "sublabel": "Vue 3 + Vite · Firefish 风格",
+      "pos": [
+        1060,
+        620
+      ],
+      "size": [
+        180,
+        64
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "已实现（M1–M4）",
+      "wraps": [
+        "main",
+        "httpapi",
+        "account",
+        "note",
+        "streaming",
+        "media",
+        "config",
+        "db",
+        "storage"
+      ]
+    },
+    {
+      "kind": "region",
+      "label": "规划中（M5–M7）",
+      "wraps": [
+        "federation",
+        "deliver",
+        "queue",
+        "web"
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "from": "client",
+      "to": "httpapi",
+      "label": "RPC / WS",
+      "variant": "emphasis"
+    },
+    {
+      "from": "main",
+      "to": "httpapi",
+      "label": "装配"
+    },
+    {
+      "from": "httpapi",
+      "to": "account",
+      "label": "鉴权"
+    },
+    {
+      "from": "httpapi",
+      "to": "note",
+      "label": "读写"
+    },
+    {
+      "from": "httpapi",
+      "to": "streaming",
+      "label": "升级",
+      "variant": "emphasis"
+    },
+    {
+      "from": "httpapi",
+      "to": "media",
+      "label": "上传"
+    },
+    {
+      "from": "config",
+      "to": "main",
+      "label": "加载"
+    },
+    {
+      "from": "note",
+      "to": "db",
+      "label": "SQL",
+      "variant": "emphasis"
+    },
+    {
+      "from": "account",
+      "to": "db",
+      "label": "SQL"
+    },
+    {
+      "from": "streaming",
+      "to": "db",
+      "label": "NOTIFY",
+      "variant": "dashed"
+    },
+    {
+      "from": "media",
+      "to": "storage",
+      "label": "Put / Get"
+    },
+    {
+      "from": "fediverse",
+      "to": "federation",
+      "label": "Inbox / WebFinger",
+      "variant": "dashed"
+    },
+    {
+      "from": "federation",
+      "to": "note",
+      "label": "解析远程笔记",
+      "variant": "dashed"
+    },
+    {
+      "from": "note",
+      "to": "deliver",
+      "label": "入队",
+      "variant": "dashed"
+    },
+    {
+      "from": "deliver",
+      "to": "queue",
+      "label": "SKIP LOCKED",
+      "variant": "dashed"
+    },
+    {
+      "from": "browser",
+      "to": "web",
+      "label": "SPA",
+      "variant": "dashed"
+    },
+    {
+      "from": "web",
+      "to": "httpapi",
+      "label": "RPC / WS",
+      "variant": "dashed"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "已实现 M1–M4",
+      "items": [
+        "单二进制，Go 1.26 标准库 net/http",
+        "Misskey RPC + Streaming WebSocket",
+        "local 与 S3 双媒体后端"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "规划中 M5–M7",
+      "items": [
+        "federation / deliver / queue 尚无代码",
+        "web 前端目录尚未创建",
+        "ap_keys、ap_activities、deliver_queue、events 表已建但无读写方"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "读图说明",
+      "items": [
+        "实现状态由区域边界区分，不靠颜色",
+        "虚线 = 规划中的链路",
+        "随里程碑推进更新"
+      ]
+    }
+  ]
+}
