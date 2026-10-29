@@ -18,7 +18,7 @@ registration_mode = "admin"
 federation_mode = "none"
 
 # Built frontend directory (index.html + assets). Leave the default if you
-# build web/ with `npm run build`; a missing directory keeps the server
+# build web/ with `pnpm build`; a missing directory keeps the server
 # API-only.
 web_dir = "./web/dist"
 

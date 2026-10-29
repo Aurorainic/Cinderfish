@@ -70,7 +70,7 @@ cd /tmp/refcheck/misskey && git sparse-checkout set packages/backend/src package
 
 - Go 1.26.8，`GOPROXY=https://mirrors.aliyun.com/goproxy/,direct`
 - PostgreSQL 18：库 `cinderfish`（开发）、`cinderfish_test`（测试）；角色/密码 `cinderfish`/`cinderfish`
-- Redis：**可选**，默认关闭；本机没有 `redis-server`，测试用 `miniredis` 代替
+- Redis：**可选**，默认关闭；本机已装 `redis-server` 8.0.5（systemd `redis-server.service`，监听 `127.0.0.1:6379`），单元测试默认用 `miniredis`，设 `CINDERFISH_TEST_REDIS_URL` 时对真实服务端再跑一遍集成测试
 - **访问 GitHub 必须走代理** `127.0.0.1:19823`
 - `dl.min.io` 被代理拦截，MinIO 二进制下不下来；S3 后端**尚未做真实服务端验证**
 - S3 客户端用 `github.com/minio/minio-go/v7`（不是 AWS SDK，依赖树太大）
@@ -82,7 +82,8 @@ cd /home/lainsaka/文档/MilnFish   # 目录改名待办
 
 go vet ./...
 go test ./...
-CINDERFISH_TEST_DATABASE_URL="postgres://cinderfish:cinderfish@localhost:5432/cinderfish_test" go test ./...
+CINDERFISH_TEST_DATABASE_URL="postgres://cinderfish:cinderfish@localhost:5432/cinderfish_test" \
+CINDERFISH_TEST_REDIS_URL="redis://127.0.0.1:6379/0" go test ./...
 
 cd web && pnpm install && pnpm build && cd ..   # 产出 web/dist
 cp config.example.toml config.toml   # 按需改
@@ -239,6 +240,21 @@ prefix = "cinderfish"
 
 `prefix` 用于多实例共用一个 Redis 库时隔离频道；空值回退到 `cinderfish`。
 
+URL 支持标准 Redis URI 语法，包括密码：`redis://:password@127.0.0.1:6379/0`（ACL 用户则写成 `redis://user:password@host:port/db`）。密码错误时启动直接失败并打印 `WRONGPASS`，不会退化成静默重试。
+
+测试分两层：
+
+- `miniredis`（`internal/streaming/redis_test.go`、`internal/federation/redis_wake_test.go`）覆盖投递、自身回声丢弃、大报文不分块、唤醒不阻塞，默认执行。
+- 真实服务端集成测试（`*_integration_test.go`、`internal/httpapi/streaming_relay_redis_test.go`）在 `CINDERFISH_TEST_REDIS_URL` 设置后执行，覆盖真实 Pub/Sub 往返、`requirepass` 认证与生产接线方式（`NewRedisRelay` + `ListenRedis`）。
+
+本机安装与启动（Ubuntu/Debian 系）：
+
+```bash
+sudo apt-get install -y redis-server
+sudo systemctl enable --now redis-server
+redis-cli ping   # PONG
+```
+
 ### 11.5 实时更新
 
 `web/src/stores/streaming.ts` 维护唯一 `/streaming` 连接：token 走 query，`connect` 带 `pong:true`，按订阅 id 分发 `channel` 帧，断线指数退避（1s→30s，6 次封顶），登录/退出时重建连接。`main` 频道只由外壳订阅一次（服务端每连接只允许一个），时间线各自订阅自己的频道，重连后重新拉取。
@@ -334,7 +350,7 @@ POST /inbox                            POST /users/{id}/inbox
 - **S3 后端未做真实服务端验证**：只验证了编译、接口与 URL 生成逻辑。
 - **缩略图/WebP 生成未实现**：`drive_files.thumbnail_key` 字段已留，图片处理管道还没写。
 - **前端没有真实第三方客户端联调**：页面已在构建产物上用浏览器走查，但没有用 misskey-js 或 Misskey Web 前端连过本实例。
-- **Redis 只对 miniredis 验证过**：本机没有 `redis-server`，跨进程中继的单元测试与双进程 smoke 都用 miniredis；没有对真实 Redis 做过持久化/认证/网络闪断验证。
+- **Redis 已在真实服务端验证核心路径**：本机 Redis 8.0.5 上跑过跨进程中继集成测试（含 20 KB 大报文不分块）、`requirepass` 认证（`redis://:pass@host:port/db`）、错误密码启动失败，以及双进程 smoke（A 建笔记 → Redis → B 的 WebSocket 约 6ms 收到）。**未验证**：持久化（RDB/AOF）、主从/Cluster、网络闪断后的重连行为、真实高并发压力。
 - **Streaming 未做真实 Misskey 客户端联调**：已用自写 WebSocket 客户端验证（握手、`connect`、`connected`、笔记投递全部通过），但**没有**用 misskey-js 或 Misskey Web 前端实际连过。
 - **联邦没有任何第三方联调**：只跑了本实现的双实例测试（真签名、真 HTTP、真库），没有对 Mastodon / GoToSocial / 真实 Misskey 实例互通。这是 M5 之后最该补的验证。
 - **Streaming 多进程中继只手测了单连接的 LISTEN/NOTIFY 往返**，没有做真正的双进程联调。
