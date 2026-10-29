@@ -10,7 +10,7 @@
       "url": "https://github.com/Aurorainic/Cinderfish.git",
       "provider": "github",
       "link_mode": "web",
-      "revision": "62b19df5eb1e84bbb9dd9e7b388e6f75f4acfb2b"
+      "revision": "c9ec7053a3a6dad6d2591629d84654bf8c3981cd"
     }
   },
   "components": [
@@ -74,8 +74,8 @@
       "pos": [300, 320],
       "size": [200, 64],
       "sources": [
-        { "path": "internal/httpapi/server.go", "line": 94, "end_line": 167, "label": "全部路由" },
-        { "path": "internal/httpapi/server.go", "line": 169, "end_line": 175, "label": "SPA 前置分流" }
+        { "path": "internal/httpapi/server.go", "line": 94, "end_line": 171, "label": "全部路由" },
+        { "path": "internal/httpapi/server.go", "line": 173, "end_line": 179, "label": "SPA 前置分流" }
       ]
     },
     {
@@ -217,7 +217,7 @@
       "title": "当前状态",
       "items": [
         "M1–M5 已完成：骨架、账户、笔记、Streaming、ActivityPub 联邦",
-        "M6 完成；M7 进行中：媒体迁移工具已落地",
+        "M6 完成；M7 进行中：媒体迁移与账号管理已落地",
         "单个 Go 二进制内嵌迁移脚本，启动时自动升级到 v4"
       ]
     },
