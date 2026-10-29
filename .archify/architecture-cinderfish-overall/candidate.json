@@ -10,7 +10,7 @@
       "url": "https://github.com/Aurorainic/Cinderfish.git",
       "provider": "github",
       "link_mode": "web",
-      "revision": "1e863b742cdde86efdd7525ecaa5713f461c32bb"
+      "revision": "0511de2eaec63b93038b831b129f4f68c72d12f4"
     }
   },
   "components": [
@@ -169,7 +169,7 @@
       "size": [180, 64],
       "sources": [
         { "path": "internal/streaming/redis.go", "line": 1, "end_line": 30, "label": "Redis 中继" },
-        { "path": "cmd/cinderfish/main.go", "line": 60, "end_line": 85, "label": "启动选择中继" }
+        { "path": "internal/federation/redis_wake.go", "line": 1, "end_line": 30, "label": "投递唤醒" }
       ]
     },
     {
@@ -217,6 +217,7 @@
     { "from": "federation", "to": "note", "label": "远程对象 / 提及" },
     { "from": "federation", "to": "deliver", "label": "入队" },
     { "from": "deliver", "to": "fediverse", "label": "HTTP POST + 签名" },
+    { "from": "deliver", "to": "redis", "label": "投递唤醒（可选）", "variant": "dashed" },
     { "from": "account", "to": "postgres", "label": "SQL" },
     { "from": "note", "to": "postgres", "label": "SQL" },
     { "from": "streaming", "to": "postgres", "label": "LISTEN/NOTIFY（默认）", "variant": "dashed" },
@@ -230,7 +231,7 @@
       "title": "当前状态",
       "items": [
         "M1–M5 已完成：骨架、账户、笔记、Streaming、ActivityPub 联邦",
-        "M6 与 M7 完成；Redis 作为可选跨进程中继接入 Streaming",
+        "Redis 可选：Streaming 中继 + 投递唤醒，PostgreSQL 仍是事实来源",
         "单个 Go 二进制内嵌迁移脚本，启动时自动升级到 v4"
       ]
     },

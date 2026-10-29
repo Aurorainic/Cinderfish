@@ -2,7 +2,7 @@
 
 - 产出：`cinderfish-overall.html`
 - 源：`candidate.json`（Archify architecture schema v1）
-- 绘制时基线：`aaa8eba`（前端改用 pnpm 之后）
+- 绘制时基线：`0511de2`（Redis 可选中继之后）
 - 画布：1040×812，宽画布契约不触发（宽度低于 1240）
 
 ## 目录命名
