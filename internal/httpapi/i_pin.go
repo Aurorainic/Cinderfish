@@ -7,16 +7,21 @@ import (
 	"github.com/Aurorainic/cinderfish/internal/account"
 )
 
+// errIDPinLimitExceeded is Cinderfish's id for the pin-limit error,
+// styled after Misskey's error ids.
+const errIDPinLimitExceeded = "4e1b0f8e-9a2d-4c7e-b3a1-6f5d8c2b7a94"
+
 // handleIPin implements POST /api/i/pin: it adds a note owned by the
-// authenticated user to their pinned notes. The answer is 204, matching
-// Misskey's empty response.
+// authenticated user to their pinned notes, at most MaxPinnedNotes at a
+// time. The response is the packed MeDetailed user, like i/update.
 func (s *Server) handleIPin(w http.ResponseWriter, r *http.Request) {
 	s.pinNote(w, r, true)
 }
 
 // handleIUnpin implements POST /api/i/unpin: it removes a note from the
-// authenticated user's pinned notes. Unpinning a note that is not pinned
-// is a no-op.
+// authenticated user's pinned notes. Unpinning a note that is not
+// pinned is a no-op; unknown and foreign notes answer NO_SUCH_NOTE like
+// Misskey, so a note's existence is not leaked.
 func (s *Server) handleIUnpin(w http.ResponseWriter, r *http.Request) {
 	s.pinNote(w, r, false)
 }
@@ -52,15 +57,18 @@ func (s *Server) pinNote(w http.ResponseWriter, r *http.Request, pin bool) {
 	}
 	if err != nil {
 		switch {
-		case errors.Is(err, account.ErrNoSuchPinTarget):
+		// Misskey maps both the unknown and the foreign note to
+		// NO_SUCH_NOTE, so neither the existence nor the ownership of
+		// a note is revealed.
+		case errors.Is(err, account.ErrNoSuchPinTarget), errors.Is(err, account.ErrNotOwnNote):
 			writeAPIError(w, &APIError{
 				Message: "No such note.", Code: "NO_SUCH_NOTE",
 				ID: errIDNoSuchNote, Kind: "client", Status: http.StatusNotFound,
 			})
-		case errors.Is(err, account.ErrNotOwnNote):
+		case errors.Is(err, account.ErrPinLimitExceeded):
 			writeAPIError(w, &APIError{
-				Message: "That note is not yours.", Code: "ACCESS_DENIED",
-				ID: errIDForbidden, Kind: "permission", Status: http.StatusForbidden,
+				Message: "You cannot pin any more notes.", Code: "PIN_LIMIT_EXCEEDED",
+				ID: errIDPinLimitExceeded, Kind: "client", Status: http.StatusBadRequest,
 			})
 		default:
 			writeInternalServerError(w)
@@ -68,5 +76,7 @@ func (s *Server) pinNote(w http.ResponseWriter, r *http.Request, pin bool) {
 		return
 	}
 
-	w.WriteHeader(http.StatusNoContent)
+	packed := packMeDetailed(info.User, info.User.CreatedAt, info.Token == nil, loadProfile(r.Context(), s, info.User.ID))
+	s.applyUserCounts(r.Context(), info.User.ID, packed)
+	writeJSON(w, http.StatusOK, packed)
 }

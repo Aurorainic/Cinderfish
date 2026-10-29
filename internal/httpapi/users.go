@@ -18,13 +18,13 @@ func (s *Server) handleUsersNotes(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var body struct {
-		UserID   string `json:"userId"`
-		Username string `json:"username"`
-		Limit    int    `json:"limit"`
-		SinceID  string `json:"sinceId"`
-		UntilID  string `json:"untilId"`
-		WithFiles   *bool `json:"withFiles"`
-		WithReplies *bool `json:"withReplies"`
+		UserID      string `json:"userId"`
+		Username    string `json:"username"`
+		Limit       int    `json:"limit"`
+		SinceID     string `json:"sinceId"`
+		UntilID     string `json:"untilId"`
+		WithFiles   *bool  `json:"withFiles"`
+		WithReplies *bool  `json:"withReplies"`
 	}
 	if err := decodeOptionalJSON(r, &body); err != nil {
 		writeAPIError(w, err)
@@ -89,6 +89,11 @@ func (s *Server) applyPinnedNotes(ctx context.Context, userID string, packed map
 	ids, err := s.accounts.PinnedNoteIDs(ctx, userID)
 	if err != nil {
 		return
+	}
+	// pinnedNoteIds and pinnedNotes must agree, so both are capped at
+	// the same limit.
+	if len(ids) > account.MaxPinnedNotes {
+		ids = ids[:account.MaxPinnedNotes]
 	}
 	packed["pinnedNoteIds"] = ids
 	notes := make([]any, 0, len(ids))

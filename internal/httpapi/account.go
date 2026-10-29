@@ -211,6 +211,7 @@ func (s *Server) handleI(w http.ResponseWriter, r *http.Request) {
 	includeSecrets := info.Token == nil
 	packed := packMeDetailed(info.User, info.User.CreatedAt, includeSecrets, loadProfile(r.Context(), s, info.User.ID))
 	s.applyUserCounts(r.Context(), info.User.ID, packed)
+	s.applyPinnedNotes(r.Context(), info.User.ID, packed)
 	writeJSON(w, http.StatusOK, packed)
 }
 

@@ -1,24 +1,73 @@
 package httpapi
 
 import (
+	"encoding/json"
 	"errors"
 	"net/http"
+	"unicode/utf8"
 
 	"github.com/Aurorainic/cinderfish/internal/account"
 	"github.com/Aurorainic/cinderfish/internal/media"
 )
 
+// Profile field length caps, matching Misskey's user profile limits.
+const (
+	maxProfileNameLength        = 50
+	maxProfileDescriptionLength = 500
+)
+
+// nullableField carries an optional request field: an absent key leaves
+// the stored value unchanged, while an explicit JSON null and an empty
+// string both clear it — Misskey's own client sends null to clear a
+// field.
+type nullableField struct {
+	present bool
+	value   *string
+}
+
+func (f *nullableField) UnmarshalJSON(data []byte) error {
+	f.present = true
+	if string(data) == "null" {
+		f.value = nil
+		return nil
+	}
+	var s string
+	if err := json.Unmarshal(data, &s); err != nil {
+		return err
+	}
+	f.value = &s
+	return nil
+}
+
+// provided reports whether the request carried the field at all.
+func (f *nullableField) provided() bool { return f.present }
+
+// asUpdatePointer maps the field onto UpdateProfile's *string
+// convention: nil is "not provided", a pointer to "" clears, a pointer
+// to the value sets.
+func (f *nullableField) asUpdatePointer() *string {
+	if !f.present {
+		return nil
+	}
+	if f.value == nil {
+		s := ""
+		return &s
+	}
+	return f.value
+}
+
 // handleIUpdate implements POST /api/i/update: it writes the editable
 // profile fields of the authenticated user.
 //
-// name and description are optional; when provided, an empty string
-// clears the field. avatarId names a drive file: empty clears the
-// avatar, a non-empty id must belong to the caller.
+// name, description and avatarId are all optional. A provided null or
+// empty string clears the field; avatarId otherwise names a drive file
+// belonging to the caller. name is capped at 50 and description at 500
+// characters.
 func (s *Server) handleIUpdate(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		Name        *string `json:"name"`
-		Description *string `json:"description"`
-		AvatarID    *string `json:"avatarId"`
+		Name        nullableField `json:"name"`
+		Description nullableField `json:"description"`
+		AvatarID    nullableField `json:"avatarId"`
 	}
 	if err := decodeOptionalJSON(r, &body); err != nil {
 		writeAPIError(w, err)
@@ -36,14 +85,27 @@ func (s *Server) handleIUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if body.AvatarID != nil && *body.AvatarID != "" {
-		if err := s.checkOwnAvatarFile(r, info.User.ID, *body.AvatarID); err != nil {
+	if body.Name.provided() {
+		if v := body.Name.asUpdatePointer(); v != nil && utf8.RuneCountInString(*v) > maxProfileNameLength {
+			writeAPIError(w, invalidParamError("name is too long"))
+			return
+		}
+	}
+	if body.Description.provided() {
+		if v := body.Description.asUpdatePointer(); v != nil && utf8.RuneCountInString(*v) > maxProfileDescriptionLength {
+			writeAPIError(w, invalidParamError("description is too long"))
+			return
+		}
+	}
+
+	if avatarID := body.AvatarID.asUpdatePointer(); avatarID != nil && *avatarID != "" {
+		if err := s.checkOwnAvatarFile(r, info.User.ID, *avatarID); err != nil {
 			writeAPIError(w, err)
 			return
 		}
 	}
 
-	if err := s.accounts.UpdateProfile(r.Context(), info.User.ID, body.Name, body.Description, body.AvatarID); err != nil {
+	if err := s.accounts.UpdateProfile(r.Context(), info.User.ID, body.Name.asUpdatePointer(), body.Description.asUpdatePointer(), body.AvatarID.asUpdatePointer()); err != nil {
 		if errors.Is(err, media.ErrNotFound) || errors.Is(err, account.ErrNoSuchAvatarFile) {
 			writeAPIError(w, &APIError{
 				Message: "No such file.", Code: "NO_SUCH_FILE",

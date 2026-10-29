@@ -86,9 +86,10 @@ func TestPinnedNoteIDsOrderAndIdempotence(t *testing.T) {
 		t.Errorf("pin list after unpin = %v, want [%s %s]", got, created[2], created[0])
 	}
 
-	// Unpinning a note that is not pinned is a no-op.
-	if err := svc.UnpinNote(ctx, user.ID, "nosuchnote"); err != nil {
-		t.Errorf("UnpinNote unknown = %v, want no-op", err)
+	// Unpinning a note that does not exist fails like Misskey's
+	// NO_SUCH_NOTE: the note id is validated before the array remove.
+	if err := svc.UnpinNote(ctx, user.ID, "nosuchnote"); err != account.ErrNoSuchPinTarget {
+		t.Errorf("UnpinNote unknown = %v, want ErrNoSuchPinTarget", err)
 	}
 }
 
@@ -123,5 +124,51 @@ func TestPinNoteRejectsForeignAndMissingNotes(t *testing.T) {
 		t.Error("pinning a missing note must fail")
 	} else if err != account.ErrNoSuchPinTarget {
 		t.Errorf("error = %v, want ErrNoSuchPinTarget", err)
+	}
+}
+
+func TestPinNoteLimit(t *testing.T) {
+	pool := testPool(t)
+	svc := account.NewService(pool)
+	notes := note.NewService(pool)
+	ctx := context.Background()
+
+	user, _, err := svc.Register(ctx, account.RegistrationOpen, uniqueUsername(t), "password123", "")
+	if err != nil {
+		t.Fatalf("Register: %v", err)
+	}
+
+	var ids []string
+	for i := 0; i < account.MaxPinnedNotes+1; i++ {
+		txt := "pin target"
+		n, err := notes.Create(ctx, note.CreateParams{UserID: user.ID, Text: &txt})
+		if err != nil {
+			t.Fatalf("create note %d: %v", i, err)
+		}
+		ids = append(ids, n.ID)
+	}
+
+	for _, id := range ids[:account.MaxPinnedNotes] {
+		if err := svc.PinNote(ctx, user.ID, id); err != nil {
+			t.Fatalf("PinNote %s: %v", id, err)
+		}
+	}
+	if err := svc.PinNote(ctx, user.ID, ids[account.MaxPinnedNotes]); err != account.ErrPinLimitExceeded {
+		t.Errorf("over-limit pin = %v, want ErrPinLimitExceeded", err)
+	}
+	pinned, err := svc.PinnedNoteIDs(ctx, user.ID)
+	if err != nil {
+		t.Fatalf("PinnedNoteIDs: %v", err)
+	}
+	if len(pinned) != account.MaxPinnedNotes {
+		t.Errorf("pin list = %d entries, want %d", len(pinned), account.MaxPinnedNotes)
+	}
+
+	// Unpinning frees a slot.
+	if err := svc.UnpinNote(ctx, user.ID, ids[0]); err != nil {
+		t.Fatalf("UnpinNote: %v", err)
+	}
+	if err := svc.PinNote(ctx, user.ID, ids[account.MaxPinnedNotes]); err != nil {
+		t.Fatalf("PinNote after unpin: %v", err)
 	}
 }
