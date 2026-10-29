@@ -38,6 +38,10 @@ type Server struct {
 	storage media.Storage
 	drive   *media.DriveService
 
+	// web serves the built Vue frontend. It is nil when no build is
+	// present, so API-only deployments and tests still work.
+	web *staticSite
+
 	// streamBus carries Streaming API events. It is always present so
 	// handlers can publish unconditionally; stream is nil until the
 	// server is attached to a running listener.
@@ -58,6 +62,9 @@ type Server struct {
 // endpoints that do not need persistence.
 func NewServer(cfg *config.Config) *Server {
 	s := &Server{cfg: cfg, startedAt: time.Now(), streamBus: streaming.NewBus()}
+	if site, err := newStaticSite(cfg.WebDir); err == nil {
+		s.web = site
+	}
 	s.mux = http.NewServeMux()
 	s.registerRoutes()
 	return s
@@ -159,6 +166,10 @@ func (s *Server) registerRoutes() {
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if s.web != nil && s.web.handles(r) {
+		s.web.serve(w, r)
+		return
+	}
 	s.mux.ServeHTTP(w, r)
 }
 

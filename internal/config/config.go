@@ -17,7 +17,10 @@ type Config struct {
 	DatabaseURL      string     `toml:"database_url"`
 	RegistrationMode string     `toml:"registration_mode"`
 	FederationMode   string     `toml:"federation_mode"`
-	Federation       Federation `toml:"federation"`
+	// WebDir points at the built frontend (index.html + assets). An
+	// empty or missing directory leaves the server API-only.
+	WebDir     string     `toml:"web_dir"`
+	Federation Federation `toml:"federation"`
 	Media            Media      `toml:"media"`
 }
 
@@ -66,6 +69,7 @@ func Load(path string) (*Config, error) {
 		DatabaseURL:      "postgres://cinderfish:cinderfish@localhost:5432/cinderfish",
 		RegistrationMode: "admin",
 		FederationMode:   "none",
+		WebDir:           "./web/dist",
 		Media:            Media{Backend: "local", LocalPath: "./data/files"},
 	}
 
@@ -89,6 +93,7 @@ func applyEnv(c *Config) {
 	setStr("CINDERFISH_FEDERATION_MODE", &c.FederationMode)
 	setStr("CINDERFISH_MEDIA_BACKEND", &c.Media.Backend)
 	setStr("CINDERFISH_MEDIA_LOCAL_PATH", &c.Media.LocalPath)
+	setStr("CINDERFISH_WEB_DIR", &c.WebDir)
 	setInt("CINDERFISH_PORT", &c.Port)
 }
 

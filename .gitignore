@@ -5,3 +5,5 @@
 *.out
 coverage.txt
 tmp/
+web/node_modules/
+web/dist/

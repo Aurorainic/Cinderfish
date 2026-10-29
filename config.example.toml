@@ -17,6 +17,11 @@ registration_mode = "admin"
 # public | allowlist | none
 federation_mode = "none"
 
+# Built frontend directory (index.html + assets). Leave the default if you
+# build web/ with `npm run build`; a missing directory keeps the server
+# API-only.
+web_dir = "./web/dist"
+
 [media]
 # local | s3
 backend = "local"
