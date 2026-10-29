@@ -6,11 +6,11 @@
   "status": "skipped",
   "visualReview": "not-requested",
   "provenance": "current",
-  "deliveryReceiptId": "7c0b5d8a-2b36-4429-9e6e-3644fac31f0f",
+  "deliveryReceiptId": "b24cc0ef-a360-412e-983d-d0f600908116",
   "artifact": {
-    "path": "/home/lainsaka/文档/Cinderfish/.archify/architecture-cinderfish-overall-20261028-195500/cinderfish-overall.html",
-    "sha256": "9cc2f33f18bb2381233359875153e671ab6c0ee399c8a9b8aa19cbdb587fe40a",
-    "bytes": 864951
+    "path": "/home/lainsaka/文档/MilnFish/.archify/architecture-cinderfish-overall/cinderfish-overall.html",
+    "sha256": "d9c3a27cee55b29c29ff2299fdb285f7bc22ac8513693d2dfc465729846bab35",
+    "bytes": 863761
   },
   "state": {
     "detail": "read",
@@ -26,7 +26,7 @@
       "severity": "warning",
       "message": "No supported browser found. Install Chrome/Chromium (or Microsoft Edge), or set ARCHIFY_CHROME to its executable path.",
       "subject": {
-        "artifact": "/home/lainsaka/文档/Cinderfish/.archify/architecture-cinderfish-overall-20261028-195500/cinderfish-overall.html"
+        "artifact": "/home/lainsaka/文档/MilnFish/.archify/architecture-cinderfish-overall/cinderfish-overall.html"
       },
       "evidence": {
         "executable": null
@@ -60,6 +60,7 @@
     "contactSheet": null
   },
   "sidecars": {
+    "directory": "/home/lainsaka/文档/MilnFish/.archify/architecture-cinderfish-overall/review-1",
     "receipt": "cinderfish-overall.browser-check.json",
     "files": []
   },

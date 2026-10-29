@@ -1,0 +1,227 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Cinderfish 项目整体结构",
+    "output": ".archify/architecture-cinderfish-overall/cinderfish-overall.html",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/Aurorainic/Cinderfish.git",
+      "provider": "github",
+      "link_mode": "web",
+      "revision": "53f419e4f2c1b02926de1f7d22e27db1161aad98"
+    }
+  },
+  "components": [
+    {
+      "id": "client",
+      "type": "external",
+      "label": "Misskey 客户端",
+      "sublabel": "浏览器 / misskey-js",
+      "pos": [40, 200],
+      "size": [180, 64]
+    },
+    {
+      "id": "fediverse",
+      "type": "external",
+      "label": "Fediverse 远端实例",
+      "sublabel": "Mastodon / Misskey / GoToSocial",
+      "pos": [40, 360],
+      "size": [180, 64]
+    },
+    {
+      "id": "config",
+      "type": "backend",
+      "label": "config",
+      "sublabel": "TOML + CINDERFISH_* 覆盖",
+      "pos": [300, 60],
+      "size": [190, 64],
+      "sources": [
+        { "path": "internal/config/config.go", "line": 61, "end_line": 92, "label": "加载与校验" }
+      ]
+    },
+    {
+      "id": "main",
+      "type": "backend",
+      "label": "cmd/cinderfish",
+      "sublabel": "入口 · 迁移 · 装配 · 优雅关闭",
+      "pos": [300, 180],
+      "size": [190, 64],
+      "sources": [
+        { "path": "cmd/cinderfish/main.go", "line": 24, "end_line": 49, "label": "启动与迁移" },
+        { "path": "cmd/cinderfish/main.go", "line": 71, "end_line": 78, "label": "联邦与投递 worker" }
+      ]
+    },
+    {
+      "id": "httpapi",
+      "type": "backend",
+      "label": "httpapi",
+      "sublabel": "Misskey RPC · AP 路由 · WS 升级",
+      "pos": [300, 320],
+      "size": [200, 64],
+      "sources": [
+        { "path": "internal/httpapi/server.go", "line": 87, "end_line": 158, "label": "全部路由" }
+      ]
+    },
+    {
+      "id": "account",
+      "type": "backend",
+      "label": "account / auth",
+      "sublabel": "注册三模式 · token · OAuth PKCE",
+      "pos": [560, 40],
+      "size": [190, 64],
+      "sources": [
+        { "path": "internal/account/service.go", "line": 70, "end_line": 112, "label": "注册与 token" }
+      ]
+    },
+    {
+      "id": "note",
+      "type": "backend",
+      "label": "note",
+      "sublabel": "笔记 · 四时间线 · 反应 · 通知",
+      "pos": [560, 150],
+      "size": [190, 64],
+      "sources": [
+        { "path": "internal/note/service.go", "line": 121, "end_line": 197, "label": "创建笔记与提及解析" }
+      ]
+    },
+    {
+      "id": "streaming",
+      "type": "backend",
+      "label": "streaming",
+      "sublabel": "五频道 · 事件总线 · LISTEN/NOTIFY",
+      "pos": [560, 260],
+      "size": [190, 64],
+      "sources": [
+        { "path": "internal/httpapi/streaming.go", "line": 10, "end_line": 38, "label": "端点装配" },
+        { "path": "internal/streaming/bus.go", "line": 409, "end_line": 421, "label": "跨进程监听" }
+      ]
+    },
+    {
+      "id": "media",
+      "type": "backend",
+      "label": "media",
+      "sublabel": "Drive 元数据 · Storage 接口",
+      "pos": [560, 370],
+      "size": [190, 64],
+      "sources": [
+        { "path": "internal/media/drive.go", "line": 41, "end_line": 52, "label": "Drive 服务" },
+        { "path": "internal/media/storage.go", "line": 11, "end_line": 23, "label": "存储接口" }
+      ]
+    },
+    {
+      "id": "federation",
+      "type": "backend",
+      "label": "federation",
+      "sublabel": "HTTP 签名 · AP 渲染/解析 · Inbox",
+      "pos": [300, 520],
+      "size": [190, 64],
+      "sources": [
+        { "path": "internal/federation/keys.go", "line": 1, "end_line": 8, "label": "包职责" },
+        { "path": "internal/httpapi/activitypub.go", "line": 581, "end_line": 638, "label": "Inbox 验签与处理" },
+        { "path": "internal/federation/signature.go", "line": 33, "end_line": 63, "label": "签名头" }
+      ]
+    },
+    {
+      "id": "deliver",
+      "type": "backend",
+      "label": "投递 worker",
+      "sublabel": "deliver_queue · 指数退避",
+      "pos": [300, 660],
+      "size": [190, 64],
+      "sources": [
+        { "path": "internal/federation/deliver.go", "line": 13, "end_line": 52, "label": "队列与重试" }
+      ]
+    },
+    {
+      "id": "postgres",
+      "type": "database",
+      "label": "PostgreSQL",
+      "sublabel": "迁移 v4 · 23 张表",
+      "pos": [820, 130],
+      "size": [180, 140],
+      "sources": [
+        { "path": "internal/db/db.go", "line": 287, "end_line": 351, "label": "v4 迁移" },
+        { "path": "internal/db/db.go", "line": 143, "end_line": 166, "label": "联邦表与投递队列" }
+      ]
+    },
+    {
+      "id": "storage",
+      "type": "cloud",
+      "label": "媒体后端",
+      "sublabel": "local / S3 兼容",
+      "pos": [820, 390],
+      "size": [180, 64],
+      "sources": [
+        { "path": "internal/media/local.go", "line": 14, "end_line": 20, "label": "本地实现" },
+        { "path": "internal/media/s3.go", "line": 35, "end_line": 41, "label": "S3 实现" }
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "cinderfish 单二进制（Go 1.26）",
+      "wraps": [
+        "config",
+        "main",
+        "httpapi",
+        "account",
+        "note",
+        "streaming",
+        "media",
+        "federation",
+        "deliver"
+      ]
+    }
+  ],
+  "connections": [
+    { "from": "client", "to": "httpapi", "label": "Misskey RPC / WS", "variant": "emphasis" },
+    { "from": "config", "to": "main", "label": "加载" },
+    { "from": "main", "to": "httpapi", "label": "装配路由" },
+    { "from": "httpapi", "to": "account", "label": "注册 / 登录" },
+    { "from": "httpapi", "to": "note", "label": "笔记 / 时间线" },
+    { "from": "httpapi", "to": "streaming", "label": "WS 升级", "variant": "emphasis" },
+    { "from": "httpapi", "to": "media", "label": "Drive 上传" },
+    { "from": "httpapi", "to": "federation", "label": "AP 路由" },
+    { "from": "fediverse", "to": "federation", "label": "Inbox / WebFinger", "variant": "emphasis" },
+    { "from": "federation", "to": "note", "label": "远程对象 / 提及" },
+    { "from": "federation", "to": "deliver", "label": "入队" },
+    { "from": "deliver", "to": "fediverse", "label": "HTTP POST + 签名" },
+    { "from": "account", "to": "postgres", "label": "SQL" },
+    { "from": "note", "to": "postgres", "label": "SQL" },
+    { "from": "streaming", "to": "postgres", "label": "LISTEN/NOTIFY", "variant": "dashed" },
+    { "from": "media", "to": "postgres", "label": "drive_files" },
+    { "from": "media", "to": "storage", "label": "Put / Get" }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "当前状态",
+      "items": [
+        "M1–M5 已完成：骨架、账户、笔记、Streaming、ActivityPub 联邦",
+        "M6 前端与 M7 打磨未开始；Firefish 风格 Web 前端尚未创建",
+        "单个 Go 二进制内嵌迁移脚本，启动时自动升级到 v4"
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "联邦链路",
+      "items": [
+        "入站：HTTP Signatures 验签后交给 Inbox，语义结果记日志并回 202",
+        "出站：先写 deliver_queue，worker 按 inbox 逐行重试，指数退避 1s→5min",
+        "三模式 public / allowlist / none 存在数据库，切换立即生效"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "读图说明",
+      "items": [
+        "矩形边界 = 单进程内的包；PostgreSQL 与对象存储是外部依赖",
+        "虚线 = 通过 PostgreSQL LISTEN/NOTIFY 的跨进程中继",
+        "external 节点是协议对端，不属于本仓库"
+      ]
+    }
+  ]
+}

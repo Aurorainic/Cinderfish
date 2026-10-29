@@ -220,6 +220,7 @@ POST /inbox                            POST /users/{id}/inbox
 | `docs/research/2026-10-28-m4-streaming-source-calibration.md` | **M4 Streaming 协议逐条对照上游源码** |
 | `docs/research/2026-10-28-m5-federation-source-calibration.md` | **M5 联邦逐条对照上游源码** |
 | `docs/research/2026-10-28-project-name-decision.md` | 命名决策记录 |
+| `.archify/architecture-cinderfish-overall/` | 项目整体结构图（Archify 产物，随里程碑更新） |
 
 ## 13. 已知的未验证项
 

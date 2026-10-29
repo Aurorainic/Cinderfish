@@ -30,6 +30,15 @@ go build -o cinderfish ./cmd/cinderfish
 | M6 前端 | 未开始 |
 | M7 打磨 | 未开始 |
 
+## 架构图
+
+项目整体结构图（包结构、数据流、联邦链路、Streaming 中继）：
+
+- 产物：[`.archify/architecture-cinderfish-overall/cinderfish-overall.html`](.archify/architecture-cinderfish-overall/cinderfish-overall.html)
+- 源：[`.archify/architecture-cinderfish-overall/candidate.json`](.archify/architecture-cinderfish-overall/candidate.json)
+
+图随里程碑更新，维护方式见该目录下的 `README.md`。
+
 ## 文档
 
 - **交接说明**：[`docs/HANDOVER.md`](docs/HANDOVER.md) — 给接手者必读
