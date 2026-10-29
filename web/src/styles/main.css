@@ -368,6 +368,40 @@ select {
   min-height: 96px;
 }
 
+.notice {
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  font-size: 0.88rem;
+  margin-bottom: 14px;
+  border: 1px solid var(--border);
+  background: var(--panel-2);
+}
+
+.notice.error {
+  border-color: color-mix(in srgb, var(--danger) 45%, var(--border));
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  color: var(--danger);
+}
+
+.notice.info {
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+  background: var(--accent-soft);
+  color: var(--text);
+}
+
+.hint {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.hint.ok {
+  color: var(--success);
+}
+
+.hint.bad {
+  color: var(--danger);
+}
+
 /* ---------- page scaffolding ---------- */
 
 .page-title {
