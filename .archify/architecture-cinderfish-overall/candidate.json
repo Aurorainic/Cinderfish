@@ -10,7 +10,7 @@
       "url": "https://github.com/Aurorainic/Cinderfish.git",
       "provider": "github",
       "link_mode": "web",
-      "revision": "0511de2eaec63b93038b831b129f4f68c72d12f4"
+      "revision": "32b2b973d9ca2cc225ad715928fa7529ef0f8bf8"
     }
   },
   "components": [
@@ -19,28 +19,61 @@
       "type": "external",
       "label": "Misskey 客户端",
       "sublabel": "浏览器 / misskey-js",
-      "pos": [40, 200],
-      "size": [180, 64]
+      "pos": [
+        40,
+        200
+      ],
+      "size": [
+        180,
+        64
+      ]
     },
     {
       "id": "fediverse",
       "type": "external",
       "label": "Fediverse 远端实例",
       "sublabel": "Mastodon / Misskey / GoToSocial",
-      "pos": [40, 360],
-      "size": [180, 64]
+      "pos": [
+        40,
+        360
+      ],
+      "size": [
+        180,
+        64
+      ]
     },
     {
       "id": "web",
       "type": "frontend",
       "label": "web 前端",
       "sublabel": "Vue 3 · Vite · Firefish 风格外壳",
-      "pos": [40, 40],
-      "size": [180, 64],
+      "pos": [
+        40,
+        40
+      ],
+      "size": [
+        180,
+        64
+      ],
       "sources": [
-        { "path": "web/src/layouts/AppShell.vue", "line": 1, "end_line": 40, "label": "应用外壳与导航" },
-        { "path": "web/src/api/client.ts", "line": 99, "end_line": 160, "label": "类型化 API 客户端" },
-        { "path": "web/src/stores/streaming.ts", "line": 1, "end_line": 40, "label": "Streaming WebSocket 客户端" }
+        {
+          "path": "web/src/layouts/AppShell.vue",
+          "line": 1,
+          "end_line": 40,
+          "label": "应用外壳与导航"
+        },
+        {
+          "path": "web/src/api/client.ts",
+          "line": 99,
+          "end_line": 160,
+          "label": "类型化 API 客户端"
+        },
+        {
+          "path": "web/src/stores/streaming.ts",
+          "line": 1,
+          "end_line": 40,
+          "label": "Streaming WebSocket 客户端"
+        }
       ]
     },
     {
@@ -48,10 +81,21 @@
       "type": "backend",
       "label": "config",
       "sublabel": "TOML + CINDERFISH_* 覆盖",
-      "pos": [300, 60],
-      "size": [190, 64],
+      "pos": [
+        300,
+        60
+      ],
+      "size": [
+        190,
+        64
+      ],
       "sources": [
-        { "path": "internal/config/config.go", "line": 64, "end_line": 93, "label": "加载与校验" }
+        {
+          "path": "internal/config/config.go",
+          "line": 64,
+          "end_line": 93,
+          "label": "加载与校验"
+        }
       ]
     },
     {
@@ -59,11 +103,27 @@
       "type": "backend",
       "label": "cmd/cinderfish",
       "sublabel": "入口 · 迁移 · 装配 · 优雅关闭",
-      "pos": [300, 180],
-      "size": [190, 64],
+      "pos": [
+        300,
+        180
+      ],
+      "size": [
+        190,
+        64
+      ],
       "sources": [
-        { "path": "cmd/cinderfish/main.go", "line": 24, "end_line": 49, "label": "启动与迁移" },
-        { "path": "cmd/cinderfish/main.go", "line": 71, "end_line": 78, "label": "联邦与投递 worker" }
+        {
+          "path": "cmd/cinderfish/main.go",
+          "line": 24,
+          "end_line": 49,
+          "label": "启动与迁移"
+        },
+        {
+          "path": "cmd/cinderfish/main.go",
+          "line": 71,
+          "end_line": 78,
+          "label": "联邦与投递 worker"
+        }
       ]
     },
     {
@@ -71,11 +131,27 @@
       "type": "backend",
       "label": "httpapi",
       "sublabel": "Misskey RPC · AP 路由 · WS 升级",
-      "pos": [300, 320],
-      "size": [200, 64],
+      "pos": [
+        300,
+        320
+      ],
+      "size": [
+        200,
+        64
+      ],
       "sources": [
-        { "path": "internal/httpapi/server.go", "line": 94, "end_line": 171, "label": "全部路由" },
-        { "path": "internal/httpapi/server.go", "line": 173, "end_line": 179, "label": "SPA 前置分流" }
+        {
+          "path": "internal/httpapi/server.go",
+          "line": 94,
+          "end_line": 171,
+          "label": "全部路由"
+        },
+        {
+          "path": "internal/httpapi/server.go",
+          "line": 173,
+          "end_line": 179,
+          "label": "SPA 前置分流"
+        }
       ]
     },
     {
@@ -83,10 +159,21 @@
       "type": "backend",
       "label": "account / auth",
       "sublabel": "注册三模式 · token · OAuth PKCE",
-      "pos": [560, 40],
-      "size": [190, 64],
+      "pos": [
+        560,
+        40
+      ],
+      "size": [
+        190,
+        64
+      ],
       "sources": [
-        { "path": "internal/account/service.go", "line": 70, "end_line": 112, "label": "注册与 token" }
+        {
+          "path": "internal/account/service.go",
+          "line": 70,
+          "end_line": 112,
+          "label": "注册与 token"
+        }
       ]
     },
     {
@@ -94,10 +181,21 @@
       "type": "backend",
       "label": "note",
       "sublabel": "笔记 · 四时间线 · 反应 · 通知",
-      "pos": [560, 150],
-      "size": [190, 64],
+      "pos": [
+        560,
+        150
+      ],
+      "size": [
+        190,
+        64
+      ],
       "sources": [
-        { "path": "internal/note/service.go", "line": 121, "end_line": 197, "label": "创建笔记与提及解析" }
+        {
+          "path": "internal/note/service.go",
+          "line": 121,
+          "end_line": 197,
+          "label": "创建笔记与提及解析"
+        }
       ]
     },
     {
@@ -105,11 +203,27 @@
       "type": "backend",
       "label": "streaming",
       "sublabel": "五频道 · 事件总线 · PG 或 Redis 中继",
-      "pos": [560, 260],
-      "size": [190, 64],
+      "pos": [
+        560,
+        260
+      ],
+      "size": [
+        190,
+        64
+      ],
       "sources": [
-        { "path": "internal/httpapi/streaming.go", "line": 10, "end_line": 38, "label": "端点装配" },
-        { "path": "internal/streaming/bus.go", "line": 409, "end_line": 421, "label": "跨进程监听" }
+        {
+          "path": "internal/httpapi/streaming.go",
+          "line": 10,
+          "end_line": 38,
+          "label": "端点装配"
+        },
+        {
+          "path": "internal/streaming/bus.go",
+          "line": 409,
+          "end_line": 421,
+          "label": "跨进程监听"
+        }
       ]
     },
     {
@@ -117,11 +231,27 @@
       "type": "backend",
       "label": "media",
       "sublabel": "Drive · Storage 接口 · local/S3 迁移",
-      "pos": [560, 370],
-      "size": [190, 64],
+      "pos": [
+        560,
+        370
+      ],
+      "size": [
+        190,
+        64
+      ],
       "sources": [
-        { "path": "internal/media/storage.go", "line": 11, "end_line": 23, "label": "存储接口" },
-        { "path": "internal/media/migrate.go", "line": 40, "end_line": 95, "label": "跨后端迁移" }
+        {
+          "path": "internal/media/storage.go",
+          "line": 11,
+          "end_line": 23,
+          "label": "存储接口"
+        },
+        {
+          "path": "internal/media/migrate.go",
+          "line": 40,
+          "end_line": 95,
+          "label": "跨后端迁移"
+        }
       ]
     },
     {
@@ -129,12 +259,33 @@
       "type": "backend",
       "label": "federation",
       "sublabel": "HTTP 签名 · AP 渲染/解析 · Inbox",
-      "pos": [300, 520],
-      "size": [190, 64],
+      "pos": [
+        300,
+        520
+      ],
+      "size": [
+        190,
+        64
+      ],
       "sources": [
-        { "path": "internal/federation/keys.go", "line": 1, "end_line": 8, "label": "包职责" },
-        { "path": "internal/httpapi/activitypub.go", "line": 581, "end_line": 638, "label": "Inbox 验签与处理" },
-        { "path": "internal/federation/signature.go", "line": 33, "end_line": 63, "label": "签名头" }
+        {
+          "path": "internal/federation/keys.go",
+          "line": 1,
+          "end_line": 8,
+          "label": "包职责"
+        },
+        {
+          "path": "internal/httpapi/activitypub.go",
+          "line": 581,
+          "end_line": 638,
+          "label": "Inbox 验签与处理"
+        },
+        {
+          "path": "internal/federation/signature.go",
+          "line": 33,
+          "end_line": 63,
+          "label": "签名头"
+        }
       ]
     },
     {
@@ -142,10 +293,21 @@
       "type": "backend",
       "label": "投递 worker",
       "sublabel": "deliver_queue · 指数退避",
-      "pos": [300, 660],
-      "size": [190, 64],
+      "pos": [
+        300,
+        660
+      ],
+      "size": [
+        190,
+        64
+      ],
       "sources": [
-        { "path": "internal/federation/deliver.go", "line": 13, "end_line": 52, "label": "队列与重试" }
+        {
+          "path": "internal/federation/deliver.go",
+          "line": 13,
+          "end_line": 52,
+          "label": "队列与重试"
+        }
       ]
     },
     {
@@ -153,23 +315,55 @@
       "type": "database",
       "label": "PostgreSQL",
       "sublabel": "迁移 v4 · 23 张表",
-      "pos": [820, 130],
-      "size": [180, 140],
+      "pos": [
+        820,
+        130
+      ],
+      "size": [
+        180,
+        140
+      ],
       "sources": [
-        { "path": "internal/db/db.go", "line": 287, "end_line": 351, "label": "v4 迁移" },
-        { "path": "internal/db/db.go", "line": 143, "end_line": 166, "label": "联邦表与投递队列" }
+        {
+          "path": "internal/db/db.go",
+          "line": 287,
+          "end_line": 351,
+          "label": "v4 迁移"
+        },
+        {
+          "path": "internal/db/db.go",
+          "line": 143,
+          "end_line": 166,
+          "label": "联邦表与投递队列"
+        }
       ]
     },
     {
       "id": "redis",
       "type": "messagebus",
       "label": "Redis（可选）",
-      "sublabel": "Pub/Sub · 跨进程 Streaming",
-      "pos": [820, 540],
-      "size": [180, 64],
+      "sublabel": "Pub/Sub · 中继与投递唤醒",
+      "pos": [
+        820,
+        540
+      ],
+      "size": [
+        180,
+        64
+      ],
       "sources": [
-        { "path": "internal/streaming/redis.go", "line": 1, "end_line": 30, "label": "Redis 中继" },
-        { "path": "internal/federation/redis_wake.go", "line": 1, "end_line": 30, "label": "投递唤醒" }
+        {
+          "path": "internal/streaming/redis.go",
+          "line": 1,
+          "end_line": 30,
+          "label": "Redis 中继"
+        },
+        {
+          "path": "internal/federation/redis_wake.go",
+          "line": 1,
+          "end_line": 30,
+          "label": "投递唤醒"
+        }
       ]
     },
     {
@@ -177,11 +371,27 @@
       "type": "cloud",
       "label": "媒体后端",
       "sublabel": "local / S3 兼容",
-      "pos": [820, 390],
-      "size": [180, 64],
+      "pos": [
+        820,
+        390
+      ],
+      "size": [
+        180,
+        64
+      ],
       "sources": [
-        { "path": "internal/media/local.go", "line": 14, "end_line": 20, "label": "本地实现" },
-        { "path": "internal/media/s3.go", "line": 35, "end_line": 41, "label": "S3 实现" }
+        {
+          "path": "internal/media/local.go",
+          "line": 14,
+          "end_line": 20,
+          "label": "本地实现"
+        },
+        {
+          "path": "internal/media/s3.go",
+          "line": 35,
+          "end_line": 41,
+          "label": "S3 实现"
+        }
       ]
     }
   ],
@@ -203,27 +413,118 @@
     }
   ],
   "connections": [
-    { "from": "client", "to": "web", "label": "浏览器加载", "variant": "emphasis" },
-    { "from": "web", "to": "httpapi", "label": "静态资源 · SPA fallback" },
-    { "from": "client", "to": "httpapi", "label": "Misskey RPC / WS", "variant": "emphasis" },
-    { "from": "config", "to": "main", "label": "加载" },
-    { "from": "main", "to": "httpapi", "label": "装配路由" },
-    { "from": "httpapi", "to": "account", "label": "注册 / 登录" },
-    { "from": "httpapi", "to": "note", "label": "笔记 / 时间线" },
-    { "from": "httpapi", "to": "streaming", "label": "WS 升级", "variant": "emphasis" },
-    { "from": "httpapi", "to": "media", "label": "Drive 上传" },
-    { "from": "httpapi", "to": "federation", "label": "AP 路由" },
-    { "from": "fediverse", "to": "federation", "label": "Inbox / WebFinger", "variant": "emphasis" },
-    { "from": "federation", "to": "note", "label": "远程对象 / 提及" },
-    { "from": "federation", "to": "deliver", "label": "入队" },
-    { "from": "deliver", "to": "fediverse", "label": "HTTP POST + 签名" },
-    { "from": "deliver", "to": "redis", "label": "投递唤醒（可选）", "variant": "dashed" },
-    { "from": "account", "to": "postgres", "label": "SQL" },
-    { "from": "note", "to": "postgres", "label": "SQL" },
-    { "from": "streaming", "to": "postgres", "label": "LISTEN/NOTIFY（默认）", "variant": "dashed" },
-    { "from": "streaming", "to": "redis", "label": "Pub/Sub（可选）", "variant": "dashed" },
-    { "from": "media", "to": "postgres", "label": "drive_files" },
-    { "from": "media", "to": "storage", "label": "Put / Get" }
+    {
+      "from": "client",
+      "to": "web",
+      "label": "浏览器加载",
+      "variant": "emphasis"
+    },
+    {
+      "from": "web",
+      "to": "httpapi",
+      "label": "静态资源 · SPA fallback"
+    },
+    {
+      "from": "client",
+      "to": "httpapi",
+      "label": "Misskey RPC / WS",
+      "variant": "emphasis"
+    },
+    {
+      "from": "config",
+      "to": "main",
+      "label": "加载"
+    },
+    {
+      "from": "main",
+      "to": "httpapi",
+      "label": "装配路由"
+    },
+    {
+      "from": "httpapi",
+      "to": "account",
+      "label": "注册 / 登录"
+    },
+    {
+      "from": "httpapi",
+      "to": "note",
+      "label": "笔记 / 时间线"
+    },
+    {
+      "from": "httpapi",
+      "to": "streaming",
+      "label": "WS 升级",
+      "variant": "emphasis"
+    },
+    {
+      "from": "httpapi",
+      "to": "media",
+      "label": "Drive 上传"
+    },
+    {
+      "from": "httpapi",
+      "to": "federation",
+      "label": "AP 路由"
+    },
+    {
+      "from": "fediverse",
+      "to": "federation",
+      "label": "Inbox / WebFinger",
+      "variant": "emphasis"
+    },
+    {
+      "from": "federation",
+      "to": "note",
+      "label": "远程对象 / 提及"
+    },
+    {
+      "from": "federation",
+      "to": "deliver",
+      "label": "入队"
+    },
+    {
+      "from": "deliver",
+      "to": "fediverse",
+      "label": "HTTP POST + 签名"
+    },
+    {
+      "from": "deliver",
+      "to": "redis",
+      "label": "投递唤醒（可选）",
+      "variant": "dashed"
+    },
+    {
+      "from": "account",
+      "to": "postgres",
+      "label": "SQL"
+    },
+    {
+      "from": "note",
+      "to": "postgres",
+      "label": "SQL"
+    },
+    {
+      "from": "streaming",
+      "to": "postgres",
+      "label": "LISTEN/NOTIFY（默认）",
+      "variant": "dashed"
+    },
+    {
+      "from": "streaming",
+      "to": "redis",
+      "label": "Pub/Sub（可选）",
+      "variant": "dashed"
+    },
+    {
+      "from": "media",
+      "to": "postgres",
+      "label": "drive_files"
+    },
+    {
+      "from": "media",
+      "to": "storage",
+      "label": "Put / Get"
+    }
   ],
   "cards": [
     {
@@ -232,6 +533,7 @@
       "items": [
         "M1–M5 已完成：骨架、账户、笔记、Streaming、ActivityPub 联邦",
         "Redis 可选：Streaming 中继 + 投递唤醒，PostgreSQL 仍是事实来源",
+        "Redis 路径已对真实 8.0.5 验证：跨进程集成测试、requirepass、双进程 smoke",
         "单个 Go 二进制内嵌迁移脚本，启动时自动升级到 v4"
       ]
     },
@@ -249,7 +551,7 @@
       "title": "读图说明",
       "items": [
         "矩形边界 = 单进程内的包；PostgreSQL 与对象存储是外部依赖",
-        "虚线 = 通过 PostgreSQL LISTEN/NOTIFY 的跨进程中继",
+        "虚线 = 跨进程中继：PostgreSQL LISTEN/NOTIFY，或可选的 Redis Pub/Sub",
         "external 节点是协议对端，不属于本仓库"
       ]
     }
