@@ -10,7 +10,7 @@
       "url": "https://github.com/Aurorainic/Cinderfish.git",
       "provider": "github",
       "link_mode": "web",
-      "revision": "aaa8ebaa26712ce28cc332639864599f2bcadb7b"
+      "revision": "1e863b742cdde86efdd7525ecaa5713f461c32bb"
     }
   },
   "components": [
@@ -104,7 +104,7 @@
       "id": "streaming",
       "type": "backend",
       "label": "streaming",
-      "sublabel": "五频道 · 事件总线 · LISTEN/NOTIFY",
+      "sublabel": "五频道 · 事件总线 · PG 或 Redis 中继",
       "pos": [560, 260],
       "size": [190, 64],
       "sources": [
@@ -161,6 +161,18 @@
       ]
     },
     {
+      "id": "redis",
+      "type": "messagebus",
+      "label": "Redis（可选）",
+      "sublabel": "Pub/Sub · 跨进程 Streaming",
+      "pos": [820, 540],
+      "size": [180, 64],
+      "sources": [
+        { "path": "internal/streaming/redis.go", "line": 1, "end_line": 30, "label": "Redis 中继" },
+        { "path": "cmd/cinderfish/main.go", "line": 60, "end_line": 85, "label": "启动选择中继" }
+      ]
+    },
+    {
       "id": "storage",
       "type": "cloud",
       "label": "媒体后端",
@@ -207,7 +219,8 @@
     { "from": "deliver", "to": "fediverse", "label": "HTTP POST + 签名" },
     { "from": "account", "to": "postgres", "label": "SQL" },
     { "from": "note", "to": "postgres", "label": "SQL" },
-    { "from": "streaming", "to": "postgres", "label": "LISTEN/NOTIFY", "variant": "dashed" },
+    { "from": "streaming", "to": "postgres", "label": "LISTEN/NOTIFY（默认）", "variant": "dashed" },
+    { "from": "streaming", "to": "redis", "label": "Pub/Sub（可选）", "variant": "dashed" },
     { "from": "media", "to": "postgres", "label": "drive_files" },
     { "from": "media", "to": "storage", "label": "Put / Get" }
   ],
@@ -217,7 +230,7 @@
       "title": "当前状态",
       "items": [
         "M1–M5 已完成：骨架、账户、笔记、Streaming、ActivityPub 联邦",
-        "M6 与 M7 完成：迁移、账号管理、性能基线、部署文档均已落地",
+        "M6 与 M7 完成；Redis 作为可选跨进程中继接入 Streaming",
         "单个 Go 二进制内嵌迁移脚本，启动时自动升级到 v4"
       ]
     },
