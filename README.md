@@ -59,4 +59,9 @@ go run ./cmd/cinderfish-media-migrate --config config.toml --to s3 --dry-run
 ```bash
 go vet ./...
 go test ./...
+CINDERFISH_TEST_DATABASE_URL="postgres://cinderfish:cinderfish@localhost:5432/cinderfish_test" go test ./...
+
+# 性能自比（结果记录在 docs/research/2026-10-29-performance-baseline.md）
+CINDERFISH_TEST_DATABASE_URL="postgres://cinderfish:cinderfish@localhost:5432/cinderfish_test" \
+  go test ./internal/httpapi -run '^$' -bench . -benchmem -benchtime 2s
 ```

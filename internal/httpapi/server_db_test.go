@@ -22,7 +22,7 @@ import (
 	"github.com/Aurorainic/cinderfish/internal/media"
 )
 
-func testPool(t *testing.T) *pgxpool.Pool {
+func testPool(t testing.TB) *pgxpool.Pool {
 	t.Helper()
 	url := os.Getenv("CINDERFISH_TEST_DATABASE_URL")
 	if url == "" {
