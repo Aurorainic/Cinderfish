@@ -4,7 +4,7 @@ import { useRoute, useRouter } from "vue-router";
 import { api } from "../api/client";
 import type { Note } from "../api/types";
 import AppIcon from "../components/AppIcon.vue";
-import NoteCard from "../components/NoteCard.vue";
+import NoteItem from "../components/note/Note.vue";
 import NoteComposer from "../components/NoteComposer.vue";
 import { isLoggedIn } from "../stores/session";
 
@@ -50,7 +50,14 @@ watch(() => route.params.id, load, { immediate: true });
   <p v-else-if="error" class="notice error">{{ error }}</p>
 
   <template v-else-if="note">
-    <NoteCard :note="note" @reply="replyTo = $event" @deleted="onDeleted" @updated="note = $event" />
+    <div class="note-detail">
+      <NoteItem
+        :note="note"
+        detail
+        @reply="replyTo = $event"
+        @deleted="onDeleted"
+      />
+    </div>
     <NoteComposer
       v-if="isLoggedIn"
       class="reply-composer"
@@ -62,14 +69,18 @@ watch(() => route.params.id, load, { immediate: true });
 </template>
 
 <style scoped>
+.note-detail {
+  padding: 4px 0 8px;
+  border-bottom: 1px solid var(--divider);
+}
+
 .reply-composer {
   margin-top: 16px;
 }
 
 .skeleton {
-  height: 180px;
-  border-radius: var(--radius-lg);
-  background: var(--panel);
-  border: 1px solid var(--border);
+  height: 160px;
+  border-radius: 0;
+  background: var(--panel-2);
 }
 </style>

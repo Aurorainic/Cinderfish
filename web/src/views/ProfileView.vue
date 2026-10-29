@@ -4,7 +4,7 @@ import { useRoute, useRouter } from "vue-router";
 import { api, ApiError } from "../api/client";
 import type { Note, UserDetailed } from "../api/types";
 import AppIcon from "../components/AppIcon.vue";
-import NoteCard from "../components/NoteCard.vue";
+import NoteItem from "../components/note/Note.vue";
 import ProfileHeader from "../components/ProfileHeader.vue";
 import { isLoggedIn, session } from "../stores/session";
 
@@ -250,7 +250,7 @@ watch(
 
     <template v-else>
       <div class="notes">
-        <NoteCard
+        <NoteItem
           v-for="note in notes"
           :key="note.id"
           :note="note"
@@ -291,10 +291,14 @@ watch(
   font-size: 1.05rem;
 }
 
+/* Borderless rows: dividers come from the note itself, so no gap. */
 .notes {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+}
+
+.notes > :deep(.note:last-child) {
+  border-bottom: 0;
 }
 
 .more {

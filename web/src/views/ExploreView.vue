@@ -4,7 +4,7 @@ import { useRoute } from "vue-router";
 import { api } from "../api/client";
 import type { Note, TimelineParams } from "../api/types";
 import AppIcon from "../components/AppIcon.vue";
-import NoteCard from "../components/NoteCard.vue";
+import NoteItem from "../components/note/Note.vue";
 import PagedFeed from "../components/ui/PagedFeed.vue";
 
 const route = useRoute();
@@ -59,20 +59,27 @@ function onDeleted(id: string) {
     <button type="button" class="tab" :class="{ active: scope === 'global' }" @click="scope = 'global'">全球</button>
   </nav>
 
-  <PagedFeed :key="`${scope}:${tag}`" ref="feed" :fetcher="fetcher" :stream-channel="streamChannels[scope]">
-    <template #item="{ item }">
-      <NoteCard :note="toNote(item)" @deleted="onDeleted" />
-    </template>
-    <template #empty>
-      <div class="placeholder">
-        <AppIcon name="feather" />
-        <span>这里还没有笔记。</span>
-      </div>
-    </template>
-  </PagedFeed>
+  <div class="explore-feed">
+    <PagedFeed :key="`${scope}:${tag}`" ref="feed" :fetcher="fetcher" :stream-channel="streamChannels[scope]">
+      <template #item="{ item }">
+        <NoteItem :note="toNote(item)" @deleted="onDeleted" />
+      </template>
+      <template #empty>
+        <div class="placeholder">
+          <AppIcon name="feather" />
+          <span>这里还没有笔记。</span>
+        </div>
+      </template>
+    </PagedFeed>
+  </div>
 </template>
 
 <style scoped>
+/* Borderless rows supply their own hairline; drop PagedFeed's card gap. */
+.explore-feed :deep(.paged-feed) {
+  gap: 0;
+}
+
 .tabs {
   display: flex;
   gap: 6px;

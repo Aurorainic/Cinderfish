@@ -4,7 +4,7 @@ import { api } from "../api/client";
 import type { Note, TimelineParams } from "../api/types";
 import { isLoggedIn } from "../stores/session";
 import AppIcon from "./AppIcon.vue";
-import NoteCard from "./NoteCard.vue";
+import NoteItem from "./note/Note.vue";
 import PagedFeed from "./ui/PagedFeed.vue";
 
 const props = withDefaults(
@@ -70,21 +70,30 @@ function toNote(item: unknown): Note {
     <RouterLink to="/login" class="button small">登录</RouterLink>
   </div>
 
-  <PagedFeed
-    v-else
-    ref="feed"
-    :key="`${source}:${tag}`"
-    :fetcher="fetcher"
-    :stream-channel="streamChannels[source]"
-  >
-    <template #item="{ item }">
-      <NoteCard :note="toNote(item)" @deleted="onDeleted" />
-    </template>
-    <template #empty>
-      <div class="placeholder">
-        <AppIcon name="feather" />
-        <span>这里还没有笔记。</span>
-      </div>
-    </template>
-  </PagedFeed>
+  <div v-else class="timeline-feed">
+    <PagedFeed
+      ref="feed"
+      :key="`${source}:${tag}`"
+      :fetcher="fetcher"
+      :stream-channel="streamChannels[source]"
+    >
+      <template #item="{ item }">
+        <NoteItem :note="toNote(item)" @deleted="onDeleted" />
+      </template>
+      <template #empty>
+        <div class="placeholder">
+          <AppIcon name="feather" />
+          <span>这里还没有笔记。</span>
+        </div>
+      </template>
+    </PagedFeed>
+  </div>
 </template>
+
+<style scoped>
+/* PagedFeed spaces its rows for cards; borderless rows butt against their
+   own hairline instead. */
+.timeline-feed :deep(.paged-feed) {
+  gap: 0;
+}
+</style>
