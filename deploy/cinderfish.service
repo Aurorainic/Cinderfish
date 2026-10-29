@@ -1,0 +1,25 @@
+[Unit]
+Description=Cinderfish federated social instance
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=cinderfish
+Group=cinderfish
+WorkingDirectory=/opt/cinderfish
+ExecStart=/opt/cinderfish/cinderfish --config /etc/cinderfish/config.toml
+EnvironmentFile=-/etc/cinderfish/cinderfish.env
+Restart=on-failure
+RestartSec=3
+LimitNOFILE=65535
+
+# The process only writes media under /var/lib/cinderfish.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/cinderfish
+
+[Install]
+WantedBy=multi-user.target

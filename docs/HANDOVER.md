@@ -20,7 +20,7 @@ Go 单二进制的个人/极小规模联邦社交实例。后端契约是 **Miss
 | M4 Streaming（WebSocket） | ✅ | 见 git log |
 | M5 联邦（ActivityPub） | ✅ | `ce7bf11` … `620435d` |
 | M6 前端 | ✅ | `9281a5c` |
-| M7 打磨 | 🚧 进行中 | — |
+| M7 打磨 | ✅ | 见 git log（迁移工具、账号管理、性能基线、部署文档） |
 
 ## 3. 契约以源码为准
 
@@ -87,6 +87,9 @@ cd web && npm install && npm run build && cd ..   # 产出 web/dist
 cp config.example.toml config.toml   # 按需改
 go build -o cinderfish ./cmd/cinderfish
 ./cinderfish --config config.toml
+
+# registration_mode = admin 时没有自助注册，用命令行建第一个管理员
+go run ./cmd/cinderfish-admin --config config.toml create --username root --password-stdin --admin
 ```
 
 只跑 API 时可以不构建前端：`web_dist` 目录不存在，服务器自动退回纯 API 模式。
@@ -300,6 +303,8 @@ POST /inbox                            POST /users/{id}/inbox
 | `docs/research/2026-10-28-m5-federation-source-calibration.md` | **M5 联邦逐条对照上游源码** |
 | `docs/research/2026-10-28-project-name-decision.md` | 命名决策记录 |
 | `docs/research/2026-10-29-performance-baseline.md` | **性能自比基线（M7）** |
+| `docs/DEPLOY.md` | **生产部署指南（反向代理、systemd、备份、媒体迁移）** |
+| `deploy/` | systemd 单元、Caddyfile、生产配置模板 |
 | `web/` | Vue 3 前端源码（构建到 `web/dist`） |
 | `.archify/architecture-cinderfish-overall/` | 项目整体结构图（Archify 产物，随里程碑更新） |
 

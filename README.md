@@ -35,7 +35,7 @@ go run ./cmd/cinderfish-media-migrate --config config.toml --to s3 --dry-run
 | M4 Streaming | ✅ WebSocket 端点、五个频道、事件广播（进程内 fanout + LISTEN/NOTIFY 跨进程中继） |
 | M5 联邦 | ✅ WebFinger、Actor、Inbox/Outbox、HTTP Signatures、三模式策略、投递队列、双实例 smoke test |
 | M6 前端 | ✅ Vue 3 时间线、发帖、反应、通知、资料、设置、管理页；WebSocket 实时更新 |
-| M7 打磨 | 🚧 进行中 |
+| M7 打磨 | ✅ 媒体迁移工具、账号管理、性能基线、部署文档 |
 
 ## 架构图
 
@@ -49,6 +49,8 @@ go run ./cmd/cinderfish-media-migrate --config config.toml --to s3 --dry-run
 ## 文档
 
 - **交接说明**：[`docs/HANDOVER.md`](docs/HANDOVER.md) — 给接手者必读
+- **部署指南**：[`docs/DEPLOY.md`](docs/DEPLOY.md) — systemd、Caddy、备份与升级
+- **性能基线**：[`docs/research/2026-10-29-performance-baseline.md`](docs/research/2026-10-29-performance-baseline.md)
 - 架构设计：[`docs/superpowers/specs/2026-10-26-cinderfish-architecture-v0.md`](docs/superpowers/specs/2026-10-26-cinderfish-architecture-v0.md)
 - 调研记录：[`docs/research/`](docs/research/)
 

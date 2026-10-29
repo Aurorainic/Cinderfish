@@ -317,6 +317,18 @@ LIMIT $1 OFFSET $2
 	return out, rows.Err()
 }
 
+// SetAdmin grants or revokes administrator rights.
+func (s *Service) SetAdmin(ctx context.Context, userID string, admin bool) error {
+	ct, err := s.pool.Exec(ctx, `UPDATE users SET is_admin = $1 WHERE id = $2`, admin, userID)
+	if err != nil {
+		return fmt.Errorf("account: set admin: %w", err)
+	}
+	if ct.RowsAffected() == 0 {
+		return ErrUserNotFound
+	}
+	return nil
+}
+
 // SetSuspended blocks or restores a local account. A suspended account
 // cannot sign in or use its token.
 func (s *Service) SetSuspended(ctx context.Context, userID string, suspended bool) error {

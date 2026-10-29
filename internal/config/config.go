@@ -11,17 +11,17 @@ import (
 )
 
 type Config struct {
-	Host             string     `toml:"host"`
-	Port             int        `toml:"port"`
-	Domain           string     `toml:"domain"`
-	DatabaseURL      string     `toml:"database_url"`
-	RegistrationMode string     `toml:"registration_mode"`
-	FederationMode   string     `toml:"federation_mode"`
+	Host             string `toml:"host"`
+	Port             int    `toml:"port"`
+	Domain           string `toml:"domain"`
+	DatabaseURL      string `toml:"database_url"`
+	RegistrationMode string `toml:"registration_mode"`
+	FederationMode   string `toml:"federation_mode"`
 	// WebDir points at the built frontend (index.html + assets). An
 	// empty or missing directory leaves the server API-only.
 	WebDir     string     `toml:"web_dir"`
 	Federation Federation `toml:"federation"`
-	Media            Media      `toml:"media"`
+	Media      Media      `toml:"media"`
 }
 
 // Federation groups the ActivityPub settings.

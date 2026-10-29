@@ -229,3 +229,40 @@ func asRegistrationError(err error, target **account.RegistrationError) bool {
 	}
 	return false
 }
+
+func TestSetAdminAndSuspend(t *testing.T) {
+	pool := testPool(t)
+	svc := account.NewService(pool)
+	ctx := context.Background()
+
+	user, _, err := svc.Register(ctx, account.RegistrationOpen, "mod", "password123", "")
+	if err != nil {
+		t.Fatalf("register: %v", err)
+	}
+	if user.IsAdmin {
+		t.Fatal("a registered user must not be an administrator")
+	}
+
+	if err := svc.SetAdmin(ctx, user.ID, true); err != nil {
+		t.Fatalf("set admin: %v", err)
+	}
+	updated, err := svc.GetByID(ctx, user.ID)
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	if !updated.IsAdmin {
+		t.Error("user is not an administrator after SetAdmin")
+	}
+
+	if err := svc.SetSuspended(ctx, user.ID, true); err != nil {
+		t.Fatalf("suspend: %v", err)
+	}
+	updated, _ = svc.GetByID(ctx, user.ID)
+	if !updated.IsSuspended {
+		t.Error("user is not suspended after SetSuspended")
+	}
+
+	if err := svc.SetAdmin(ctx, "missing", true); err != account.ErrUserNotFound {
+		t.Errorf("SetAdmin on a missing user = %v, want ErrUserNotFound", err)
+	}
+}

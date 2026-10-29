@@ -1,0 +1,33 @@
+# Production template. Sensitive values can come from
+# /etc/cinderfish/cinderfish.env (CINDERFISH_DATABASE_URL, ...).
+
+host = "127.0.0.1"
+port = 3000
+domain = "social.example.com"
+
+database_url = "postgres://cinderfish:CHANGE_ME@127.0.0.1:5432/cinderfish"
+
+# open | invite | admin
+registration_mode = "admin"
+
+# public | allowlist | none (first-start seed; the database is authoritative)
+federation_mode = "public"
+
+web_dir = "/opt/cinderfish/web"
+
+[federation]
+# Required behind a reverse proxy, so actor and note ids use https.
+public_url = "https://social.example.com"
+
+[media]
+backend = "local"
+local_path = "/var/lib/cinderfish/media"
+
+[media.s3]
+endpoint = ""
+bucket = ""
+region = ""
+access_key = ""
+secret_key = ""
+use_ssl = true
+public_base_url = ""
