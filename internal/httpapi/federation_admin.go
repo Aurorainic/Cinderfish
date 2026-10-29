@@ -81,7 +81,7 @@ func (s *Server) handleAdminAllowlist(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if r.Method == http.MethodGet {
-		writeJSON(w, http.StatusOK, map[string]any{"hosts": s.federationPolicy.Allowlist(r.Context())})
+		writeJSON(w, http.StatusOK, map[string]any{"hosts": allowlistJSON(s.federationPolicy.Allowlist(r.Context()))})
 		return
 	}
 
@@ -107,5 +107,14 @@ func (s *Server) handleAdminAllowlist(w http.ResponseWriter, r *http.Request) {
 		writeInternalServerError(w)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"hosts": s.federationPolicy.Allowlist(r.Context())})
+	writeJSON(w, http.StatusOK, map[string]any{"hosts": allowlistJSON(s.federationPolicy.Allowlist(r.Context()))})
+}
+
+// allowlistJSON renders an empty allowlist as [] rather than null, so
+// clients can call .length without a guard.
+func allowlistJSON(hosts []string) []string {
+	if hosts == nil {
+		return []string{}
+	}
+	return hosts
 }

@@ -73,9 +73,16 @@ async function post<T>(path: string, body: Record<string, unknown> = {}, authed 
   const token = getToken();
   if (authed && token) payload.i = token;
 
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    Accept: "application/json",
+  };
+  // The admin handlers authenticate from the header only, so send both:
+  // `i` for Misskey compatibility and Bearer for every backend route.
+  if (authed && token) headers.Authorization = `Bearer ${token}`;
   const res = await fetch(path, {
     method: "POST",
-    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    headers,
     body: JSON.stringify(payload),
   });
   if (!res.ok) throw await parseError(res);
