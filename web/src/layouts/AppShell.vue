@@ -7,7 +7,7 @@ import UserAvatar from "../components/UserAvatar.vue";
 import InstanceCard from "../components/widgets/InstanceCard.vue";
 import { instance, loadInstance } from "../stores/instance";
 import { isAdmin, refreshSession, session, signout } from "../stores/session";
-import type { ShellMode } from "../stores/shell";
+import { type ShellMode, setShellMode } from "../stores/shell";
 import { streaming, unreadNotifications } from "../stores/streaming";
 
 const props = withDefaults(defineProps<{ mode?: ShellMode }>(), { mode: "universal" });
@@ -34,6 +34,12 @@ const nav = computed(() => {
 function handleSignout() {
   signout();
   router.push("/");
+}
+
+// The layout switch is a preference, not a route: deck mode keeps the same
+// URL and only swaps what the main area renders.
+function toggleShellMode() {
+  setShellMode(props.mode === "deck" ? "universal" : "deck");
 }
 
 onMounted(() => {
@@ -74,6 +80,15 @@ watch(
           <UserAvatar :user="session.me" :size="34" />
           <span class="account-name">{{ session.me.username }}</span>
         </RouterLink>
+        <button
+          class="rail-mode"
+          type="button"
+          :aria-pressed="props.mode === 'deck'"
+          :title="props.mode === 'deck' ? '切换到通用视图' : '切换到 Deck 视图'"
+          @click="toggleShellMode"
+        >
+          {{ props.mode === "deck" ? "通用" : "Deck" }}
+        </button>
         <button class="icon-button" type="button" :title="theme === 'dark' ? '切换浅色' : '切换深色'" @click="toggleTheme">
           <AppIcon :name="theme === 'dark' ? 'sun' : 'moon'" />
         </button>
@@ -120,6 +135,36 @@ watch(
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Deck/universal switch. Labelled rather than icon-only so the two layouts
+   stay distinguishable once the rail collapses; the label is short enough for
+   the icon-only rail. */
+.rail-mode {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.rail-mode:hover,
+.rail-mode[aria-pressed="true"] {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.rail-mode:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .nav-icon {
@@ -188,6 +233,12 @@ watch(
 
   .account-name {
     display: none;
+  }
+
+  .rail-mode {
+    width: 40px;
+    padding: 6px 0;
+    font-size: 0.7rem;
   }
 }
 
