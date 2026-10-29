@@ -10,7 +10,7 @@
       "url": "https://github.com/Aurorainic/Cinderfish.git",
       "provider": "github",
       "link_mode": "web",
-      "revision": "89742dc660a2fb1570be3add617d1090bb4680e7"
+      "revision": "9281a5cd94d4a2717a793ed631ec8a0c205c5201"
     }
   },
   "components": [
@@ -40,7 +40,7 @@
       "sources": [
         { "path": "web/src/layouts/AppShell.vue", "line": 1, "end_line": 40, "label": "应用外壳与导航" },
         { "path": "web/src/api/client.ts", "line": 99, "end_line": 160, "label": "类型化 API 客户端" },
-        { "path": "web/src/lib/mfm.ts", "line": 1, "end_line": 30, "label": "MFM 安全渲染" }
+        { "path": "web/src/stores/streaming.ts", "line": 1, "end_line": 40, "label": "Streaming WebSocket 客户端" }
       ]
     },
     {
@@ -217,7 +217,7 @@
       "title": "当前状态",
       "items": [
         "M1–M5 已完成：骨架、账户、笔记、Streaming、ActivityPub 联邦",
-        "M6 基本完成：时间线、发帖、通知、资料、设置、管理页均已接通 API",
+        "M6 完成：页面全部接通 API，时间线与通知走 WebSocket 实时更新",
         "单个 Go 二进制内嵌迁移脚本，启动时自动升级到 v4"
       ]
     },

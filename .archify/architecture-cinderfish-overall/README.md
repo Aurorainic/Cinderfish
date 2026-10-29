@@ -2,7 +2,7 @@
 
 - 产出：`cinderfish-overall.html`
 - 源：`candidate.json`（Archify architecture schema v1）
-- 绘制时基线：`89742dc`（通知、资料、设置与管理页之后）
+- 绘制时基线：`9281a5c`（WebSocket 实时集成之后）
 - 画布：1040×812，宽画布契约不触发（宽度低于 1240）
 
 ## 目录命名
