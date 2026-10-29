@@ -13,8 +13,7 @@ import (
 // not name a real file fall back to index.html so client-side routes
 // work on a hard reload.
 type staticSite struct {
-	root  string
-	index []byte
+	root string
 }
 
 func newStaticSite(root string) (*staticSite, error) {
@@ -28,11 +27,10 @@ func newStaticSite(root string) (*staticSite, error) {
 	if !info.IsDir() {
 		return nil, os.ErrInvalid
 	}
-	index, err := os.ReadFile(filepath.Join(root, "index.html"))
-	if err != nil {
+	if _, err := os.Stat(filepath.Join(root, "index.html")); err != nil {
 		return nil, err
 	}
-	return &staticSite{root: root, index: index}, nil
+	return &staticSite{root: root}, nil
 }
 
 // handles reports whether a request belongs to the SPA rather than the
@@ -70,9 +68,16 @@ func (s *staticSite) serve(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	// Read index.html per request: it is a few hundred bytes, and a
+	// rebuild then goes live without restarting the server.
+	index, err := os.ReadFile(filepath.Join(s.root, "index.html"))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	http.ServeContent(w, r, "index.html", time.Time{}, bytes.NewReader(s.index))
+	http.ServeContent(w, r, "index.html", time.Time{}, bytes.NewReader(index))
 }
 
 // pathClean normalises a URL path. Unlike path.Clean on an untrusted

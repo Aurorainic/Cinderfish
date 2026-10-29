@@ -24,7 +24,7 @@ func (s *Server) handleMeta(w http.ResponseWriter, r *http.Request) {
 		"maintainerEmail":              "",
 		"version":                      "0.1.0",
 		"providesTarball":              false,
-		"name":                         "CinderFish",
+		"name":                         "Cinderfish",
 		"shortName":                    "cinderfish",
 		"uri":                          "https://" + s.cfg.Domain,
 		"description":                  "",

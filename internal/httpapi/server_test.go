@@ -39,8 +39,8 @@ func TestMetaDetailed(t *testing.T) {
 	}
 	m := decodeJSON(t, rec)
 
-	if m["name"] != "CinderFish" {
-		t.Errorf("meta.name = %v", m["name"])
+	if m["name"] != "Cinderfish" {
+		t.Errorf("meta.name = %v, want Cinderfish", m["name"])
 	}
 	// Misskey names the instance URL `uri`, not `instanceUrl`.
 	if m["uri"] != "https://fish.example" {
