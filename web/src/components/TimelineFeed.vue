@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { api } from "../api/client";
 import type { Note } from "../api/types";
 import { isLoggedIn } from "../stores/session";
+import { streaming } from "../stores/streaming";
 import AppIcon from "./AppIcon.vue";
 import NoteCard from "./NoteCard.vue";
 import NoteComposer from "./NoteComposer.vue";
@@ -87,8 +88,54 @@ function onDeleted(id: string) {
   notes.value = notes.value.filter((n) => n.id !== id);
 }
 
-watch(() => [props.source, props.tag], load);
-onMounted(load);
+const channelName = computed(
+  () =>
+    ({
+      local: "localTimeline",
+      global: "globalTimeline",
+      hybrid: "hybridTimeline",
+      home: "homeTimeline",
+    })[props.source],
+);
+
+let subscription = "";
+let off: (() => void) | null = null;
+
+function subscribe() {
+  unsubscribe();
+  if (needsAuth.value && !isLoggedIn.value) return;
+  subscription = streaming.subscribe(channelName.value);
+}
+
+function unsubscribe() {
+  if (subscription) streaming.unsubscribe(subscription);
+  subscription = "";
+}
+
+watch(() => [props.source, props.tag], () => {
+  load();
+  subscribe();
+});
+
+onMounted(() => {
+  load();
+  subscribe();
+  off = streaming.on((channel, type, body) => {
+    if (channel === "" && type === "__reconnected") {
+      load();
+      return;
+    }
+    if (channel !== channelName.value || type !== "note") return;
+    const note = body as Note;
+    if (!note?.id || notes.value.some((n) => n.id === note.id)) return;
+    notes.value = [note, ...notes.value];
+  });
+});
+
+onBeforeUnmount(() => {
+  unsubscribe();
+  off?.();
+});
 </script>
 
 <template>

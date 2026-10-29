@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { api } from "../api/client";
 import type { Notification } from "../api/types";
 import { session } from "../stores/session";
+import { setUnreadNotifications, streaming } from "../stores/streaming";
 import AppIcon from "../components/AppIcon.vue";
 import NotificationItem from "../components/NotificationItem.vue";
 
@@ -41,6 +42,7 @@ async function load() {
     items.value = page;
     untilId.value = page.length ? page[page.length - 1].id : "";
     hasMore.value = page.length >= pageSize;
+    setUnreadNotifications(unreadCount.value);
   } catch (err) {
     error.value = err instanceof Error ? err.message : "加载通知失败";
   } finally {
@@ -72,6 +74,7 @@ async function markAllRead() {
   try {
     await api.markAllNotificationsRead();
     for (const n of items.value) n.isRead = true;
+    setUnreadNotifications(0);
     if (session.me) {
       session.me.unreadNotificationsCount = 0;
       session.me.hasUnreadNotification = false;
@@ -83,7 +86,20 @@ async function markAllRead() {
   }
 }
 
-onMounted(load);
+let off: (() => void) | null = null;
+
+onMounted(() => {
+  load();
+  off = streaming.on((channel, type, body) => {
+    if (channel !== "main" || type !== "notification" || !session.me) return;
+    const incoming = body as Notification;
+    if (!incoming?.id || items.value.some((n) => n.id === incoming.id)) return;
+    items.value = [incoming, ...items.value];
+    setUnreadNotifications(unreadCount.value);
+  });
+});
+
+onBeforeUnmount(() => off?.());
 </script>
 
 <template>

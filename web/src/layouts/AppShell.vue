@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import AppIcon from "../components/AppIcon.vue";
 import UserAvatar from "../components/UserAvatar.vue";
 import { instance, loadInstance } from "../stores/instance";
 import { isAdmin, refreshSession, session, signout } from "../stores/session";
+import { streaming, unreadNotifications } from "../stores/streaming";
 
 const router = useRouter();
 const theme = ref(document.documentElement.dataset.theme ?? "dark");
@@ -33,7 +34,14 @@ function handleSignout() {
 onMounted(() => {
   refreshSession();
   loadInstance();
+  streaming.start();
 });
+
+// A new token changes who the stream speaks for, so reconnect on it.
+watch(
+  () => session.token,
+  () => streaming.restart(),
+);
 </script>
 
 <template>
@@ -46,7 +54,12 @@ onMounted(() => {
 
       <nav class="nav">
         <RouterLink v-for="item in nav" :key="item.to" :to="item.to" class="nav-link">
-          <AppIcon :name="item.icon" />
+          <span class="nav-icon">
+            <AppIcon :name="item.icon" />
+            <span v-if="item.to === '/notifications' && unreadNotifications" class="nav-badge">
+              {{ unreadNotifications > 99 ? "99+" : unreadNotifications }}
+            </span>
+          </span>
           <span>{{ item.label }}</span>
         </RouterLink>
       </nav>
@@ -127,6 +140,27 @@ onMounted(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.nav-icon {
+  position: relative;
+  display: inline-flex;
+}
+
+.nav-badge {
+  position: absolute;
+  top: -6px;
+  right: -10px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 0.65rem;
+  font-weight: 800;
+  line-height: 16px;
+  text-align: center;
 }
 
 @media (max-width: 1080px) {
