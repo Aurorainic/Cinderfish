@@ -70,6 +70,7 @@ cd /tmp/refcheck/misskey && git sparse-checkout set packages/backend/src package
 
 - Go 1.26.8，`GOPROXY=https://mirrors.aliyun.com/goproxy/,direct`
 - PostgreSQL 18：库 `cinderfish`（开发）、`cinderfish_test`（测试）；角色/密码 `cinderfish`/`cinderfish`
+- Redis：**可选**，默认关闭；本机没有 `redis-server`，测试用 `miniredis` 代替
 - **访问 GitHub 必须走代理** `127.0.0.1:19823`
 - `dl.min.io` 被代理拦截，MinIO 二进制下不下来；S3 后端**尚未做真实服务端验证**
 - S3 客户端用 `github.com/minio/minio-go/v7`（不是 AWS SDK，依赖树太大）
@@ -113,7 +114,7 @@ go run ./cmd/cinderfish-media-migrate --config config.toml --to local --to-local
 
 `--dry-run` 只统计；`--limit N` 限制条数；单个对象失败不会中断其余，报告会列出失败 key，退出码为 1。`--delete-source` 只在整轮无失败时清理源对象。迁移完成后把 `config.toml` 的 `media.backend` 切到新后端再重启。
 
-配置项可用 `CINDERFISH_*` 环境变量覆盖，如 `CINDERFISH_PORT`、`CINDERFISH_DOMAIN`、`CINDERFISH_REGISTRATION_MODE`、`CINDERFISH_FEDERATION_MODE`、`CINDERFISH_MEDIA_BACKEND`、`CINDERFISH_MEDIA_LOCAL_PATH`、`CINDERFISH_WEB_DIR`。
+配置项可用 `CINDERFISH_*` 环境变量覆盖，如 `CINDERFISH_PORT`、`CINDERFISH_DOMAIN`、`CINDERFISH_REGISTRATION_MODE`、`CINDERFISH_FEDERATION_MODE`、`CINDERFISH_MEDIA_BACKEND`、`CINDERFISH_MEDIA_LOCAL_PATH`、`CINDERFISH_WEB_DIR`、`CINDERFISH_REDIS_ENABLED`、`CINDERFISH_REDIS_URL`、`CINDERFISH_REDIS_PREFIX`。
 
 ## 8. 代码结构
 
@@ -218,11 +219,30 @@ web/src/views/       Timeline、Note、Notifications、Profile、Explore、Setti
 - 其余 GET/HEAD 先找真实文件，找不到回退 `index.html`；`/assets/*` 带一年 immutable 缓存，`index.html` 每次读取（重新构建无需重启）。
 - 目录不存在时服务器保持纯 API 模式。
 
-### 11.4 实时更新
+### 11.4 Redis（可选）
+
+默认关闭，PostgreSQL 仍是唯一必选依赖。开启后：
+
+- Streaming 的跨进程中继从 `LISTEN/NOTIFY` 换成 Redis Pub/Sub（频道 `<prefix>:stream`），不再受 8000 字节 NOTIFY 上限约束，也不再需要分块重组。
+- 启用后启动时会 `PING`，连不上直接退出——避免两个进程对"用哪种中继"产生分歧。
+- 关闭时行为与之前完全一致；Redis 与 PostgreSQL 两种中继不能同时挂在同一个进程上。
+
+配置：
+
+```toml
+[redis]
+enabled = true
+url = "redis://127.0.0.1:6379/0"
+prefix = "cinderfish"
+```
+
+`prefix` 用于多实例共用一个 Redis 库时隔离频道；空值回退到 `cinderfish`。
+
+### 11.5 实时更新
 
 `web/src/stores/streaming.ts` 维护唯一 `/streaming` 连接：token 走 query，`connect` 带 `pong:true`，按订阅 id 分发 `channel` 帧，断线指数退避（1s→30s，6 次封顶），登录/退出时重建连接。`main` 频道只由外壳订阅一次（服务端每连接只允许一个），时间线各自订阅自己的频道，重连后重新拉取。
 
-### 11.5 开发与构建
+### 11.6 开发与构建
 
 ```bash
 cd web
@@ -231,7 +251,7 @@ pnpm dev      # 5173，代理 /api /media /streaming 到 127.0.0.1:3000
 pnpm build    # 先 vue-tsc --noEmit，再输出 web/dist
 ```
 
-### 11.6 已知缺口
+### 11.7 已知缺口
 
 - **资料不可编辑**：后端没有 `i/update`，昵称、简介、头像都只读。
 - **没有搜索、没有用户列表页、没有投票接口**（前端只展示投票结果）。
@@ -313,6 +333,7 @@ POST /inbox                            POST /users/{id}/inbox
 - **S3 后端未做真实服务端验证**：只验证了编译、接口与 URL 生成逻辑。
 - **缩略图/WebP 生成未实现**：`drive_files.thumbnail_key` 字段已留，图片处理管道还没写。
 - **前端没有真实第三方客户端联调**：页面已在构建产物上用浏览器走查，但没有用 misskey-js 或 Misskey Web 前端连过本实例。
+- **Redis 只对 miniredis 验证过**：本机没有 `redis-server`，跨进程中继的单元测试与双进程 smoke 都用 miniredis；没有对真实 Redis 做过持久化/认证/网络闪断验证。
 - **Streaming 未做真实 Misskey 客户端联调**：已用自写 WebSocket 客户端验证（握手、`connect`、`connected`、笔记投递全部通过），但**没有**用 misskey-js 或 Misskey Web 前端实际连过。
 - **联邦没有任何第三方联调**：只跑了本实现的双实例测试（真签名、真 HTTP、真库），没有对 Mastodon / GoToSocial / 真实 Misskey 实例互通。这是 M5 之后最该补的验证。
 - **Streaming 多进程中继只手测了单连接的 LISTEN/NOTIFY 往返**，没有做真正的双进程联调。

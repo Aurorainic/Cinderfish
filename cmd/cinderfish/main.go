@@ -5,6 +5,7 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -13,6 +14,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/redis/go-redis/v9"
 
 	"github.com/Aurorainic/cinderfish/internal/config"
 	"github.com/Aurorainic/cinderfish/internal/db"
@@ -54,19 +56,37 @@ func main() {
 	api.AttachStreaming(log.Printf)
 
 	// Relay events to, and receive them from, other processes of the
-	// same instance through PostgreSQL LISTEN/NOTIFY. This costs one
-	// NOTIFY per event; it is what makes a future multi-process
-	// deployment work without a Redis dependency.
+	// same instance. PostgreSQL LISTEN/NOTIFY is the default and needs no
+	// extra service; Redis pub/sub is opt-in and carries the same events
+	// without PostgreSQL's 8000 byte payload cap.
 	notifyCtx, stopNotify := context.WithCancel(ctx)
 	defer stopNotify()
 
+	redisClient, err := openRedis(ctx, cfg)
+	if err != nil {
+		log.Fatalf("cinderfish: redis: %v", err)
+	}
+	if redisClient != nil {
+		defer redisClient.Close()
+	}
+
 	bus := api.StreamBus()
-	bus.SetPublisher(streaming.NewPublisher(pool))
-	go func() {
-		if err := streaming.Listen(notifyCtx, pool, bus, log.Printf); err != nil {
-			log.Printf("cinderfish: streaming notify listener: %v", err)
-		}
-	}()
+	if redisClient != nil {
+		bus.SetPublisher(streaming.NewRedisRelay(redisClient, cfg.Redis.Prefix))
+		go func() {
+			if err := streaming.ListenRedis(notifyCtx, redisClient, cfg.Redis.Prefix, bus, log.Printf); err != nil {
+				log.Printf("cinderfish: streaming redis listener: %v", err)
+			}
+		}()
+		log.Printf("cinderfish: streaming relay uses Redis (prefix %q)", cfg.Redis.Prefix)
+	} else {
+		bus.SetPublisher(streaming.NewPublisher(pool))
+		go func() {
+			if err := streaming.Listen(notifyCtx, pool, bus, log.Printf); err != nil {
+				log.Printf("cinderfish: streaming notify listener: %v", err)
+			}
+		}()
+	}
 
 	// ActivityPub: policy, renderer, remote store, inbox and the delivery
 	// worker. The worker runs in this process; the queue is a table, so a
@@ -123,6 +143,27 @@ func openDB(ctx context.Context, cfg *config.Config) (*pgxpool.Pool, error) {
 	}
 	poolCfg.MaxConns = 10
 	return pgxpool.NewWithConfig(ctx, poolCfg)
+}
+
+// openRedis returns a connected client when Redis is enabled, and nil
+// when it is not. An enabled but unreachable Redis is a startup error:
+// silently falling back would make two processes disagree about the relay.
+func openRedis(ctx context.Context, cfg *config.Config) (*redis.Client, error) {
+	if !cfg.Redis.Enabled {
+		return nil, nil
+	}
+	opts, err := redis.ParseURL(cfg.Redis.URL)
+	if err != nil {
+		return nil, fmt.Errorf("parse url: %w", err)
+	}
+	client := redis.NewClient(opts)
+	pingCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	if err := client.Ping(pingCtx).Err(); err != nil {
+		_ = client.Close()
+		return nil, fmt.Errorf("ping %s: %w", opts.Addr, err)
+	}
+	return client, nil
 }
 
 // openStorage builds the media backend named by the configuration.

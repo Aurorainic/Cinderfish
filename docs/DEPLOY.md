@@ -192,6 +192,36 @@ sudo -u cinderfish /opt/cinderfish/cinderfish-media-migrate --config /etc/cinder
 - 白名单按域名后缀匹配：`example.com` 允许 `sub.example.com`，不允许 `notexample.com`。
 - 关闭联邦（`none`）时所有 ActivityPub 路由回 403，但本地 API 与前端不受影响。
 
+## 9.5 Redis（可选）
+
+单进程部署不需要 Redis。以下情况建议开启：
+
+- 打算跑多个 `cinderfish` 进程（共享同一个 PostgreSQL），需要 Streaming 事件跨进程中继；
+- 事件体经常接近或超过 PostgreSQL `NOTIFY` 的 8000 字节上限（大笔记、大通知），不想走分块重组；
+- 希望减少数据库上的 `NOTIFY` 写入。
+
+配置：
+
+```toml
+[redis]
+enabled = true
+url = "redis://127.0.0.1:6379/0"
+prefix = "cinderfish"
+```
+
+- 开启后 Redis 只做 Pub/Sub，不存业务数据；PostgreSQL 仍是唯一事实来源，Redis 丢消息最多丢一次实时推送，历史数据不受影响。
+- 启动时会 `PING`，连不上直接失败，不会静默退回 PostgreSQL 中继。
+- 多实例共用一个 Redis 库时用不同的 `prefix`。
+- Redis 建议只监听本机或内网，并设置 `requirepass`；URL 写成 `redis://:密码@127.0.0.1:6379/0`。
+- 至少保留 `maxmemory-policy noeviction`：Pub/Sub 不占内存，但同库里的其它数据不应被误逐出。
+
+systemd 里可以用环境变量覆盖：
+
+```ini
+Environment=CINDERFISH_REDIS_ENABLED=true
+Environment=CINDERFISH_REDIS_URL=redis://:CHANGE_ME@127.0.0.1:6379/0
+```
+
 ## 10. 升级
 
 ```bash

@@ -5,7 +5,7 @@ Go 单二进制的个人 / 极小规模联邦社交实例。
 - 后端契约：Misskey 原生 API（`POST /api/<endpoint>` RPC 风格）+ Streaming API
 - 通信层：ActivityPub 联邦（WebFinger / Actor / Inbox / Outbox / HTTP Signatures）
 - 前端：自建 Firefish 风格（Vue 3 + TypeScript）
-- 依赖：PostgreSQL 必需；Redis 可选；媒体支持 local 与 S3 兼容存储
+- 依赖：PostgreSQL 必需；Redis 可选（跨进程 Streaming 中继）；媒体支持 local 与 S3 兼容存储
 
 ## 快速开始
 

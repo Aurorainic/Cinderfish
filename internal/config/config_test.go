@@ -64,3 +64,57 @@ func TestS3BackendValidation(t *testing.T) {
 	_, err = Load("")
 	require.Error(t, err, "secret key check not enforced yet, but endpoint/bucket should pass; only other invalid fields fail")
 }
+
+func TestRedisDefaultsAndFile(t *testing.T) {
+	c, err := Load("")
+	require.NoError(t, err)
+	assert.False(t, c.Redis.Enabled, "redis must be opt-in")
+	assert.Equal(t, "redis://127.0.0.1:6379/0", c.Redis.URL)
+	assert.Equal(t, "cinderfish", c.Redis.Prefix)
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.toml")
+	require.NoError(t, os.WriteFile(path, []byte(`
+[redis]
+enabled = true
+url = "redis://redis.internal:6380/2"
+prefix = "fish"
+`), 0o600))
+
+	c, err = Load(path)
+	require.NoError(t, err)
+	assert.True(t, c.Redis.Enabled)
+	assert.Equal(t, "redis://redis.internal:6380/2", c.Redis.URL)
+	assert.Equal(t, "fish", c.Redis.Prefix)
+}
+
+func TestRedisEnvOverrideAndValidation(t *testing.T) {
+	t.Setenv("CINDERFISH_REDIS_ENABLED", "true")
+	t.Setenv("CINDERFISH_REDIS_URL", "redis://127.0.0.1:6390/1")
+	t.Setenv("CINDERFISH_REDIS_PREFIX", "test")
+
+	c, err := Load("")
+	require.NoError(t, err)
+	assert.True(t, c.Redis.Enabled)
+	assert.Equal(t, "redis://127.0.0.1:6390/1", c.Redis.URL)
+	assert.Equal(t, "test", c.Redis.Prefix)
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.toml")
+	require.NoError(t, os.WriteFile(path, []byte("[redis]\nenabled = true\nurl = \"\"\n"), 0o600))
+	t.Setenv("CINDERFISH_REDIS_ENABLED", "")
+	t.Setenv("CINDERFISH_REDIS_URL", "")
+	_, err = Load(path)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "redis.url")
+}
+
+func TestRedisBlankPrefixFallsBack(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.toml")
+	require.NoError(t, os.WriteFile(path, []byte("[redis]\nprefix = \"\"\n"), 0o600))
+
+	c, err := Load(path)
+	require.NoError(t, err)
+	assert.Equal(t, "cinderfish", c.Redis.Prefix)
+}
