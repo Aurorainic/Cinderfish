@@ -10,7 +10,7 @@
       "url": "https://github.com/Aurorainic/Cinderfish.git",
       "provider": "github",
       "link_mode": "web",
-      "revision": "53f419e4f2c1b02926de1f7d22e27db1161aad98"
+      "revision": "998abde9d0845aa3c8e3524f448d89414a0cee3b"
     }
   },
   "components": [
@@ -31,6 +31,19 @@
       "size": [180, 64]
     },
     {
+      "id": "web",
+      "type": "frontend",
+      "label": "web 前端",
+      "sublabel": "Vue 3 · Vite · Firefish 风格外壳",
+      "pos": [40, 40],
+      "size": [180, 64],
+      "sources": [
+        { "path": "web/src/layouts/AppShell.vue", "line": 1, "end_line": 20, "label": "应用外壳与导航" },
+        { "path": "web/src/router/index.ts", "line": 1, "end_line": 19, "label": "SPA 路由" },
+        { "path": "internal/httpapi/web.go", "line": 42, "end_line": 59, "label": "静态托管与 SPA fallback" }
+      ]
+    },
+    {
       "id": "config",
       "type": "backend",
       "label": "config",
@@ -38,7 +51,7 @@
       "pos": [300, 60],
       "size": [190, 64],
       "sources": [
-        { "path": "internal/config/config.go", "line": 61, "end_line": 92, "label": "加载与校验" }
+        { "path": "internal/config/config.go", "line": 64, "end_line": 93, "label": "加载与校验" }
       ]
     },
     {
@@ -61,7 +74,8 @@
       "pos": [300, 320],
       "size": [200, 64],
       "sources": [
-        { "path": "internal/httpapi/server.go", "line": 87, "end_line": 158, "label": "全部路由" }
+        { "path": "internal/httpapi/server.go", "line": 94, "end_line": 166, "label": "全部路由" },
+        { "path": "internal/httpapi/server.go", "line": 168, "end_line": 174, "label": "SPA 前置分流" }
       ]
     },
     {
@@ -177,6 +191,8 @@
     }
   ],
   "connections": [
+    { "from": "client", "to": "web", "label": "浏览器加载", "variant": "emphasis" },
+    { "from": "web", "to": "httpapi", "label": "静态资源 · SPA fallback" },
     { "from": "client", "to": "httpapi", "label": "Misskey RPC / WS", "variant": "emphasis" },
     { "from": "config", "to": "main", "label": "加载" },
     { "from": "main", "to": "httpapi", "label": "装配路由" },
@@ -201,7 +217,7 @@
       "title": "当前状态",
       "items": [
         "M1–M5 已完成：骨架、账户、笔记、Streaming、ActivityPub 联邦",
-        "M6 前端与 M7 打磨未开始；Firefish 风格 Web 前端尚未创建",
+        "M6 进行中：Vue 外壳、主题与 SPA 托管已就绪，页面正在接 API",
         "单个 Go 二进制内嵌迁移脚本，启动时自动升级到 v4"
       ]
     },

@@ -2,7 +2,7 @@
 
 - 产出：`cinderfish-overall.html`
 - 源：`candidate.json`（Archify architecture schema v1）
-- 绘制时基线：`53f419e`（M5 联邦完成、项目更名 Cinderfish 之后）
+- 绘制时基线：`998abde`（M6 前端脚手架与静态托管之后）
 - 画布：1040×812，宽画布契约不触发（宽度低于 1240）
 
 ## 目录命名
@@ -19,7 +19,8 @@ receipt 的路径字段都要跟着改。复审证据按 `review-<n>/` 递增，
 - **矩形边界**：`cinderfish` 单进程内的包。`main` 装配 `httpapi`，`httpapi` 挂接各领域包与联邦、Streaming。
 - **边界外**：`PostgreSQL` 与 `media` 后端（local / S3）是进程外依赖；`Misskey 客户端` 与 `Fediverse 远端实例` 是协议对端。
 - **虚线**：Streaming 通过 PostgreSQL `LISTEN/NOTIFY` 做跨进程中继，不是进程内直连。
-- **M6 / M7**：Firefish 风格 Web 前端尚未创建，因此图中没有 `web` 节点，状态写在 `cards` 里。
+- **web 节点**：Vue 3 前端，经 `httpapi` 的静态托管与 SPA fallback 由同一进程发出；协议命名空间不进 SPA。
+- **M7**：打磨项（S3 迁移工具、admin 面板、性能自测、部署文档）尚未开始，状态写在 `cards` 里。
 
 ## 每完成一个里程碑怎么改
 
