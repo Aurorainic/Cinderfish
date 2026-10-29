@@ -1,7 +1,9 @@
 package httpapi_test
 
 import (
+	"bytes"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 )
 
@@ -73,4 +75,74 @@ func TestUsersNotesRequiresIdentity(t *testing.T) {
 	if resp.StatusCode != http.StatusNotFound {
 		t.Fatalf("status = %d, want 404; body %v", resp.StatusCode, body)
 	}
+}
+
+func TestUsersNotesFilters(t *testing.T) {
+	ts := newTestServer(t, "open")
+	_, authorToken := createUser(t, ts, "alice")
+	_, bobToken := createUser(t, ts, "bob")
+
+	resp, file := uploadFile(t, ts.URL, authorToken, "pic.png", bytes.NewBufferString("png bytes"))
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("upload: status %d, body %v", resp.StatusCode, file)
+	}
+	fileID, _ := file["id"].(string)
+
+	photoID := createNote(t, ts, authorToken, map[string]any{"text": "with file", "fileIds": []string{fileID}})
+	bobNote := createNote(t, ts, bobToken, map[string]any{"text": "bob's note"})
+	replyID := createNote(t, ts, authorToken, map[string]any{"text": "reply", "replyId": bobNote})
+	plainID := createNote(t, ts, authorToken, map[string]any{"text": "plain"})
+
+	// Default: all three, newest first.
+	raw := usersNotesRaw(t, ts, map[string]any{"username": "alice"})
+	if got := rawIDs(raw); !equalIDs(got, []string{plainID, replyID, photoID}) {
+		t.Errorf("default users/notes = %v, want %v", got, []string{plainID, replyID, photoID})
+	}
+
+	// withFiles keeps only the note carrying a file.
+	raw = usersNotesRaw(t, ts, map[string]any{"username": "alice", "withFiles": true})
+	if got := rawIDs(raw); !equalIDs(got, []string{photoID}) {
+		t.Errorf("withFiles users/notes = %v, want [%s]", got, photoID)
+	}
+
+	// withReplies=false drops replies to other users.
+	raw = usersNotesRaw(t, ts, map[string]any{"username": "alice", "withReplies": false})
+	if got := rawIDs(raw); !equalIDs(got, []string{plainID, photoID}) {
+		t.Errorf("withReplies=false users/notes = %v, want %v", got, []string{plainID, photoID})
+	}
+}
+
+// usersNotesRaw posts /api/users/notes and returns the raw response.
+func usersNotesRaw(t *testing.T, ts *httptest.Server, body map[string]any) any {
+	t.Helper()
+	resp, raw := postRaw(t, ts, "/api/users/notes", body)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("users/notes: status %d, body %v", resp.StatusCode, raw)
+	}
+	return raw
+}
+
+// rawIDs extracts the note ids from a users/notes response.
+func rawIDs(raw any) []string {
+	list, _ := raw.([]any)
+	ids := make([]string, 0, len(list))
+	for _, item := range list {
+		m, _ := item.(map[string]any)
+		if id, ok := m["id"].(string); ok {
+			ids = append(ids, id)
+		}
+	}
+	return ids
+}
+
+func equalIDs(got, want []string) bool {
+	if len(got) != len(want) {
+		return false
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			return false
+		}
+	}
+	return true
 }

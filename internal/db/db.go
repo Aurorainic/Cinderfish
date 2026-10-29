@@ -358,6 +358,12 @@ DROP INDEX IF EXISTS idx_users_username_lower;
 CREATE UNIQUE INDEX idx_users_username_lower_local ON users (username_lower) WHERE host IS NULL;
 CREATE UNIQUE INDEX idx_users_username_lower_remote ON users (username_lower, host) WHERE host IS NOT NULL;
 `,
+
+	// v5: pinned notes.
+	5: `
+ALTER TABLE user_profiles
+    ADD COLUMN IF NOT EXISTS pinned_note_ids TEXT[] NOT NULL DEFAULT '{}';
+`,
 }
 
 // Migrate applies pending migrations in order and returns the version

@@ -23,6 +23,8 @@ func (s *Server) handleUsersNotes(w http.ResponseWriter, r *http.Request) {
 		Limit    int    `json:"limit"`
 		SinceID  string `json:"sinceId"`
 		UntilID  string `json:"untilId"`
+		WithFiles   *bool `json:"withFiles"`
+		WithReplies *bool `json:"withReplies"`
 	}
 	if err := decodeOptionalJSON(r, &body); err != nil {
 		writeAPIError(w, err)
@@ -59,7 +61,12 @@ func (s *Server) handleUsersNotes(w http.ResponseWriter, r *http.Request) {
 		viewerID = info.User.ID
 	}
 
-	notes, err := s.timeline.UserNotes(r.Context(), user.ID, body.Limit, body.SinceID, body.UntilID)
+	// Misskey's users/notes defaults: withFiles is false and withReplies
+	// is true unless the request says otherwise.
+	withFiles := body.WithFiles != nil && *body.WithFiles
+	withReplies := body.WithReplies == nil || *body.WithReplies
+
+	notes, err := s.timeline.UserNotes(r.Context(), user.ID, body.Limit, body.SinceID, body.UntilID, withFiles, withReplies)
 	if err != nil {
 		writeInternalServerError(w)
 		return
@@ -71,6 +78,31 @@ func (s *Server) handleUsersNotes(w http.ResponseWriter, r *http.Request) {
 		out = append(out, packNoteDetail(r.Context(), s, n, pc))
 	}
 	writeJSON(w, http.StatusOK, out)
+}
+
+// applyPinnedNotes fills pinnedNoteIds and pinnedNotes with the user's
+// pin list in stored order, at most five notes packed.
+func (s *Server) applyPinnedNotes(ctx context.Context, userID string, packed map[string]any) {
+	if s.accounts == nil || s.notes == nil {
+		return
+	}
+	ids, err := s.accounts.PinnedNoteIDs(ctx, userID)
+	if err != nil {
+		return
+	}
+	packed["pinnedNoteIds"] = ids
+	notes := make([]any, 0, len(ids))
+	for i, id := range ids {
+		if i >= 5 {
+			break
+		}
+		n, err := s.notes.Get(ctx, id)
+		if err != nil {
+			continue
+		}
+		notes = append(notes, packNoteDetail(ctx, s, n, s.notePackContext(ctx, n, "")))
+	}
+	packed["pinnedNotes"] = notes
 }
 
 // applyUserCounts fills the profile counters that the UserDetailed schema

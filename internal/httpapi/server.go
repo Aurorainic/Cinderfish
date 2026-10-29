@@ -104,6 +104,8 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("POST /api/username/available", s.handleUsernameAvailable)
 	s.mux.HandleFunc("POST /api/i", s.handleI)
 	s.mux.HandleFunc("POST /api/i/update", s.handleIUpdate)
+	s.mux.HandleFunc("POST /api/i/pin", s.handleIPin)
+	s.mux.HandleFunc("POST /api/i/unpin", s.handleIUnpin)
 	s.mux.HandleFunc("POST /api/users/show", s.handleUsersShow)
 	s.mux.HandleFunc("POST /api/users/notes", s.handleUsersNotes)
 	s.mux.HandleFunc("POST /api/miauth/gen-token", s.handleMiAuthGenToken)

@@ -387,7 +387,7 @@ SELECT count(*) FROM notes WHERE user_id = $1 AND user_host IS NULL AND deleted_
 		return
 	}
 
-	notes, err := s.timeline.UserNotes(r.Context(), u.ID, 20, r.URL.Query().Get("since_id"), r.URL.Query().Get("until_id"))
+	notes, err := s.timeline.UserNotes(r.Context(), u.ID, 20, r.URL.Query().Get("since_id"), r.URL.Query().Get("until_id"), false, true)
 	if err != nil {
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return

@@ -213,8 +213,10 @@ SELECT id FROM notes WHERE created_at >= $1 AND deleted_at IS NULL ORDER BY id A
 //
 // This is the outbox query: public and home visibility only, local-only
 // notes excluded, and cursor-bounded the same way the timeline is so
-// peers see a stable order across pages.
-func (s *TimelineService) UserNotes(ctx context.Context, userID string, limit int, sinceID, untilID string) ([]*Note, error) {
+// peers see a stable order across pages. withFiles keeps only the notes
+// that carry drive files; withReplies=false drops replies to other
+// users while keeping replies to one's own notes.
+func (s *TimelineService) UserNotes(ctx context.Context, userID string, limit int, sinceID, untilID string, withFiles, withReplies bool) ([]*Note, error) {
 	if limit <= 0 || limit > 100 {
 		limit = 20
 	}
@@ -222,6 +224,12 @@ func (s *TimelineService) UserNotes(ctx context.Context, userID string, limit in
 	q.add("n.user_id = %s", userID)
 	q.add("n.user_host IS NULL")
 	q.conds = append(q.conds, "n.deleted_at IS NULL", "n.local_only = FALSE", "n.visibility IN ('public','home')")
+	if withFiles {
+		q.conds = append(q.conds, "n.file_ids <> '{}'")
+	}
+	if !withReplies {
+		q.add("(n.reply_id IS NULL OR n.reply_user_id = n.user_id)")
+	}
 	if sinceID != "" {
 		q.add("n.id > %s", sinceID)
 	}

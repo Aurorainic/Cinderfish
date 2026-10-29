@@ -266,6 +266,7 @@ func (s *Server) handleUsersShow(w http.ResponseWriter, r *http.Request) {
 
 	packed := packUserDetailed(user, user.CreatedAt, false, loadProfile(r.Context(), s, user.ID))
 	s.applyUserCounts(r.Context(), user.ID, packed)
+	s.applyPinnedNotes(r.Context(), user.ID, packed)
 	writeJSON(w, http.StatusOK, packed)
 }
 
