@@ -73,7 +73,7 @@ func (s *Server) handleFollowingCreate(w http.ResponseWriter, r *http.Request) {
 		s.sendRemoteFollow(r.Context(), info.User.ID, target.ID, *target.Host)
 	}
 
-	writeJSON(w, http.StatusOK, packUserLite(target, s.cfg.Domain))
+	writeJSON(w, http.StatusOK, packUserLite(target, s.cfg.Domain, nil))
 }
 
 // handleFollowingDelete is POST /api/following/delete.
@@ -129,7 +129,7 @@ func (s *Server) handleFollowingDelete(w http.ResponseWriter, r *http.Request) {
 		s.sendRemoteUndoFollow(r.Context(), info.User.ID, target.ID, *target.Host)
 	}
 
-	writeJSON(w, http.StatusOK, packUserLite(target, s.cfg.Domain))
+	writeJSON(w, http.StatusOK, packUserLite(target, s.cfg.Domain, nil))
 }
 
 // sendRemoteFollow resolves the remote actor, queues a signed Follow, and

@@ -7,14 +7,27 @@ import (
 )
 
 // packUserLite renders a user in the UserLite schema, the shape used by
-// most list endpoints.
-func packUserLite(u *account.User, host string) map[string]any {
+// most list endpoints. prof may be nil, which leaves name and avatarUrl
+// unset as before the profile packing existed.
+func packUserLite(u *account.User, host string, prof *account.Profile) map[string]any {
+	var name, avatarURL, hostField any
+	if prof != nil {
+		if prof.Name != "" {
+			name = prof.Name
+		}
+		if prof.AvatarURL != "" {
+			avatarURL = prof.AvatarURL
+		}
+	}
+	if u.Host != nil && *u.Host != "" {
+		hostField = *u.Host
+	}
 	return map[string]any{
 		"id":                          u.ID,
-		"name":                        nil,
+		"name":                        name,
 		"username":                    u.Username,
-		"host":                        nil,
-		"avatarUrl":                   nil,
+		"host":                        hostField,
+		"avatarUrl":                   avatarURL,
 		"avatarBlurhash":              nil,
 		"avatarDecorations":           []any{},
 		"isBot":                       false,
@@ -27,9 +40,11 @@ func packUserLite(u *account.User, host string) map[string]any {
 	}
 }
 
-// packUserDetailed renders a user in the UserDetailed schema.
-func packUserDetailed(u *account.User, createdAt time.Time, isMe bool) map[string]any {
-	packed := packUserLite(u, "")
+// packUserDetailed renders a user in the UserDetailed schema. prof
+// supplies the description; the caller loads it so the packer stays free
+// of database access.
+func packUserDetailed(u *account.User, createdAt time.Time, isMe bool, prof *account.Profile) map[string]any {
+	packed := packUserLite(u, "", prof)
 	packed["url"] = ""
 	packed["uri"] = ""
 	packed["movedTo"] = nil
@@ -44,7 +59,11 @@ func packUserDetailed(u *account.User, createdAt time.Time, isMe bool) map[strin
 	packed["isAdmin"] = u.IsAdmin
 	packed["isSilenced"] = false
 	packed["isSuspended"] = u.IsSuspended
-	packed["description"] = nil
+	var description any
+	if prof != nil && prof.Description != "" {
+		description = prof.Description
+	}
+	packed["description"] = description
 	packed["location"] = nil
 	packed["birthday"] = nil
 	packed["lang"] = nil
@@ -71,8 +90,8 @@ func packUserDetailed(u *account.User, createdAt time.Time, isMe bool) map[strin
 //
 // includeSecrets controls whether the private fields (email and friends)
 // are returned; Misskey only sets it for native-token requests.
-func packMeDetailed(u *account.User, createdAt time.Time, includeSecrets bool) map[string]any {
-	packed := packUserDetailed(u, createdAt, true)
+func packMeDetailed(u *account.User, createdAt time.Time, includeSecrets bool, prof *account.Profile) map[string]any {
+	packed := packUserDetailed(u, createdAt, true, prof)
 	packed["avatarId"] = nil
 	packed["bannerId"] = nil
 	packed["followedMessage"] = nil

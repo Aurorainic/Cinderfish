@@ -12,6 +12,7 @@ import (
 
 	"github.com/Aurorainic/cinderfish/internal/auth"
 	"github.com/Aurorainic/cinderfish/internal/idgen"
+	"github.com/Aurorainic/cinderfish/internal/media"
 )
 
 // RegistrationMode controls who may create an account.
@@ -50,6 +51,10 @@ func (e *RegistrationError) Error() string { return e.Message }
 // Service provides account operations.
 type Service struct {
 	pool *pgxpool.Pool
+
+	// drive resolves avatar files for UpdateProfile; attached by the
+	// server wiring through AttachDrive.
+	drive *media.DriveService
 }
 
 // NewService returns a Service backed by the given pool.

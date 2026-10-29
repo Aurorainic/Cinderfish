@@ -1,0 +1,113 @@
+package account
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"strings"
+
+	"github.com/jackc/pgx/v5"
+
+	"github.com/Aurorainic/cinderfish/internal/media"
+)
+
+// Profile is the editable part of a user's profile. Empty strings mean
+// the column is NULL.
+type Profile struct {
+	Name        string
+	Description string
+	AvatarURL   string
+}
+
+// ErrNoSuchAvatarFile is returned when an avatar file id does not name
+// an existing drive file.
+var ErrNoSuchAvatarFile = errors.New("account: no such avatar file")
+
+// AttachDrive wires the drive service used to resolve avatar files.
+// UpdateProfile reports an error when an avatar is set without one.
+func (s *Service) AttachDrive(drive *media.DriveService) {
+	s.drive = drive
+}
+
+// GetProfile loads a user's profile. A user without a profile row reads
+// as the zero value instead of failing.
+func (s *Service) GetProfile(ctx context.Context, userID string) (*Profile, error) {
+	var name, description, avatarURL *string
+	err := s.pool.QueryRow(ctx, `
+SELECT name, description, avatar_url FROM user_profiles WHERE user_id = $1
+`, userID).Scan(&name, &description, &avatarURL)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return &Profile{}, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("account: get profile: %w", err)
+	}
+	return &Profile{
+		Name:        derefString(name),
+		Description: derefString(description),
+		AvatarURL:   derefString(avatarURL),
+	}, nil
+}
+
+// UpdateProfile writes the editable profile fields. A nil pointer leaves
+// the field unchanged; a non-nil empty string clears it. avatarFileID is
+// resolved through the attached drive service: an empty string clears
+// avatar_url, a non-empty id must name an existing drive file whose URL
+// becomes avatar_url.
+func (s *Service) UpdateProfile(ctx context.Context, userID string, name, description, avatarFileID *string) error {
+	var sets []string
+	var args []any
+
+	if name != nil {
+		args = append(args, nullIfEmpty(*name))
+		sets = append(sets, fmt.Sprintf("name = $%d", len(args)))
+	}
+	if description != nil {
+		args = append(args, nullIfEmpty(*description))
+		sets = append(sets, fmt.Sprintf("description = $%d", len(args)))
+	}
+	if avatarFileID != nil {
+		if *avatarFileID == "" {
+			args = append(args, nil)
+			sets = append(sets, fmt.Sprintf("avatar_url = $%d", len(args)))
+		} else {
+			if s.drive == nil {
+				return fmt.Errorf("account: no drive service attached to resolve avatar")
+			}
+			f, err := s.drive.Get(ctx, *avatarFileID)
+			if err != nil {
+				if errors.Is(err, media.ErrNotFound) {
+					return ErrNoSuchAvatarFile
+				}
+				return fmt.Errorf("account: resolve avatar: %w", err)
+			}
+			args = append(args, f.URL)
+			sets = append(sets, fmt.Sprintf("avatar_url = $%d", len(args)))
+		}
+	}
+
+	if len(sets) == 0 {
+		return nil
+	}
+	args = append(args, userID)
+	query := "UPDATE user_profiles SET " + strings.Join(sets, ", ") +
+		fmt.Sprintf(" WHERE user_id = $%d", len(args))
+	if _, err := s.pool.Exec(ctx, query, args...); err != nil {
+		return fmt.Errorf("account: update profile: %w", err)
+	}
+	return nil
+}
+
+func derefString(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
+}
+
+func nullIfEmpty(s string) any {
+	if s == "" {
+		return nil
+	}
+	return s
+}

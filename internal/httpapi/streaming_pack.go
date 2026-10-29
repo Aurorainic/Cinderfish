@@ -89,7 +89,7 @@ func (s *Server) packNotification(n *note.Notification, viewerID string) map[str
 	}
 	if n.NotifierID != nil {
 		if author, err := s.accounts.GetByID(ctx, *n.NotifierID); err == nil {
-			item["user"] = packUserLite(author, "")
+			item["user"] = packUserLite(author, "", nil)
 		}
 	}
 	if n.NoteID != nil {

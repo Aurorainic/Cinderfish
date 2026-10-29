@@ -88,6 +88,9 @@ func (s *Server) SetStorage(storage media.Storage) {
 	s.storage = storage
 	if s.pool != nil {
 		s.drive = media.NewDriveService(s.pool, storage)
+		if s.accounts != nil {
+			s.accounts.AttachDrive(s.drive)
+		}
 	}
 }
 

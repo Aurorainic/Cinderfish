@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"errors"
 	"net/http"
 
@@ -81,10 +82,23 @@ func (s *Server) handleSignup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	packed := packMeDetailed(user, user.CreatedAt, true)
+	packed := packMeDetailed(user, user.CreatedAt, true, loadProfile(r.Context(), s, user.ID))
 	s.applyUserCounts(r.Context(), user.ID, packed)
 	packed["token"] = token
 	writeJSON(w, http.StatusOK, packed)
+}
+
+// loadProfile fetches a user's profile for the packers, tolerating a
+// missing profile row or a transient read failure by passing nothing.
+func loadProfile(ctx context.Context, s *Server, userID string) *account.Profile {
+	if s.accounts == nil {
+		return nil
+	}
+	prof, err := s.accounts.GetProfile(ctx, userID)
+	if err != nil {
+		return nil
+	}
+	return prof
 }
 
 // registrationMode maps the configured mode onto the account service.
@@ -195,7 +209,7 @@ func (s *Server) handleI(w http.ResponseWriter, r *http.Request) {
 
 	// Misskey only includes secrets for native-token requests.
 	includeSecrets := info.Token == nil
-	packed := packMeDetailed(info.User, info.User.CreatedAt, includeSecrets)
+	packed := packMeDetailed(info.User, info.User.CreatedAt, includeSecrets, loadProfile(r.Context(), s, info.User.ID))
 	s.applyUserCounts(r.Context(), info.User.ID, packed)
 	writeJSON(w, http.StatusOK, packed)
 }
@@ -250,7 +264,7 @@ func (s *Server) handleUsersShow(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	packed := packUserDetailed(user, user.CreatedAt, false)
+	packed := packUserDetailed(user, user.CreatedAt, false, loadProfile(r.Context(), s, user.ID))
 	s.applyUserCounts(r.Context(), user.ID, packed)
 	writeJSON(w, http.StatusOK, packed)
 }

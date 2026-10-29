@@ -48,7 +48,7 @@ func (s *Server) handleAdminAccountsCreate(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	packed := packUserDetailed(user, user.CreatedAt, false)
+	packed := packUserDetailed(user, user.CreatedAt, false, loadProfile(r.Context(), s, user.ID))
 	s.applyUserCounts(r.Context(), user.ID, packed)
 	writeJSON(w, http.StatusOK, packed)
 }
@@ -80,7 +80,7 @@ func (s *Server) handleAdminShowUsers(w http.ResponseWriter, r *http.Request) {
 
 	out := make([]any, 0, len(users))
 	for _, u := range users {
-		packed := packUserDetailed(u, u.CreatedAt, false)
+		packed := packUserDetailed(u, u.CreatedAt, false, loadProfile(r.Context(), s, u.ID))
 		s.applyUserCounts(r.Context(), u.ID, packed)
 		out = append(out, packed)
 	}

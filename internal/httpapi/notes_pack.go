@@ -137,7 +137,7 @@ func (s *Server) notePackContext(ctx context.Context, n *note.Note, viewerID str
 	pc := notePackContext{ViewerID: viewerID}
 
 	if author, err := s.accounts.GetByID(ctx, n.UserID); err == nil {
-		pc.Author = packUserLite(author, "")
+		pc.Author = packUserLite(author, "", loadProfile(ctx, s, n.UserID))
 	} else {
 		pc.Author = map[string]any{"id": n.UserID}
 	}
