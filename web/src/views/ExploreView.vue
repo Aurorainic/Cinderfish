@@ -1,11 +1,50 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { useRoute } from "vue-router";
-import TimelineFeed from "../components/TimelineFeed.vue";
+import { api } from "../api/client";
+import type { Note, TimelineParams } from "../api/types";
+import AppIcon from "../components/AppIcon.vue";
+import NoteCard from "../components/NoteCard.vue";
+import PagedFeed from "../components/ui/PagedFeed.vue";
 
 const route = useRoute();
 const scope = ref<"local" | "global">("local");
 const tag = computed(() => (typeof route.query.tag === "string" ? route.query.tag : ""));
+
+const PAGE_SIZE = 20;
+
+const streamChannels = { local: "localTimeline", global: "globalTimeline" };
+
+const timelineApi = { local: api.localTimeline, global: api.globalTimeline };
+
+// Client-side tag filter: keep a raw cursor so pages do not skip the notes
+// dropped by the filter (PagedFeed's cursor comes from the filtered list).
+let rawCursor = "";
+
+async function fetcher(p: { untilId?: string; sinceId?: string }): Promise<Note[]> {
+  const params: TimelineParams = { limit: PAGE_SIZE };
+  if (tag.value) {
+    if (p.untilId === undefined) rawCursor = "";
+    params.untilId = rawCursor || undefined;
+  } else if (p.untilId) {
+    params.untilId = p.untilId;
+  }
+  const page = await timelineApi[scope.value](params);
+  if (page.length) rawCursor = page[page.length - 1].id;
+  if (!tag.value) return page;
+  const needle = `#${tag.value}`.toLowerCase();
+  return page.filter((n) => (n.text ?? "").toLowerCase().includes(needle));
+}
+
+const feed = ref<InstanceType<typeof PagedFeed> | null>(null);
+
+function toNote(item: unknown): Note {
+  return item as Note;
+}
+
+function onDeleted(id: string) {
+  feed.value?.remove(id);
+}
 </script>
 
 <template>
@@ -20,7 +59,17 @@ const tag = computed(() => (typeof route.query.tag === "string" ? route.query.ta
     <button type="button" class="tab" :class="{ active: scope === 'global' }" @click="scope = 'global'">全球</button>
   </nav>
 
-  <TimelineFeed :source="scope" :tag="tag" />
+  <PagedFeed :key="`${scope}:${tag}`" ref="feed" :fetcher="fetcher" :stream-channel="streamChannels[scope]">
+    <template #item="{ item }">
+      <NoteCard :note="toNote(item)" @deleted="onDeleted" />
+    </template>
+    <template #empty>
+      <div class="placeholder">
+        <AppIcon name="feather" />
+        <span>这里还没有笔记。</span>
+      </div>
+    </template>
+  </PagedFeed>
 </template>
 
 <style scoped>

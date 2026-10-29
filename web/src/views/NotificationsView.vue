@@ -1,23 +1,21 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, ref } from "vue";
 import { api } from "../api/client";
 import type { Notification } from "../api/types";
 import { session } from "../stores/session";
-import { setUnreadNotifications, streaming } from "../stores/streaming";
+import { setUnreadNotifications } from "../stores/streaming";
 import AppIcon from "../components/AppIcon.vue";
 import NotificationItem from "../components/NotificationItem.vue";
+import PagedFeed from "../components/ui/PagedFeed.vue";
 
 type Filter = "all" | "unread";
 
-const pageSize = 20;
+const PAGE_SIZE = 20;
 
-const items = ref<Notification[]>([]);
-const loading = ref(false);
-const loadingMore = ref(false);
+const notifications = ref<Notification[]>([]);
+const unreadCount = ref(0);
 const marking = ref(false);
 const error = ref("");
-const untilId = ref("");
-const hasMore = ref(false);
 const filter = ref<Filter>("all");
 
 const filters: { id: Filter; label: string }[] = [
@@ -25,46 +23,20 @@ const filters: { id: Filter; label: string }[] = [
   { id: "unread", label: "未读" },
 ];
 
-const unreadCount = computed(() => items.value.filter((n) => !n.isRead).length);
-const visible = computed(() =>
-  filter.value === "unread" ? items.value.filter((n) => !n.isRead) : items.value,
+const itemFilter = computed(() =>
+  filter.value === "unread" ? (item: unknown) => (item as Notification).isRead === false : undefined,
 );
-const emptyText = computed(() =>
-  filter.value === "unread" ? "没有未读通知。" : "还没有通知。",
-);
+const emptyText = computed(() => (filter.value === "unread" ? "没有未读通知。" : "还没有通知。"));
 
-async function load() {
-  if (!session.me) return;
-  loading.value = true;
-  error.value = "";
-  try {
-    const page = await api.notifications({ limit: pageSize });
-    items.value = page;
-    untilId.value = page.length ? page[page.length - 1].id : "";
-    hasMore.value = page.length >= pageSize;
-    setUnreadNotifications(unreadCount.value);
-  } catch (err) {
-    error.value = err instanceof Error ? err.message : "加载通知失败";
-  } finally {
-    loading.value = false;
-  }
+async function fetcher(p: { untilId?: string; sinceId?: string }): Promise<Notification[]> {
+  return api.notifications({ limit: PAGE_SIZE, untilId: p.untilId });
 }
 
-async function loadMore() {
-  if (!untilId.value || loadingMore.value || !session.me) return;
-  loadingMore.value = true;
-  error.value = "";
-  try {
-    const page = await api.notifications({ limit: pageSize, untilId: untilId.value });
-    const seen = new Set(items.value.map((n) => n.id));
-    items.value = [...items.value, ...page.filter((n) => !seen.has(n.id))];
-    untilId.value = page.length ? page[page.length - 1].id : "";
-    hasMore.value = page.length >= pageSize;
-  } catch (err) {
-    error.value = err instanceof Error ? err.message : "加载更多通知失败";
-  } finally {
-    loadingMore.value = false;
-  }
+function onItems(items: unknown[]) {
+  notifications.value = items as Notification[];
+  const unread = notifications.value.filter((n) => !n.isRead).length;
+  unreadCount.value = unread;
+  setUnreadNotifications(unread);
 }
 
 async function markAllRead() {
@@ -73,8 +45,8 @@ async function markAllRead() {
   error.value = "";
   try {
     await api.markAllNotificationsRead();
-    for (const n of items.value) n.isRead = true;
-    setUnreadNotifications(0);
+    for (const n of notifications.value) n.isRead = true;
+    onItems(notifications.value);
     if (session.me) {
       session.me.unreadNotificationsCount = 0;
       session.me.hasUnreadNotification = false;
@@ -85,21 +57,6 @@ async function markAllRead() {
     marking.value = false;
   }
 }
-
-let off: (() => void) | null = null;
-
-onMounted(() => {
-  load();
-  off = streaming.on((channel, type, body) => {
-    if (channel !== "main" || type !== "notification" || !session.me) return;
-    const incoming = body as Notification;
-    if (!incoming?.id || items.value.some((n) => n.id === incoming.id)) return;
-    items.value = [incoming, ...items.value];
-    setUnreadNotifications(unreadCount.value);
-  });
-});
-
-onBeforeUnmount(() => off?.());
 </script>
 
 <template>
@@ -141,24 +98,20 @@ onBeforeUnmount(() => off?.());
 
     <p v-if="error" class="notice error">{{ error }}</p>
 
-    <div v-if="loading" class="panel skeleton-panel">
-      <div v-for="i in 5" :key="i" class="skeleton"></div>
-    </div>
-
-    <div v-else-if="visible.length" class="panel">
-      <NotificationItem v-for="n in visible" :key="n.id" :notification="n" class="row" />
-    </div>
-
-    <p v-else-if="!error" class="placeholder">
-      <AppIcon name="bell" />
-      <span>{{ emptyText }}</span>
-    </p>
-
-    <div v-if="hasMore && !loading" class="more">
-      <button class="button ghost small" type="button" :disabled="loadingMore" @click="loadMore">
-        {{ loadingMore ? "加载中…" : "加载更多" }}
-      </button>
-    </div>
+    <PagedFeed
+      ref="feed"
+      :fetcher="fetcher"
+      stream-channel="main"
+      stream-type="notification"
+      new-items-label="新通知"
+      :filter="itemFilter"
+      @items="onItems"
+    >
+      <template #item="{ item }">
+        <NotificationItem :notification="item as Notification" class="row" />
+      </template>
+      <template #empty>{{ emptyText }}</template>
+    </PagedFeed>
   </template>
 </template>
 
@@ -227,49 +180,5 @@ onBeforeUnmount(() => off?.());
 .filter.active .badge {
   background: rgba(0, 0, 0, 0.22);
   color: var(--on-accent);
-}
-
-.panel {
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  background: var(--panel);
-}
-
-.row + .row {
-  border-top: 1px solid var(--border);
-}
-
-.more {
-  display: flex;
-  justify-content: center;
-  padding: 14px 0 0;
-}
-
-.skeleton-panel {
-  gap: 0;
-  padding: 0;
-}
-
-.skeleton {
-  height: 66px;
-  background: linear-gradient(90deg, var(--panel) 25%, var(--panel-2) 50%, var(--panel) 75%);
-  background-size: 200% 100%;
-  animation: shimmer 1.4s infinite linear;
-}
-
-.skeleton + .skeleton {
-  border-top: 1px solid var(--border);
-}
-
-@keyframes shimmer {
-  from {
-    background-position: 200% 0;
-  }
-  to {
-    background-position: -200% 0;
-  }
 }
 </style>
