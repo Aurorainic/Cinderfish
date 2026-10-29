@@ -1,17 +1,17 @@
 {
   "schemaVersion": 1,
-  "receiptId": "19a39d53-4654-49d5-a5c8-7873e512634b",
+  "receiptId": "1a149bb4-1c8a-4338-9d23-c8c69ce22921",
   "status": "current",
   "command": "deliver",
   "type": "architecture",
   "input": "/home/lainsaka/文档/MilnFish/.archify/architecture-cinderfish-overall/candidate.json",
   "output": "/home/lainsaka/文档/MilnFish/.archify/architecture-cinderfish-overall/cinderfish-overall.html",
   "specification": {
-    "sha256": "e7b8169c310c802d461b564524b57f5ea549310bf2f211c0dba5bec190f9ec0e",
-    "bytes": 8693
+    "sha256": "1fde956c59746d281d38f5a7fe3d54c77373f748c51eeca2b6c014dea774340f",
+    "bytes": 8689
   },
   "artifact": {
-    "sha256": "fa7549fa10a643628260e9675867bdd745ed00c76f5c65ab4272e7eaaf964fe3",
-    "bytes": 868710
+    "sha256": "e0b0218b85395db8e79c68e5f38fa25b988971c1456c7ced27ed3cc55fbe1957",
+    "bytes": 868706
   }
 }
