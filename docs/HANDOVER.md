@@ -1,6 +1,6 @@
 # Cinderfish 交接说明
 
-- 最后更新：2026-10-28（M5 联邦完成）
+- 最后更新：2026-10-29（M6 前端完成）
 - 项目名 **Cinderfish**（2026-10-28 定名，Go module `github.com/Aurorainic/cinderfish`）
 - 仓库：当前目录 `/home/lainsaka/文档/MilnFish`，分支 `main`；远程 `origin` 为
   `https://github.com/Aurorainic/Cinderfish.git`（GitHub 仓库已更名，本地目录改名待办）
@@ -19,8 +19,8 @@ Go 单二进制的个人/极小规模联邦社交实例。后端契约是 **Miss
 | M3 笔记/时间线/反应/通知/存储 | ✅ | `f4b8508` |
 | M4 Streaming（WebSocket） | ✅ | 见 git log |
 | M5 联邦（ActivityPub） | ✅ | `ce7bf11` … `620435d` |
-| M6 前端 | ⬜ 未开始 | — |
-| M7 打磨 | ⬜ 未开始 | — |
+| M6 前端 | ✅ | `9281a5c` |
+| M7 打磨 | 🚧 进行中 | — |
 
 ## 3. 契约以源码为准
 
@@ -83,16 +83,19 @@ go vet ./...
 go test ./...
 CINDERFISH_TEST_DATABASE_URL="postgres://cinderfish:cinderfish@localhost:5432/cinderfish_test" go test ./...
 
+cd web && npm install && npm run build && cd ..   # 产出 web/dist
 cp config.example.toml config.toml   # 按需改
 go build -o cinderfish ./cmd/cinderfish
 ./cinderfish --config config.toml
 ```
 
+只跑 API 时可以不构建前端：`web_dist` 目录不存在，服务器自动退回纯 API 模式。
+
 数据库迁移在启动时自动执行（不可变的版本化脚本）。当前 schema 版本为 **4**。
 
 数据库测试包（`internal/account`、`internal/httpapi`）都会 TRUNCATE 同一批表，因此每个包用 `internal/testdb` 在 `TestMain` 里持有 PostgreSQL advisory lock，直到该包的测试二进制退出——这样 `go test ./...` 并行跑包时不会互相清表（不加锁时会随机出现"找不到用户"之类的假失败）。
 
-配置项可用 `CINDERFISH_*` 环境变量覆盖，如 `CINDERFISH_PORT`、`CINDERFISH_DOMAIN`、`CINDERFISH_REGISTRATION_MODE`、`CINDERFISH_FEDERATION_MODE`、`CINDERFISH_MEDIA_BACKEND`、`CINDERFISH_MEDIA_LOCAL_PATH`。
+配置项可用 `CINDERFISH_*` 环境变量覆盖，如 `CINDERFISH_PORT`、`CINDERFISH_DOMAIN`、`CINDERFISH_REGISTRATION_MODE`、`CINDERFISH_FEDERATION_MODE`、`CINDERFISH_MEDIA_BACKEND`、`CINDERFISH_MEDIA_LOCAL_PATH`、`CINDERFISH_WEB_DIR`。
 
 ## 8. 代码结构
 
@@ -107,8 +110,9 @@ internal/note/              笔记服务、时间线服务、反应服务、通�
 internal/media/             Storage 接口 + local 实现 + S3 实现 + Drive 服务
 internal/streaming/         Streaming API：事件总线、WebSocket 连接、五个频道
 internal/federation/        联邦：HTTP 签名、三模式策略、AP 渲染/解析、inbox、投递队列
-internal/httpapi/           路由装配与全部端点处理器
+internal/httpapi/           路由装配与全部端点处理器、静态托管与 SPA fallback
 internal/testdb/            数据库测试的 advisory lock 辅助
+web/                        Vue 3 + TypeScript 前端（api/stores/components/views/layouts）
 ```
 
 依赖方向单向：`httpapi → 领域包 → db/media(接口)`。`streaming` 只定义接口，实现由 `httpapi` 注入。
@@ -119,7 +123,8 @@ internal/testdb/            数据库测试的 advisory lock 辅助
 POST /api/meta                          GET  /api/ping
 POST /api/signup                        POST /api/signin
 POST /api/username/available            POST /api/i
-POST /api/users/show                    POST /api/miauth/gen-token
+POST /api/users/show                    POST /api/users/notes
+POST /api/miauth/gen-token
 POST /api/notes/create                  POST /api/notes/show
 POST /api/notes/delete                  POST /api/notes/reactions/create
 POST /api/notes/reactions/delete        POST /api/notes/local-timeline
@@ -131,12 +136,13 @@ POST /api/drive/files/show              POST /api/drive/files/delete
 POST /api/following/create              POST /api/following/delete
 POST /api/admin/federation/mode         GET/POST /api/admin/federation/allowlist
 GET  /media/{path...}
+GET  /                                  （Web 前端，SPA fallback）
 GET  /.well-known/oauth-authorization-server
 GET  /oauth/authorize                   POST /oauth/token
 GET  /streaming                         （WebSocket 升级）
 ```
 
-M5 联邦路由见 §11.1。
+M5 联邦路由见 §12.1。
 
 ## 10. M4 Streaming 要点
 
@@ -157,11 +163,69 @@ M5 联邦路由见 §11.1。
 - **unreadNotification 提醒未实现**：需要"最近已读通知"游标。
 - **events 表未写入**：M4 不做重放。
 
-## 11. M5 联邦（ActivityPub）
+## 11. M6 前端
+
+技术栈：Vue 3.5 + TypeScript 5.9 + Vite 8 + vue-router 4。没有 UI 组件库，也没有 Pinia——共享状态是模块级 `reactive` store（`web/src/stores/`），设计令牌在 `web/src/styles/main.css`。
+
+### 11.1 目录
+
+```
+web/src/api/         类型（Misskey schema）与 fetch 客户端（ApiError 解析 error 信封）
+web/src/stores/      session（token + /api/i）、instance（meta）、streaming（WebSocket）
+web/src/lib/         MFM 渲染（先转义再生成标记）、相对时间
+web/src/components/  NoteCard、NoteComposer、TimelineFeed、QuotedNote、UserAvatar、AppIcon 等
+web/src/layouts/     AppShell（三栏 + 移动底栏）、AuthLayout
+web/src/views/       Timeline、Note、Notifications、Profile、Explore、Settings、Admin、Login、Signup
+```
+
+### 11.2 已完成的页面
+
+- **时间线**：关注 / 本地 / 混合 / 全球四频道，`untilId` 分页，WebSocket 实时插入新笔记，加载更多按页大小判断。
+- **发帖**：CW、可见性（public/home/followers）、仅本地、多文件上传、回复上下文、Ctrl/Cmd+Enter 发布；发布后直接插入列表。
+- **笔记卡片**：MFM 渲染（代码块、行内代码、提及、话题标签、链接、粗斜体/删除线、自定义 emoji 占位）、图片与附件、引用转贴、投票展示、反应（快捷表情 + 取消）、转贴、回复、删除自己的笔记。
+- **笔记详情**：单条笔记 + 回复框。
+- **通知**：全部/未读筛选，按类型生成中文文案，显示相关笔记摘要，全部标为已读，实时新通知置顶，侧栏未读徽标。
+- **资料**：真实关注/被关注/笔记计数，加入时间，关注/取消关注，用户笔记分页；远程资料与 404 有明确说明。
+- **设置**：账户信息、主题（浅色/深色，本机持久化）、实例信息、退出登录；明确说明资料编辑尚无后端接口。
+- **管理**：联邦模式三选一（public/allowlist/none，立即生效）、白名单增删（后缀匹配说明），非管理员显示门禁卡片。
+- **探索**：本地/全球公开时间线，支持 `?tag=` 过滤。
+- **登录/注册**：真实 signin/signup，注册前检查用户名可用性，邀请码字段，注册关闭提示。
+
+### 11.3 服务端托管
+
+`web_dir`（默认 `./web/dist`，环境变量 `CINDERFISH_WEB_DIR`）指向构建产物。命中规则：
+
+- `/api*`、`/media`、`/.well-known`、`/oauth`、`/users`、`/nodeinfo`、`/inbox`、`/streaming` 永远交给 Go mux。
+- `/@user` 与 `/notes/{id}` 在 `Accept` 含 `text/html` 时给前端，否则仍走 ActivityPub。
+- 其余 GET/HEAD 先找真实文件，找不到回退 `index.html`；`/assets/*` 带一年 immutable 缓存，`index.html` 每次读取（重新构建无需重启）。
+- 目录不存在时服务器保持纯 API 模式。
+
+### 11.4 实时更新
+
+`web/src/stores/streaming.ts` 维护唯一 `/streaming` 连接：token 走 query，`connect` 带 `pong:true`，按订阅 id 分发 `channel` 帧，断线指数退避（1s→30s，6 次封顶），登录/退出时重建连接。`main` 频道只由外壳订阅一次（服务端每连接只允许一个），时间线各自订阅自己的频道，重连后重新拉取。
+
+### 11.5 开发与构建
+
+```bash
+cd web
+npm install
+npm run dev      # 5173，代理 /api /media /streaming 到 127.0.0.1:3000
+npm run build    # 先 vue-tsc --noEmit，再输出 web/dist
+```
+
+### 11.6 已知缺口
+
+- **资料不可编辑**：后端没有 `i/update`，昵称、简介、头像都只读。
+- **没有搜索、没有用户列表页、没有投票接口**（前端只展示投票结果）。
+- **远程资料不能浏览**：`users/show` 只接受本地用户名；远程用户点击 `@user@host` 会得到说明卡片。
+- **管理面板只有联邦设置**：账户管理、封禁、邀请码管理尚未实现。
+- **没有前端自动化测试**：验证靠 `vue-tsc` + 构建 + 真实浏览器手工走查；没有引入 vitest/playwright。
+
+## 12. M5 联邦（ActivityPub）
 
 源码对照记录见 `docs/research/2026-10-28-m5-federation-source-calibration.md`（逐条对照上游文件，含刻意偏离项）。
 
-### 11.1 已实现的路由
+### 12.1 已实现的路由
 
 ```
 GET  /.well-known/webfinger            GET  /.well-known/host-meta(.json)
@@ -174,7 +238,7 @@ GET  /notes/{id}                       GET  /notes/{id}/activity
 POST /inbox                            POST /users/{id}/inbox
 ```
 
-### 11.2 关键实现要点
+### 12.2 关键实现要点
 
 1. **签名**：出站 POST 签 `(request-target) date host digest`，GET 签 `(request-target) date host`，`keyId` 形如 `<url>/users/<id>#main-key`。入站按上游顺序校验：解析 Signature → host/date 必须被覆盖 → Host 必须是本机 → digest 格式 → digest 值 → RSA 签名。`Date` 超出 ±5 分钟直接拒绝。
 2. **内容协商**：`Accept` 含 `application/ld+json` 回 LD，否则回 `application/activity+json`；都带 `Vary: Accept` 与 `Cache-Control: public, max-age=180`。
@@ -185,14 +249,14 @@ POST /inbox                            POST /users/{id}/inbox
 7. **正文渲染**：项目存 MFM、没有存 HTML，所以 `content` 由 `federation.MFMToHTML` 生成（提及/话题标签/自定义 emoji/裸链接/粗斜体/行内与围栏代码）。代码块先提取再转义，所以代码里的 URL 不会被链接化。
 8. **用户名唯一性**：v2 的 `idx_users_username_lower` 是全表唯一，远程用户进同一张表后 `alice@a.example` 会和本地 `alice` 撞。v4 改成：本地用户名唯一 + `(username_lower, host)` 唯一。
 
-### 11.3 测试覆盖
+### 12.3 测试覆盖
 
 - 单元：签名签发/验证往返（POST 与 GET）、篡改正文、错误 Host、未覆盖 digest、过期 Date、`Authorization: Signature` 形式、白名单后缀匹配、MFM 转换、Person/Note 渲染、`ParseMentions`。
 - 集成（真库 + httptest，`CINDERFISH_TEST_DATABASE_URL` 必需）：webfinger 三种 resource 形状与 422/404/400、actor 文档字段、`@handle` 路由、nodeinfo、两种 host-meta、`none` 下全路由 403。
 - **双实例 smoke**：两个真实实例、真实 HTTP、真实 RSA 签名。alpha 的 Follow 被 beta 验签通过并记录，beta 投递签名 Accept，alpha 验签通过并记录关注。域名到监听地址的跳转由一个 rewrite transport 完成，密码学与 HTTP 环没有任何 mock。
 - 管理面：非管理员改模式 403、切到 `none` 后下一次请求即 403、非法模式 400、白名单增删与后缀匹配语义。
 
-### 11.4 已知缺口（不是 bug，是范围）
+### 12.4 已知缺口（不是 bug，是范围）
 
 - **XRD 形式的 webfinger 不实现**：只做 JRD，现代联邦软件都只用 JRD。
 - **LinkedDataSignature（`signatureValue`）不实现**：只用 HTTP Signatures。
@@ -205,7 +269,7 @@ POST /inbox                            POST /users/{id}/inbox
 - **没有被拉黑的实例列表、没有 relay**：Relay 按定案不做。
 - **没有真实三方联调**：没有对 Mastodon/GoToSocial/真实 Misskey 实例跑过。双实例测试证明的是本实现自洽。
 
-## 12. 文档索引
+## 13. 文档索引
 
 | 文档 | 内容 |
 |------|------|
@@ -220,13 +284,14 @@ POST /inbox                            POST /users/{id}/inbox
 | `docs/research/2026-10-28-m4-streaming-source-calibration.md` | **M4 Streaming 协议逐条对照上游源码** |
 | `docs/research/2026-10-28-m5-federation-source-calibration.md` | **M5 联邦逐条对照上游源码** |
 | `docs/research/2026-10-28-project-name-decision.md` | 命名决策记录 |
+| `web/` | Vue 3 前端源码（构建到 `web/dist`） |
 | `.archify/architecture-cinderfish-overall/` | 项目整体结构图（Archify 产物，随里程碑更新） |
 
-## 13. 已知的未验证项
+## 14. 已知的未验证项
 
 - **S3 后端未做真实服务端验证**：只验证了编译、接口与 URL 生成逻辑。
 - **缩略图/WebP 生成未实现**：`drive_files.thumbnail_key` 字段已留，图片处理管道还没写。
-- **前端完全未开始**（M6）。
+- **前端没有真实第三方客户端联调**：页面已在构建产物上用浏览器走查，但没有用 misskey-js 或 Misskey Web 前端连过本实例。
 - **Streaming 未做真实 Misskey 客户端联调**：已用自写 WebSocket 客户端验证（握手、`connect`、`connected`、笔记投递全部通过），但**没有**用 misskey-js 或 Misskey Web 前端实际连过。
 - **联邦没有任何第三方联调**：只跑了本实现的双实例测试（真签名、真 HTTP、真库），没有对 Mastodon / GoToSocial / 真实 Misskey 实例互通。这是 M5 之后最该补的验证。
 - **Streaming 多进程中继只手测了单连接的 LISTEN/NOTIFY 往返**，没有做真正的双进程联调。

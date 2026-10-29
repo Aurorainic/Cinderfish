@@ -10,7 +10,8 @@ Go 单二进制的个人 / 极小规模联邦社交实例。
 ## 快速开始
 
 ```bash
-# 依赖：Go 1.26+、PostgreSQL 14+
+# 依赖：Go 1.26+、Node 20+（构建前端）、PostgreSQL 14+
+cd web && npm install && npm run build && cd ..   # 产出 web/dist
 cp config.example.toml config.toml   # 按需修改
 go build -o cinderfish ./cmd/cinderfish
 ./cinderfish --config config.toml
@@ -27,8 +28,8 @@ go build -o cinderfish ./cmd/cinderfish
 | M3 笔记与时间线 | ✅ 笔记 CRUD、四条时间线、反应、通知、Drive + local/S3 双存储 |
 | M4 Streaming | ✅ WebSocket 端点、五个频道、事件广播（进程内 fanout + LISTEN/NOTIFY 跨进程中继） |
 | M5 联邦 | ✅ WebFinger、Actor、Inbox/Outbox、HTTP Signatures、三模式策略、投递队列、双实例 smoke test |
-| M6 前端 | 未开始 |
-| M7 打磨 | 未开始 |
+| M6 前端 | ✅ Vue 3 时间线、发帖、反应、通知、资料、设置、管理页；WebSocket 实时更新 |
+| M7 打磨 | 🚧 进行中 |
 
 ## 架构图
 
