@@ -19,6 +19,7 @@
 | 范围 | 总体重构，不采用壳先行或内容先行的分期取舍；按里程碑排序推进 | 用户明确 |
 | 强调色 | 保留 ember 橙（现有 theme 的一部分，「保留友善」连带配色） | 我的判断 |
 | 字体/图标 | 维持 Inter + 手写 SVG 图标集；去 AI 味靠去渐变光斑、去大投影、降圆角实现，不依赖换字体 | 我的判断 |
+| 后端范围 | 最小后端打包：把已有数据（notes `files` 从 `fileIds`、用户 `name`/`avatarUrl`/`host`、`pinnedNotes`）填充进现有 API 响应；自定义 emoji 注册表、`notes/reactions` 列表端点等新后端特性推迟 | 用户拍板（推荐档） |
 
 ## 目标
 
@@ -36,12 +37,12 @@
 
 ## 非目标（首版不做）
 
-- 用户自定义主题、主题编辑器、第三方主题导入——token 词表为将来留接口，机制先不做。
+- 自定义 emoji 注册表与 admin 管理、第三方主题导入、主题编辑器——token 词表为将来留接口，机制先不做。
 - i18n 层——首版维持中文硬编码。
 - antenna、clips、频道、列表等需要新后端 API 的列类型。
-- 「谁反应了」浮层——现有后端无 `notes/reactions` 列表端点，不新增后端 API；picker 数据
-  来源为 `meta`（`emojis`/`reactionEmojis`）+ 本地 unicode 集。
-- 后端改动为零：所有功能在现有 Misskey-compatible API（`notes/*`、`meta`、`streaming`）上实现。
+- 「谁反应了」浮层——现有后端无 `notes/reactions` 列表端点且本期不加；picker 数据
+  来源为本地 unicode 集（自定义 emoji 待后端注册表落地后接入）。
+- 后端改动仅限最小打包层（见决策记录）：不新增端点、不改 schema。
 
 ## 反目标（出现即失败）
 
@@ -70,6 +71,16 @@
   4. **M4 收尾**：widget 栏、通知页改造、profile 多分区、细节打磨
   M1 先行的理由：NoteCard 的去卡片化和列宽适配都依赖最终壳的度量（列宽、token 值），
   反过来则要二次返工。
+
+## 我已拍板的架构细节（评审轮确定）
+
+- deck 不是独立 URL，而是 shell 偏好（`localStorage`，如 `cinderfish.ui`）。universal 模式走
+  正常路由；deck 模式下点笔记/头像采用 Firefish `os.pageWindow` 式弹窗导航，不改全局路由。
+- 窄视口导航：底部栏（导航项 + 发帖入口合并），universal 与 deck 的窄形态一致。
+- universal 主列顶部保留「首页/本地/社交/全局」四源切换 tab；deck 模式中同一功能在列头菜单。
+- widget 栏首版：重样式现有实例卡 + 链接列表，不新增依赖后端数据的 widget。
+- 发帖器：全局化 + 引用（renoteId+文本）+ 草稿自动保存；`specified` 可见性提供，但收件人
+  用手动 @handle 输入（后端无 users/search，不做补全）。
 
 ## 留给实现者的事项
 
