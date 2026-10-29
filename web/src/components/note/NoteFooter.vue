@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import type { Note } from "../../api/types";
+import { openReactionPicker } from "../../os";
 import AppIcon from "../AppIcon.vue";
 
 const props = defineProps<{
@@ -18,17 +19,31 @@ const emit = defineEmits<{
   remove: [];
 }>();
 
-// F7 replaces this fixed palette with the full emoji picker; until then the
-// footer keeps the small quick set the old NoteCard offered.
-const quickReactions = ["👍", "❤️", "😂", "🎉", "👀", "🤔", "🔥", "✨"];
+const LIKE_ONLY = new Set([
+  "likeOnly",
+  "likeOnlyForRemote",
+  "nonSensitiveOnlyForLocalLikeOnlyForRemote",
+]);
 
-const paletteOpen = ref(false);
+// `reactionAcceptance` is packed by the notes handler but is not part of the
+// shared Note type yet, so it is read through a narrow intersection.
+const acceptance = computed<string | null>(
+  () => (props.note as Note & { reactionAcceptance?: string | null }).reactionAcceptance ?? null,
+);
+
+const likeOnly = computed(() => acceptance.value !== null && LIKE_ONLY.has(acceptance.value));
 
 const reactionCount = computed(() => props.reactionCount);
 
-function pick(emoji: string) {
-  paletteOpen.value = false;
-  emit("react", emoji);
+const reactButton = ref<HTMLButtonElement | null>(null);
+
+function onReact() {
+  if (props.busy) return;
+  if (likeOnly.value) {
+    emit("react", "⭐");
+    return;
+  }
+  openReactionPicker((emoji) => emit("react", emoji), reactButton.value);
 }
 </script>
 
@@ -42,31 +57,21 @@ function pick(emoji: string) {
       <AppIcon name="renote" />
       <span v-if="note.renoteCount">{{ note.renoteCount }}</span>
     </button>
-    <div class="react-wrap">
-      <button
-        type="button"
-        class="action"
-        title="反应"
-        :disabled="busy"
-        :aria-expanded="paletteOpen"
-        @click="paletteOpen = !paletteOpen"
-      >
-        <AppIcon name="heart" />
-        <span v-if="reactionCount">{{ reactionCount }}</span>
-      </button>
-      <div v-if="paletteOpen" class="palette" role="menu">
-        <button
-          v-for="emoji in quickReactions"
-          :key="emoji"
-          type="button"
-          role="menuitem"
-          :class="{ mine: myReaction === emoji }"
-          @click="pick(emoji)"
-        >
-          {{ emoji }}
-        </button>
-      </div>
-    </div>
+    <button
+      ref="reactButton"
+      type="button"
+      class="action"
+      :class="{ reacted: !!myReaction }"
+      :title="likeOnly ? (myReaction ? '取消星标' : '星标') : '反应'"
+      :aria-label="likeOnly ? '星标' : '添加反应'"
+      :aria-haspopup="likeOnly ? undefined : 'dialog'"
+      :disabled="busy"
+      @click="onReact"
+    >
+      <span v-if="likeOnly" class="star" aria-hidden="true">⭐</span>
+      <AppIcon v-else name="heart" />
+      <span v-if="reactionCount">{{ reactionCount }}</span>
+    </button>
     <span class="spacer"></span>
     <button v-if="isMine" type="button" class="action danger" title="删除" :disabled="busy" @click="emit('remove')">
       <AppIcon name="close" />
@@ -112,6 +117,15 @@ function pick(emoji: string) {
   background: var(--accent-soft);
 }
 
+.action.reacted {
+  color: var(--accent);
+}
+
+.star {
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
 .action:disabled {
   opacity: 0.5;
   cursor: default;
@@ -125,39 +139,6 @@ function pick(emoji: string) {
 
 .spacer {
   flex: 1;
-}
-
-.react-wrap {
-  position: relative;
-}
-
-.palette {
-  position: absolute;
-  bottom: calc(100% + 6px);
-  left: 0;
-  z-index: 10;
-  display: flex;
-  gap: 2px;
-  padding: 6px;
-  border: 1px solid var(--divider);
-  border-radius: var(--radius-sm);
-  background: var(--panel);
-  box-shadow: var(--shadow-sm);
-}
-
-.palette button {
-  border: 0;
-  background: transparent;
-  font-size: 1.1rem;
-  padding: 4px 6px;
-  border-radius: 6px;
-  cursor: pointer;
-}
-
-.palette button:hover,
-.palette button:focus-visible,
-.palette button.mine {
-  background: var(--accent-soft);
 }
 
 /* Touch devices have no hover state, so the actions stay visible. */

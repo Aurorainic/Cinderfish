@@ -3,6 +3,7 @@
 // (OsOverlay, mounted once in App.vue) renders the resulting layers.
 import { computed, defineComponent, h, onUnmounted, ref, type CSSProperties } from "vue";
 import type { Note } from "./api/types";
+import EmojiPicker from "./components/ui/EmojiPicker.vue";
 import PageWindow from "./components/ui/PageWindow.vue";
 
 let nextRequestId = 0;
@@ -13,6 +14,21 @@ type PostFormRequest = PostFormOptions & { id: number };
 const postFormRequest = ref<PostFormRequest | null>(null);
 
 type ConfirmRequest = { id: number; message: string; resolve: (ok: boolean) => void };
+
+type ReactionPickerRequest = {
+  id: number;
+  left: number;
+  top: number;
+  onSelect: (emoji: string) => void;
+};
+
+const reactionPickerRequest = ref<ReactionPickerRequest | null>(null);
+
+// Mirrors the sizes EmojiPicker's stylesheet caps itself at, so the popover can
+// be positioned without mounting it first.
+const PICKER_WIDTH = 336;
+const PICKER_HEIGHT = 420;
+const PICKER_GAP = 8;
 
 const confirmQueue = ref<ConfirmRequest[]>([]);
 
@@ -26,6 +42,32 @@ export function openPostForm(opts: PostFormOptions = {}): void {
 
 function closePostForm(): void {
   postFormRequest.value = null;
+}
+
+/** Open the single reaction picker. The chosen emoji goes to `onSelect`;
+ * `anchor` places the popover above (or below) the button that opened it.
+ * Opening it again replaces the previous request. */
+export function openReactionPicker(onSelect: (emoji: string) => void, anchor?: Element | null): void {
+  const viewportWidth = window.innerWidth;
+  const viewportHeight = window.innerHeight;
+  let left = (viewportWidth - PICKER_WIDTH) / 2;
+  let top = (viewportHeight - PICKER_HEIGHT) / 2;
+
+  if (anchor) {
+    const rect = anchor.getBoundingClientRect();
+    left = rect.left;
+    top = rect.top - PICKER_HEIGHT - PICKER_GAP;
+    if (top < PICKER_GAP) top = rect.bottom + PICKER_GAP;
+  }
+
+  left = Math.max(PICKER_GAP, Math.min(left, viewportWidth - PICKER_WIDTH - PICKER_GAP));
+  top = Math.max(PICKER_GAP, Math.min(top, viewportHeight - PICKER_HEIGHT - PICKER_GAP));
+
+  reactionPickerRequest.value = { id: ++nextRequestId, left, top, onSelect };
+}
+
+function closeReactionPicker(): void {
+  reactionPickerRequest.value = null;
 }
 
 /** Ask for confirmation. Returns true when the user confirms, false when they
@@ -52,6 +94,10 @@ function handleEscape(): void {
     resolveConfirm(false);
     return;
   }
+  if (reactionPickerRequest.value) {
+    closeReactionPicker();
+    return;
+  }
   if (postFormRequest.value) closePostForm();
 }
 
@@ -69,6 +115,20 @@ const backdropStyle: CSSProperties = {
   inset: 0,
   background: "rgba(0, 0, 0, 0.5)",
 };
+
+// The picker is a popover: it dims nothing, the backdrop only catches clicks.
+const pickerBackdropStyle: CSSProperties = {
+  position: "fixed",
+  inset: 0,
+  background: "transparent",
+};
+
+const pickerLayerStyle = (request: ReactionPickerRequest): CSSProperties => ({
+  position: "fixed",
+  left: `${request.left}px`,
+  top: `${request.top}px`,
+  zIndex: 1101,
+});
 
 const confirmBoxStyle: CSSProperties = {
   position: "relative",
@@ -136,15 +196,22 @@ export const OsOverlay = defineComponent({
     window.addEventListener("keydown", onKeydown);
     onUnmounted(() => window.removeEventListener("keydown", onKeydown));
 
+    function pickEmoji(request: ReactionPickerRequest, emoji: string): void {
+      closeReactionPicker();
+      request.onSelect(emoji);
+    }
+
     return () => {
       const confirm = currentConfirm.value;
       const form = postFormRequest.value;
-      if (!confirm && !form) return null;
+      const picker = reactionPickerRequest.value;
+      if (!confirm && !form && !picker) return null;
       return h("div", { style: overlayStyle }, [
         h("div", {
           key: "backdrop",
-          style: backdropStyle,
-          onClick: () => (confirm ? resolveConfirm(false) : closePostForm()),
+          style: confirm || form ? backdropStyle : pickerBackdropStyle,
+          onClick: () =>
+            confirm ? resolveConfirm(false) : picker ? closeReactionPicker() : closePostForm(),
         }),
         confirm
           ? h("div", { key: confirm.id, style: confirmBoxStyle, role: "alertdialog", "aria-modal": "true" }, [
@@ -154,6 +221,18 @@ export const OsOverlay = defineComponent({
                 h("button", { style: primaryButtonStyle, type: "button", onClick: () => resolveConfirm(true) }, "确定"),
               ]),
             ])
+          : null,
+        picker
+          ? h(
+              "div",
+              { key: `picker-${picker.id}`, style: pickerLayerStyle(picker) },
+              [
+                h(EmojiPicker, {
+                  onSelect: (emoji: string) => pickEmoji(picker, emoji),
+                  onClose: () => closeReactionPicker(),
+                }),
+              ],
+            )
           : null,
         form
           ? h(
