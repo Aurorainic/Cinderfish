@@ -10,7 +10,7 @@
       "url": "https://github.com/Aurorainic/Cinderfish.git",
       "provider": "github",
       "link_mode": "web",
-      "revision": "cf3d132e90eb701c51fe7da974b0965a1eb33296"
+      "revision": "89742dc660a2fb1570be3add617d1090bb4680e7"
     }
   },
   "components": [
@@ -217,7 +217,7 @@
       "title": "当前状态",
       "items": [
         "M1–M5 已完成：骨架、账户、笔记、Streaming、ActivityPub 联邦",
-        "M6 进行中：时间线、发帖、MFM 渲染、反应与笔记详情已完成",
+        "M6 基本完成：时间线、发帖、通知、资料、设置、管理页均已接通 API",
         "单个 Go 二进制内嵌迁移脚本，启动时自动升级到 v4"
       ]
     },
