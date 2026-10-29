@@ -6,6 +6,7 @@ import { isLoggedIn } from "../stores/session";
 import AppIcon from "./AppIcon.vue";
 import NoteItem from "./note/Note.vue";
 import PagedFeed from "./ui/PagedFeed.vue";
+import type { PagedFeedParams, PagedFeedResult } from "./ui/PagedFeed.vue";
 
 const props = withDefaults(
   defineProps<{ source: "local" | "global" | "hybrid" | "home"; tag?: string }>(),
@@ -33,10 +34,11 @@ const streamChannels = {
 // When a tag filter is active the fetcher applies it client-side; PagedFeed
 // derives its cursor from the last item it received, which would skip
 // unfiltered notes between pages. The fetcher therefore keeps its own raw
-// cursor and ignores PagedFeed's untilId while filtering.
+// cursor and ignores PagedFeed's untilId while filtering, and reports
+// hasMore from the raw page so an empty filtered page keeps paginating.
 let rawCursor = "";
 
-async function fetcher(p: { untilId?: string; sinceId?: string }): Promise<Note[]> {
+async function fetcher(p: PagedFeedParams): Promise<PagedFeedResult> {
   const params: TimelineParams = { limit: PAGE_SIZE };
   if (props.tag) {
     if (p.untilId === undefined) rawCursor = "";
@@ -46,10 +48,18 @@ async function fetcher(p: { untilId?: string; sinceId?: string }): Promise<Note[
   }
   const page = await timelineApi[props.source](params);
   if (page.length) rawCursor = page[page.length - 1].id;
+  const hasMore = page.length >= PAGE_SIZE;
   if (!props.tag) return page;
   const needle = `#${props.tag}`.toLowerCase();
-  return page.filter((n) => (n.text ?? "").toLowerCase().includes(needle));
+  return { items: page.filter((n) => (n.text ?? "").toLowerCase().includes(needle)), hasMore };
 }
+
+// Streamed notes behind the pill must match the active tag filter too.
+const streamFilter = computed(() => {
+  if (!props.tag) return undefined;
+  const needle = `#${props.tag}`.toLowerCase();
+  return (item: unknown) => ((item as Note).text ?? "").toLowerCase().includes(needle);
+});
 
 const feed = ref<InstanceType<typeof PagedFeed> | null>(null);
 
@@ -76,6 +86,7 @@ function toNote(item: unknown): Note {
       :key="`${source}:${tag}`"
       :fetcher="fetcher"
       :stream-channel="streamChannels[source]"
+      :stream-filter="streamFilter"
     >
       <template #item="{ item }">
         <NoteItem :note="toNote(item)" @deleted="onDeleted" />

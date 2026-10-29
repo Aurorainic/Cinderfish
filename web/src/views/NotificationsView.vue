@@ -7,6 +7,7 @@ import { setUnreadNotifications } from "../stores/streaming";
 import AppIcon from "../components/AppIcon.vue";
 import NotificationItem from "../components/NotificationItem.vue";
 import PagedFeed from "../components/ui/PagedFeed.vue";
+import type { PagedFeedParams } from "../components/ui/PagedFeed.vue";
 
 type Filter = "all" | "unread";
 
@@ -28,8 +29,8 @@ const itemFilter = computed(() =>
 );
 const emptyText = computed(() => (filter.value === "unread" ? "没有未读通知。" : "还没有通知。"));
 
-async function fetcher(p: { untilId?: string; sinceId?: string }): Promise<Notification[]> {
-  return api.notifications({ limit: PAGE_SIZE, untilId: p.untilId });
+async function fetcher(p: PagedFeedParams): Promise<Notification[]> {
+  return api.notifications({ limit: PAGE_SIZE, untilId: p.untilId || undefined });
 }
 
 function onItems(items: unknown[]) {
@@ -99,7 +100,6 @@ async function markAllRead() {
     <p v-if="error" class="notice error">{{ error }}</p>
 
     <PagedFeed
-      ref="feed"
       :fetcher="fetcher"
       stream-channel="main"
       stream-type="notification"

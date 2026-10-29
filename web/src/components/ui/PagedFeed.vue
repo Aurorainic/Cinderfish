@@ -7,15 +7,21 @@ export interface PagedFeedParams {
   sinceId?: string;
 }
 
+// A fetcher returns a plain page, or { items, hasMore } when it filters the
+// page client-side and must report hasMore from the raw (unfiltered) page,
+// so an empty filtered page does not stop pagination.
+export type PagedFeedResult = unknown[] | { items: unknown[]; hasMore?: boolean };
+
 const props = withDefaults(
   defineProps<{
-    fetcher: (p: PagedFeedParams) => Promise<unknown[]>;
+    fetcher: (p: PagedFeedParams) => Promise<PagedFeedResult>;
     streamChannel?: string;
     streamType?: string;
     pageSize?: number;
     disabled?: boolean;
     newItemsLabel?: string;
     filter?: (item: unknown) => boolean;
+    streamFilter?: (item: unknown) => boolean;
   }>(),
   {
     streamChannel: "",
@@ -24,6 +30,7 @@ const props = withDefaults(
     disabled: false,
     newItemsLabel: "新笔记",
     filter: undefined,
+    streamFilter: undefined,
   },
 );
 
@@ -63,39 +70,70 @@ function publish() {
   emit("items", items.value.slice());
 }
 
+// The next-page cursor; "" means "no cursor yet" and is passed through so
+// filtered fetchers can tell loadMore from reload. Client-side filtered
+// fetchers keep their own raw cursor and ignore this, but a plain-array
+// fetcher paginates with it.
+const cursor = ref("");
+
+function advanceCursor() {
+  const id = idOf(items.value[items.value.length - 1]);
+  if (id) cursor.value = id;
+}
+
+function splitResult(raw: PagedFeedResult): { items: unknown[]; hasMoreHint?: boolean } {
+  if (Array.isArray(raw)) return { items: raw };
+  return { items: raw.items, hasMoreHint: raw.hasMore };
+}
+
+// Overlapping load() calls (reconnect, fetcher swap) race; only the latest
+// one may touch the component state.
+let loadSeq = 0;
+
 async function load() {
   if (props.disabled) return;
+  const seq = ++loadSeq;
   loading.value = true;
   error.value = "";
   try {
-    const page = await props.fetcher({});
+    const raw = await props.fetcher({});
+    if (seq !== loadSeq) return;
+    const result = splitResult(raw);
     seen.clear();
-    items.value = takeFresh(page);
-    hasMore.value = page.length >= props.pageSize;
+    cursor.value = "";
+    items.value = takeFresh(result.items);
+    advanceCursor();
+    hasMore.value = result.hasMoreHint ?? result.items.length >= props.pageSize;
     pending.value = [];
     publish();
   } catch (err) {
+    if (seq !== loadSeq) return;
     error.value = err instanceof Error ? err.message : "加载失败";
   } finally {
-    loading.value = false;
+    if (seq === loadSeq) loading.value = false;
   }
   void checkMore();
 }
 
 async function loadMore() {
   if (props.disabled || loading.value || loadingMore.value || !hasMore.value) return;
-  const last = items.value[items.value.length - 1];
-  const untilId = idOf(last);
-  if (!untilId) return;
   loadingMore.value = true;
   try {
-    const page = await props.fetcher({ untilId });
-    const fresh = takeFresh(page);
-    if (fresh.length) items.value = [...items.value, ...fresh];
-    // Stop when the server has no more, and also when a page produced nothing
-    // new: without that guard a fully-duplicated page would re-request the
-    // same cursor forever.
-    hasMore.value = page.length >= props.pageSize && fresh.length > 0;
+    // "" (not undefined) marks loadMore without a usable cursor; undefined
+    // always means reload, so client-side filtered fetchers can tell the two
+    // apart and only reset their own raw cursor on reload.
+    const raw = await props.fetcher({ untilId: cursor.value });
+    const result = splitResult(raw);
+    const fresh = takeFresh(result.items);
+    if (fresh.length) {
+      items.value = [...items.value, ...fresh];
+      advanceCursor();
+    }
+    // For a plain-array fetcher, stop when the server has no more and also
+    // when a page produced nothing new: without that guard a fully
+    // duplicated page would re-request the same cursor forever. A hinted
+    // fetcher owns its cursor, so its hasMore is authoritative.
+    hasMore.value = result.hasMoreHint ?? (result.items.length >= props.pageSize && fresh.length > 0);
     publish();
   } catch (err) {
     error.value = err instanceof Error ? err.message : "加载更多失败";
@@ -187,6 +225,7 @@ function handleStream(channel: string, type: string, body: unknown) {
   }
   if (channel !== props.streamChannel || type !== props.streamType) return;
   if (!body || typeof body !== "object") return;
+  if (props.streamFilter && !props.streamFilter(body)) return;
   const id = idOf(body);
   if (!id || seen.has(id)) return;
   if (pending.value.some((item) => idOf(item) === id)) return;
@@ -230,7 +269,10 @@ watch(
 
 watch(hasMore, async (more) => {
   await nextTick();
-  if (more && sentinel.value) observer?.observe(sentinel.value);
+  const el = sentinel.value;
+  if (!el || !observer) return;
+  observer.unobserve(el);
+  if (more) observer.observe(el);
 });
 
 onMounted(() => {
@@ -337,10 +379,6 @@ defineExpose({ refresh, remove });
   flex: 1;
   height: 1px;
   background: var(--border);
-}
-
-.empty {
-  color: var(--muted);
 }
 
 .sentinel {

@@ -6,6 +6,7 @@ import type { Note, TimelineParams } from "../api/types";
 import AppIcon from "../components/AppIcon.vue";
 import NoteItem from "../components/note/Note.vue";
 import PagedFeed from "../components/ui/PagedFeed.vue";
+import type { PagedFeedParams, PagedFeedResult } from "../components/ui/PagedFeed.vue";
 
 const route = useRoute();
 const scope = ref<"local" | "global">("local");
@@ -18,10 +19,12 @@ const streamChannels = { local: "localTimeline", global: "globalTimeline" };
 const timelineApi = { local: api.localTimeline, global: api.globalTimeline };
 
 // Client-side tag filter: keep a raw cursor so pages do not skip the notes
-// dropped by the filter (PagedFeed's cursor comes from the filtered list).
+// dropped by the filter (PagedFeed's cursor comes from the filtered list),
+// and report hasMore from the raw page so an empty filtered page keeps
+// paginating.
 let rawCursor = "";
 
-async function fetcher(p: { untilId?: string; sinceId?: string }): Promise<Note[]> {
+async function fetcher(p: PagedFeedParams): Promise<PagedFeedResult> {
   const params: TimelineParams = { limit: PAGE_SIZE };
   if (tag.value) {
     if (p.untilId === undefined) rawCursor = "";
@@ -31,10 +34,18 @@ async function fetcher(p: { untilId?: string; sinceId?: string }): Promise<Note[
   }
   const page = await timelineApi[scope.value](params);
   if (page.length) rawCursor = page[page.length - 1].id;
+  const hasMore = page.length >= PAGE_SIZE;
   if (!tag.value) return page;
   const needle = `#${tag.value}`.toLowerCase();
-  return page.filter((n) => (n.text ?? "").toLowerCase().includes(needle));
+  return { items: page.filter((n) => (n.text ?? "").toLowerCase().includes(needle)), hasMore };
 }
+
+// Streamed notes behind the pill must match the active tag filter too.
+const streamFilter = computed(() => {
+  if (!tag.value) return undefined;
+  const needle = `#${tag.value}`.toLowerCase();
+  return (item: unknown) => ((item as Note).text ?? "").toLowerCase().includes(needle);
+});
 
 const feed = ref<InstanceType<typeof PagedFeed> | null>(null);
 
@@ -60,7 +71,13 @@ function onDeleted(id: string) {
   </nav>
 
   <div class="explore-feed">
-    <PagedFeed :key="`${scope}:${tag}`" ref="feed" :fetcher="fetcher" :stream-channel="streamChannels[scope]">
+    <PagedFeed
+      :key="`${scope}:${tag}`"
+      ref="feed"
+      :fetcher="fetcher"
+      :stream-channel="streamChannels[scope]"
+      :stream-filter="streamFilter"
+    >
       <template #item="{ item }">
         <NoteItem :note="toNote(item)" @deleted="onDeleted" />
       </template>
