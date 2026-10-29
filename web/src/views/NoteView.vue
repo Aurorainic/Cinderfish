@@ -5,8 +5,7 @@ import { api } from "../api/client";
 import type { Note } from "../api/types";
 import AppIcon from "../components/AppIcon.vue";
 import NoteItem from "../components/note/Note.vue";
-import NoteComposer from "../components/NoteComposer.vue";
-import { isLoggedIn } from "../stores/session";
+import { openPostForm } from "../os";
 
 const route = useRoute();
 const router = useRouter();
@@ -14,7 +13,6 @@ const router = useRouter();
 const note = ref<Note | null>(null);
 const loading = ref(false);
 const error = ref("");
-const replyTo = ref<Note | null>(null);
 
 async function load() {
   const id = String(route.params.id ?? "");
@@ -54,17 +52,10 @@ watch(() => route.params.id, load, { immediate: true });
       <NoteItem
         :note="note"
         detail
-        @reply="replyTo = $event"
+        @reply="openPostForm({ reply: $event })"
         @deleted="onDeleted"
       />
     </div>
-    <NoteComposer
-      v-if="isLoggedIn"
-      class="reply-composer"
-      :reply-to="replyTo"
-      @posted="replyTo = null"
-      @cancel="replyTo = null"
-    />
   </template>
 </template>
 
@@ -72,10 +63,6 @@ watch(() => route.params.id, load, { immediate: true });
 .note-detail {
   padding: 4px 0 8px;
   border-bottom: 1px solid var(--divider);
-}
-
-.reply-composer {
-  margin-top: 16px;
 }
 
 .skeleton {

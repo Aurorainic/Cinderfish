@@ -3,6 +3,7 @@
 // (OsOverlay, mounted once in App.vue) renders the resulting layers.
 import { computed, defineComponent, h, onUnmounted, ref, type CSSProperties } from "vue";
 import type { Note } from "./api/types";
+import PostForm from "./components/composer/PostForm.vue";
 import EmojiPicker from "./components/ui/EmojiPicker.vue";
 import PageWindow from "./components/ui/PageWindow.vue";
 
@@ -34,8 +35,9 @@ const confirmQueue = ref<ConfirmRequest[]>([]);
 
 const currentConfirm = computed(() => confirmQueue.value[0] ?? null);
 
-/** Open the global post form. F9 swaps the stub panel for the real PostForm;
- * the signature is frozen here. */
+/** Open the global post form. The signature is frozen; `quote` marks the
+ * renote target as a quote, which the form renders with a preview and submits
+ * as renoteId plus text (the backend accepts both on one note). */
 export function openPostForm(opts: PostFormOptions = {}): void {
   postFormRequest.value = { ...opts, id: ++nextRequestId };
 }
@@ -172,17 +174,10 @@ const primaryButtonStyle: CSSProperties = {
   fontWeight: 600,
 };
 
-const stubBodyStyle: CSSProperties = {
-  padding: "16px",
-  color: "var(--muted)",
-  lineHeight: 1.7,
-};
-
-function contextLines(opts: PostFormOptions): string[] {
-  const lines: string[] = [];
-  if (opts.reply) lines.push(`回复 @${opts.reply.user.username}`);
-  if (opts.renote && opts.quote) lines.push("引用转贴");
-  return lines;
+function postFormTitle(opts: PostFormOptions): string {
+  if (opts.reply) return "回复";
+  if (opts.renote) return "引用";
+  return "发帖";
 }
 
 /** The singleton overlay container. Mount it once in App.vue; it renders
@@ -239,16 +234,17 @@ export const OsOverlay = defineComponent({
               PageWindow,
               {
                 key: form.id,
-                title: "发帖",
+                title: postFormTitle(form),
                 onClose: () => closePostForm(),
               },
               {
-                default: () => [
-                  h("div", { style: stubBodyStyle }, [
-                    ...contextLines(form).map((line) => h("p", { key: line, style: { margin: "0 0 8px" } }, line)),
-                    h("p", { style: { margin: 0 } }, "发帖器尚未接入，此为占位面板（任务 F9 替换为真实组件）。"),
-                  ]),
-                ],
+                default: () =>
+                  h(PostForm, {
+                    replyTo: form.reply ?? null,
+                    renoteTo: form.renote ?? null,
+                    onPosted: () => closePostForm(),
+                    onCancel: () => closePostForm(),
+                  }),
               },
             )
           : null,

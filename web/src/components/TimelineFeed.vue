@@ -4,6 +4,7 @@ import { api } from "../api/client";
 import type { Note, TimelineParams } from "../api/types";
 import { isLoggedIn } from "../stores/session";
 import AppIcon from "./AppIcon.vue";
+import PostForm from "./composer/PostForm.vue";
 import NoteItem from "./note/Note.vue";
 import PagedFeed from "./ui/PagedFeed.vue";
 import type { PagedFeedParams, PagedFeedResult } from "./ui/PagedFeed.vue";
@@ -81,6 +82,10 @@ function toNote(item: unknown): Note {
   </div>
 
   <div v-else class="timeline-feed">
+    <!-- The section's own composer. Replies and quotes go through
+         os.openPostForm so there is only ever one post dialog. New notes
+         arrive through the streaming channel. -->
+    <PostForm v-if="isLoggedIn" fixed />
     <PagedFeed
       ref="feed"
       :key="`${source}:${tag}`"
