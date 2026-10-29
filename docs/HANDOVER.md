@@ -83,7 +83,7 @@ go vet ./...
 go test ./...
 CINDERFISH_TEST_DATABASE_URL="postgres://cinderfish:cinderfish@localhost:5432/cinderfish_test" go test ./...
 
-cd web && npm install && npm run build && cd ..   # 产出 web/dist
+cd web && pnpm install && pnpm build && cd ..   # 产出 web/dist
 cp config.example.toml config.toml   # 按需改
 go build -o cinderfish ./cmd/cinderfish
 ./cinderfish --config config.toml
@@ -226,9 +226,9 @@ web/src/views/       Timeline、Note、Notifications、Profile、Explore、Setti
 
 ```bash
 cd web
-npm install
-npm run dev      # 5173，代理 /api /media /streaming 到 127.0.0.1:3000
-npm run build    # 先 vue-tsc --noEmit，再输出 web/dist
+pnpm install
+pnpm dev      # 5173，代理 /api /media /streaming 到 127.0.0.1:3000
+pnpm build    # 先 vue-tsc --noEmit，再输出 web/dist
 ```
 
 ### 11.6 已知缺口

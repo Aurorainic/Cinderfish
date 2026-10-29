@@ -25,7 +25,7 @@ go build -trimpath -o cinderfish-admin ./cmd/cinderfish-admin
 go build -trimpath -o cinderfish-media-migrate ./cmd/cinderfish-media-migrate
 
 # 前端（产物在 web/dist）
-cd web && npm ci && npm run build && cd ..
+cd web && pnpm install --frozen-lockfile && pnpm build && cd ..
 ```
 
 只需要 API 时可以跳过前端构建；`web_dir` 不存在时服务器自动退回纯 API 模式。

@@ -10,8 +10,8 @@ Go 单二进制的个人 / 极小规模联邦社交实例。
 ## 快速开始
 
 ```bash
-# 依赖：Go 1.26+、Node 20+（构建前端）、PostgreSQL 14+
-cd web && npm install && npm run build && cd ..   # 产出 web/dist
+# 依赖：Go 1.26+、Node 20+ 与 pnpm（构建前端）、PostgreSQL 14+
+cd web && pnpm install && pnpm build && cd ..   # 产出 web/dist
 cp config.example.toml config.toml   # 按需修改
 go build -o cinderfish ./cmd/cinderfish
 ./cinderfish --config config.toml
