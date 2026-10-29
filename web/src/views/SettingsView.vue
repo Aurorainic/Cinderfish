@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
+import { api, ApiError } from "../api/client";
 import AppIcon from "../components/AppIcon.vue";
 import UserAvatar from "../components/UserAvatar.vue";
 import { instance, loadInstance } from "../stores/instance";
@@ -64,6 +65,130 @@ const registrationLabel = computed(() => {
 
 const me = computed(() => session.me);
 
+// i/update caps the profile fields at 50 and 500 characters; the counters
+// below count runes, the same way the server counts them.
+const MAX_NAME = 50;
+const MAX_DESCRIPTION = 500;
+
+const profileName = ref("");
+const profileDescription = ref("");
+const profileSaving = ref(false);
+const avatarBusy = ref(false);
+const profileError = ref("");
+const profileSaved = ref(false);
+let savedTimer: number | undefined;
+
+const nameLength = computed(() => [...profileName.value].length);
+const descriptionLength = computed(() => [...profileDescription.value].length);
+const overLimit = computed(
+  () => nameLength.value > MAX_NAME || descriptionLength.value > MAX_DESCRIPTION,
+);
+
+const profileDirty = computed(() => {
+  const current = session.me;
+  if (!current) return false;
+  return (
+    profileName.value !== (current.name ?? "") ||
+    profileDescription.value !== (current.description ?? "")
+  );
+});
+
+const canSaveProfile = computed(
+  () =>
+    profileDirty.value &&
+    !overLimit.value &&
+    !profileSaving.value &&
+    !avatarBusy.value &&
+    !!session.me,
+);
+
+function syncProfileForm() {
+  profileName.value = session.me?.name ?? "";
+  profileDescription.value = session.me?.description ?? "";
+}
+
+function errorMessage(err: unknown, fallback: string): string {
+  if (err instanceof ApiError) return err.message || fallback;
+  if (err instanceof Error) return err.message || fallback;
+  return fallback;
+}
+
+function flashSaved() {
+  profileSaved.value = true;
+  window.clearTimeout(savedTimer);
+  savedTimer = window.setTimeout(() => (profileSaved.value = false), 2500);
+}
+
+async function saveProfile() {
+  if (!canSaveProfile.value) return;
+  profileSaving.value = true;
+  profileError.value = "";
+  try {
+    // An empty string clears the field; i/update treats "" and null alike.
+    // Both keys are always sent, so the form state is exactly what is saved.
+    session.me = await api.iUpdate({
+      name: profileName.value.trim(),
+      description: profileDescription.value,
+    });
+    syncProfileForm();
+    flashSaved();
+  } catch (err) {
+    profileError.value = errorMessage(err, "保存失败");
+  } finally {
+    profileSaving.value = false;
+  }
+}
+
+function resetProfile() {
+  syncProfileForm();
+  profileError.value = "";
+}
+
+async function onAvatarPicked(event: Event) {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  input.value = "";
+  if (!file) return;
+  if (!file.type.startsWith("image/")) {
+    profileError.value = "请选择图片文件。";
+    return;
+  }
+  avatarBusy.value = true;
+  profileError.value = "";
+  try {
+    const uploaded = await api.uploadFile(file);
+    session.me = await api.iUpdate({ avatarId: uploaded.id });
+    flashSaved();
+  } catch (err) {
+    profileError.value = errorMessage(err, "头像上传失败");
+  } finally {
+    avatarBusy.value = false;
+  }
+}
+
+async function removeAvatar() {
+  if (avatarBusy.value || !session.me) return;
+  avatarBusy.value = true;
+  profileError.value = "";
+  try {
+    session.me = await api.iUpdate({ avatarId: "" });
+    flashSaved();
+  } catch (err) {
+    profileError.value = errorMessage(err, "移除头像失败");
+  } finally {
+    avatarBusy.value = false;
+  }
+}
+
+// The session may resolve after this view mounts, so the form follows it.
+watch(
+  () => session.me?.id,
+  () => {
+    syncProfileForm();
+  },
+  { immediate: true },
+);
+
 function handleSignout() {
   signout();
   router.push("/");
@@ -112,9 +237,82 @@ onMounted(() => {
         <RouterLink :to="`/@${me.username}`" class="button ghost small">查看个人资料</RouterLink>
       </div>
 
-      <p class="notice info">
-        修改昵称、简介、头像与密码暂时不能在网页端完成：后端尚未提供对应的编辑接口。
-      </p>
+      <p class="muted small account-hint">密码修改尚未在网页端开放，需要时请由管理员在服务器上处理。</p>
+    </section>
+
+    <section v-if="me" class="card">
+      <h2 class="card-title">个人资料</h2>
+      <p class="muted small">昵称、简介和头像会显示在个人页与每条笔记的头部，保存后立即生效。</p>
+
+      <div class="avatar-row">
+        <UserAvatar :user="me" :size="72" />
+        <div class="avatar-actions">
+          <label class="button ghost small upload-button">
+            <input type="file" accept="image/*" class="file-input" @change="onAvatarPicked" />
+            {{ avatarBusy ? "上传中…" : me.avatarUrl ? "更换头像" : "上传头像" }}
+          </label>
+          <button
+            v-if="me.avatarUrl"
+            type="button"
+            class="button ghost small"
+            :disabled="avatarBusy"
+            @click="removeAvatar"
+          >
+            移除头像
+          </button>
+        </div>
+      </div>
+
+      <p v-if="profileError" class="notice error">{{ profileError }}</p>
+
+      <div class="field">
+        <label for="profile-name">
+          昵称
+          <span class="counter" :class="{ over: nameLength > MAX_NAME }">{{ nameLength }}/{{ MAX_NAME }}</span>
+        </label>
+        <input
+          id="profile-name"
+          v-model="profileName"
+          class="input"
+          type="text"
+          :maxlength="MAX_NAME"
+          autocomplete="nickname"
+          placeholder="留空则显示用户名"
+        />
+      </div>
+
+      <div class="field">
+        <label for="profile-description">
+          简介
+          <span class="counter" :class="{ over: descriptionLength > MAX_DESCRIPTION }">
+            {{ descriptionLength }}/{{ MAX_DESCRIPTION }}
+          </span>
+        </label>
+        <textarea
+          id="profile-description"
+          v-model="profileDescription"
+          class="textarea"
+          rows="4"
+          :maxlength="MAX_DESCRIPTION"
+          placeholder="介绍一下自己…"
+        ></textarea>
+      </div>
+
+      <p v-if="profileSaved" class="notice info">已保存</p>
+
+      <div class="row-actions">
+        <button type="button" class="button" :disabled="!canSaveProfile" @click="saveProfile">
+          {{ profileSaving ? "保存中…" : "保存" }}
+        </button>
+        <button
+          type="button"
+          class="button ghost"
+          :disabled="!profileDirty || profileSaving"
+          @click="resetProfile"
+        >
+          还原
+        </button>
+      </div>
     </section>
 
     <section class="card">
@@ -232,6 +430,62 @@ onMounted(() => {
   display: flex;
   gap: 8px;
   margin-top: 14px;
+}
+
+.account-hint {
+  margin-top: 12px;
+}
+
+.avatar-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 14px 0 18px;
+  flex-wrap: wrap;
+}
+
+.avatar-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* The label is the button; the real input stays off-screen but focusable
+   through the label, so keyboard users still reach it. */
+.upload-button {
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.file-input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.upload-button:focus-within {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.field label {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.counter {
+  font-weight: 500;
+  font-size: 0.78rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.counter.over {
+  color: var(--danger);
 }
 
 .mono {

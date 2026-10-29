@@ -68,10 +68,69 @@ async function parseError(res: Response): Promise<ApiError> {
   return new ApiError(res.statusText || `HTTP ${res.status}`, res.status);
 }
 
-async function post<T>(path: string, body: Record<string, unknown> = {}, authed = true): Promise<T> {
+// Every note carries a copy of its author. After the signed-in user edits
+// their own profile, the copies already in memory are stale, so the author
+// fields a note header shows (name and avatar) are restamped on the way out
+// whenever the author is the viewer. Notes fetched before the session
+// resolved simply keep the server's copy until the next fetch.
+interface ViewerStamp {
+  id: string;
+  name: string | null;
+  avatarUrl: string | null;
+}
+
+const VIEWER_PATHS = new Set([
+  "/api/i",
+  "/api/signup",
+  "/api/i/update",
+  "/api/i/pin",
+  "/api/i/unpin",
+]);
+
+let viewer: ViewerStamp | null = null;
+
+function rememberViewer(value: unknown): void {
+  if (value === null || typeof value !== "object") return;
+  const me = value as Record<string, unknown>;
+  if (typeof me.id !== "string" || typeof me.username !== "string") return;
+  viewer = {
+    id: me.id,
+    name: typeof me.name === "string" ? me.name : null,
+    avatarUrl: typeof me.avatarUrl === "string" ? me.avatarUrl : null,
+  };
+}
+
+function stampViewer(value: unknown, depth = 0): void {
+  if (!viewer || depth > 4 || value === null || typeof value !== "object") return;
+  if (Array.isArray(value)) {
+    for (const item of value) stampViewer(item, depth + 1);
+    return;
+  }
+  const record = value as Record<string, unknown>;
+  const author = record.user;
+  if (record.userId === viewer.id && author && typeof author === "object") {
+    record.user = {
+      ...(author as Record<string, unknown>),
+      name: viewer.name,
+      avatarUrl: viewer.avatarUrl,
+    };
+  }
+  for (const key of ["reply", "renote", "note"]) {
+    const nested = record[key];
+    if (nested && typeof nested === "object") stampViewer(nested, depth + 1);
+  }
+}
+
+// sendToken defaults to true: every endpoint that can serve viewer-specific
+// fields (myReaction on notes, unread counts, the pinned list) reads the
+// token from the request, so a read that forgets it silently loses those
+// fields. Pass false only where a token would be meaningless or harmful:
+// signin, signup, availability checks and instance meta.
+async function post<T>(path: string, body: Record<string, unknown> = {}, sendToken = true): Promise<T> {
   const payload: Record<string, unknown> = { ...body };
   const token = getToken();
-  if (authed && token) payload.i = token;
+  if (!token) viewer = null;
+  if (sendToken && token) payload.i = token;
 
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -79,14 +138,17 @@ async function post<T>(path: string, body: Record<string, unknown> = {}, authed 
   };
   // The admin handlers authenticate from the header only, so send both:
   // `i` for Misskey compatibility and Bearer for every backend route.
-  if (authed && token) headers.Authorization = `Bearer ${token}`;
+  if (sendToken && token) headers.Authorization = `Bearer ${token}`;
   const res = await fetch(path, {
     method: "POST",
     headers,
     body: JSON.stringify(payload),
   });
   if (!res.ok) throw await parseError(res);
-  return (await res.json()) as T;
+  const data = (await res.json()) as T;
+  if (VIEWER_PATHS.has(path)) rememberViewer(data);
+  else stampViewer(data);
+  return data;
 }
 
 async function upload(file: File): Promise<DriveFile> {
@@ -121,8 +183,21 @@ export const api = {
 
   i: () => post<MeDetailed>("/api/i"),
 
+  // iUpdate writes the editable profile fields. An absent key leaves the
+  // stored value alone; null or an empty string clears the field, which is
+  // how Misskey's own client clears a description. name is capped at 50
+  // and description at 500 characters by the server.
+  iUpdate: (params: { name?: string | null; description?: string | null; avatarId?: string | null }) =>
+    post<MeDetailed>("/api/i/update", params as Record<string, unknown>),
+
+  // pin/unpin answer with the freshly packed MeDetailed user, so callers can
+  // replace the session copy and get the new pinnedNoteIds for free.
+  pin: (noteId: string) => post<MeDetailed>("/api/i/pin", { noteId }),
+
+  unpin: (noteId: string) => post<MeDetailed>("/api/i/unpin", { noteId }),
+
   usersShow: (params: { userId?: string; username?: string; host?: string }) =>
-    post<UserDetailed>("/api/users/show", params, false),
+    post<UserDetailed>("/api/users/show", params),
 
   usersNotes: (params: {
     userId?: string;
@@ -130,7 +205,9 @@ export const api = {
     limit?: number;
     sinceId?: string;
     untilId?: string;
-  }) => post<Note[]>("/api/users/notes", params as Record<string, unknown>, false),
+    withFiles?: boolean;
+    withReplies?: boolean;
+  }) => post<Note[]>("/api/users/notes", params as Record<string, unknown>),
 
   createNote: (params: {
     text?: string;
@@ -143,7 +220,7 @@ export const api = {
     visibleUserIds?: string[];
   }) => post<Note>("/api/notes/create", params),
 
-  showNote: (noteId: string) => post<Note>("/api/notes/show", { noteId }, false),
+  showNote: (noteId: string) => post<Note>("/api/notes/show", { noteId }),
 
   deleteNote: (noteId: string) => post<Record<string, never>>("/api/notes/delete", { noteId }),
 
@@ -153,10 +230,10 @@ export const api = {
   unreact: (noteId: string) => post<Record<string, never>>("/api/notes/reactions/delete", { noteId }),
 
   localTimeline: (params: TimelineParams = {}) =>
-    post<Note[]>("/api/notes/local-timeline", params as Record<string, unknown>, false),
+    post<Note[]>("/api/notes/local-timeline", params as Record<string, unknown>),
 
   globalTimeline: (params: TimelineParams = {}) =>
-    post<Note[]>("/api/notes/global-timeline", params as Record<string, unknown>, false),
+    post<Note[]>("/api/notes/global-timeline", params as Record<string, unknown>),
 
   hybridTimeline: (params: TimelineParams = {}) =>
     post<Note[]>("/api/notes/hybrid-timeline", params as Record<string, unknown>),

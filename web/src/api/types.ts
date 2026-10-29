@@ -89,6 +89,9 @@ export interface Note {
   reply?: Note | null;
   renote?: Note | null;
   myReaction?: string;
+  // Omitted by the packer when the note left it unset; Misskey clients treat
+  // an absent value like "all".
+  reactionAcceptance?: string | null;
   hasPoll?: boolean;
   poll?: Poll;
   clippedCount?: number;
