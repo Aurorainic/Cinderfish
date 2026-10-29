@@ -10,7 +10,7 @@
       "url": "https://github.com/Aurorainic/Cinderfish.git",
       "provider": "github",
       "link_mode": "web",
-      "revision": "60b860c3d8d2f23b8a87d30b03aa92edf2261e84"
+      "revision": "cf3d132e90eb701c51fe7da974b0965a1eb33296"
     }
   },
   "components": [
@@ -74,8 +74,8 @@
       "pos": [300, 320],
       "size": [200, 64],
       "sources": [
-        { "path": "internal/httpapi/server.go", "line": 94, "end_line": 166, "label": "全部路由" },
-        { "path": "internal/httpapi/server.go", "line": 168, "end_line": 174, "label": "SPA 前置分流" }
+        { "path": "internal/httpapi/server.go", "line": 94, "end_line": 167, "label": "全部路由" },
+        { "path": "internal/httpapi/server.go", "line": 169, "end_line": 175, "label": "SPA 前置分流" }
       ]
     },
     {
