@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/Aurorainic/cinderfish/internal/media"
 	"github.com/Aurorainic/cinderfish/internal/note"
 )
 
@@ -19,10 +20,25 @@ type notePackContext struct {
 	// Reactions counts per emoji and their sum.
 	Reactions     map[string]int
 	ReactionTotal int
+	// Files are the drive files referenced by the note's FileIDs.
+	Files []*media.File
 }
 
 // packNote renders a note in Misskey's Note schema.
 func packNote(n *note.Note, pc notePackContext) map[string]any {
+	files := make([]any, 0, len(n.FileIDs))
+	if len(n.FileIDs) > 0 {
+		byID := make(map[string]*media.File, len(pc.Files))
+		for _, f := range pc.Files {
+			byID[f.ID] = f
+		}
+		for _, id := range n.FileIDs {
+			if f := byID[id]; f != nil {
+				files = append(files, packDriveFile(f))
+			}
+		}
+	}
+
 	packed := map[string]any{
 		"id":             n.ID,
 		"createdAt":      n.CreatedAt.UTC().Format(time.RFC3339Nano),
@@ -39,7 +55,7 @@ func packNote(n *note.Note, pc notePackContext) map[string]any {
 		"reactionEmojis": []any{},
 		"emojis":         []any{},
 		"fileIds":        n.FileIDs,
-		"files":          []any{},
+		"files":          files,
 		"replyId":        n.ReplyID,
 		"renoteId":       n.RenoteID,
 		"mentions":       n.Mentions,
@@ -128,6 +144,12 @@ func (s *Server) notePackContext(ctx context.Context, n *note.Note, viewerID str
 
 	if n.Visibility == note.VisibilitySpecified {
 		pc.VisibleUserIDs = s.notes.VisibleUserIDs(ctx, n.ID)
+	}
+
+	if len(n.FileIDs) > 0 && s.drive != nil {
+		if files, err := s.drive.GetMany(ctx, n.FileIDs); err == nil {
+			pc.Files = files
+		}
 	}
 
 	if counts, err := s.noteReactions.Counts(ctx, n.ID); err == nil {

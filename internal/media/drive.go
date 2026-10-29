@@ -146,6 +146,35 @@ FROM drive_files WHERE id = $1
 	return &f, nil
 }
 
+// GetMany loads the files with the given ids. Files that do not exist
+// are omitted from the result; the order is not guaranteed.
+func (s *DriveService) GetMany(ctx context.Context, ids []string) ([]*File, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	rows, err := s.pool.Query(ctx, `
+SELECT id, user_id, name, content_type, size, md5, storage_key, storage_backend,
+       thumbnail_key, is_sensitive, created_at
+FROM drive_files WHERE id = ANY($1)
+`, ids)
+	if err != nil {
+		return nil, fmt.Errorf("media: list files by id: %w", err)
+	}
+	defer rows.Close()
+
+	var out []*File
+	for rows.Next() {
+		var f File
+		if err := rows.Scan(&f.ID, &f.UserID, &f.Name, &f.ContentType, &f.Size, &f.MD5,
+			&f.StorageKey, &f.StorageBackend, &f.ThumbnailKey, &f.IsSensitive, &f.CreatedAt); err != nil {
+			return nil, fmt.Errorf("media: scan file list: %w", err)
+		}
+		f.URL = s.storage.URL(f.StorageKey)
+		out = append(out, &f)
+	}
+	return out, rows.Err()
+}
+
 // List returns a user's files, newest first.
 func (s *DriveService) List(ctx context.Context, userID string, limit int, sinceID, untilID string) ([]*File, error) {
 	if limit <= 0 {

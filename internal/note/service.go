@@ -209,6 +209,7 @@ SELECT id FROM users WHERE username_lower = lower($1) AND host IS NULL
 		LocalOnly:      p.LocalOnly,
 		CW:             p.CW,
 		Text:           p.Text,
+		FileIDs:        p.FileIDs,
 		ReplyID:        p.ReplyID,
 		ReplyUserID:    replyUserID,
 		RenoteID:       p.RenoteID,
