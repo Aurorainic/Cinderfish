@@ -10,7 +10,7 @@
       "url": "https://github.com/Aurorainic/Cinderfish.git",
       "provider": "github",
       "link_mode": "web",
-      "revision": "9281a5cd94d4a2717a793ed631ec8a0c205c5201"
+      "revision": "62b19df5eb1e84bbb9dd9e7b388e6f75f4acfb2b"
     }
   },
   "components": [
@@ -116,12 +116,12 @@
       "id": "media",
       "type": "backend",
       "label": "media",
-      "sublabel": "Drive 元数据 · Storage 接口",
+      "sublabel": "Drive · Storage 接口 · local/S3 迁移",
       "pos": [560, 370],
       "size": [190, 64],
       "sources": [
-        { "path": "internal/media/drive.go", "line": 41, "end_line": 52, "label": "Drive 服务" },
-        { "path": "internal/media/storage.go", "line": 11, "end_line": 23, "label": "存储接口" }
+        { "path": "internal/media/storage.go", "line": 11, "end_line": 23, "label": "存储接口" },
+        { "path": "internal/media/migrate.go", "line": 40, "end_line": 95, "label": "跨后端迁移" }
       ]
     },
     {
@@ -217,7 +217,7 @@
       "title": "当前状态",
       "items": [
         "M1–M5 已完成：骨架、账户、笔记、Streaming、ActivityPub 联邦",
-        "M6 完成：页面全部接通 API，时间线与通知走 WebSocket 实时更新",
+        "M6 完成；M7 进行中：媒体迁移工具已落地",
         "单个 Go 二进制内嵌迁移脚本，启动时自动升级到 v4"
       ]
     },
