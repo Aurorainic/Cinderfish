@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import AppShell from "./layouts/AppShell.vue";
+import { OsOverlay } from "./os";
 </script>
 
 <template>
@@ -9,4 +10,5 @@ import AppShell from "./layouts/AppShell.vue";
       <component :is="Component" />
     </AppShell>
   </RouterView>
+  <OsOverlay />
 </template>
