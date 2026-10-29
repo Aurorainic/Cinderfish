@@ -1,63 +1,114 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { api } from "../api/client";
 import type { Notification } from "../api/types";
 import { session } from "../stores/session";
-import { setUnreadNotifications } from "../stores/streaming";
+import { setUnreadNotifications, streaming, unreadNotifications } from "../stores/streaming";
 import AppIcon from "../components/AppIcon.vue";
 import NotificationItem from "../components/NotificationItem.vue";
 import PagedFeed from "../components/ui/PagedFeed.vue";
 import type { PagedFeedParams } from "../components/ui/PagedFeed.vue";
 
-type Filter = "all" | "unread";
+// Type tabs are a pure client-side view filter: the backend endpoint takes no
+// type parameter we need, and PagedFeed keeps paginating on the unfiltered
+// page while the filter only decides what is painted.
+type Filter = "all" | "reaction" | "mention" | "renote";
 
 const PAGE_SIZE = 20;
 
 const notifications = ref<Notification[]>([]);
-const unreadCount = ref(0);
 const marking = ref(false);
 const error = ref("");
 const filter = ref<Filter>("all");
 
 const filters: { id: Filter; label: string }[] = [
   { id: "all", label: "全部" },
-  { id: "unread", label: "未读" },
+  { id: "reaction", label: "反应" },
+  { id: "mention", label: "提及" },
+  { id: "renote", label: "转贴" },
 ];
 
-const itemFilter = computed(() =>
-  filter.value === "unread" ? (item: unknown) => (item as Notification).isRead === false : undefined,
-);
-const emptyText = computed(() => (filter.value === "unread" ? "没有未读通知。" : "还没有通知。"));
+const itemFilter = computed(() => {
+  const type = filter.value;
+  return type === "all" ? undefined : (item: unknown) => (item as Notification).type === type;
+});
+
+const emptyText = computed(() => {
+  switch (filter.value) {
+    case "reaction":
+      return "还没有反应通知。";
+    case "mention":
+      return "还没有提及通知。";
+    case "renote":
+      return "还没有转贴通知。";
+    default:
+      return "还没有通知。";
+  }
+});
 
 async function fetcher(p: PagedFeedParams): Promise<Notification[]> {
   return api.notifications({ limit: PAGE_SIZE, untilId: p.untilId || undefined });
 }
 
+// The unread badge lives in the store, shared with the shell navigation. Seed
+// it from the session once the account is loaded; live notifications bump it
+// in the store itself.
+let seeded = false;
+watch(
+  () => session.me?.unreadNotificationsCount,
+  (count) => {
+    if (seeded || typeof count !== "number") return;
+    seeded = true;
+    setUnreadNotifications(count);
+  },
+  { immediate: true },
+);
+
 function onItems(items: unknown[]) {
   notifications.value = items as Notification[];
-  const unread = notifications.value.filter((n) => !n.isRead).length;
-  unreadCount.value = unread;
-  setUnreadNotifications(unread);
+}
+
+function markLocalRead() {
+  for (const n of notifications.value) n.isRead = true;
+  setUnreadNotifications(0);
+  if (session.me) {
+    session.me.unreadNotificationsCount = 0;
+    session.me.hasUnreadNotification = false;
+  }
 }
 
 async function markAllRead() {
-  if (marking.value || unreadCount.value === 0) return;
+  if (marking.value || unreadNotifications.value === 0) return;
   marking.value = true;
   error.value = "";
   try {
     await api.markAllNotificationsRead();
-    for (const n of notifications.value) n.isRead = true;
-    onItems(notifications.value);
-    if (session.me) {
-      session.me.unreadNotificationsCount = 0;
-      session.me.hasUnreadNotification = false;
-    }
+    markLocalRead();
   } catch (err) {
     error.value = err instanceof Error ? err.message : "标记已读失败";
   } finally {
     marking.value = false;
   }
 }
+
+// "Mark all as read" is announced on the main channel, so a tab opened in a
+// second client clears its dots without polling.
+let subscription = "";
+let offStream: (() => void) | null = null;
+
+onMounted(() => {
+  subscription = streaming.subscribe("main");
+  offStream = streaming.on((channel, type) => {
+    if (channel === "main" && type === "readAllNotifications") markLocalRead();
+  });
+});
+
+onBeforeUnmount(() => {
+  if (subscription) streaming.unsubscribe(subscription);
+  subscription = "";
+  offStream?.();
+  offStream = null;
+});
 </script>
 
 <template>
@@ -69,13 +120,13 @@ async function markAllRead() {
   </div>
 
   <template v-else>
-    <header class="page-title">
+    <header class="page-title head">
       <h1>通知</h1>
-      <span v-if="unreadCount" class="count">{{ unreadCount }} 条未读</span>
+      <span v-if="unreadNotifications" class="count">{{ unreadNotifications }} 条未读</span>
       <button
         class="button ghost small mark"
         type="button"
-        :disabled="marking || unreadCount === 0"
+        :disabled="marking || unreadNotifications === 0"
         @click="markAllRead"
       >
         <AppIcon name="check" />
@@ -83,39 +134,45 @@ async function markAllRead() {
       </button>
     </header>
 
-    <nav class="filters">
+    <nav class="filters" aria-label="通知类型">
       <button
         v-for="tab in filters"
         :key="tab.id"
         type="button"
         class="filter"
         :class="{ active: filter === tab.id }"
+        :aria-pressed="filter === tab.id"
         @click="filter = tab.id"
       >
         {{ tab.label }}
-        <span v-if="tab.id === 'unread' && unreadCount" class="badge">{{ unreadCount }}</span>
       </button>
     </nav>
 
     <p v-if="error" class="notice error">{{ error }}</p>
 
-    <PagedFeed
-      :fetcher="fetcher"
-      stream-channel="main"
-      stream-type="notification"
-      new-items-label="新通知"
-      :filter="itemFilter"
-      @items="onItems"
-    >
-      <template #item="{ item }">
-        <NotificationItem :notification="item as Notification" class="row" />
-      </template>
-      <template #empty>{{ emptyText }}</template>
-    </PagedFeed>
+    <div class="feed">
+      <PagedFeed
+        :fetcher="fetcher"
+        stream-channel="main"
+        stream-type="notification"
+        new-items-label="新通知"
+        :filter="itemFilter"
+        @items="onItems"
+      >
+        <template #item="{ item }">
+          <NotificationItem :notification="item as Notification" />
+        </template>
+        <template #empty>{{ emptyText }}</template>
+      </PagedFeed>
+    </div>
   </template>
 </template>
 
 <style scoped>
+.head {
+  flex-wrap: wrap;
+}
+
 .count {
   padding: 2px 9px;
   border-radius: 999px;
@@ -136,25 +193,31 @@ async function markAllRead() {
 
 .filters {
   display: flex;
-  gap: 6px;
-  padding: 5px;
-  margin-bottom: 16px;
+  gap: 4px;
+  padding: 4px;
+  margin-bottom: 14px;
   border: 1px solid var(--border);
   border-radius: 999px;
   background: var(--panel);
   width: fit-content;
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.filters::-webkit-scrollbar {
+  display: none;
 }
 
 .filter {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 7px 18px;
+  flex: none;
+  padding: 6px 16px;
   border: 0;
   border-radius: 999px;
   background: transparent;
   color: var(--muted);
   font-weight: 600;
+  font-size: 0.88rem;
   cursor: pointer;
   transition: background 0.15s ease, color 0.15s ease;
 }
@@ -168,17 +231,18 @@ async function markAllRead() {
   color: var(--on-accent);
 }
 
-.badge {
-  padding: 0 6px;
-  border-radius: 999px;
-  background: var(--panel-2);
-  color: var(--accent);
-  font-size: 0.72rem;
-  font-weight: 700;
+/* Borderless rows carry their own hairline, so they must not be spaced. */
+.feed :deep(.paged-feed) {
+  gap: 0;
 }
 
-.filter.active .badge {
-  background: rgba(0, 0, 0, 0.22);
-  color: var(--on-accent);
+@media (max-width: 520px) {
+  .mark {
+    margin-left: 0;
+  }
+
+  .filter {
+    padding: 6px 13px;
+  }
 }
 </style>
