@@ -506,58 +506,14 @@ select {
   max-width: 12ch;
 }
 
-@media (max-width: 1080px) {
-  .shell {
-    grid-template-columns: 84px minmax(0, 1fr);
-  }
-  .brand-name,
-  .nav-link span {
-    display: none;
-  }
-  .nav-link {
-    justify-content: center;
-    padding: 13px 0;
-  }
-  .brand {
-    justify-content: center;
-  }
-  .side {
-    display: none;
-  }
-}
+/* ---------- responsive ---------- */
+
+/* Shell breakpoints belong to the components that own them: the rail collapse
+   (1280px) and the widget column (1100px) live in AppShell.vue, and the
+   bottom bar (720px) in MobileNav.vue. What stays here is cross-page layout
+   that no single component owns. */
 
 @media (max-width: 720px) {
-  .shell {
-    display: block;
-    padding: 12px 12px 80px;
-  }
-  .rail {
-    position: fixed;
-    inset: auto 0 0 0;
-    z-index: 20;
-    height: auto;
-    flex-direction: row;
-    align-items: center;
-    gap: 0;
-    padding: 6px 10px calc(6px + env(safe-area-inset-bottom));
-    background: color-mix(in srgb, var(--bg-raised) 92%, transparent);
-    border-top: 1px solid var(--border);
-    backdrop-filter: blur(12px);
-  }
-  .brand {
-    display: none;
-  }
-  .nav {
-    flex: 1;
-    flex-direction: row;
-    justify-content: space-around;
-  }
-  .nav-link {
-    padding: 10px 12px;
-  }
-  .rail-foot {
-    margin: 0;
-  }
   .auth {
     grid-template-columns: 1fr;
   }

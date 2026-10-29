@@ -2,10 +2,15 @@
 import { computed, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import AppIcon from "../components/AppIcon.vue";
+import MobileNav from "../components/ui/MobileNav.vue";
 import UserAvatar from "../components/UserAvatar.vue";
+import InstanceCard from "../components/widgets/InstanceCard.vue";
 import { instance, loadInstance } from "../stores/instance";
 import { isAdmin, refreshSession, session, signout } from "../stores/session";
+import type { ShellMode } from "../stores/shell";
 import { streaming, unreadNotifications } from "../stores/streaming";
+
+const props = withDefaults(defineProps<{ mode?: ShellMode }>(), { mode: "universal" });
 
 const router = useRouter();
 const theme = ref(document.documentElement.dataset.theme ?? "dark");
@@ -45,7 +50,7 @@ watch(
 </script>
 
 <template>
-  <div class="shell">
+  <div class="shell" :data-shell="props.mode">
     <aside class="rail">
       <RouterLink to="/" class="brand" aria-label="Cinderfish 首页">
         <span class="brand-mark"><AppIcon name="flame" /></span>
@@ -53,14 +58,14 @@ watch(
       </RouterLink>
 
       <nav class="nav">
-        <RouterLink v-for="item in nav" :key="item.to" :to="item.to" class="nav-link">
+        <RouterLink v-for="item in nav" :key="item.to" :to="item.to" class="nav-link" :title="item.label">
           <span class="nav-icon">
             <AppIcon :name="item.icon" />
             <span v-if="item.to === '/notifications' && unreadNotifications" class="nav-badge">
               {{ unreadNotifications > 99 ? "99+" : unreadNotifications }}
             </span>
           </span>
-          <span>{{ item.label }}</span>
+          <span class="nav-label">{{ item.label }}</span>
         </RouterLink>
       </nav>
 
@@ -82,43 +87,18 @@ watch(
       <slot />
     </main>
 
-    <aside class="side">
-      <section class="card instance-card">
-        <div class="instance-head">
-          <span class="instance-logo"><AppIcon name="flame" /></span>
-          <div>
-            <h2>{{ instance.meta?.name ?? "Cinderfish" }}</h2>
-            <p class="muted small">个人联邦实例</p>
-          </div>
-        </div>
-        <p class="muted small">
-          {{ instance.meta?.description || "一个个人或极小规模的联邦社交实例。后端遵循 Misskey API，通信层使用 ActivityPub。" }}
-        </p>
-        <div v-if="!session.me" class="instance-actions">
-          <RouterLink to="/login" class="button ghost small">登录</RouterLink>
-          <RouterLink to="/signup" class="button small">注册</RouterLink>
-        </div>
-        <div v-else class="instance-actions">
-          <RouterLink :to="`/@${session.me.username}`" class="button ghost small">我的主页</RouterLink>
-          <RouterLink to="/settings" class="button small">设置</RouterLink>
-        </div>
-      </section>
-
-      <section class="card">
-        <h3 class="card-title">关于</h3>
-        <ul class="link-list">
-          <li><RouterLink to="/explore">探索时间线</RouterLink></li>
-          <li><a :href="`/.well-known/nodeinfo`" target="_blank" rel="noopener">NodeInfo</a></li>
-          <li><a :href="`/.well-known/host-meta`" target="_blank" rel="noopener">HostMeta</a></li>
-        </ul>
-      </section>
-
-      <p class="side-foot muted small">Cinderfish · AGPL-3.0</p>
+    <aside class="widgets">
+      <slot name="widgets"><InstanceCard /></slot>
     </aside>
+
+    <MobileNav />
   </div>
 </template>
 
 <style scoped>
+/* Rail collapse is a pure media-query state: the full rail down to 1280px,
+   an icon-only rail below it. No resize listener, nothing to keep in sync
+   with the viewport in JS. */
 .account-chip {
   display: flex;
   align-items: center;
@@ -163,13 +143,76 @@ watch(
   text-align: center;
 }
 
-@media (max-width: 1080px) {
-  .account-name {
+/* Widget column container; the default content is the InstanceCard stack. */
+.widgets {
+  position: sticky;
+  top: 24px;
+  align-self: start;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+@media (max-width: 1279px) {
+  .shell {
+    grid-template-columns: 76px minmax(0, 1fr) var(--side-width);
+    gap: 20px;
+  }
+
+  .brand {
+    justify-content: center;
+    padding: 6px 0;
+  }
+
+  .brand-name,
+  .nav-label {
     display: none;
   }
+
+  .nav-link {
+    justify-content: center;
+    padding: 13px 0;
+  }
+
+  .rail-foot {
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    padding: 0;
+  }
+
   .account-chip {
     padding: 3px;
     border-radius: 50%;
+  }
+
+  .account-name {
+    display: none;
+  }
+}
+
+@media (max-width: 1099px) {
+  .shell {
+    grid-template-columns: 76px minmax(0, 1fr);
+  }
+
+  .widgets {
+    display: none;
+  }
+}
+
+@media (max-width: 720px) {
+  .shell {
+    display: block;
+    padding: 12px 12px calc(72px + env(safe-area-inset-bottom));
+  }
+
+  .rail {
+    display: none;
+  }
+
+  .main {
+    padding-bottom: 0;
   }
 }
 </style>
