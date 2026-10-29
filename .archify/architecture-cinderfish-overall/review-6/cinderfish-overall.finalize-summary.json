@@ -1,0 +1,67 @@
+{
+  "schemaVersion": 1,
+  "ok": false,
+  "command": "finalize",
+  "status": "skipped",
+  "type": "architecture",
+  "quality": "showcase",
+  "specification": {
+    "path": "/home/lainsaka/文档/MilnFish/.archify/architecture-cinderfish-overall/candidate.json",
+    "sha256": "52d0a43440c56f4996fcdcc975ba430cfbce4f373ae94f42fe1522086bb004e8",
+    "bytes": 8650
+  },
+  "artifact": {
+    "path": "/home/lainsaka/文档/MilnFish/.archify/architecture-cinderfish-overall/cinderfish-overall.html",
+    "sha256": "4e25a1d2158471ed2f24f02f39384e75fa3a374a05151774a4b06524efca02fe",
+    "bytes": 868627
+  },
+  "gates": {
+    "validate": "pass",
+    "deliver": "pass",
+    "check": "pass",
+    "browser-check": "skipped"
+  },
+  "failedStage": "browser-check",
+  "diagnostics": [
+    {
+      "code": "viewer/chrome-unavailable",
+      "severity": "warning",
+      "message": "No supported browser found. Install Chrome/Chromium (or Microsoft Edge), or set ARCHIFY_CHROME to its executable path.",
+      "subject": {
+        "artifact": "/home/lainsaka/文档/MilnFish/.archify/architecture-cinderfish-overall/cinderfish-overall.html"
+      },
+      "evidence": {
+        "executable": null
+      },
+      "supportedFixes": [
+        "set ARCHIFY_CHROME to a Chrome/Chromium executable (or Microsoft Edge) and rerun browser-check"
+      ]
+    }
+  ],
+  "diagnosticSummary": {
+    "total": 1,
+    "shown": 1,
+    "truncated": false
+  },
+  "evidence": {
+    "receipt": "/home/lainsaka/文档/MilnFish/.archify/architecture-cinderfish-overall/review-6/cinderfish-overall.finalize.json",
+    "summaryReceipt": "/home/lainsaka/文档/MilnFish/.archify/architecture-cinderfish-overall/review-6/cinderfish-overall.finalize-summary.json",
+    "browserCheckReceipt": "/home/lainsaka/文档/MilnFish/.archify/architecture-cinderfish-overall/review-6/cinderfish-overall.browser-check.json"
+  },
+  "update": {
+    "status": "current",
+    "installedVersion": "3.2.0",
+    "availableVersion": "3.2.0",
+    "releaseNotes": null,
+    "checkedAt": "2026-10-28T11:36:52.218Z",
+    "source": "cache",
+    "noticeRequired": false,
+    "noticeText": null
+  },
+  "visualReview": "not-requested",
+  "durationMs": 709,
+  "browserCheck": {
+    "requested": true,
+    "ran": false
+  }
+}

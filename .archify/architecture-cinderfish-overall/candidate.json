@@ -10,7 +10,7 @@
       "url": "https://github.com/Aurorainic/Cinderfish.git",
       "provider": "github",
       "link_mode": "web",
-      "revision": "aeb3025e7638deda34dcd1fc22a2861748cad686"
+      "revision": "60b860c3d8d2f23b8a87d30b03aa92edf2261e84"
     }
   },
   "components": [
@@ -40,7 +40,7 @@
       "sources": [
         { "path": "web/src/layouts/AppShell.vue", "line": 1, "end_line": 40, "label": "应用外壳与导航" },
         { "path": "web/src/api/client.ts", "line": 99, "end_line": 160, "label": "类型化 API 客户端" },
-        { "path": "web/src/stores/session.ts", "line": 8, "end_line": 44, "label": "会话与 token" }
+        { "path": "web/src/lib/mfm.ts", "line": 1, "end_line": 30, "label": "MFM 安全渲染" }
       ]
     },
     {
@@ -217,7 +217,7 @@
       "title": "当前状态",
       "items": [
         "M1–M5 已完成：骨架、账户、笔记、Streaming、ActivityPub 联邦",
-        "M6 进行中：外壳、SPA 托管、类型化 API 客户端与登录/注册已完成",
+        "M6 进行中：时间线、发帖、MFM 渲染、反应与笔记详情已完成",
         "单个 Go 二进制内嵌迁移脚本，启动时自动升级到 v4"
       ]
     },
