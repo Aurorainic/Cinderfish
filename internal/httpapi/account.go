@@ -82,6 +82,7 @@ func (s *Server) handleSignup(w http.ResponseWriter, r *http.Request) {
 	}
 
 	packed := packMeDetailed(user, user.CreatedAt, true)
+	s.applyUserCounts(r.Context(), user.ID, packed)
 	packed["token"] = token
 	writeJSON(w, http.StatusOK, packed)
 }
@@ -194,7 +195,9 @@ func (s *Server) handleI(w http.ResponseWriter, r *http.Request) {
 
 	// Misskey only includes secrets for native-token requests.
 	includeSecrets := info.Token == nil
-	writeJSON(w, http.StatusOK, packMeDetailed(info.User, info.User.CreatedAt, includeSecrets))
+	packed := packMeDetailed(info.User, info.User.CreatedAt, includeSecrets)
+	s.applyUserCounts(r.Context(), info.User.ID, packed)
+	writeJSON(w, http.StatusOK, packed)
 }
 
 // handleUsersShow implements POST /api/users/show.
@@ -247,7 +250,9 @@ func (s *Server) handleUsersShow(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, packUserDetailed(user, user.CreatedAt, false))
+	packed := packUserDetailed(user, user.CreatedAt, false)
+	s.applyUserCounts(r.Context(), user.ID, packed)
+	writeJSON(w, http.StatusOK, packed)
 }
 
 // handleMiAuthGenToken implements POST /api/miauth/gen-token: it issues a

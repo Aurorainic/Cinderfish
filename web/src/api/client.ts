@@ -117,6 +117,14 @@ export const api = {
   usersShow: (params: { userId?: string; username?: string; host?: string }) =>
     post<UserDetailed>("/api/users/show", params, false),
 
+  usersNotes: (params: {
+    userId?: string;
+    username?: string;
+    limit?: number;
+    sinceId?: string;
+    untilId?: string;
+  }) => post<Note[]>("/api/users/notes", params as Record<string, unknown>, false),
+
   createNote: (params: {
     text?: string;
     cw?: string | null;

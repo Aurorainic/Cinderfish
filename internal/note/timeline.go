@@ -221,9 +221,7 @@ func (s *TimelineService) UserNotes(ctx context.Context, userID string, limit in
 	q := &queryBuilder{}
 	q.add("n.user_id = %s", userID)
 	q.add("n.user_host IS NULL")
-	q.add("n.deleted_at IS NULL", nil)
-	q.add("n.local_only = FALSE", nil)
-	q.add("n.visibility IN ('public','home')", nil)
+	q.conds = append(q.conds, "n.deleted_at IS NULL", "n.local_only = FALSE", "n.visibility IN ('public','home')")
 	if sinceID != "" {
 		q.add("n.id > %s", sinceID)
 	}
