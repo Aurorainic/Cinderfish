@@ -10,7 +10,7 @@
       "url": "https://github.com/Aurorainic/Cinderfish.git",
       "provider": "github",
       "link_mode": "web",
-      "revision": "998abde9d0845aa3c8e3524f448d89414a0cee3b"
+      "revision": "aeb3025e7638deda34dcd1fc22a2861748cad686"
     }
   },
   "components": [
@@ -38,9 +38,9 @@
       "pos": [40, 40],
       "size": [180, 64],
       "sources": [
-        { "path": "web/src/layouts/AppShell.vue", "line": 1, "end_line": 20, "label": "应用外壳与导航" },
-        { "path": "web/src/router/index.ts", "line": 1, "end_line": 19, "label": "SPA 路由" },
-        { "path": "internal/httpapi/web.go", "line": 42, "end_line": 59, "label": "静态托管与 SPA fallback" }
+        { "path": "web/src/layouts/AppShell.vue", "line": 1, "end_line": 40, "label": "应用外壳与导航" },
+        { "path": "web/src/api/client.ts", "line": 99, "end_line": 160, "label": "类型化 API 客户端" },
+        { "path": "web/src/stores/session.ts", "line": 8, "end_line": 44, "label": "会话与 token" }
       ]
     },
     {
@@ -217,7 +217,7 @@
       "title": "当前状态",
       "items": [
         "M1–M5 已完成：骨架、账户、笔记、Streaming、ActivityPub 联邦",
-        "M6 进行中：Vue 外壳、主题与 SPA 托管已就绪，页面正在接 API",
+        "M6 进行中：外壳、SPA 托管、类型化 API 客户端与登录/注册已完成",
         "单个 Go 二进制内嵌迁移脚本，启动时自动升级到 v4"
       ]
     },

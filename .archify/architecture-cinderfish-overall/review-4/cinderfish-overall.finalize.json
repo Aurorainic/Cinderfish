@@ -1,0 +1,127 @@
+{
+  "schemaVersion": 1,
+  "ok": false,
+  "command": "finalize",
+  "status": "fail",
+  "type": "architecture",
+  "quality": "showcase",
+  "startedAt": "2026-10-29T09:05:33.974Z",
+  "specification": {
+    "path": "/home/lainsaka/文档/MilnFish/.archify/architecture-cinderfish-overall/candidate.json",
+    "sha256": "311f4a90562bbe0669c397745b5ab85feca56a21d835f56ba5619d72a74a7791",
+    "bytes": 8778
+  },
+  "artifact": {
+    "path": "/home/lainsaka/文档/MilnFish/.archify/architecture-cinderfish-overall/cinderfish-overall.html",
+    "sha256": "d65018b8de431012908e5cbc6046c96135e80308152b871f4086befcf41c891e",
+    "bytes": 868638
+  },
+  "stages": {
+    "validate": {
+      "status": "fail",
+      "exitCode": 1,
+      "durationMs": null,
+      "command": [
+        "/home/lainsaka/.nvm/versions/node/v24.22.1/bin/node",
+        "/home/lainsaka/.agents/skills/archify/bin/archify.mjs",
+        "deliver",
+        "architecture",
+        "/home/lainsaka/文档/MilnFish/.archify/architecture-cinderfish-overall/candidate.json",
+        "/home/lainsaka/文档/MilnFish/.archify/architecture-cinderfish-overall/cinderfish-overall.html",
+        "--quality",
+        "showcase",
+        "--repo-root",
+        "/home/lainsaka/文档/MilnFish",
+        "--json"
+      ],
+      "receipt": {
+        "schemaVersion": 1,
+        "ok": false,
+        "command": "deliver",
+        "receiptId": "87d05b85-9ebe-4731-9f9d-fba559457ad6",
+        "stage": "render",
+        "type": "architecture",
+        "input": "/home/lainsaka/文档/MilnFish/.archify/architecture-cinderfish-overall/candidate.json",
+        "output": "/home/lainsaka/文档/MilnFish/.archify/architecture-cinderfish-overall/cinderfish-overall.html",
+        "error": "architecture schema validation failed:\n  /components/2/sources (id/label: \"web\") must NOT have more than 3 items {\"limit\":3}",
+        "diagnostics": [
+          {
+            "code": "schema/maxItems",
+            "severity": "error",
+            "message": "/components/2/sources (id/label: \"web\") must NOT have more than 3 items",
+            "subject": {
+              "diagramType": "architecture",
+              "path": "/components/2/sources",
+              "identity": "web"
+            },
+            "evidence": {
+              "keyword": "maxItems",
+              "limit": 3
+            },
+            "supportedFixes": [
+              "provide at most 3 item(s)"
+            ]
+          }
+        ],
+        "provenance": "failed",
+        "update": {
+          "status": "unavailable",
+          "installedVersion": null,
+          "availableVersion": null,
+          "releaseNotes": null,
+          "checkedAt": null,
+          "source": null,
+          "noticeRequired": false,
+          "noticeText": null,
+          "reason": "disabled"
+        }
+      },
+      "execution": "embedded-in-deliver"
+    },
+    "deliver": {
+      "status": "not-run",
+      "execution": "blocked-by-validate"
+    }
+  },
+  "browserCheck": {
+    "requested": true,
+    "ran": false
+  },
+  "diagnostics": [
+    {
+      "code": "schema/maxItems",
+      "severity": "error",
+      "message": "/components/2/sources (id/label: \"web\") must NOT have more than 3 items",
+      "subject": {
+        "diagramType": "architecture",
+        "path": "/components/2/sources",
+        "identity": "web"
+      },
+      "evidence": {
+        "keyword": "maxItems",
+        "limit": 3
+      },
+      "supportedFixes": [
+        "provide at most 3 item(s)"
+      ]
+    }
+  ],
+  "evidence": {
+    "receipt": "/home/lainsaka/文档/MilnFish/.archify/architecture-cinderfish-overall/review-4/cinderfish-overall.finalize.json",
+    "summaryReceipt": "/home/lainsaka/文档/MilnFish/.archify/architecture-cinderfish-overall/review-4/cinderfish-overall.finalize-summary.json"
+  },
+  "visualReview": "not-requested",
+  "failedStage": "validate",
+  "finishedAt": "2026-10-29T09:05:34.169Z",
+  "durationMs": 194,
+  "update": {
+    "status": "current",
+    "installedVersion": "3.2.0",
+    "availableVersion": "3.2.0",
+    "releaseNotes": null,
+    "checkedAt": "2026-10-28T11:36:52.218Z",
+    "source": "cache",
+    "noticeRequired": false,
+    "noticeText": null
+  }
+}

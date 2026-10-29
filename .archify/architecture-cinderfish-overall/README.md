@@ -2,7 +2,7 @@
 
 - 产出：`cinderfish-overall.html`
 - 源：`candidate.json`（Archify architecture schema v1）
-- 绘制时基线：`998abde`（M6 前端脚手架与静态托管之后）
+- 绘制时基线：`aeb3025`（M6 API 客户端与登录/注册之后）
 - 画布：1040×812，宽画布契约不触发（宽度低于 1240）
 
 ## 目录命名

@@ -1,0 +1,470 @@
+{
+  "schemaVersion": 1,
+  "ok": false,
+  "command": "finalize",
+  "status": "skipped",
+  "type": "architecture",
+  "quality": "showcase",
+  "startedAt": "2026-10-29T09:05:44.518Z",
+  "specification": {
+    "path": "/home/lainsaka/文档/MilnFish/.archify/architecture-cinderfish-overall/candidate.json",
+    "sha256": "3d6316dbbbe5f789d6a81a019f6145f6dcd1d3ba23fb59985f0b01e8baad6dab",
+    "bytes": 8662
+  },
+  "artifact": {
+    "path": "/home/lainsaka/文档/MilnFish/.archify/architecture-cinderfish-overall/cinderfish-overall.html",
+    "sha256": "e6bafd0251739935066c872e9459e77a8c26cd46a5064f8cf3aca1873ac4ea74",
+    "bytes": 868646
+  },
+  "stages": {
+    "validate": {
+      "status": "pass",
+      "exitCode": 0,
+      "durationMs": null,
+      "execution": "embedded-in-deliver",
+      "command": [
+        "/home/lainsaka/.nvm/versions/node/v24.22.1/bin/node",
+        "/home/lainsaka/.agents/skills/archify/bin/archify.mjs",
+        "deliver",
+        "architecture",
+        "/home/lainsaka/文档/MilnFish/.archify/architecture-cinderfish-overall/candidate.json",
+        "/home/lainsaka/文档/MilnFish/.archify/architecture-cinderfish-overall/cinderfish-overall.html",
+        "--quality",
+        "showcase",
+        "--repo-root",
+        "/home/lainsaka/文档/MilnFish",
+        "--json"
+      ],
+      "receipt": {
+        "schemaVersion": 1,
+        "ok": true,
+        "command": "validate",
+        "specification": {
+          "sha256": "3d6316dbbbe5f789d6a81a019f6145f6dcd1d3ba23fb59985f0b01e8baad6dab",
+          "bytes": 8662
+        },
+        "validation": {
+          "checksPassed": 9,
+          "checkCount": 9,
+          "compositionProfile": "showcase",
+          "compositionStatus": "pass",
+          "errors": 0,
+          "warnings": 0
+        }
+      }
+    },
+    "deliver": {
+      "status": "pass",
+      "exitCode": 0,
+      "durationMs": 442,
+      "command": [
+        "/home/lainsaka/.nvm/versions/node/v24.22.1/bin/node",
+        "/home/lainsaka/.agents/skills/archify/bin/archify.mjs",
+        "deliver",
+        "architecture",
+        "/home/lainsaka/文档/MilnFish/.archify/architecture-cinderfish-overall/candidate.json",
+        "/home/lainsaka/文档/MilnFish/.archify/architecture-cinderfish-overall/cinderfish-overall.html",
+        "--quality",
+        "showcase",
+        "--repo-root",
+        "/home/lainsaka/文档/MilnFish",
+        "--json"
+      ],
+      "receipt": {
+        "schemaVersion": 1,
+        "receiptId": "6a75478d-9b00-4761-8420-86536c3c8a88",
+        "ok": true,
+        "command": "deliver",
+        "type": "architecture",
+        "input": "/home/lainsaka/文档/MilnFish/.archify/architecture-cinderfish-overall/candidate.json",
+        "output": "/home/lainsaka/文档/MilnFish/.archify/architecture-cinderfish-overall/cinderfish-overall.html",
+        "specification": {
+          "sha256": "3d6316dbbbe5f789d6a81a019f6145f6dcd1d3ba23fb59985f0b01e8baad6dab",
+          "bytes": 8662
+        },
+        "artifact": {
+          "sha256": "e6bafd0251739935066c872e9459e77a8c26cd46a5064f8cf3aca1873ac4ea74",
+          "bytes": 868646
+        },
+        "validation": {
+          "checksPassed": 9,
+          "checkCount": 9,
+          "compositionProfile": "showcase",
+          "compositionStatus": "pass",
+          "errors": 0,
+          "warnings": 0
+        },
+        "evidence": {
+          "verified": true,
+          "repository": "https://github.com/Aurorainic/Cinderfish",
+          "revision": "aeb3025e7638deda34dcd1fc22a2861748cad686",
+          "references": 22
+        },
+        "update": {
+          "status": "unavailable",
+          "installedVersion": null,
+          "availableVersion": null,
+          "releaseNotes": null,
+          "checkedAt": null,
+          "source": null,
+          "noticeRequired": false,
+          "noticeText": null,
+          "reason": "disabled"
+        }
+      }
+    },
+    "check": {
+      "status": "pass",
+      "exitCode": 0,
+      "durationMs": 151,
+      "command": [
+        "/home/lainsaka/.nvm/versions/node/v24.22.1/bin/node",
+        "/home/lainsaka/.agents/skills/archify/bin/archify.mjs",
+        "check",
+        "/home/lainsaka/文档/MilnFish/.archify/architecture-cinderfish-overall/cinderfish-overall.html",
+        "--require-provenance"
+      ],
+      "receipt": {
+        "ok": true,
+        "file": "/home/lainsaka/文档/MilnFish/.archify/architecture-cinderfish-overall/cinderfish-overall.html",
+        "artifact": {
+          "sha256": "e6bafd0251739935066c872e9459e77a8c26cd46a5064f8cf3aca1873ac4ea74",
+          "bytes": 868646
+        },
+        "checks": [
+          {
+            "name": "single_svg",
+            "ok": true,
+            "details": [
+              "found 1 <svg> block(s)"
+            ]
+          },
+          {
+            "name": "finite_svg",
+            "ok": true,
+            "details": []
+          },
+          {
+            "name": "orthogonal_arrows",
+            "ok": true,
+            "details": []
+          },
+          {
+            "name": "label_route_clearance",
+            "ok": true,
+            "details": []
+          },
+          {
+            "name": "relationship_crossings",
+            "ok": true,
+            "details": []
+          },
+          {
+            "name": "relationship_corridors",
+            "ok": true,
+            "details": []
+          },
+          {
+            "name": "container_border_runs",
+            "ok": true,
+            "details": []
+          },
+          {
+            "name": "route_rhythm",
+            "ok": true,
+            "details": []
+          },
+          {
+            "name": "legend_clearance",
+            "ok": true,
+            "details": []
+          }
+        ],
+        "composition": {
+          "schemaVersion": 1,
+          "profile": "showcase",
+          "status": "pass",
+          "summary": {
+            "errors": 0,
+            "warnings": 0
+          },
+          "metrics": {
+            "properCrossings": 0,
+            "resolvedCrossovers": 3,
+            "ambiguousCorridors": 0,
+            "arrowheadCollisions": 0,
+            "containerBorderRuns": 0,
+            "labelRouteClearanceIssues": 0,
+            "labelCanvasOverflowIssues": 0,
+            "minLabelRouteClearance": 4,
+            "desktopReadabilityIssues": 0,
+            "viewportHeightIssues": 0,
+            "minProjectedNodeTextPx": 7.153846153846154,
+            "maxBends": 4,
+            "routesOverSuggestedBends": 2,
+            "maxStretch": 1,
+            "routesOverSuggestedStretch": 0,
+            "minSegmentPx": 22,
+            "minInteriorSegmentPx": 34.9,
+            "shortSegmentCount": 0,
+            "shortEndpointSegmentCount": 0,
+            "shortInteriorSegmentCount": 0,
+            "microSegmentCount": 0
+          },
+          "suggestedLimits": {
+            "bendsPerRelationship": 2,
+            "stretch": 1.35,
+            "segmentPx": 16,
+            "microSegmentPx": 8
+          },
+          "routeReview": {
+            "crossings": [
+              {
+                "left": {
+                  "from": "httpapi",
+                  "to": "account",
+                  "label": "注册 / 登录",
+                  "collectionIndex": 5,
+                  "artifactIndex": 6
+                },
+                "right": {
+                  "from": "httpapi",
+                  "to": "streaming",
+                  "label": "WS 升级",
+                  "collectionIndex": 7,
+                  "artifactIndex": 8
+                },
+                "point": [
+                  429.7772727272664,
+                  296
+                ],
+                "sharedNode": "httpapi"
+              },
+              {
+                "left": {
+                  "from": "httpapi",
+                  "to": "note",
+                  "label": "笔记 / 时间线",
+                  "collectionIndex": 6,
+                  "artifactIndex": 7
+                },
+                "right": {
+                  "from": "httpapi",
+                  "to": "streaming",
+                  "label": "WS 升级",
+                  "collectionIndex": 7,
+                  "artifactIndex": 8
+                },
+                "point": [
+                  536,
+                  291.99999999999994
+                ],
+                "sharedNode": "httpapi"
+              },
+              {
+                "left": {
+                  "from": "httpapi",
+                  "to": "streaming",
+                  "label": "WS 升级",
+                  "collectionIndex": 7,
+                  "artifactIndex": 8
+                },
+                "right": {
+                  "from": "federation",
+                  "to": "note",
+                  "label": "远程对象 / 提及",
+                  "collectionIndex": 11,
+                  "artifactIndex": 12
+                },
+                "point": [
+                  528,
+                  292
+                ]
+              }
+            ],
+            "detours": [
+              {
+                "relationship": {
+                  "from": "httpapi",
+                  "to": "account",
+                  "label": "注册 / 登录",
+                  "collectionIndex": 5,
+                  "artifactIndex": 6
+                },
+                "bends": 4,
+                "stretch": 1
+              },
+              {
+                "relationship": {
+                  "from": "federation",
+                  "to": "note",
+                  "label": "远程对象 / 提及",
+                  "collectionIndex": 11,
+                  "artifactIndex": 12
+                },
+                "bends": 4,
+                "stretch": 1
+              }
+            ]
+          },
+          "leadingSpace": {
+            "measured": true,
+            "emptyTopPx": 10,
+            "emptyTopRatio": 0.012,
+            "occupiedTop": 10,
+            "viewBoxTop": 0,
+            "canvasHeight": 812,
+            "typicalNodeHeight": 64,
+            "reviewSuggested": false
+          },
+          "desktopReadability": {
+            "budgetBasis": "legacy-930",
+            "readerContract": "declared-wide-v1",
+            "availableDiagramWidth": 930,
+            "actualBudgetPx": 930,
+            "limit": "legacy",
+            "requestedTargetPx": 7.5,
+            "requestedTargetMet": false,
+            "hardFloorPx": 6,
+            "hardFloorMet": true,
+            "minimumOwner": {
+              "kind": "edge",
+              "id": null,
+              "from": "client",
+              "to": "web"
+            },
+            "minimumSourceTextPx": 8,
+            "minimumProjectedTextPx": 7.153846153846154,
+            "semanticTextCount": 48
+          },
+          "issues": []
+        },
+        "provenance": "current",
+        "deliveryReceiptId": "6a75478d-9b00-4761-8420-86536c3c8a88"
+      }
+    },
+    "browser-check": {
+      "status": "skipped",
+      "exitCode": 2,
+      "durationMs": 18,
+      "command": [
+        "/home/lainsaka/.nvm/versions/node/v24.22.1/bin/node",
+        "/home/lainsaka/.agents/skills/archify/bin/archify.mjs",
+        "browser-check",
+        "/home/lainsaka/文档/MilnFish/.archify/architecture-cinderfish-overall/cinderfish-overall.html",
+        "--json",
+        "--require-provenance",
+        "--out-dir",
+        "/home/lainsaka/文档/MilnFish/.archify/architecture-cinderfish-overall/review-5"
+      ],
+      "execution": "in-process",
+      "receipt": {
+        "schemaVersion": 1,
+        "ok": false,
+        "command": "browser-check",
+        "evidenceKind": "automated-browser",
+        "status": "skipped",
+        "visualReview": "not-requested",
+        "provenance": "current",
+        "deliveryReceiptId": "6a75478d-9b00-4761-8420-86536c3c8a88",
+        "artifact": {
+          "path": "/home/lainsaka/文档/MilnFish/.archify/architecture-cinderfish-overall/cinderfish-overall.html",
+          "sha256": "e6bafd0251739935066c872e9459e77a8c26cd46a5064f8cf3aca1873ac4ea74",
+          "bytes": 868646
+        },
+        "state": {
+          "detail": "read",
+          "motion": "still"
+        },
+        "chrome": {
+          "status": "unavailable",
+          "executable": null
+        },
+        "diagnostics": [
+          {
+            "code": "viewer/chrome-unavailable",
+            "severity": "warning",
+            "message": "No supported browser found. Install Chrome/Chromium (or Microsoft Edge), or set ARCHIFY_CHROME to its executable path.",
+            "subject": {
+              "artifact": "/home/lainsaka/文档/MilnFish/.archify/architecture-cinderfish-overall/cinderfish-overall.html"
+            },
+            "evidence": {
+              "executable": null
+            },
+            "supportedFixes": [
+              "set ARCHIFY_CHROME to a Chrome/Chromium executable (or Microsoft Edge) and rerun browser-check"
+            ]
+          }
+        ],
+        "containment": {
+          "status": "skipped",
+          "policy": "fit-or-reader-declared-readable-vertical-scroll",
+          "viewports": []
+        },
+        "themeStates": {
+          "status": "skipped",
+          "viewports": []
+        },
+        "readability": {
+          "status": "skipped",
+          "minimumProjectedNodeTextPx": 6,
+          "viewports": []
+        },
+        "viewerChrome": {
+          "status": "skipped",
+          "viewports": []
+        },
+        "captures": {
+          "status": "not-requested",
+          "screenshots": [],
+          "contactSheet": null
+        },
+        "sidecars": {
+          "directory": "/home/lainsaka/文档/MilnFish/.archify/architecture-cinderfish-overall/review-5",
+          "receipt": "cinderfish-overall.browser-check.json",
+          "files": []
+        },
+        "error": "No supported browser found. Install Chrome/Chromium (or Microsoft Edge), or set ARCHIFY_CHROME to its executable path."
+      }
+    }
+  },
+  "browserCheck": {
+    "requested": true,
+    "ran": false
+  },
+  "diagnostics": [
+    {
+      "code": "viewer/chrome-unavailable",
+      "severity": "warning",
+      "message": "No supported browser found. Install Chrome/Chromium (or Microsoft Edge), or set ARCHIFY_CHROME to its executable path.",
+      "subject": {
+        "artifact": "/home/lainsaka/文档/MilnFish/.archify/architecture-cinderfish-overall/cinderfish-overall.html"
+      },
+      "evidence": {
+        "executable": null
+      },
+      "supportedFixes": [
+        "set ARCHIFY_CHROME to a Chrome/Chromium executable (or Microsoft Edge) and rerun browser-check"
+      ]
+    }
+  ],
+  "evidence": {
+    "receipt": "/home/lainsaka/文档/MilnFish/.archify/architecture-cinderfish-overall/review-5/cinderfish-overall.finalize.json",
+    "summaryReceipt": "/home/lainsaka/文档/MilnFish/.archify/architecture-cinderfish-overall/review-5/cinderfish-overall.finalize-summary.json",
+    "browserCheckReceipt": "/home/lainsaka/文档/MilnFish/.archify/architecture-cinderfish-overall/review-5/cinderfish-overall.browser-check.json"
+  },
+  "visualReview": "not-requested",
+  "failedStage": "browser-check",
+  "finishedAt": "2026-10-29T09:05:45.224Z",
+  "durationMs": 706,
+  "update": {
+    "status": "current",
+    "installedVersion": "3.2.0",
+    "availableVersion": "3.2.0",
+    "releaseNotes": null,
+    "checkedAt": "2026-10-28T11:36:52.218Z",
+    "source": "cache",
+    "noticeRequired": false,
+    "noticeText": null
+  }
+}
