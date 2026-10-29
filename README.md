@@ -19,6 +19,12 @@ go build -o cinderfish ./cmd/cinderfish
 
 服务启动时自动执行数据库迁移（迁移脚本内嵌在二进制中）。
 
+媒体在 local 与 S3 之间迁移：
+
+```bash
+go run ./cmd/cinderfish-media-migrate --config config.toml --to s3 --dry-run
+```
+
 ## 当前进度
 
 | 里程碑 | 状态 |

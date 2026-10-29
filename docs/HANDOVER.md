@@ -95,6 +95,21 @@ go build -o cinderfish ./cmd/cinderfish
 
 数据库测试包（`internal/account`、`internal/httpapi`）都会 TRUNCATE 同一批表，因此每个包用 `internal/testdb` 在 `TestMain` 里持有 PostgreSQL advisory lock，直到该包的测试二进制退出——这样 `go test ./...` 并行跑包时不会互相清表（不加锁时会随机出现"找不到用户"之类的假失败）。
 
+### 7.1 媒体后端迁移
+
+`cmd/cinderfish-media-migrate` 把 `drive_files` 里的对象从当前 `[media]` 配置的后端搬到另一个后端；对象 key（内容哈希）不变，只更新行的 `storage_backend`，笔记里的链接因此不需要改写。
+
+```bash
+# 本地 → S3（S3 参数取自 config.toml 的 [media.s3]）
+go run ./cmd/cinderfish-media-migrate --config config.toml --to s3 --dry-run
+go run ./cmd/cinderfish-media-migrate --config config.toml --to s3 --delete-source
+
+# S3 → 本地
+go run ./cmd/cinderfish-media-migrate --config config.toml --to local --to-local-path ./data/files
+```
+
+`--dry-run` 只统计；`--limit N` 限制条数；单个对象失败不会中断其余，报告会列出失败 key，退出码为 1。`--delete-source` 只在整轮无失败时清理源对象。迁移完成后把 `config.toml` 的 `media.backend` 切到新后端再重启。
+
 配置项可用 `CINDERFISH_*` 环境变量覆盖，如 `CINDERFISH_PORT`、`CINDERFISH_DOMAIN`、`CINDERFISH_REGISTRATION_MODE`、`CINDERFISH_FEDERATION_MODE`、`CINDERFISH_MEDIA_BACKEND`、`CINDERFISH_MEDIA_LOCAL_PATH`、`CINDERFISH_WEB_DIR`。
 
 ## 8. 代码结构
