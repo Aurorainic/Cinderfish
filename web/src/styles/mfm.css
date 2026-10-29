@@ -1,0 +1,185 @@
+/* MFM function styles. Every animation defined here must also appear in the
+   prefers-reduced-motion guard at the bottom of this file. */
+
+.mfm-x2 {
+  font-size: 200%;
+}
+.mfm-x3 {
+  font-size: 300%;
+}
+.mfm-x4 {
+  font-size: 400%;
+}
+
+.mfm-center {
+  display: block;
+  text-align: center;
+}
+
+.mfm-small {
+  font-size: 0.8em;
+  opacity: 0.7;
+}
+
+.mfm-blur {
+  filter: blur(6px);
+  color: transparent;
+}
+
+.mfm-mono {
+  font-family: ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas,
+    monospace;
+}
+
+.mfm-serif {
+  font-family: "Noto Serif SC", Georgia, "Times New Roman", serif;
+}
+
+.mfm-plain {
+  /* $[plain] keeps its content untouched; nothing extra to apply. */
+}
+
+@keyframes mfm-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes mfm-spin-x {
+  from {
+    transform: rotateX(0deg);
+  }
+  to {
+    transform: rotateX(360deg);
+  }
+}
+
+@keyframes mfm-spin-y {
+  from {
+    transform: rotateY(0deg);
+  }
+  to {
+    transform: rotateY(360deg);
+  }
+}
+
+.mfm-spin {
+  display: inline-block;
+  animation: mfm-spin 1.5s linear infinite;
+}
+
+.mfm-spin--x {
+  animation-name: mfm-spin-x;
+}
+
+.mfm-spin--y {
+  animation-name: mfm-spin-y;
+}
+
+@keyframes mfm-shake {
+  0% {
+    transform: translate(0) rotate(0deg);
+  }
+  25% {
+    transform: translate(-1px, 0) rotate(-4deg);
+  }
+  50% {
+    transform: translate(1px, -1px) rotate(0deg);
+  }
+  75% {
+    transform: translate(0, 1px) rotate(4deg);
+  }
+  100% {
+    transform: translate(0) rotate(0deg);
+  }
+}
+
+.mfm-shake {
+  display: inline-block;
+  animation: mfm-shake 0.4s ease-in-out infinite;
+}
+
+@keyframes mfm-jump {
+  0% {
+    transform: translateY(0);
+  }
+  35% {
+    transform: translateY(-30%);
+  }
+  50% {
+    transform: translateY(0);
+  }
+  85% {
+    transform: translateY(-10%);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+
+.mfm-jump {
+  display: inline-block;
+  animation: mfm-jump 0.75s ease-in-out infinite;
+}
+
+@keyframes mfm-blink {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+.mfm-blink {
+  animation: mfm-blink 1s ease-in-out infinite;
+}
+
+@keyframes mfm-rainbow {
+  0% {
+    filter: hue-rotate(0deg);
+  }
+  14% {
+    filter: hue-rotate(51deg);
+  }
+  28% {
+    filter: hue-rotate(102deg);
+  }
+  42% {
+    filter: hue-rotate(154deg);
+  }
+  57% {
+    filter: hue-rotate(205deg);
+  }
+  71% {
+    filter: hue-rotate(256deg);
+  }
+  85% {
+    filter: hue-rotate(308deg);
+  }
+  100% {
+    filter: hue-rotate(360deg);
+  }
+}
+
+.mfm-rainbow {
+  animation: mfm-rainbow 12s linear infinite;
+}
+
+/* Motion-producing MFM functions switch off entirely for users who ask for
+   reduced motion; static effects (blur, colours, fonts) stay. */
+@media (prefers-reduced-motion: reduce) {
+  .mfm-spin,
+  .mfm-shake,
+  .mfm-jump,
+  .mfm-blink,
+  .mfm-rainbow {
+    animation: none;
+  }
+}

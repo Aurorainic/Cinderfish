@@ -2,6 +2,7 @@ import { createApp } from "vue";
 import App from "./App.vue";
 import { router } from "./router";
 import "./styles/main.css";
+import "./styles/mfm.css";
 
 // Resolve the theme before the first paint so the shell does not flash.
 const stored = localStorage.getItem("cinderfish.theme");
