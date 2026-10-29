@@ -224,6 +224,7 @@ web/src/views/       Timeline、Note、Notifications、Profile、Explore、Setti
 默认关闭，PostgreSQL 仍是唯一必选依赖。开启后：
 
 - Streaming 的跨进程中继从 `LISTEN/NOTIFY` 换成 Redis Pub/Sub（频道 `<prefix>:stream`），不再受 8000 字节 NOTIFY 上限约束，也不再需要分块重组。
+- 联邦投递队列仍是 PostgreSQL 表；入队时通过 `<prefix>:deliver` 发布一次唤醒，本进程与其它进程的 worker 立刻检查队列，而不是等 2 秒轮询。唤醒只是提示，丢一次最多晚一个轮询周期。
 - 启用后启动时会 `PING`，连不上直接退出——避免两个进程对"用哪种中继"产生分歧。
 - 关闭时行为与之前完全一致；Redis 与 PostgreSQL 两种中继不能同时挂在同一个进程上。
 

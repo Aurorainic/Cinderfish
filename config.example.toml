@@ -23,7 +23,8 @@ federation_mode = "none"
 web_dir = "./web/dist"
 
 # Optional Redis: PostgreSQL stays the source of truth. Redis pub/sub
-# carries Streaming events between processes of one instance.
+# carries Streaming events and delivery wakeups between processes of one
+# instance.
 [redis]
 enabled = false
 url = "redis://127.0.0.1:6379/0"

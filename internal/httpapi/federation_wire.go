@@ -126,6 +126,10 @@ func (s *Server) RenderActorTest(ctx context.Context, userID string) (federation
 // arrange rows the API cannot create yet.
 func (s *Server) TestPool() *pgxpool.Pool { return s.pool }
 
+// Deliverer returns the outbound delivery worker, or nil when federation
+// is not attached.
+func (s *Server) Deliverer() *federation.Deliverer { return s.federationDeliver }
+
 // Federation exposes the federation dependencies, mainly for tests.
 func (s *Server) Federation() (*federation.Policy, *federation.Store, *federation.Inbox, *federation.Deliverer) {
 	return s.federationPolicy, s.federationStore, s.federationInbox, s.federationDeliver

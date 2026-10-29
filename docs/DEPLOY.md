@@ -210,9 +210,11 @@ prefix = "cinderfish"
 ```
 
 - 开启后 Redis 只做 Pub/Sub，不存业务数据；PostgreSQL 仍是唯一事实来源，Redis 丢消息最多丢一次实时推送，历史数据不受影响。
+- 频道有两个：`<prefix>:stream` 承载 Streaming 事件，`<prefix>:deliver` 唤醒联邦投递 worker。投递队列本身仍在 `deliver_queue` 表里，唤醒丢失只会让下一次轮询晚 2 秒。
 - 启动时会 `PING`，连不上直接失败，不会静默退回 PostgreSQL 中继。
 - 多实例共用一个 Redis 库时用不同的 `prefix`。
 - Redis 建议只监听本机或内网，并设置 `requirepass`；URL 写成 `redis://:密码@127.0.0.1:6379/0`。
+- 投递 worker 仍是"每实例一个"的设计；Redis 唤醒只是降低延迟，不会让多个进程安全地重复消费同一批投递。
 - 至少保留 `maxmemory-policy noeviction`：Pub/Sub 不占内存，但同库里的其它数据不应被误逐出。
 
 systemd 里可以用环境变量覆盖：

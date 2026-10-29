@@ -26,6 +26,17 @@ type Deliverer struct {
 	MaxAttempts int
 	// PollInterval is how often an idle worker checks the queue.
 	PollInterval time.Duration
+
+	// wake nudges a sleeping worker after this process enqueues work.
+	wake chan struct{}
+	// waker notifies workers in other processes when Redis is enabled.
+	waker WakeNotifier
+}
+
+// WakeNotifier publishes a wakeup so workers in other processes poll the
+// queue now instead of at the next tick. It is optional.
+type WakeNotifier interface {
+	NotifyDelivery(ctx context.Context) error
 }
 
 // Delivery is one queued delivery.
@@ -48,6 +59,7 @@ func NewDeliverer(pool *pgxpool.Pool, store *Store, client *Client, policy *Poli
 		policy:       policy,
 		MaxAttempts:  12,
 		PollInterval: 2 * time.Second,
+		wake:         make(chan struct{}, 1),
 	}
 }
 
@@ -70,7 +82,30 @@ VALUES ($1,$2,$3,$4,$5)
 	`, payload, inboxURL, nullIfEmpty(activityID), nullIfEmpty(keyID), nullIfEmpty(userID)); err != nil {
 		return fmt.Errorf("federation: enqueue delivery: %w", err)
 	}
+
+	d.Wake()
+	if d.waker != nil {
+		ctx := context.Background()
+		go func() {
+			if err := d.waker.NotifyDelivery(ctx); err != nil {
+				logf("federation: delivery wakeup failed: %v", err)
+			}
+		}()
+	}
 	return nil
+}
+
+// SetWakeNotifier installs the cross-process wakeup publisher. Without
+// one, a worker only wakes for work enqueued in its own process.
+func (d *Deliverer) SetWakeNotifier(n WakeNotifier) { d.waker = n }
+
+// Wake asks the worker to check the queue now. It never blocks: one
+// pending wakeup is enough.
+func (d *Deliverer) Wake() {
+	select {
+	case d.wake <- struct{}{}:
+	default:
+	}
 }
 
 // Pending returns up to limit deliveries that are due now.
@@ -99,7 +134,8 @@ LIMIT $2
 	return out, rows.Err()
 }
 
-// Run processes the queue until ctx is cancelled.
+// Run processes the queue until ctx is cancelled. It wakes every
+// PollInterval, and immediately when Wake is called.
 func (d *Deliverer) Run(ctx context.Context) {
 	ticker := time.NewTicker(d.PollInterval)
 	defer ticker.Stop()
@@ -110,6 +146,7 @@ func (d *Deliverer) Run(ctx context.Context) {
 		select {
 		case <-ctx.Done():
 			return
+		case <-d.wake:
 		case <-ticker.C:
 		}
 	}

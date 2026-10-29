@@ -18,6 +18,7 @@ import (
 
 	"github.com/Aurorainic/cinderfish/internal/config"
 	"github.com/Aurorainic/cinderfish/internal/db"
+	"github.com/Aurorainic/cinderfish/internal/federation"
 	"github.com/Aurorainic/cinderfish/internal/httpapi"
 	"github.com/Aurorainic/cinderfish/internal/media"
 	"github.com/Aurorainic/cinderfish/internal/streaming"
@@ -96,6 +97,17 @@ func main() {
 		log.Fatalf("cinderfish: %v", err)
 	}
 	api.StartFederationWorkers(notifyCtx)
+	if redisClient != nil {
+		if deliverer := api.Deliverer(); deliverer != nil {
+			deliverer.SetWakeNotifier(federation.NewRedisWake(redisClient, cfg.Redis.Prefix))
+			go func() {
+				if err := federation.ListenDeliveries(notifyCtx, redisClient, cfg.Redis.Prefix, deliverer.Wake, log.Printf); err != nil {
+					log.Printf("cinderfish: delivery wakeup listener: %v", err)
+				}
+			}()
+			log.Printf("cinderfish: delivery wakeups use Redis (prefix %q)", cfg.Redis.Prefix)
+		}
+	}
 	if mode := cfg.FederationMode; mode == "none" {
 		log.Printf("cinderfish: federation is off; AP routes answer 403")
 	}
