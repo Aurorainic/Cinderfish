@@ -40,6 +40,8 @@ func packUserDetailed(u *account.User, createdAt time.Time, isMe bool) map[strin
 	packed["bannerUrl"] = nil
 	packed["bannerBlurhash"] = nil
 	packed["isLocked"] = false
+	packed["isModerator"] = u.IsAdmin
+	packed["isAdmin"] = u.IsAdmin
 	packed["isSilenced"] = false
 	packed["isSuspended"] = u.IsSuspended
 	packed["description"] = nil

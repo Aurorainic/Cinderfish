@@ -29,6 +29,8 @@ export interface UserDetailed extends UserLite {
   isLocked: boolean;
   isSilenced: boolean;
   isSuspended: boolean;
+  isModerator?: boolean;
+  isAdmin?: boolean;
   description: string | null;
   location: string | null;
   birthday: string | null;

@@ -83,8 +83,6 @@ func (s *Service) Register(ctx context.Context, mode RegistrationMode, username,
 		return nil, "", &RegistrationError{Code: "INVALID_PASSWORD", Message: "Invalid password."}
 	}
 
-	lower := auth.NormalizeUsername(username)
-
 	switch mode {
 	case RegistrationAdmin:
 		return nil, "", &RegistrationError{
@@ -97,17 +95,36 @@ func (s *Service) Register(ctx context.Context, mode RegistrationMode, username,
 		}
 	}
 
-	exists, err := s.usernameExists(ctx, lower)
+	user, err := s.Create(ctx, username, password)
 	if err != nil {
 		return nil, "", err
 	}
+	return user, user.Token, nil
+}
+
+// Create makes a local account regardless of the registration mode. It is
+// what an administrator uses to add a user while self-service signup is
+// closed, which is the "admin" registration mode.
+func (s *Service) Create(ctx context.Context, username, password string) (*User, error) {
+	if err := auth.ValidateUsername(username); err != nil {
+		return nil, &RegistrationError{Code: "INVALID_USERNAME", Message: "Invalid username."}
+	}
+	if password == "" {
+		return nil, &RegistrationError{Code: "INVALID_PASSWORD", Message: "Invalid password."}
+	}
+
+	lower := auth.NormalizeUsername(username)
+	exists, err := s.usernameExists(ctx, lower)
+	if err != nil {
+		return nil, err
+	}
 	if exists {
-		return nil, "", ErrUsernameTaken
+		return nil, ErrUsernameTaken
 	}
 
 	hash, err := auth.HashPassword(password)
 	if err != nil {
-		return nil, "", err
+		return nil, err
 	}
 	token := auth.GenerateNativeToken()
 
@@ -122,7 +139,7 @@ func (s *Service) Register(ctx context.Context, mode RegistrationMode, username,
 
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
-		return nil, "", err
+		return nil, err
 	}
 	defer tx.Rollback(ctx)
 
@@ -131,19 +148,19 @@ INSERT INTO users (id, username, username_lower, password_hash, token)
 VALUES ($1, $2, $3, $4, $5)
 `, user.ID, user.Username, user.UsernameLower, user.PasswordHash, user.Token); err != nil {
 		if isUniqueViolation(err) {
-			return nil, "", ErrUsernameTaken
+			return nil, ErrUsernameTaken
 		}
-		return nil, "", fmt.Errorf("account: insert user: %w", err)
+		return nil, fmt.Errorf("account: insert user: %w", err)
 	}
 
 	if _, err := tx.Exec(ctx, `INSERT INTO user_profiles (user_id) VALUES ($1)`, user.ID); err != nil {
-		return nil, "", fmt.Errorf("account: insert profile: %w", err)
+		return nil, fmt.Errorf("account: insert profile: %w", err)
 	}
 
 	if err := tx.Commit(ctx); err != nil {
-		return nil, "", err
+		return nil, err
 	}
-	return user, token, nil
+	return user, nil
 }
 
 // claimInvite reserves an invitation ticket for use, marking it used.
@@ -266,6 +283,51 @@ func (s *Service) CountUsers(ctx context.Context) (int, error) {
 		return 0, fmt.Errorf("account: count users: %w", err)
 	}
 	return n, nil
+}
+
+// ListLocal returns local accounts for the administration page, oldest
+// first, with administrators at the front.
+func (s *Service) ListLocal(ctx context.Context, limit, offset int) ([]*User, error) {
+	if limit <= 0 || limit > 100 {
+		limit = 30
+	}
+	if offset < 0 {
+		offset = 0
+	}
+	rows, err := s.pool.Query(ctx, `
+SELECT id, username, username_lower, host, password_hash, COALESCE(token, ''),
+       is_admin, is_suspended, created_at
+FROM users WHERE host IS NULL
+ORDER BY is_admin DESC, created_at ASC
+LIMIT $1 OFFSET $2
+`, limit, offset)
+	if err != nil {
+		return nil, fmt.Errorf("account: list users: %w", err)
+	}
+	defer rows.Close()
+
+	out := []*User{}
+	for rows.Next() {
+		u, err := scanUser(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, u)
+	}
+	return out, rows.Err()
+}
+
+// SetSuspended blocks or restores a local account. A suspended account
+// cannot sign in or use its token.
+func (s *Service) SetSuspended(ctx context.Context, userID string, suspended bool) error {
+	ct, err := s.pool.Exec(ctx, `UPDATE users SET is_suspended = $1 WHERE id = $2`, suspended, userID)
+	if err != nil {
+		return fmt.Errorf("account: set suspended: %w", err)
+	}
+	if ct.RowsAffected() == 0 {
+		return ErrUserNotFound
+	}
+	return nil
 }
 
 func isUniqueViolation(err error) bool {

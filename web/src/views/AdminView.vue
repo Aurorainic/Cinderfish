@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
 import AppIcon from "../components/AppIcon.vue";
+import UserAvatar from "../components/UserAvatar.vue";
 import { api, ApiError } from "../api/client";
+import type { UserDetailed } from "../api/types";
 import { instance, loadInstance } from "../stores/instance";
 import { isAdmin, session } from "../stores/session";
 
@@ -143,6 +145,94 @@ async function removeHost(host: string) {
   }
 }
 
+// Account management. Rows are UserDetailed: isSuspended is present, but
+// isAdmin is not packed into the list, so read it defensively.
+const users = ref<UserDetailed[]>([]);
+const usersLoading = ref(true);
+const usersError = ref("");
+const usersNotice = ref<{ kind: "ok" | "bad"; text: string } | null>(null);
+const suspending = ref<string | null>(null);
+
+const newUsername = ref("");
+const newPassword = ref("");
+const creating = ref(false);
+const createNotice = ref<{ kind: "ok" | "bad"; text: string } | null>(null);
+
+function rowIsAdmin(row: UserDetailed): boolean {
+  return row.isAdmin === true;
+}
+
+function formatDate(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  return date.toLocaleDateString("zh-CN", { year: "numeric", month: "2-digit", day: "2-digit" });
+}
+
+async function loadUsers() {
+  usersLoading.value = true;
+  usersError.value = "";
+  try {
+    users.value = await api.adminShowUsers({ limit: 50 });
+  } catch (err) {
+    usersError.value = `用户列表加载失败：${messageOf(err)}`;
+    users.value = [];
+  } finally {
+    usersLoading.value = false;
+  }
+}
+
+async function toggleSuspend(row: UserDetailed) {
+  if (suspending.value !== null || row.id === session.me?.id) return;
+  const wasSuspended = row.isSuspended;
+  if (!wasSuspended) {
+    const ok = window.confirm(
+      `确定要停用 @${row.username} 吗？停用后该账号将无法登录，也无法发布内容。`,
+    );
+    if (!ok) return;
+  }
+  suspending.value = row.id;
+  usersNotice.value = null;
+  try {
+    if (wasSuspended) await api.adminUnsuspendUser(row.id);
+    else await api.adminSuspendUser(row.id);
+    row.isSuspended = !wasSuspended;
+    usersNotice.value = {
+      kind: "ok",
+      text: wasSuspended ? `已恢复 @${row.username}。` : `已停用 @${row.username}。`,
+    };
+  } catch (err) {
+    usersNotice.value = {
+      kind: "bad",
+      text: `${wasSuspended ? "恢复" : "停用"}失败：${messageOf(err)}`,
+    };
+  } finally {
+    suspending.value = null;
+  }
+}
+
+async function createAccount() {
+  if (creating.value) return;
+  createNotice.value = null;
+  const username = newUsername.value.trim();
+  const password = newPassword.value;
+  if (!username || !password) {
+    createNotice.value = { kind: "bad", text: "请填写用户名与密码。" };
+    return;
+  }
+  creating.value = true;
+  try {
+    const created = await api.adminCreateAccount(username, password);
+    users.value = [created, ...users.value];
+    newUsername.value = "";
+    newPassword.value = "";
+    createNotice.value = { kind: "ok", text: `已创建账号 @${created.username}。` };
+  } catch (err) {
+    createNotice.value = { kind: "bad", text: `创建失败：${messageOf(err)}` };
+  } finally {
+    creating.value = false;
+  }
+}
+
 let started = false;
 
 watch(
@@ -151,6 +241,7 @@ watch(
     if (!ready || !admin || started) return;
     started = true;
     void loadHosts();
+    void loadUsers();
   },
   { immediate: true },
 );
@@ -300,6 +391,105 @@ onMounted(() => {
       </p>
 
       <p class="hint format-hint">只填域名，不需要写协议或路径。</p>
+    </section>
+
+    <section class="card section">
+      <div class="section-head">
+        <h2>账号管理</h2>
+        <span v-if="users.length" class="count">{{ users.length }}</span>
+      </div>
+      <p class="muted small section-desc">
+        这里是本实例的本地账号。被停用的账号无法登录，也无法发布内容。
+      </p>
+
+      <form class="create-account" @submit.prevent="createAccount">
+        <label class="sr-only" for="new-username">新账号用户名</label>
+        <input
+          id="new-username"
+          v-model="newUsername"
+          class="input"
+          type="text"
+          placeholder="用户名"
+          autocomplete="off"
+          spellcheck="false"
+          :disabled="creating"
+        />
+        <label class="sr-only" for="new-password">新账号初始密码</label>
+        <input
+          id="new-password"
+          v-model="newPassword"
+          class="input"
+          type="password"
+          placeholder="初始密码"
+          autocomplete="new-password"
+          :disabled="creating"
+        />
+        <button class="button" type="submit" :disabled="creating">
+          {{ creating ? "创建中…" : "创建账号" }}
+        </button>
+      </form>
+      <p class="muted small create-hint">
+        注册模式为 <code>admin</code> 时自助注册已关闭，新账号只能由管理员在这里创建。
+      </p>
+
+      <p
+        v-if="createNotice"
+        class="notice"
+        :class="createNotice.kind === 'ok' ? 'info' : 'error'"
+        role="status"
+        aria-live="polite"
+      >
+        {{ createNotice.text }}
+      </p>
+
+      <p
+        v-if="usersNotice"
+        class="notice"
+        :class="usersNotice.kind === 'ok' ? 'info' : 'error'"
+        role="status"
+        aria-live="polite"
+      >
+        {{ usersNotice.text }}
+      </p>
+
+      <div v-if="usersError" class="notice error" role="alert">
+        <span>{{ usersError }}</span>
+        <button class="button ghost small" type="button" @click="loadUsers">重试</button>
+      </div>
+
+      <p v-if="usersLoading" class="hint">正在加载用户列表…</p>
+      <ul v-else-if="users.length" class="users">
+        <li v-for="row in users" :key="row.id" class="user">
+          <UserAvatar :user="row" :size="40" />
+          <div class="user-main">
+            <div class="user-name">
+              <span>{{ row.name || row.username }}</span>
+              <span v-if="rowIsAdmin(row)" class="badge">管理员</span>
+              <span v-if="row.isSuspended" class="badge suspended">已停用</span>
+            </div>
+            <div class="user-handle">@{{ row.username }}</div>
+            <div class="user-joined">加入于 {{ formatDate(row.createdAt) }}</div>
+          </div>
+          <button
+            type="button"
+            class="button ghost small"
+            :class="{ danger: !row.isSuspended }"
+            :disabled="suspending !== null || row.id === session.me?.id"
+            :title="row.id === session.me?.id ? '不能停用自己的账号' : undefined"
+            :aria-label="
+              row.id === session.me?.id
+                ? `不能停用自己的账号`
+                : row.isSuspended
+                  ? `恢复 ${row.username} 的账号`
+                  : `停用 ${row.username} 的账号`
+            "
+            @click="toggleSuspend(row)"
+          >
+            {{ suspending === row.id ? "处理中…" : row.isSuspended ? "恢复" : "停用" }}
+          </button>
+        </li>
+      </ul>
+      <p v-else-if="!usersError" class="hint">还没有本地账号。</p>
     </section>
   </template>
 </template>
@@ -498,6 +688,84 @@ onMounted(() => {
   color: var(--danger);
 }
 
+.create-account {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.create-account .input {
+  flex: 1;
+  min-width: 0;
+}
+
+.create-hint {
+  margin-bottom: 14px;
+}
+
+.users {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.user {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 8px 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-raised);
+}
+
+.user-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.user-name {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-weight: 600;
+  color: var(--text-strong);
+  overflow-wrap: anywhere;
+}
+
+.user-handle {
+  font-size: 0.82rem;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.user-joined {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.badge {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.badge.suspended {
+  background: transparent;
+  color: var(--danger);
+  border: 1px solid var(--danger);
+}
+
 .notice {
   display: flex;
   align-items: center;
@@ -539,6 +807,14 @@ code {
 
   .add-host {
     flex-direction: column;
+  }
+
+  .create-account {
+    flex-direction: column;
+  }
+
+  .user {
+    flex-wrap: wrap;
   }
 }
 </style>

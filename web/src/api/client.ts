@@ -192,4 +192,16 @@ export const api = {
 
   updateFederationAllowlist: (host: string, remove = false) =>
     post<{ hosts: string[] }>("/api/admin/federation/allowlist", { host, remove }),
+
+  adminCreateAccount: (username: string, password: string) =>
+    post<UserDetailed>("/api/admin/accounts/create", { username, password }),
+
+  adminShowUsers: (params: { limit?: number; offset?: number } = {}) =>
+    post<UserDetailed[]>("/api/admin/show-users", params as Record<string, unknown>),
+
+  adminSuspendUser: (userId: string) =>
+    post<Record<string, never>>("/api/admin/suspend-user", { userId }),
+
+  adminUnsuspendUser: (userId: string) =>
+    post<Record<string, never>>("/api/admin/unsuspend-user", { userId }),
 };

@@ -2,11 +2,16 @@ package httpapi
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"strings"
 
 	"github.com/Aurorainic/cinderfish/internal/account"
 )
+
+// errAccountSuspended is returned when a suspended account presents a
+// valid token; callers answer 401 like any other failed authentication.
+var errAccountSuspended = errors.New("httpapi: account suspended")
 
 // authContextKey is the context key under which the authenticated user
 // and token are stored.
@@ -43,6 +48,10 @@ func (s *Server) authenticate(ctx context.Context, r *http.Request, body map[str
 	user, accessToken, err := s.tokens.Resolve(ctx, token)
 	if err != nil {
 		return nil, err
+	}
+	// A suspended account keeps its rows but loses every credential.
+	if user.IsSuspended {
+		return nil, errAccountSuspended
 	}
 	return &AuthInfo{User: user, Token: accessToken}, nil
 }

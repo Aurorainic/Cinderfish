@@ -111,6 +111,10 @@ func (s *Server) registerRoutes() {
 
 	// Federation administration. The mode and allowlist live in the
 	// database so they change at runtime without a restart.
+	s.mux.HandleFunc("POST /api/admin/accounts/create", s.handleAdminAccountsCreate)
+	s.mux.HandleFunc("POST /api/admin/show-users", s.handleAdminShowUsers)
+	s.mux.HandleFunc("POST /api/admin/suspend-user", s.handleAdminSuspendUser)
+	s.mux.HandleFunc("POST /api/admin/unsuspend-user", s.handleAdminUnsuspendUser)
 	s.mux.HandleFunc("POST /api/admin/federation/mode", s.handleAdminFederationMode)
 	s.mux.HandleFunc("GET /api/admin/federation/allowlist", s.handleAdminAllowlist)
 	s.mux.HandleFunc("POST /api/admin/federation/allowlist", s.handleAdminAllowlist)
