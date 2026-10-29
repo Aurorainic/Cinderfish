@@ -35,10 +35,6 @@
   font-family: "Noto Serif SC", Georgia, "Times New Roman", serif;
 }
 
-.mfm-plain {
-  /* $[plain] keeps its content untouched; nothing extra to apply. */
-}
-
 @keyframes mfm-spin {
   from {
     transform: rotate(0deg);

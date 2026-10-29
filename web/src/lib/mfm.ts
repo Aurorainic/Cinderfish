@@ -21,6 +21,14 @@ export function renderMFM(input: string | null | undefined): string {
     stashed.push(html);
     return `${PLACEHOLDER}${stashed.length - 1}${PLACEHOLDER}`;
   };
+  // Resolves placeholders inside arbitrary text; used by the final pass and
+  // by $[plain], whose content is stashed away and therefore cannot rely on
+  // the final pass to expand code-block placeholders it contains.
+  const restore = (source: string): string =>
+    source.replace(new RegExp(`${PLACEHOLDER}(\\d+)${PLACEHOLDER}`, "g"), (_m, index: string) => {
+      return stashed[Number(index)] ?? "";
+    });
+  const sink = { stash, restore };
 
   // Fenced code first, so URLs and markup inside it stay literal.
   let text = input.replace(
@@ -34,21 +42,31 @@ export function renderMFM(input: string | null | undefined): string {
 
   text = escapeHtml(text);
 
+  // MFM functions are expanded right after escaping and before any link
+  // markup exists, so the function pass can never rewrite attributes inside
+  // generated anchors (e.g. a URL text containing "$[x2]" would otherwise be
+  // turned into markup inside the href). URLs, mentions and hashtags inside
+  // function content are still linkified by the passes below.
+  text = renderFunctions(text, 0, sink);
+
   text = text.replace(/https?:\/\/[^\s<]+/g, (url) => {
-    const trimmed = url.replace(/[.,;:!?)\]]+$/, "");
+    const trimmed = url.replace(/[.,;:!?)]+$/, "");
     const tail = url.slice(trimmed.length);
     return `<a class="mfm-link" href="${trimmed}" target="_blank" rel="noopener noreferrer">${trimmed}</a>${tail}`;
   });
 
+  // The literal ">" lead is only produced by function markup above (user
+  // ">" is escaped), so mentions and hashtags at the very start of function
+  // content still linkify.
   text = text.replace(
-    /(^|[\s(])@([A-Za-z0-9_]+)(?:@([A-Za-z0-9.-]+))?/g,
+    /(^|[\s(>])@([A-Za-z0-9_]+)(?:@([A-Za-z0-9.-]+))?/g,
     (_m, lead: string, name: string, host?: string) => {
       const handle = host ? `@${name}@${host}` : `@${name}`;
       return `${lead}<a class="mfm-mention" href="/${handle}">${handle}</a>`;
     },
   );
 
-  text = text.replace(/(^|[\s(])#([^\s#<>]+)/g, (_m, lead: string, tag: string) => {
+  text = text.replace(/(^|[\s(>])#([^\s#<>]+)/g, (_m, lead: string, tag: string) => {
     return `${lead}<a class="mfm-hashtag" href="/explore?tag=${encodeURIComponent(tag)}">#${tag}</a>`;
   });
 
@@ -63,21 +81,23 @@ export function renderMFM(input: string | null | undefined): string {
 
   text = text.replace(/\n/g, "<br />");
 
-  text = renderFunctions(text, 0);
-
-  return text.replace(new RegExp(`${PLACEHOLDER}(\\d+)${PLACEHOLDER}`, "g"), (_m, index: string) => {
-    return stashed[Number(index)] ?? "";
-  });
+  return restore(text);
 }
 
 // MFM function support ($[x2 text], $[spin.left text], ...). The pass runs
-// after every other transform, so the content inside a function is already
-// escaped HTML and the function layer only wraps that HTML in elements with
-// attributes it produces itself; user text can never inject markup here.
-// Unknown or invalid functions degrade to their (already rendered) content.
+// right after escaping and before links/mentions/hashtags are generated, so
+// it never sees or rewrites generated anchor markup and its output is inline
+// HTML built only from already-escaped content plus attributes this file
+// produces itself. Unknown or invalid functions degrade to their content.
 const MAX_MFM_DEPTH = 40;
 const FUNCTION_TOKEN = /^[a-zA-Z0-9_.=,+-]+$/;
-const HEX_COLOR = /^[0-9a-fA-F]{3,8}$/;
+// CSS only accepts 3, 4, 6 or 8 hex digits.
+const HEX_COLOR = /^(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
+
+type FnSink = {
+  stash: (html: string) => string;
+  restore: (text: string) => string;
+};
 
 function findFunctionClose(text: string, start: number): number {
   // The opening "$[" before `start` is already consumed, so begin one level deep.
@@ -96,7 +116,7 @@ function findFunctionClose(text: string, start: number): number {
   return -1;
 }
 
-function renderFunctions(text: string, depth: number): string {
+function renderFunctions(text: string, depth: number, sink: FnSink): string {
   if (depth > MAX_MFM_DEPTH || !text.includes("$[")) return text;
   let out = "";
   let i = 0;
@@ -114,17 +134,17 @@ function renderFunctions(text: string, depth: number): string {
       i = open + 2;
       continue;
     }
-    out += renderFunctionCall(text.slice(open + 2, close), depth);
+    out += renderFunctionCall(text.slice(open + 2, close), depth, sink);
     i = close + 1;
   }
   return out;
 }
 
-function renderFunctionCall(inner: string, depth: number): string {
+function renderFunctionCall(inner: string, depth: number, sink: FnSink): string {
   const sep = inner.search(/\s/);
   const token = sep === -1 ? inner : inner.slice(0, sep);
   const content = sep === -1 ? "" : inner.slice(sep + 1);
-  const processed = renderFunctions(content, depth + 1);
+  const processed = renderFunctions(content, depth + 1, sink);
 
   // Misskey argument syntax: the first token is `name.arg1,arg2` where each
   // arg may be a flag or key=value. Malformed tokens degrade to the content.
@@ -193,7 +213,10 @@ function renderFunctionCall(inner: string, depth: number): string {
     case "small":
       return `<span class="mfm-small">${processed}</span>`;
     case "plain":
-      return `<span class="mfm-plain">${processed}</span>`;
+      // $[plain] keeps its content literal: no recursive function pass, and
+      // the result is stashed so later passes (links, markup, emoji) cannot
+      // touch it either. Newlines match the outer renderer's behaviour.
+      return `<span class="mfm-plain">${sink.stash(sink.restore(content).replace(/\n/g, "<br />"))}</span>`;
     default:
       return processed;
   }
