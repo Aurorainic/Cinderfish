@@ -4,6 +4,7 @@ import { api } from "../../api/client";
 import type { Note, UserDetailed } from "../../api/types";
 import { isLoggedIn, session } from "../../stores/session";
 import AppIcon from "../AppIcon.vue";
+import NoteDetail from "../note/NoteDetail.vue";
 import NoteItem from "../note/Note.vue";
 import ProfileHeader from "../ProfileHeader.vue";
 import PageWindow from "../ui/PageWindow.vue";
@@ -124,7 +125,7 @@ function onNoteDeleted(id: string): void {
       <template v-if="noteId">
         <div v-if="noteLoading" class="skeleton"></div>
         <p v-else-if="noteError" class="notice error">{{ noteError }}</p>
-        <NoteItem v-else-if="note" :note="note" detail @deleted="onNoteDeleted" />
+        <NoteDetail v-else-if="note" :note="note" @deleted="onNoteDeleted" />
       </template>
 
       <template v-else>

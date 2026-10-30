@@ -1,30 +1,42 @@
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { api, ApiError } from "../api/client";
 import type { Note, UserDetailed } from "../api/types";
 import AppIcon from "../components/AppIcon.vue";
 import NoteItem from "../components/note/Note.vue";
-import ProfileHeader from "../components/ProfileHeader.vue";
+import ProfileCard from "../components/profile/ProfileCard.vue";
+import ProfileSidebar from "../components/profile/ProfileSidebar.vue";
+import PageHeader from "../components/ui/PageHeader.vue";
+import PagedFeed from "../components/ui/PagedFeed.vue";
+import type { PagedFeedParams, PagedFeedResult } from "../components/ui/PagedFeed.vue";
+import { usePageTitle } from "../composables/use-page-title";
 import { isLoggedIn, session } from "../stores/session";
 
 type Tab = "notes" | "media" | "replies";
 
+const TABS = [
+  { key: "notes", label: "笔记", icon: "feather" },
+  { key: "media", label: "媒体", icon: "image" },
+  { key: "replies", label: "回复", icon: "reply" },
+] as const;
+
+const TAB_KEYS: readonly string[] = ["notes", "media", "replies"];
+
+const EMPTY_TEXT: Record<Tab, string> = {
+  notes: "还没有发布任何笔记。",
+  media: "还没有带媒体的笔记。",
+  replies: "还没有回复过别人。",
+};
+
+const PAGE_SIZE = 20;
+const WIDE_THRESHOLD = 1000;
+
 const route = useRoute();
 const router = useRouter();
 
-const pageSize = 20;
-// A tab whose filter drops most of a page (replies) asks for more than one
-// page per click so the list does not look empty while older items exist.
-const maxPagesPerFetch = 3;
-
-const tabs: { id: Tab; label: string; empty: string }[] = [
-  { id: "notes", label: "笔记", empty: "还没有发布任何笔记。" },
-  { id: "media", label: "媒体", empty: "还没有带媒体的笔记。" },
-  { id: "replies", label: "回复", empty: "还没有回复过别人。" },
-];
-
-const tab = ref<Tab>("notes");
+const rootEl = ref<HTMLElement | null>(null);
+const wide = ref(false);
 
 const user = ref<UserDetailed | null>(null);
 const loading = ref(false);
@@ -32,20 +44,16 @@ const loadError = ref("");
 const missing = ref(false);
 const missingRemote = ref(false);
 
-const notes = ref<Note[]>([]);
-const notesLoading = ref(false);
-const notesLoadingMore = ref(false);
-const notesError = ref("");
-const untilId = ref("");
-const hasMore = ref(false);
-
 const following = ref(false);
 const followBusy = ref(false);
 const followNotice = ref("");
 
-// The route is `/@:handle`, so the param holds `username` for a local
-// account and `username@host` for a remote one. Only the local instance
-// can serve a profile today.
+const moreOpen = ref(false);
+const moreNotice = ref("");
+const moreWrap = ref<HTMLElement | null>(null);
+
+const feed = ref<InstanceType<typeof PagedFeed> | null>(null);
+
 const handle = computed(() => {
   const raw = route.params.handle;
   const value = Array.isArray(raw) ? (raw[0] ?? "") : String(raw ?? "");
@@ -53,6 +61,8 @@ const handle = computed(() => {
   if (at < 0) return { username: value, host: "" };
   return { username: value.slice(0, at), host: value.slice(at + 1) };
 });
+
+const acct = computed(() => (handle.value.host ? `${handle.value.username}@${handle.value.host}` : handle.value.username));
 
 const isRemote = computed(() => {
   const host = handle.value.host.toLowerCase();
@@ -79,20 +89,34 @@ const viewUser = computed<UserDetailed | null>(() => {
   };
 });
 
+const displayName = computed(() => viewUser.value?.name || viewUser.value?.username || "");
+const headerTitle = computed(() => displayName.value || acct.value);
+const headerSubtitle = computed(() => (acct.value ? `@${acct.value}` : ""));
 const pinnedNotes = computed(() => user.value?.pinnedNotes ?? []);
+const loginTarget = computed(() => ({ path: "/login", query: { redirect: route.fullPath } }));
 
-const currentTab = computed(() => tabs.find((t) => t.id === tab.value) ?? tabs[0]);
+usePageTitle(() => (displayName.value ? `${displayName.value} (@${handle.value.username})` : ""));
 
-function errorMessage(err: unknown, fallback: string): string {
-  if (err instanceof ApiError) return err.message || fallback;
-  if (err instanceof Error) return err.message || fallback;
-  return fallback;
-}
+// The selected tab lives in `?tab=`, so a reload, a shared link and the back
+// button all land on the same list.
+const tab = computed<string>({
+  get() {
+    const raw = typeof route.query.tab === "string" ? route.query.tab : "";
+    return TAB_KEYS.includes(raw) ? raw : "notes";
+  },
+  set(value) {
+    if (tab.value === value) return;
+    const query = { ...route.query };
+    if (value === "notes") delete query.tab;
+    else query.tab = value;
+    void router.push({ query });
+  },
+});
 
-// The three tabs differ only in their users/notes filter: the notes tab
-// drops replies to other users (Misskey's profile default), the media tab
-// keeps notes with files, and the replies tab asks for everything and
-// keeps only the replies — the backend has no replies-only switch.
+const activeTab = computed<Tab>(() => (TAB_KEYS.includes(tab.value) ? (tab.value as Tab) : "notes"));
+const emptyText = computed(() => EMPTY_TEXT[activeTab.value]);
+const feedKey = computed(() => `${handle.value.username}:${activeTab.value}`);
+
 interface NotesParams {
   username?: string;
   limit?: number;
@@ -101,82 +125,35 @@ interface NotesParams {
   withReplies?: boolean;
 }
 
-function pageParams(cursor: string): NotesParams {
-  const params: NotesParams = { username: handle.value.username, limit: pageSize };
-  if (cursor) params.untilId = cursor;
-  if (tab.value === "notes") params.withReplies = false;
-  else if (tab.value === "media") params.withFiles = true;
-  return params;
-}
+// Switching tabs remounts the feed, which resets this cursor too: it only
+// exists so the replies tab can paginate on the raw page while showing a
+// filtered subset of it.
+let rawCursor = "";
 
-function keepForTab(page: Note[]): Note[] {
-  if (tab.value === "replies") return page.filter((n) => !!n.replyId);
-  return page;
-}
+async function fetcher(p: PagedFeedParams): Promise<PagedFeedResult> {
+  const params: NotesParams = { username: handle.value.username, limit: PAGE_SIZE };
+  const filtering = activeTab.value === "replies";
 
-// Switching tabs while a page is in flight must not append the old tab's
-// notes to the new list, so every fetch carries the generation it started in.
-let generation = 0;
-
-async function fetchNotes(reset: boolean, mine: number): Promise<void> {
-  const seen = new Set(reset ? [] : notes.value.map((n) => n.id));
-  const collected: Note[] = [];
-  let cursor = reset ? "" : untilId.value;
-  let more = true;
-
-  for (let request = 0; request < maxPagesPerFetch && more; request += 1) {
-    const page = await api.usersNotes(pageParams(cursor));
-    if (mine !== generation) return;
-    if (page.length) cursor = page[page.length - 1].id;
-    more = page.length >= pageSize;
-    for (const note of keepForTab(page)) {
-      if (!seen.has(note.id)) {
-        seen.add(note.id);
-        collected.push(note);
-      }
-    }
-    if (collected.length >= pageSize || !more) break;
+  if (filtering) {
+    if (p.untilId === undefined) rawCursor = "";
+    if (rawCursor) params.untilId = rawCursor;
+  } else if (p.untilId) {
+    params.untilId = p.untilId;
   }
 
-  untilId.value = cursor;
-  hasMore.value = more;
-  notes.value = reset ? collected : [...notes.value, ...collected];
+  if (activeTab.value === "notes") params.withReplies = false;
+  else if (activeTab.value === "media") params.withFiles = true;
+
+  const page = await api.usersNotes(params);
+  if (page.length) rawCursor = page[page.length - 1].id;
+  if (!filtering) return page;
+  return { items: page.filter((note) => !!note.replyId), hasMore: page.length >= PAGE_SIZE };
 }
 
-async function loadNotes(): Promise<void> {
-  const mine = ++generation;
-  notesLoading.value = true;
-  notesError.value = "";
-  notes.value = [];
-  untilId.value = "";
-  hasMore.value = false;
-  try {
-    await fetchNotes(true, mine);
-  } catch (err) {
-    if (mine === generation) notesError.value = errorMessage(err, "加载笔记失败");
-  } finally {
-    if (mine === generation) notesLoading.value = false;
-  }
-}
-
-async function loadMore(): Promise<void> {
-  if (!untilId.value || notesLoadingMore.value) return;
-  const mine = generation;
-  notesLoadingMore.value = true;
-  notesError.value = "";
-  try {
-    await fetchNotes(false, mine);
-  } catch (err) {
-    if (mine === generation) notesError.value = errorMessage(err, "加载更多失败");
-  } finally {
-    if (mine === generation) notesLoadingMore.value = false;
-  }
-}
-
-function selectTab(next: Tab) {
-  if (tab.value === next) return;
-  tab.value = next;
-  void loadNotes();
+function errorMessage(err: unknown, fallback: string): string {
+  if (err instanceof ApiError) return err.message || fallback;
+  if (err instanceof Error) return err.message || fallback;
+  return fallback;
 }
 
 async function load() {
@@ -187,11 +164,6 @@ async function load() {
   missingRemote.value = false;
   following.value = false;
   followNotice.value = "";
-  notes.value = [];
-  notesError.value = "";
-  untilId.value = "";
-  hasMore.value = false;
-  tab.value = "notes";
 
   if (!username) {
     missing.value = true;
@@ -206,13 +178,9 @@ async function load() {
   loading.value = true;
   try {
     user.value = await api.usersShow({ username });
-    await loadNotes();
   } catch (err) {
-    if (err instanceof ApiError && err.status === 404) {
-      missing.value = true;
-    } else {
-      loadError.value = errorMessage(err, "加载用户失败");
-    }
+    if (err instanceof ApiError && err.status === 404) missing.value = true;
+    else loadError.value = errorMessage(err, "加载用户失败");
   } finally {
     loading.value = false;
   }
@@ -292,21 +260,84 @@ async function unfollow() {
   }
 }
 
+function toggleFollow() {
+  if (following.value) void unfollow();
+  else void follow();
+}
+
 function onReply(note: Note) {
   router.push(`/notes/${note.id}`);
 }
 
 function onDeleted(id: string) {
-  notes.value = notes.value.filter((n) => n.id !== id);
-  if (user.value) {
-    user.value.pinnedNotes = user.value.pinnedNotes.filter((n) => n.id !== id);
-    user.value.pinnedNoteIds = user.value.pinnedNoteIds.filter((noteId) => noteId !== id);
+  feed.value?.remove(id);
+  if (!user.value) return;
+  user.value.pinnedNotes = user.value.pinnedNotes.filter((note) => note.id !== id);
+  user.value.pinnedNoteIds = user.value.pinnedNoteIds.filter((noteId) => noteId !== id);
+}
+
+let moreTimer: ReturnType<typeof setTimeout> | undefined;
+
+function flashMore(text: string) {
+  moreNotice.value = text;
+  clearTimeout(moreTimer);
+  moreTimer = setTimeout(() => {
+    moreNotice.value = "";
+  }, 2500);
+}
+
+async function copyLink() {
+  moreOpen.value = false;
+  try {
+    await navigator.clipboard.writeText(window.location.href);
+    flashMore("已复制个人页链接");
+  } catch {
+    flashMore("复制失败，请手动复制地址栏链接");
   }
 }
 
-function onRenoted(note: Note) {
-  if (!notes.value.some((n) => n.id === note.id)) notes.value = [note, ...notes.value];
+function reload() {
+  moreOpen.value = false;
+  void load();
 }
+
+function onDocumentClick(event: MouseEvent) {
+  if (!moreOpen.value) return;
+  const target = event.target;
+  if (target instanceof Node && moreWrap.value?.contains(target)) return;
+  moreOpen.value = false;
+}
+
+function onKeydown(event: KeyboardEvent) {
+  if (event.key === "Escape") moreOpen.value = false;
+}
+
+// The side column joins the main column below this width. A container
+// measurement is used instead of a media query because the page also renders
+// inside shells whose main area is narrower than the viewport.
+let observer: ResizeObserver | null = null;
+
+function measure() {
+  wide.value = (rootEl.value?.clientWidth ?? 0) >= WIDE_THRESHOLD;
+}
+
+onMounted(() => {
+  measure();
+  if (rootEl.value && typeof ResizeObserver !== "undefined") {
+    observer = new ResizeObserver(measure);
+    observer.observe(rootEl.value);
+  }
+  document.addEventListener("click", onDocumentClick);
+  document.addEventListener("keydown", onKeydown);
+});
+
+onBeforeUnmount(() => {
+  observer?.disconnect();
+  observer = null;
+  clearTimeout(moreTimer);
+  document.removeEventListener("click", onDocumentClick);
+  document.removeEventListener("keydown", onKeydown);
+});
 
 watch(
   () => handle.value.username,
@@ -318,217 +349,256 @@ watch(
 </script>
 
 <template>
-  <p v-if="loading" class="skeleton"></p>
+  <div ref="rootEl" class="profile-page">
+    <PageHeader
+      v-model:tab="tab"
+      :title="headerTitle"
+      :subtitle="headerSubtitle"
+      :avatar="viewUser"
+      :tabs="viewUser ? TABS : null"
+    >
+      <template #actions>
+        <template v-if="viewUser">
+          <RouterLink v-if="isSelf" to="/settings" class="button ghost small">编辑资料</RouterLink>
+          <button
+            v-else-if="isLoggedIn"
+            type="button"
+            class="button small"
+            :class="{ ghost: following }"
+            :disabled="followBusy"
+            @click="toggleFollow"
+          >
+            <template v-if="followBusy">处理中…</template>
+            <template v-else-if="following">取消关注</template>
+            <template v-else>关注</template>
+          </button>
+          <RouterLink v-else :to="loginTarget" class="button small">登录后关注</RouterLink>
 
-  <div v-else-if="missing" class="card placeholder">
-    <AppIcon name="globe" />
-    <h2>远程账户暂不可用</h2>
-    <p class="small">
-      <template v-if="missingRemote">
-        @{{ handle.username }}@{{ handle.host }} 位于其他实例，Cinderfish
-        目前只支持浏览本地账户的资料。
+          <div ref="moreWrap" class="more">
+            <button
+              class="icon-button"
+              type="button"
+              title="更多"
+              aria-label="更多"
+              aria-haspopup="menu"
+              :aria-expanded="moreOpen"
+              @click="moreOpen = !moreOpen"
+            >
+              <AppIcon name="more" />
+            </button>
+            <div v-if="moreOpen" class="more-menu" role="menu">
+              <button type="button" class="more-item" role="menuitem" @click="copyLink">复制链接</button>
+              <button type="button" class="more-item" role="menuitem" @click="reload">刷新资料</button>
+            </div>
+          </div>
+        </template>
       </template>
-      <template v-else>没有找到这个账户，可能已经被删除或从未存在过。</template>
-    </p>
-    <RouterLink to="/explore" class="button ghost small">去探索页看看</RouterLink>
-  </div>
+    </PageHeader>
 
-  <p v-else-if="loadError" class="notice error">{{ loadError }}</p>
+    <p v-if="moreNotice" class="notice info page-notice">{{ moreNotice }}</p>
+    <p v-if="followNotice" class="notice error page-notice">{{ followNotice }}</p>
 
-  <template v-else-if="viewUser">
-    <ProfileHeader
-      :user="viewUser"
-      :is-self="isSelf"
-      :logged-in="isLoggedIn"
-      :following="following"
-      :follow-busy="followBusy"
-      @follow="follow"
-      @unfollow="unfollow"
-    />
+    <div v-if="loading" class="skeleton"></div>
 
-    <p v-if="followNotice" class="notice error follow-notice">{{ followNotice }}</p>
-
-    <section v-if="pinnedNotes.length" class="pinned" aria-labelledby="pinned-head">
-      <h2 id="pinned-head" class="pinned-head">
-        <AppIcon name="check" />
-        置顶笔记
-      </h2>
-      <div class="notes">
-        <NoteItem
-          v-for="note in pinnedNotes"
-          :key="`pinned-${note.id}`"
-          :note="note"
-          @reply="onReply"
-          @deleted="onDeleted"
-          @renoted="onRenoted"
-        />
-      </div>
-    </section>
-
-    <div class="tab-row" role="group" aria-label="个人资料分页">
-      <button
-        v-for="option in tabs"
-        :key="option.id"
-        type="button"
-        class="tab"
-        :class="{ active: tab === option.id }"
-        :aria-pressed="tab === option.id"
-        @click="selectTab(option.id)"
-      >
-        {{ option.label }}
-      </button>
-    </div>
-
-    <p v-if="notesError" class="notice error">{{ notesError }}</p>
-
-    <div v-if="notesLoading" class="skeleton-list">
-      <div v-for="i in 3" :key="i" class="skeleton-item"></div>
-    </div>
-
-    <template v-else>
-      <div class="notes">
-        <NoteItem
-          v-for="note in notes"
-          :key="note.id"
-          :note="note"
-          @reply="onReply"
-          @deleted="onDeleted"
-          @renoted="onRenoted"
-        />
-      </div>
-
-      <p v-if="!notes.length && !hasMore && !notesError" class="placeholder">
-        <AppIcon name="feather" />
-        <span>{{ currentTab.empty }}</span>
+    <div v-else-if="missing" class="card placeholder">
+      <AppIcon name="globe" />
+      <h2>远程账户暂不可用</h2>
+      <p class="small">
+        <template v-if="missingRemote">
+          @{{ handle.username }}@{{ handle.host }} 位于其他实例，Cinderfish 目前只支持浏览本地账户的资料。
+        </template>
+        <template v-else>没有找到这个账户，可能已经被删除或从未存在过。</template>
       </p>
+      <RouterLink to="/explore" class="button ghost small">去探索页看看</RouterLink>
+    </div>
 
-      <div v-if="hasMore" class="more">
-        <button class="button ghost small" type="button" :disabled="notesLoadingMore" @click="loadMore">
-          {{ notesLoadingMore ? "加载中…" : "加载更多" }}
-        </button>
+    <p v-else-if="loadError" class="notice error">
+      <span>{{ loadError }}</span>
+      <button type="button" class="button ghost small retry" @click="load">重试</button>
+    </p>
+
+    <div v-else-if="viewUser" class="profile-body" :class="{ wide }">
+      <div class="area-stack">
+        <ProfileCard :user="viewUser" />
+
+        <section v-if="pinnedNotes.length" class="pinned" aria-labelledby="pinned-head">
+          <h2 id="pinned-head" class="pinned-head">
+            <AppIcon name="check" />
+            置顶笔记
+          </h2>
+          <div class="pinned-notes">
+            <NoteItem
+              v-for="note in pinnedNotes"
+              :key="`pinned-${note.id}`"
+              :note="note"
+              @reply="onReply"
+              @deleted="onDeleted"
+            />
+          </div>
+        </section>
+
+        <p v-else-if="isSelf" class="notice info pin-tip">
+          置顶笔记会显示在个人页顶部，在笔记菜单中选择置顶。
+        </p>
       </div>
-    </template>
-  </template>
+
+      <ProfileSidebar class="area-side" :user="viewUser" />
+
+      <div class="area-feed">
+        <PagedFeed ref="feed" :key="feedKey" :fetcher="fetcher" :page-size="PAGE_SIZE">
+          <template #item="{ item }">
+            <NoteItem :note="(item as Note)" @reply="onReply" @deleted="onDeleted" />
+          </template>
+          <template #empty>
+            <div class="placeholder">
+              <AppIcon name="feather" />
+              <span>{{ emptyText }}</span>
+            </div>
+          </template>
+        </PagedFeed>
+      </div>
+    </div>
+  </div>
 </template>
 
 <style scoped>
-.follow-notice {
-  margin-top: 12px;
+.profile-page {
+  min-width: 0;
+}
+
+.page-notice {
+  margin-top: var(--space-12);
+}
+
+.retry {
+  margin-inline-start: var(--space-10);
+}
+
+.more {
+  position: relative;
+  display: flex;
+}
+
+.more-menu {
+  position: absolute;
+  top: calc(100% + var(--space-6));
+  right: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  min-width: 150px;
+  padding: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--popup-bg);
+  box-shadow: var(--shadow-popover);
+}
+
+.more-item {
+  padding: var(--space-8) var(--space-10);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: var(--fs-sm);
+  text-align: start;
+  cursor: pointer;
+}
+
+.more-item:hover {
+  background: var(--surface-hover);
+}
+
+.more-item:focus-visible {
+  outline: var(--focus-outline);
+  outline-offset: -2px;
+}
+
+/* The narrow grid keeps the side column's place right after the profile card. */
+.profile-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: "stack" "side" "feed";
+  gap: var(--space-16);
+  margin-top: var(--space-16);
+  min-width: 0;
+}
+
+.profile-body.wide {
+  grid-template-columns: minmax(0, 1fr) var(--side-width);
+  grid-template-areas: "stack side" "feed side";
+  align-items: start;
+}
+
+.area-stack {
+  grid-area: stack;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-16);
+  min-width: 0;
+}
+
+.area-side {
+  grid-area: side;
+  min-width: 0;
+}
+
+.profile-body.wide .area-side {
+  position: sticky;
+  top: var(--space-64);
+}
+
+.area-feed {
+  grid-area: feed;
+  min-width: 0;
+}
+
+/* Borderless rows: dividers come from the note itself, so no gap. */
+.area-feed :deep(.paged-feed) {
+  gap: 0;
 }
 
 .pinned {
-  margin-top: 16px;
-  padding: 10px 12px 0;
+  padding: var(--space-10) var(--space-12) 0;
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   background: var(--panel);
+  min-width: 0;
 }
 
 .pinned-head {
   display: flex;
   align-items: center;
-  gap: 6px;
-  font-size: 0.85rem;
+  gap: var(--space-6);
+  padding: 0 2px var(--space-4);
+  color: var(--accent);
+  font-size: var(--fs-sm);
   font-weight: 700;
-  color: var(--accent);
-  padding: 0 2px 4px;
 }
 
-.pinned-head :deep(.icon) {
-  width: 1em;
-  height: 1em;
+.pinned-head .icon {
+  width: 15px;
+  height: 15px;
 }
 
-.pinned .notes > :deep(.note:last-child) {
+.pinned-notes {
+  margin: 0 calc(-1 * var(--space-12));
+}
+
+.pinned-notes :deep(.note:last-child) {
   border-bottom: 0;
 }
 
-.pinned .notes {
-  margin: 0 -12px;
-}
-
-.pinned .notes > :deep(.note) {
-  padding-left: 12px;
-  padding-right: 12px;
-}
-
-.tab-row {
-  display: flex;
-  gap: 4px;
-  margin: 18px 0 8px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid var(--divider);
-  overflow-x: auto;
-}
-
-.tab {
-  padding: 7px 16px;
-  border: 1px solid transparent;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--muted);
-  font-weight: 600;
-  font-size: 0.9rem;
-  cursor: pointer;
-  transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
-  white-space: nowrap;
-}
-
-.tab:hover,
-.tab:focus-visible {
-  color: var(--text);
-  background: var(--panel-2);
-}
-
-.tab.active {
-  color: var(--accent);
-  background: var(--accent-soft);
-  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
-}
-
-/* Borderless rows: dividers come from the note itself, so no gap. */
-.notes {
-  display: flex;
-  flex-direction: column;
-}
-
-.notes > :deep(.note:last-child) {
-  border-bottom: 0;
-}
-
-.more {
-  display: flex;
-  justify-content: center;
-  padding: 16px 0 0;
+.pin-tip {
+  margin: 0;
 }
 
 .skeleton {
   height: 220px;
+  margin-top: var(--space-16);
+  border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   background: var(--panel);
-  border: 1px solid var(--border);
-}
-
-.skeleton-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.skeleton-item {
-  height: 120px;
-  border-radius: var(--radius-lg);
-  background: linear-gradient(90deg, var(--panel) 25%, var(--panel-2) 50%, var(--panel) 75%);
-  background-size: 200% 100%;
-  animation: shimmer 1.4s infinite linear;
-}
-
-@keyframes shimmer {
-  from {
-    background-position: 200% 0;
-  }
-  to {
-    background-position: -200% 0;
-  }
 }
 </style>
