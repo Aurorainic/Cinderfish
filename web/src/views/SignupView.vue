@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { api } from "../api/client";
 import AuthLayout from "../layouts/AuthLayout.vue";
+import { usePageTitle } from "../composables/use-page-title";
 import { instance, loadInstance } from "../stores/instance";
 import { signup } from "../stores/session";
 
@@ -18,6 +19,8 @@ const availability = ref<"unknown" | "checking" | "free" | "taken">("unknown");
 const closed = computed(
   () => instance.meta !== null && instance.meta.disableRegistration && !invitationCode.value,
 );
+
+usePageTitle("创建账号");
 
 let checkTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -65,14 +68,14 @@ onMounted(loadInstance);
 
 <template>
   <AuthLayout>
-    <h2 style="font-size: 1.5rem; margin-bottom: 8px">创建账号</h2>
-    <p class="muted small" style="margin-bottom: 24px">实例的注册模式决定谁能加入。</p>
+    <h2 class="auth-title">创建账号</h2>
+    <p class="muted small auth-lead">实例的注册模式决定谁能加入。</p>
 
     <p v-if="instance.meta?.disableRegistration" class="notice info">
       本实例未开放自助注册。如果管理员已发放邀请码，请在下方填写。
     </p>
 
-    <form @submit.prevent="submit">
+    <form class="auth-form" @submit.prevent="submit">
       <div class="field">
         <label for="username">用户名</label>
         <input
@@ -101,18 +104,57 @@ onMounted(loadInstance);
       </div>
       <div class="field">
         <label for="invite">邀请码（可选）</label>
-        <input id="invite" v-model="invitationCode" class="input" type="text" placeholder="invitation code" />
+        <input id="invite" v-model="invitationCode" class="input" type="text" placeholder="邀请码" />
       </div>
 
-      <p v-if="error" class="notice error">{{ error }}</p>
+      <p v-if="error" class="notice error" role="alert">{{ error }}</p>
 
-      <button class="button" type="submit" :disabled="busy || closed" style="width: 100%">
+      <button class="button auth-submit" type="submit" :disabled="busy || closed">
         {{ busy ? "创建中…" : "注册" }}
       </button>
     </form>
 
-    <p class="muted small" style="margin-top: 16px; text-align: center">
-      已有账号？<RouterLink to="/login" style="color: var(--accent)">登录</RouterLink>
+    <p class="muted small auth-switch">
+      已有账号？<RouterLink to="/login">登录</RouterLink>
     </p>
   </AuthLayout>
 </template>
+
+<style scoped>
+.auth-title {
+  margin-bottom: var(--space-8);
+  font-size: var(--fs-xl);
+}
+
+.auth-lead {
+  margin-bottom: var(--space-24);
+}
+
+.auth-form {
+  min-width: 0;
+}
+
+.auth-submit {
+  width: 100%;
+}
+
+.auth-switch {
+  margin-top: var(--space-16);
+  text-align: center;
+}
+
+.auth-switch a {
+  color: var(--accent);
+  font-weight: var(--weight-semibold);
+}
+
+.auth-switch a:hover {
+  color: var(--accent-hover);
+}
+
+@media (max-width: 380px) {
+  .auth-title {
+    font-size: var(--fs-lg);
+  }
+}
+</style>
