@@ -37,13 +37,21 @@ These decisions are settled; do not reopen them without an explicit request.
 
 - Keep research notes and source links in the repository so decisions remain auditable.
 - **The Misskey source tree is the authoritative API contract.** Before implementing an endpoint, read its `paramDef` and `res` schema in `packages/backend/src/server/api/endpoints/`, then the type definitions in `packages/misskey-js/src/api.types.ts`. Official documentation is secondary and has been found to disagree with the source in several places.
-- The reference clone lives outside the repository and does not survive a reboot. Recreate it with:
+- **Reference roles are fixed and must not be mixed up.** Misskey supplies the backend API contract only — never its UI, component structure, layout or visual language. Frontend experience is referenced from Firefish (primary) and Iceshrimp (secondary), considered together. Do not claim UI work is "Misskey-aligned"; the UI acceptance standard is Firefish/Iceshrimp information density and interaction.
+- The reference clones live in `tmp/refcheck/`, which `.gitignore` covers, so they survive a reboot. Recreate them with:
   ```bash
-  export https_proxy=http://127.0.0.1:19823 http_proxy=http://127.0.0.1:19823
-  git clone --depth 1 --filter=blob:none --sparse https://github.com/misskey-dev/misskey.git /tmp/refcheck/misskey
-  cd /tmp/refcheck/misskey && git sparse-checkout set packages/backend/src packages/misskey-js/src
+  export https_proxy=http://127.0.0.1:19823 http_proxy=http://127.0.0.1:19823   # Misskey only
+  # Misskey — API contract
+  git clone --depth 1 --filter=blob:none --sparse https://github.com/misskey-dev/misskey.git tmp/refcheck/misskey
+  cd tmp/refcheck/misskey && git sparse-checkout set packages/backend/src packages/misskey-js/src packages/frontend/src
+  # Firefish — primary frontend reference (Codeberg, no proxy needed)
+  git clone --depth 1 --filter=blob:none --sparse https://codeberg.org/firefish/firefish.git tmp/refcheck/firefish
+  cd tmp/refcheck/firefish && git sparse-checkout set packages/client/src packages/sw/src
+  # Iceshrimp — supplemental frontend reference
+  git clone --depth 1 --filter=blob:none --sparse https://codeberg.org/iceshrimp/Iceshrimp.NET.git tmp/refcheck/iceshrimp
+  cd tmp/refcheck/iceshrimp && git sparse-checkout set Iceshrimp.Frontend
   ```
-  The full backend source is about 11 MB; the Streaming implementation lives in `packages/backend/src/server/api/stream/`.
+  The Misskey backend source is about 11 MB; the Streaming implementation lives in `packages/backend/src/server/api/stream/`. The Vue-based Iceshrimp fork (`codeberg.org/banaanihillo/iceshrimp`) is the one whose components can be mirrored; `Iceshrimp.NET` is a Blazor rewrite, useful for layout and interaction decisions only. Codeberg intermittently returns 504 — retry, or fetch `…/archive/main.tar.gz` instead.
 - Misskey is AGPL-3.0-only and the user has accepted AGPL obligations for this project. Reusing its data structures, field names, enum values and behaviour is fine. If the project is ever distributed, it must be distributed under AGPL-3.0.
 - Do not claim compatibility without identifying the concrete API, protocol behaviour, or test evidence.
 - GitHub network access must use the user's proxy at `127.0.0.1:19823`. Note that `dl.min.io` is blocked by that proxy.

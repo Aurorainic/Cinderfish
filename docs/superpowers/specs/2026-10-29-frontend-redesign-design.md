@@ -1,11 +1,26 @@
 # Cinderfish 前端界面重构设计（2026-10-29）
 
-状态：待用户确认。背景与源码分析见 `docs/research/2026-10-29-frontend-redesign-reference-analysis.md`。
+状态：已实现并合并前待评审。背景与源码分析见 `docs/research/2026-10-29-frontend-redesign-reference-analysis.md`。
+
+## 参考边界（2026-10-30 用户校正，上位约束）
+
+本项目三个参考项目的职责不重叠，**混用即跑偏**：
+
+| 项目 | 角色 | 用作 | 不用作 |
+|------|------|------|--------|
+| Misskey | 后端 API 契约权威 | 端点 `paramDef`/`res`、字段名、枚举、错误信封、Streaming 帧 | 界面、组件结构、布局、视觉语言 |
+| Firefish | 前端体验主要参考 | 壳形态、note 拆件、deck、交互、主题语义粒度、断点 | 后端行为 |
+| Iceshrimp | 前端体验补充参考 | 紧凑布局、断点取舍、日期分隔列表、通知呈现 | 后端行为 |
+
+一句话：**抄 Misskey 的后端契约，做 Firefish/Iceshrimp 的前端。** 因此本设计里凡是提到
+「跟随 Misskey」的地方，都只指 API 契约；界面验收标准一律以 Firefish/Iceshrimp 的信息密度
+与交互为准。Cinderfish 自己的 ember 橙、Inter 字体、手写 SVG、CSS token 双主题机制是保留项。
 
 ## 意图与原因
 
-现有前端被评价为「AI 味过重的 Mastodon 克隆」。本次重构使其贴近 Firefish/Misskey 的
-产品语言：扁平密集的信息流、Misskey 式反应系统、MFM 呈现、自适应的壳（deck + 侧边系统）。
+现有前端被评价为「AI 味过重的 Mastodon 克隆」。本次重构使其贴近 Firefish/Iceshrimp 的
+产品语言：扁平密集的信息流、Misskey 式反应系统（数据契约来自 Misskey 后端）、MFM 呈现、
+自适应的壳（deck + 侧边系统）。
 产品定位不变：个人或极小规模联邦实例，前端体验接近 Firefish。
 
 ## 决策记录（讨论中已确认）
@@ -13,7 +28,7 @@
 | 决策点 | 结论 | 来源 |
 |--------|------|------|
 | 主题系统 | 保留现有机制：CSS 变量 token + `data-theme` 双主题 + `localStorage`，不引入 JSON5 主题 DSL；token 词表按新 UI 需要扩充（见下） | 用户明确 |
-| UI 框架 | 布局、组件形态、交互模式跟随 Misskey/Firefish | 用户明确 |
+| UI 框架 | 布局、组件形态、交互模式跟随 **Firefish 与 Iceshrimp，两者综合考虑**；Misskey 前端不作参考 | 用户明确（2026-10-30 校正） |
 | 壳 | 自适应：一个 deck 列容器贯穿两种视口。宽视图默认 universal（可折叠侧栏 + 主列 + 右 widget 栏）；窄视图单列横滑。deck 作为可切换的第二形态保留 | 用户明确 |
 | 移动端 deck 的列 | 自适应：列数随视口自动增减（窄=1 列横滑，宽=多列并排），不区分「移动版/桌面版」两套组件 | 用户明确 |
 | 范围 | 总体重构，不采用壳先行或内容先行的分期取舍；按里程碑排序推进 | 用户明确 |
@@ -25,13 +40,13 @@
 
 1. 壳层自适应：deck 列容器（列数随视口）+ universal 侧边系统（宽视图默认形态）。
 2. 笔记呈现 Firefish 化：无边框平铺行 + 1px 分隔线 + 日期分隔 + hover 显操作栏 + renote bar。
-3. 反应系统 Misskey 化：完整 emoji picker（unicode + 实例自定义 emoji）、自己的反应置顶、
-   反应胶囊视觉对齐 MkReactionsViewer（自反应 accent 底 + inset 描边）。
+3. 反应系统 Misskey 契约化：完整 emoji picker（unicode + 实例自定义 emoji）、自己的反应置顶、
+   反应胶囊视觉参照 Firefish/Iceshrimp（自反应 accent 底 + inset 描边）。
 4. MFM 补全：自定义 emoji 图片渲染 + 常用 `$[...]` 函数（x2/x3/x4、spin、shake、jump、blink、
    blur、rainbow、font、center、small、fg/bg、plain），沿用现有占位符 stash 安全管线。
 5. 组件层统一：一个通用分页组件（无限滚动 + 流式前插 + 重连重载）供时间线/通知/探索复用；
    NoteCard 拆为 header/content/media/footer 子组件。
-6. 发帖器全局化：props 驱动的全局对话框（`os.post` 模式），时间线顶部固定形态复用同一组件。
+6. 发帖器全局化：props 驱动的全局对话框（Firefish `os.post` 模式），时间线顶部固定形态复用同一组件。
 7. 全局去 AI 味：去 body 径向渐变光斑、去大投影、圆角降到 12px 级、文案改 Misskey 术语体系
    （笔记/转贴/反应），保留中文界面。
 
@@ -56,9 +71,12 @@
   `api/client.ts`、乐观反应逻辑复用。
 - 路由保持 vue-router（不引入 Misskey 的 nirax）。deck 化后 TimelineView 的页内 `source`
   状态改为列配置，路由语义维持 `/`（或 `/deck`）入口。
-- 笔记组件在窄列（~350px）与主列（~680px）下都可用：用 container query 适配（参照 Misskey）。
+- 笔记组件在窄列（~350px）与主列（~680px）下都可用：用 container query 适配（参照 Firefish 的
+  `v-size` 容器查询与 Iceshrimp 的紧凑布局）。
 - 可访问性底线：操作按钮 hover 显隐必须保持 focus-visible 可见；Firefish 式单条笔记热键
   （r/e/q/j/k）列为可选增强。
+- **Misskey 源码只用于核对 API 契约**：端点的 `paramDef`/`res`、错误信封、游标语义、
+  Streaming 帧格式；不复制其前端组件、布局或命名。
 
 ## 方案取舍（已定）
 
@@ -96,5 +114,5 @@
 
 - `pnpm typecheck` 与 `go vet`/`go test` 全绿。
 - 视觉验收：宽视口（≥1100px）呈 universal 三区；窄视口单列横滑无横向滚动条；笔记行无边框、
-  hover 显操作；反应 picker 可用且包含实例自定义 emoji。
+  hover 显操作；反应 picker 可用。**验收基准是 Firefish/Iceshrimp 的信息密度，不是 Misskey 的皮肤。**
 - 手动检查 `prefers-color-scheme` 未设时默认主题与首帧无闪烁（沿用 `main.ts` 现有逻辑）。
