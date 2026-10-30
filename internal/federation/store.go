@@ -361,6 +361,8 @@ DELETE FROM followings WHERE follower_id = $1 AND followee_id = $2
 		return fmt.Errorf("federation: unfollow: %w", err)
 	}
 	_, _ = s.pool.Exec(ctx, "DELETE FROM follow_requests WHERE follower_id = $1 AND followee_id = $2", followerID, followeeID)
+	_, _ = s.pool.Exec(ctx, "UPDATE users SET followers_count = (SELECT count(*) FROM followings WHERE followee_id = $1) WHERE id = $1", followeeID)
+	_, _ = s.pool.Exec(ctx, "UPDATE users SET following_count = (SELECT count(*) FROM followings WHERE follower_id = $1) WHERE id = $1", followerID)
 	return nil
 }
 

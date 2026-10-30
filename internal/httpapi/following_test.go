@@ -92,6 +92,13 @@ func TestFollowingCreateAndDeleteLocal(t *testing.T) {
 		t.Errorf("follow returned id %v, want the followee %s", out["id"], bobID)
 	}
 
+	// The counters follow the relationship, in both directions.
+	if resp, show := post(t, f.ts, "/api/users/show", map[string]any{"userId": bobID}); resp.StatusCode != http.StatusOK {
+		t.Fatalf("users/show bob: %d %v", resp.StatusCode, show)
+	} else if show["followersCount"] != float64(1) {
+		t.Errorf("followersCount after follow = %v, want 1", show["followersCount"])
+	}
+
 	// Following twice is an error with Misskey's id and message.
 	resp, out = postWithToken(t, f.ts, "/api/following/create", aliceToken, map[string]any{"userId": bobID})
 	if resp.StatusCode != http.StatusBadRequest {
@@ -104,6 +111,11 @@ func TestFollowingCreateAndDeleteLocal(t *testing.T) {
 	resp, out = postWithToken(t, f.ts, "/api/following/delete", aliceToken, map[string]any{"userId": bobID})
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("unfollow: %d %v", resp.StatusCode, out)
+	}
+	if resp, show := post(t, f.ts, "/api/users/show", map[string]any{"userId": bobID}); resp.StatusCode != http.StatusOK {
+		t.Fatalf("users/show bob after unfollow: %d %v", resp.StatusCode, show)
+	} else if show["followersCount"] != float64(0) {
+		t.Errorf("followersCount after unfollow = %v, want 0", show["followersCount"])
 	}
 
 	// Unfollowing what you do not follow is an error too.
