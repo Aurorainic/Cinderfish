@@ -13,7 +13,6 @@
   --panel: #1c1a23;
   --panel-2: #24212c;
   --panel-header: #221f2b;
-  --nav-bg: #17151d;
   --border: #2e2a38;
   --divider: rgba(255, 255, 255, 0.08);
   --text: #ece9f3;
@@ -33,7 +32,6 @@
   --radius-lg: 12px;
   /* Weak popover shadow only; the old 30px blur projection is gone. */
   --shadow-sm: 0 2px 10px rgba(0, 0, 0, 0.4);
-  --shadow: var(--shadow-sm);
   --rail-width: 232px;
   --side-width: 300px;
   --content-max: 680px;
@@ -47,7 +45,6 @@
   --panel: #ffffff;
   --panel-2: #f1eee8;
   --panel-header: #f4f1ea;
-  --nav-bg: #ffffff;
   --border: #e4dfd6;
   --divider: rgba(0, 0, 0, 0.08);
   --text: #241f1a;
@@ -62,7 +59,6 @@
   --cw-bg: #f0ebe1;
   --cw-fg: #241f1a;
   --shadow-sm: 0 2px 10px rgba(60, 40, 20, 0.14);
-  --shadow: var(--shadow-sm);
 }
 
 * {
@@ -178,16 +174,17 @@ select {
   padding: 6px 8px;
 }
 
+/* Flat ember badge: the accent token on its own, no gradient wash and no glow. */
 .brand-mark,
 .instance-logo {
   display: grid;
   place-items: center;
+  flex: none;
   width: 38px;
   height: 38px;
-  border-radius: 12px;
-  color: #fff;
-  background: linear-gradient(140deg, #ff8a5c, #e8471f 60%, #b42c0d);
-  box-shadow: 0 6px 18px rgba(255, 107, 53, 0.35);
+  border-radius: var(--radius-lg);
+  color: var(--on-accent);
+  background: var(--accent);
 }
 
 .brand-mark .icon,
@@ -247,15 +244,6 @@ select {
   padding-bottom: 60px;
 }
 
-.side {
-  position: sticky;
-  top: 24px;
-  align-self: start;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
 .card {
   background: var(--panel);
   border: 1px solid var(--border);
@@ -266,41 +254,6 @@ select {
 .card-title {
   font-size: 0.95rem;
   margin-bottom: 12px;
-}
-
-.instance-head {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 12px;
-}
-
-.instance-head h2 {
-  font-size: 1.05rem;
-}
-
-.instance-actions {
-  display: flex;
-  gap: 8px;
-  margin-top: 16px;
-}
-
-.link-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  color: var(--muted);
-}
-
-.link-list a:hover {
-  color: var(--accent);
-}
-
-.side-foot {
-  text-align: center;
 }
 
 /* ---------- controls ---------- */
@@ -456,21 +409,26 @@ select {
   font-size: 1.4rem;
 }
 
+/* Calm empty state: a quiet glyph, a title, an optional line of help. Used by
+   every feed/column empty slot and by the 404 page. */
 .placeholder {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 10px;
-  padding: 64px 20px;
+  padding: 48px 20px;
   text-align: center;
   color: var(--muted);
 }
 
 .placeholder .icon {
-  width: 42px;
-  height: 42px;
-  color: var(--accent);
-  opacity: 0.7;
+  width: 30px;
+  height: 30px;
+  color: var(--muted);
+}
+
+.placeholder h2 {
+  font-size: 1.05rem;
 }
 
 /* ---------- auth ---------- */
@@ -490,15 +448,14 @@ select {
   border-right: 1px solid var(--border);
 }
 
+/* Flat wash, no radial light blobs: the aside sits on the page background. */
 .auth-aside {
   display: flex;
   flex-direction: column;
   justify-content: center;
   gap: 18px;
   padding: 64px;
-  background:
-    radial-gradient(700px 400px at 80% 20%, rgba(255, 107, 53, 0.18), transparent 60%),
-    radial-gradient(500px 300px at 20% 80%, rgba(124, 92, 255, 0.16), transparent 60%);
+  background: var(--bg);
 }
 
 .auth-aside h1 {

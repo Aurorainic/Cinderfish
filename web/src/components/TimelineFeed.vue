@@ -10,8 +10,8 @@ import PagedFeed from "./ui/PagedFeed.vue";
 import type { PagedFeedParams, PagedFeedResult } from "./ui/PagedFeed.vue";
 
 const props = withDefaults(
-  defineProps<{ source: "local" | "global" | "hybrid" | "home"; tag?: string }>(),
-  { tag: "" },
+  defineProps<{ source: "local" | "global" | "hybrid" | "home"; tag?: string; composer?: boolean }>(),
+  { tag: "", composer: true },
 );
 
 const needsAuth = computed(() => props.source === "hybrid" || props.source === "home");
@@ -84,8 +84,10 @@ function toNote(item: unknown): Note {
   <div v-else class="timeline-feed">
     <!-- The section's own composer. Replies and quotes go through
          os.openPostForm so there is only ever one post dialog. New notes
-         arrive through the streaming channel. -->
-    <PostForm v-if="isLoggedIn" fixed />
+         arrive through the streaming channel. Deck columns pass
+         `:composer="false"`: a 350px column is not the place for it, and the
+         rail carries the global post entry there. -->
+    <PostForm v-if="isLoggedIn && composer" fixed />
     <PagedFeed
       ref="feed"
       :key="`${source}:${tag}`"

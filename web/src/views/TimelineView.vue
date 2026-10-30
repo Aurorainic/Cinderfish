@@ -8,10 +8,12 @@ type Source = "home" | "local" | "hybrid" | "global";
 const source = ref<Source>("local");
 const chosen = ref(false);
 
+// Misskey channel names: home reads as 首页, hybrid as 社交. Deck columns use
+// the same labels (stores/deck.ts), so both shells name a channel alike.
 const tabs: { id: Source; label: string; auth?: boolean }[] = [
-  { id: "home", label: "关注", auth: true },
+  { id: "home", label: "首页", auth: true },
   { id: "local", label: "本地" },
-  { id: "hybrid", label: "混合", auth: true },
+  { id: "hybrid", label: "社交", auth: true },
   { id: "global", label: "全球" },
 ];
 
@@ -64,7 +66,7 @@ onMounted(() => {
   padding: 5px;
   margin-bottom: 16px;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--radius);
   background: var(--panel);
   width: fit-content;
 }
@@ -72,7 +74,7 @@ onMounted(() => {
 .tab {
   padding: 7px 18px;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--muted);
   font-weight: 600;

@@ -25,9 +25,11 @@ const style = computed(() => ({ width: `${props.size ?? 40}px`, height: `${props
 .fallback {
   display: grid;
   place-items: center;
-  font-weight: 800;
-  font-size: 0.9em;
-  color: #fff;
-  background: linear-gradient(140deg, #ff8a5c, #e8471f);
+  /* Parents often set line-height: 0 under an avatar to kill inline gaps; the
+     fallback letter must keep its own line box or it drifts to the top edge. */
+  line-height: 1;
+  font-weight: 700;
+  font-size: 0.85em;
+  color: var(--text-strong);
 }
 </style>

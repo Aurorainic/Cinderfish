@@ -349,7 +349,7 @@ defineExpose({ refresh, remove });
 .new-pill {
   padding: 6px 18px;
   border: 1px solid var(--accent);
-  border-radius: 999px;
+  border-radius: var(--radius);
   background: var(--accent-soft);
   color: var(--accent);
   font-weight: 700;

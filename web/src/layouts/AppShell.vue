@@ -5,6 +5,7 @@ import AppIcon from "../components/AppIcon.vue";
 import MobileNav from "../components/ui/MobileNav.vue";
 import UserAvatar from "../components/UserAvatar.vue";
 import InstanceCard from "../components/widgets/InstanceCard.vue";
+import { openPostForm } from "../os";
 import { instance, loadInstance } from "../stores/instance";
 import { isAdmin, refreshSession, session, signout } from "../stores/session";
 import { type ShellMode, setShellMode } from "../stores/shell";
@@ -63,6 +64,13 @@ watch(
         <span class="brand-name">{{ instance.meta?.name ?? "Cinderfish" }}</span>
       </RouterLink>
 
+      <!-- The one post entry that survives in every layout: deck columns hide
+           their pinned composer, so the rail carries the global one. -->
+      <button v-if="session.me" class="compose" type="button" title="发帖" @click="openPostForm()">
+        <AppIcon name="plus" />
+        <span class="compose-label">发帖</span>
+      </button>
+
       <nav class="nav">
         <RouterLink v-for="item in nav" :key="item.to" :to="item.to" class="nav-link" :title="item.label">
           <span class="nav-icon">
@@ -114,13 +122,38 @@ watch(
 /* Rail collapse is a pure media-query state: the full rail down to 1280px,
    an icon-only rail below it. No resize listener, nothing to keep in sync
    with the viewport in JS. */
+.compose {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border: 0;
+  border-radius: var(--radius);
+  background: var(--accent);
+  color: var(--on-accent);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.compose:hover {
+  background: var(--accent-strong);
+}
+
+.compose:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 .account-chip {
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 3px 12px 3px 3px;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--radius);
   background: var(--panel);
   min-width: 0;
 }
@@ -146,7 +179,7 @@ watch(
   justify-content: center;
   padding: 6px 12px;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--radius);
   background: var(--panel);
   color: var(--muted);
   font: inherit;
@@ -240,6 +273,17 @@ watch(
     padding: 6px 0;
     font-size: 0.7rem;
   }
+
+  .compose {
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    margin: 0 auto;
+  }
+
+  .compose-label {
+    display: none;
+  }
 }
 
 @media (max-width: 1099px) {
@@ -264,6 +308,23 @@ watch(
 
   .main {
     padding-bottom: 0;
+  }
+}
+
+/* Deck mode gives the widget column's width back to the horizontal column
+   strip; the rail keeps its own width so the icon state below 1280px still
+   applies. Kept last so its higher specificity wins over the breakpoints. */
+.shell[data-shell="deck"] {
+  grid-template-columns: var(--rail-width) minmax(0, 1fr);
+}
+
+.shell[data-shell="deck"] .widgets {
+  display: none;
+}
+
+@media (max-width: 1279px) {
+  .shell[data-shell="deck"] {
+    grid-template-columns: 76px minmax(0, 1fr);
   }
 }
 </style>

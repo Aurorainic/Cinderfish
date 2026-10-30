@@ -536,3 +536,11 @@ export function searchEmojis(query: string, limit = 64): EmojiEntry[] {
 export function emojiName(char: string): string {
   return ALL_EMOJIS.find((emoji) => emoji.char === char)?.name ?? char;
 }
+
+const CHAR_BY_NAME = new Map(ALL_EMOJIS.map((emoji) => [emoji.name, emoji.char]));
+
+/** Resolve a shortcode name (as sent for custom/server emoji) back to the
+ * catalog character; undefined when the catalog does not carry that name. */
+export function emojiChar(name: string): string | undefined {
+  return CHAR_BY_NAME.get(name.replace(/^:|:$/g, "").toLowerCase());
+}

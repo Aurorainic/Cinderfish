@@ -45,8 +45,7 @@ const timeTitle = computed(() => absoluteTime(props.note.createdAt));
 
 .avatar {
   flex: none;
-  display: block;
-  line-height: 0;
+  display: flex;
 }
 
 .who {

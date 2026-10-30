@@ -197,7 +197,7 @@ onBeforeUnmount(() => {
   padding: 4px;
   margin-bottom: 14px;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--radius);
   background: var(--panel);
   width: fit-content;
   max-width: 100%;
@@ -213,7 +213,7 @@ onBeforeUnmount(() => {
   flex: none;
   padding: 6px 16px;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--muted);
   font-weight: 600;

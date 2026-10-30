@@ -139,7 +139,7 @@ const confirmBoxStyle: CSSProperties = {
   background: "var(--panel)",
   border: "1px solid var(--border)",
   borderRadius: "var(--radius-lg)",
-  boxShadow: "var(--shadow-sm, 0 4px 16px rgba(0, 0, 0, 0.3))",
+  boxShadow: "var(--shadow-sm)",
   padding: "20px",
 };
 

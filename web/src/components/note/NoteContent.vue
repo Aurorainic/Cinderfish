@@ -196,7 +196,7 @@ watch(
   gap: 6px;
   padding: 5px 10px;
   border: 1px solid var(--divider);
-  border-radius: 999px;
+  border-radius: var(--radius-sm);
   font-size: 0.8rem;
   color: var(--muted);
   max-width: 100%;

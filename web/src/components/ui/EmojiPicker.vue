@@ -235,7 +235,7 @@ function onKeydown(event: KeyboardEvent): void {
   flex: none;
   padding: 3px 8px;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--muted);
   font: inherit;

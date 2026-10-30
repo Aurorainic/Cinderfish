@@ -10,9 +10,9 @@ import { isAdmin, session } from "../stores/session";
 type Mode = "public" | "allowlist" | "none";
 
 const MODES: { id: Mode; label: string; desc: string }[] = [
-  { id: "public", label: "公开联邦", desc: "与所有实例互通消息。" },
-  { id: "allowlist", label: "仅白名单", desc: "只与白名单中的实例互通，其余实例的消息一律丢弃。" },
-  { id: "none", label: "不开放联邦", desc: "完全关闭联邦，只保留本实例内部的动态。" },
+  { id: "public", label: "公开联邦", desc: "与所有实例互相投递笔记与活动。" },
+  { id: "allowlist", label: "仅白名单", desc: "只与白名单中的实例互通，其余实例的投递一律丢弃。" },
+  { id: "none", label: "不开放联邦", desc: "完全关闭联邦，只保留本实例内部的笔记。" },
 ];
 
 // The admin API speaks public/allowlist/none, while /api/meta exposes the

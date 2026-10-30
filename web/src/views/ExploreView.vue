@@ -103,7 +103,7 @@ function onDeleted(id: string) {
   padding: 5px;
   margin-bottom: 16px;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--radius);
   background: var(--panel);
   width: fit-content;
 }
@@ -111,7 +111,7 @@ function onDeleted(id: string) {
 .tab {
   padding: 7px 18px;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--muted);
   font-weight: 600;

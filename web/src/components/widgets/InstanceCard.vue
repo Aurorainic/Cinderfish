@@ -61,9 +61,9 @@ const fallbackDescription =
   flex: none;
   width: 38px;
   height: 38px;
-  border-radius: 12px;
-  color: #fff;
-  background: linear-gradient(140deg, #ff8a5c, #e8471f 60%, #b42c0d);
+  border-radius: var(--radius-lg);
+  color: var(--on-accent);
+  background: var(--accent);
 }
 
 .instance-logo .icon {

@@ -112,7 +112,7 @@ onBeforeUnmount(() => document.removeEventListener("pointerdown", onDocumentPoin
     </header>
 
     <div class="col-body" @click.capture="interceptDeckClick">
-      <TimelineFeed v-if="isTimeline" :source="timelineSource" />
+      <TimelineFeed v-if="isTimeline" :source="timelineSource" :composer="false" />
 
       <template v-else-if="column.type === 'notifications'">
         <PagedFeed
@@ -153,7 +153,7 @@ onBeforeUnmount(() => document.removeEventListener("pointerdown", onDocumentPoin
             全球
           </button>
         </nav>
-        <TimelineFeed :key="exploreScope" :source="exploreScope" />
+        <TimelineFeed :key="exploreScope" :source="exploreScope" :composer="false" />
       </template>
     </div>
   </section>
@@ -325,7 +325,7 @@ onBeforeUnmount(() => document.removeEventListener("pointerdown", onDocumentPoin
 .scope-button {
   padding: 5px 14px;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--muted);
   font: inherit;

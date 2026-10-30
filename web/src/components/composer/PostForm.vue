@@ -65,7 +65,9 @@ const canPost = computed(() => {
   return text.value.trim().length > 0 || files.value.length > 0 || !!props.renoteTo;
 });
 
-const title = computed(() => (props.replyTo ? "回复" : props.renoteTo ? "引用" : "说点什么"));
+// Misskey's composer prompt reads as a question ("今どうしてる？"), Chinese
+// equivalent here; the header title names the action instead of repeating it.
+const title = computed(() => (props.replyTo ? "回复" : props.renoteTo ? "引用" : "发帖"));
 
 const quoteExcerpt = computed(() => {
   const target = props.renoteTo;
@@ -340,7 +342,7 @@ onBeforeUnmount(() => {
       ref="textarea"
       v-model="text"
       class="textarea composer-text"
-      :placeholder="replyTo ? '写下回复…' : renoteTo ? '引用并评论…' : '现在在想什么？'"
+      :placeholder="replyTo ? '写下回复…' : renoteTo ? '引用并评论…' : '写点什么吧？'"
       :rows="fixed ? 3 : 4"
       @keydown.ctrl.enter="submit"
       @keydown.meta.enter="submit"
@@ -694,7 +696,7 @@ onBeforeUnmount(() => {
   padding: 2px;
   gap: 2px;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--radius);
   background: var(--bg-raised);
 }
 
@@ -704,7 +706,7 @@ onBeforeUnmount(() => {
   gap: 5px;
   padding: 4px 9px;
   border: 0;
-  border-radius: 999px;
+  border-radius: calc(var(--radius) - 6px);
   background: transparent;
   color: var(--muted);
   font: inherit;

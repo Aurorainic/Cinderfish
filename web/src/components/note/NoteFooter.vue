@@ -189,7 +189,7 @@ onBeforeUnmount(() => {
   gap: 4px;
   padding: 4px 8px;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--muted);
   cursor: pointer;
@@ -245,7 +245,7 @@ onBeforeUnmount(() => {
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28);
+  box-shadow: var(--shadow-sm);
 }
 
 .menu-item {
@@ -274,7 +274,7 @@ onBeforeUnmount(() => {
 
 .pin-notice {
   padding: 2px 8px;
-  border-radius: 999px;
+  border-radius: var(--radius-sm);
   background: color-mix(in srgb, var(--danger) 12%, transparent);
   color: var(--danger);
   font-size: 0.75rem;

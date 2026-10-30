@@ -330,7 +330,7 @@ watch(
       </template>
       <template v-else>没有找到这个账户，可能已经被删除或从未存在过。</template>
     </p>
-    <RouterLink to="/explore" class="button ghost small">去发现页看看</RouterLink>
+    <RouterLink to="/explore" class="button ghost small">去探索页看看</RouterLink>
   </div>
 
   <p v-else-if="loadError" class="notice error">{{ loadError }}</p>
@@ -464,7 +464,7 @@ watch(
 .tab {
   padding: 7px 16px;
   border: 1px solid transparent;
-  border-radius: 999px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--muted);
   font-weight: 600;

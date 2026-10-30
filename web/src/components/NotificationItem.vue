@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import type { Notification } from "../api/types";
-import { EMOJI_CATEGORIES, emojiName } from "../lib/emoji-catalog";
+import { emojiChar, emojiName } from "../lib/emoji-catalog";
 import { absoluteTime, relativeTime } from "../lib/time";
 import AppIcon from "./AppIcon.vue";
 import UserAvatar from "./UserAvatar.vue";
@@ -45,17 +45,12 @@ const to = computed(() => {
 // from the API as a unicode character or as a custom `:shortcode:`; the
 // shortcode is resolved to its catalog character and otherwise shown as-is,
 // so an instance emoji that is not in the catalog still reads as a name.
-const EMOJI_BY_NAME = new Map<string, string>();
-for (const category of EMOJI_CATEGORIES) {
-  for (const entry of category.emojis) EMOJI_BY_NAME.set(entry.name, entry.char);
-}
-
 const reaction = computed(() => {
   const raw = props.notification.reaction?.trim();
   if (!raw) return "";
   const shortcode = /^:([A-Za-z0-9_+-]+):$/.exec(raw);
   if (!shortcode) return raw;
-  return EMOJI_BY_NAME.get(shortcode[1].toLowerCase()) ?? raw;
+  return emojiChar(shortcode[1]) ?? raw;
 });
 
 const reactionTitle = computed(() => emojiName(reaction.value));
@@ -248,7 +243,7 @@ const timeTitle = computed(() => absoluteTime(props.notification.createdAt));
   align-self: center;
   padding: 0 8px;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--radius-sm);
   background: var(--panel);
   font-size: 0.95rem;
   line-height: 1.6;

@@ -99,10 +99,8 @@ function toggleFollow() {
 
 .banner {
   height: 108px;
-  background:
-    radial-gradient(600px 220px at 20% 0%, rgba(255, 107, 53, 0.35), transparent 65%),
-    radial-gradient(400px 180px at 90% 20%, rgba(124, 92, 255, 0.28), transparent 70%),
-    var(--panel-2);
+  background: var(--panel-2);
+  border-bottom: 1px solid var(--divider);
 }
 
 .banner img {
