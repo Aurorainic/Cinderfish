@@ -20,6 +20,7 @@ Go 单二进制的个人/极小规模联邦社交实例。后端契约是 **Miss
 | M4 Streaming（WebSocket） | ✅ | 见 git log |
 | M5 联邦（ActivityPub） | ✅ | `ce7bf11` … `620435d` |
 | M6 前端 | ✅ | `9281a5c` |
+| M6.1 前端界面重构（Firefish/Misskey 风格、自适应 deck） | ✅ | `23ac6d7` … 见 git log |
 | M7 打磨 | ✅ | 见 git log（迁移工具、账号管理、性能基线、部署文档） |
 
 ## 3. 契约以源码为准
@@ -142,6 +143,8 @@ web/                        Vue 3 + TypeScript 前端（api/stores/components/vi
 POST /api/meta                          GET  /api/ping
 POST /api/signup                        POST /api/signin
 POST /api/username/available            POST /api/i
+POST /api/i/update                      POST /api/i/pin
+POST /api/i/unpin
 POST /api/users/show                    POST /api/users/notes
 POST /api/miauth/gen-token
 POST /api/notes/create                  POST /api/notes/show
@@ -190,25 +193,32 @@ M5 联邦路由见 §12.1。
 
 ```
 web/src/api/         类型（Misskey schema）与 fetch 客户端（ApiError 解析 error 信封）
-web/src/stores/      session（token + /api/i）、instance（meta）、streaming（WebSocket）
-web/src/lib/         MFM 渲染（先转义再生成标记）、相对时间
-web/src/components/  NoteCard、NoteComposer、TimelineFeed、QuotedNote、UserAvatar、AppIcon 等
-web/src/layouts/     AppShell（三栏 + 移动底栏）、AuthLayout
+web/src/stores/      session（token + /api/i）、instance（meta）、streaming（WebSocket）、shell（universal/deck）、deck（列配置）
+web/src/lib/         MFM 渲染（先转义，再函数解析，最后生成链接）、emoji 目录、相对时间
+web/src/os.ts        命令式 UI 总线：openPostForm / confirmDialog / openReactionPicker（单例弹层）
+web/src/components/  note/（Note、NoteHeader、NoteContent、NoteMedia、NoteFooter、RenoteBar、use-note）、
+                     composer/PostForm、deck/（DeckColumn、DeckPageWindow、deck-links）、
+                     ui/（PagedFeed、PageWindow、EmojiPicker、MobileNav）、widgets/InstanceCard 等
+web/src/layouts/     AppShell（通用壳：可折叠侧栏 + 主列 + widget 栏）、DeckShell（横向列条）、AuthLayout
 web/src/views/       Timeline、Note、Notifications、Profile、Explore、Settings、Admin、Login、Signup
 ```
 
 ### 11.2 已完成的页面
 
-- **时间线**：关注 / 本地 / 混合 / 全球四频道，`untilId` 分页，WebSocket 实时插入新笔记，加载更多按页大小判断。
-- **发帖**：CW、可见性（public/home/followers）、仅本地、多文件上传、回复上下文、Ctrl/Cmd+Enter 发布；发布后直接插入列表。
-- **笔记卡片**：MFM 渲染（代码块、行内代码、提及、话题标签、链接、粗斜体/删除线、自定义 emoji 占位）、图片与附件、引用转贴、投票展示、反应（快捷表情 + 取消）、转贴、回复、删除自己的笔记。
-- **笔记详情**：单条笔记 + 回复框。
-- **通知**：全部/未读筛选，按类型生成中文文案，显示相关笔记摘要，全部标为已读，实时新通知置顶，侧栏未读徽标。
-- **资料**：真实关注/被关注/笔记计数，加入时间，关注/取消关注，用户笔记分页；远程资料与 404 有明确说明。
-- **设置**：账户信息、主题（浅色/深色，本机持久化）、实例信息、退出登录；明确说明资料编辑尚无后端接口。
-- **管理**：联邦模式三选一（public/allowlist/none，立即生效）、白名单增删（后缀匹配说明），非管理员显示门禁卡片。
-- **探索**：本地/全球公开时间线，支持 `?tag=` 过滤。
+- **双壳自适应**：`stores/shell.ts` 记住 `universal` / `deck`（`localStorage["cinderfish.ui"]`）。通用壳 ≥1280px 是完整侧栏 232px，1280px 以下收成图标栏，1100px 以下隐藏 widget 栏，720px 以下换成五项底栏；deck 壳是 350px 列的横向 scroll-snap 列条，窄屏单列横滑、宽屏并列多列，列配置存 `localStorage["cinderfish.deck.columns"]`（非法值回退 `[local, notifications]`）。deck 模式下点笔记/头像走 `PageWindow` 覆盖层，不改 URL。
+- **时间线**：首页 / 本地 / 社交 / 全球四频道，统一由 `ui/PagedFeed` 承担无限滚动、去重、日期分隔行与断线重载；流式新笔记先累计成「N 条新笔记」浮标，点击才插入。
+- **发帖**：全局 `os.openPostForm()` 对话框（回复、引用、纯转贴），CW、可见性四态分段按钮（public/home/followers/specified 手动解析 `@user@host`）、仅本地、多文件上传、800ms 去抖草稿（`cinderfish.draft`）、Ctrl/Cmd+Enter 发布。
+- **笔记**：拆成 `note/` 下的编排层与部件，行式无卡片、`--divider` 分隔、转贴顶条、引用以 `nested` 态渲染、CW 横幅、1-4 图网格（敏感内容模糊遮罩）、container query 在 580/500/450px 降级；反应条对齐 Firefish（32px 胶囊、自己的反应 accent 实心 + 描边、`scaleIn`）。
+- **笔记详情**：单条笔记 `detail` 态（完整时间、footer 常显）+ 回复入口走全局对话框。
+- **反应**：`ui/EmojiPicker`（搜索 + 分类页签 + 最近使用，`cinderfish.recent-emojis`，键盘可导航）经 `os.openReactionPicker` 打开；`reactionAcceptance=likeOnly` 时只给星标按钮。
+- **MFM**：x2/x3/x4、spin/shake/jump/blink/rainbow/blur、center/small、fg/bg 颜色、mono/serif、plain，动效在 `styles/mfm.css` 且尊重 `prefers-reduced-motion`；未知函数降级为内文，`:shortcode:` 仍是纯文本。
+- **通知**：全部/反应/提及/转贴客户端筛选、行式排版、反应 emoji 走 emoji 目录、全部标为已读、侧栏未读徽标与流式同步。
+- **资料**：置顶笔记区（最多 5 条）+ 笔记/媒体/回复三 tab（`users/notes` 的 `withFiles` / `withReplies`），关注按钮，本人在通用壳内即时反映资料修改。
+- **设置**：个人资料段（昵称 50 字、简介 500 字、头像上传/移除 → `i/update`）、账户信息、主题（浅色/深色，本机持久化）、实例信息、退出登录。
+- **管理**：联邦模式三选一（public/allowlist/none，立即生效）、白名单增删，非管理员显示门禁卡片。
+- **探索**：本地/全球公开时间线，支持 `?tag=`（客户端过滤，仍能继续分页）。
 - **登录/注册**：真实 signin/signup，注册前检查用户名可用性，邀请码字段，注册关闭提示。
+
 
 ### 11.3 服务端托管
 
@@ -241,7 +251,7 @@ prefix = "cinderfish"
 
 ### 11.5 实时更新
 
-`web/src/stores/streaming.ts` 维护唯一 `/streaming` 连接：token 走 query，`connect` 带 `pong:true`，按订阅 id 分发 `channel` 帧，断线指数退避（1s→30s，6 次封顶），登录/退出时重建连接。`main` 频道只由外壳订阅一次（服务端每连接只允许一个），时间线各自订阅自己的频道，重连后重新拉取。
+`web/src/stores/streaming.ts` 维护唯一 `/streaming` 连接：token 走 query，`connect` 带 `pong:true`，按订阅 id 分发 `channel` 帧，断线指数退避（1s→30s，6 次封顶），登录/退出时重建连接。订阅按频道引用计数：同一频道只建立一条服务端订阅，最后一个订阅者释放时才 `disconnect`；外壳自己的 `main` 订阅也计入计数，并在 `onopen` 重新确认，所以通知页进出、断线重连都不会让未读徽标失去通道。时间线各自订阅自己的频道，`__reconnected`（空频道）触发整页重载。
 
 ### 11.6 开发与构建
 
@@ -254,10 +264,14 @@ pnpm build    # 先 vue-tsc --noEmit，再输出 web/dist
 
 ### 11.7 已知缺口
 
-- **资料不可编辑**：后端没有 `i/update`，昵称、简介、头像都只读。
+- **自定义 emoji 没有注册表**：`:shortcode:` 在 MFM 与通知里只按内置目录解析，解析不到就照原样显示；实例自定义 emoji 的注册、管理、picker 分组都在首版之外。
 - **没有搜索、没有用户列表页、没有投票接口**（前端只展示投票结果）。
 - **远程资料不能浏览**：`users/show` 只接受本地用户名；远程用户点击 `@user@host` 会得到说明卡片。
 - **管理面板只有联邦设置**：账户管理、封禁、邀请码管理尚未实现。
+- **i18n 未做**：文案硬编码中文；主题只保留 `data-theme` 双主题 + CSS 变量，没有 Firefish 的 JSON5 主题 DSL。
+- **置顶不同步联邦**：actor 文档声明了 `featured` 集合，但没有对应路由与投递，置顶只在本实例生效。
+- **草稿只有一份**：`cinderfish.draft` 是单条草稿，时间线固定发帖器与全局对话框共用同一个键。
+- **deck 覆盖层单层**：deck 模式的 PageWindow 打开另一个笔记会替换当前页，没有窗口栈。
 - **没有前端自动化测试**：验证靠 `vue-tsc` + 构建 + 真实浏览器手工走查；没有引入 vitest/playwright。
 
 ## 12. M5 联邦（ActivityPub）
