@@ -182,7 +182,7 @@ onBeforeUnmount(() => document.removeEventListener("pointerdown", onDocumentPoin
   gap: 8px;
   padding: 10px 10px 10px 14px;
   border-bottom: 1px solid var(--border);
-  background: var(--panel-header);
+  background: var(--panel-2);
   flex: none;
 }
 

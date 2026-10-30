@@ -1,13 +1,12 @@
 import { createApp } from "vue";
 import App from "./App.vue";
 import { router } from "./router";
+import { applyTheme, resolveTheme } from "./stores/theme";
 import "./styles/main.css";
 import "./styles/mfm.css";
 
-// Resolve the theme before the first paint so the shell does not flash.
-const stored = localStorage.getItem("cinderfish.theme");
-const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-document.documentElement.dataset.theme =
-  stored === "light" || stored === "dark" ? stored : prefersDark ? "dark" : "light";
+if (!document.documentElement.dataset.theme) {
+  applyTheme(resolveTheme(), { persist: false });
+}
 
 createApp(App).use(router).mount("#app");

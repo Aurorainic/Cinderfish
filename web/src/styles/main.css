@@ -1,68 +1,246 @@
-/* Cinderfish frontend: a warm ember accent on a quiet, flat shell
-   inspired by Firefish. Every colour is a token so the light theme in
+/* Cinderfish frontend: a warm ember accent on a quiet, flat shell inspired by
+   Firefish. Colours, scale, motion and layers are tokens so the light theme in
    [data-theme="light"] and the dark theme below stay in sync. */
 
 :root {
-  --accent: #ff6b35;
-  --accent-soft: rgba(255, 107, 53, 0.14);
-  --accent-strong: #ff8a5c;
-  --on-accent: #1a0f08;
+  color-scheme: dark;
+  accent-color: var(--accent);
 
+  /* ---------- surfaces ---------- */
   --bg: #0e0d12;
-  --bg-raised: #17151d;
+  --theme-color: #0e0d12;
   --panel: #1c1a23;
   --panel-2: #24212c;
-  --panel-header: #221f2b;
+  --surface-inset: #17151d;
+  --surface-hover: rgba(255, 255, 255, 0.06);
+  --surface-selected: color-mix(in srgb, var(--accent) 18%, transparent);
+  --popup-bg: #262330;
+  --window-header-bg: #221f2b;
+  --overlay-bg: rgba(0, 0, 0, 0.5);
+  --overlay-blur: 12px;
+
+  /* ---------- accent ---------- */
+  --accent: #ff6b35;
+  --accent-hover: #ff8a5c;
+  --accent-active: #e85a26;
+  --accent-soft: color-mix(in srgb, var(--accent) 14%, transparent);
+  --accent-border: color-mix(in srgb, var(--accent) 42%, var(--border));
+  --text-on-accent: #1a0f08;
+
+  /* ---------- lines ---------- */
   --border: #2e2a38;
+  --border-strong: #3d3849;
   --divider: rgba(255, 255, 255, 0.08);
+  --input-border: rgba(255, 255, 255, 0.1);
+  --input-border-hover: rgba(255, 255, 255, 0.2);
+  --input-border-invalid: var(--danger);
+
+  /* ---------- foreground ---------- */
   --text: #ece9f3;
   --text-strong: #ffffff;
-  --muted: #9893a7;
+  --text-weak: #9893a7;
+  --text-faint: #6b6579;
+  --text-date: #8b8599;
+  --text-on-status: #ffffff;
+
+  /* ---------- status ---------- */
   --danger: #f25f5c;
+  --danger-soft: color-mix(in srgb, var(--danger) 14%, transparent);
+  --danger-border: color-mix(in srgb, var(--danger) 45%, var(--border));
   --success: #4cc38a;
+  --success-soft: color-mix(in srgb, var(--success) 14%, transparent);
+  --warn: #e8b13f;
+  --warn-bg: color-mix(in srgb, var(--warn) 14%, transparent);
+  --warn-fg: #f0c463;
+  --info-bg: rgba(127, 180, 255, 0.12);
+  --info-fg: #a9c4e6;
+
+  /* ---------- content semantics ---------- */
   --link: #ff9868;
+  --link-hover: #ffb494;
   --renote: #4fd1c5;
   --mention: #7fb4ff;
+  --mention-me: #ffc2a1;
   --hashtag: #ffb35c;
   --cw-bg: #2a2634;
   --cw-fg: #ece9f3;
+  --cw-hover-bg: #332e40;
 
-  --radius-sm: 8px;
-  --radius: 14px;
-  --radius-lg: 12px;
-  /* Weak popover shadow only; the old 30px blur projection is gone. */
-  --shadow-sm: 0 2px 10px rgba(0, 0, 0, 0.4);
-  --rail-width: 232px;
-  --side-width: 300px;
-  --content-max: 680px;
+  /* ---------- navigation ---------- */
+  --nav-bg: var(--panel);
+  --nav-fg: var(--text-weak);
+  --nav-fg-hover: var(--text);
+  --nav-active: var(--accent);
+  --nav-indicator: var(--accent);
+  --badge-bg: var(--accent);
+  --badge-fg: var(--text-on-accent);
+
+  /* ---------- focus, scrollbar, selection ---------- */
+  --focus-ring: var(--accent);
+  --focus-outline: 2px solid var(--focus-ring);
+  --focus-halo: color-mix(in srgb, var(--accent) 24%, transparent);
+  --scrollbar-thumb: rgba(255, 255, 255, 0.18);
+  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.32);
+  --scrollbar-size: 8px;
+  --selection-bg: color-mix(in srgb, var(--accent) 32%, transparent);
+  --selection-fg: var(--text-strong);
+
+  /* ---------- shadow ---------- */
+  --shadow-color: rgba(0, 0, 0, 0.45);
+  --shadow-popover: 0 2px 10px var(--shadow-color);
+  --shadow-modal: 0 8px 32px var(--shadow-color);
+
+  /* ---------- radius ---------- */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-full: 999px;
+
+  /* ---------- space ---------- */
+  --space-2: 2px;
+  --space-4: 4px;
+  --space-6: 6px;
+  --space-8: 8px;
+  --space-10: 10px;
+  --space-12: 12px;
+  --space-14: 14px;
+  --space-16: 16px;
+  --space-20: 20px;
+  --space-24: 24px;
+  --space-28: 28px;
+  --space-32: 32px;
+  --space-40: 40px;
+  --space-48: 48px;
+  --space-64: 64px;
+
+  /* ---------- type ---------- */
   --font: "Inter", "Noto Sans SC", -apple-system, BlinkMacSystemFont, "Segoe UI",
     sans-serif;
+  --font-mono: ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas,
+    monospace;
+  --fs-2xs: 0.68rem;
+  --fs-xs: 0.76rem;
+  --fs-sm: 0.85rem;
+  --fs-md: 0.95rem;
+  --fs-base: 0.9375rem;
+  --fs-lg: 1.15rem;
+  --fs-xl: 1.5rem;
+  --fs-2xl: 1.9rem;
+  --fs-3xl: 2.4rem;
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+  --leading-tight: 1.25;
+  --leading-base: 1.55;
+  --leading-relaxed: 1.65;
+
+  /* ---------- motion ---------- */
+  --dur-fast: 0.12s;
+  --dur-base: 0.15s;
+  --dur-slow: 0.3s;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-emphasized: cubic-bezier(0, 0.5, 0.5, 1);
+
+  /* ---------- layers ---------- */
+  --z-sticky: 20;
+  --z-popover: 60;
+  --z-window: 1000;
+  --z-overlay: 1100;
+  --z-toast: 1200;
+
+  /* ---------- layout ---------- */
+  --rail-width: 232px;
+  --rail-width-collapsed: 76px;
+  --side-width: 300px;
+  --shell-max-width: 1240px;
+  --bottom-bar-height: 72px;
+  --touch-target: 40px;
+
+  /* ---------- legacy aliases ---------- */
+  --muted: var(--text-weak);
+  --on-accent: var(--text-on-accent);
+  --accent-strong: var(--accent-hover);
+  --bg-raised: var(--surface-inset);
+  --radius: var(--radius-md);
+  --shadow-sm: var(--shadow-popover);
 }
 
 :root[data-theme="light"] {
+  color-scheme: light;
+
   --bg: #f7f5f1;
-  --bg-raised: #ffffff;
+  --theme-color: #f7f5f1;
   --panel: #ffffff;
   --panel-2: #f1eee8;
-  --panel-header: #f4f1ea;
+  --surface-inset: #f3efe7;
+  --surface-hover: rgba(36, 31, 26, 0.06);
+  --popup-bg: #ffffff;
+  --window-header-bg: #f4f1ea;
+  --overlay-bg: rgba(30, 24, 20, 0.4);
+
   --border: #e4dfd6;
+  --border-strong: #d2cbbf;
   --divider: rgba(0, 0, 0, 0.08);
+  --input-border: rgba(36, 31, 26, 0.14);
+  --input-border-hover: rgba(36, 31, 26, 0.24);
+
   --text: #241f1a;
   --text-strong: #100d0a;
-  --muted: #786f64;
+  --text-weak: #786f64;
+  --text-faint: #a2988b;
+  --text-date: #847b70;
+
   --danger: #c8403d;
   --success: #1f8f5f;
+  --warn: #9a6a00;
+  --warn-fg: #7a5200;
+  --info-bg: rgba(22, 104, 184, 0.1);
+  --info-fg: #1b5a94;
+
   --link: #c2440f;
+  --link-hover: #96330a;
   --renote: #0e8a7b;
   --mention: #1668b8;
+  --mention-me: #b03a10;
   --hashtag: #a35a00;
   --cw-bg: #f0ebe1;
   --cw-fg: #241f1a;
-  --shadow-sm: 0 2px 10px rgba(60, 40, 20, 0.14);
+  --cw-hover-bg: #e7e0d4;
+
+  --scrollbar-thumb: rgba(36, 31, 26, 0.22);
+  --scrollbar-thumb-hover: rgba(36, 31, 26, 0.36);
+  --shadow-color: rgba(60, 40, 20, 0.18);
 }
 
 * {
   box-sizing: border-box;
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) transparent;
+}
+
+::selection {
+  color: var(--selection-fg);
+  background: var(--selection-bg);
+}
+
+::-webkit-scrollbar {
+  width: var(--scrollbar-size);
+  height: var(--scrollbar-size);
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: var(--radius-full);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
 }
 
 html,
@@ -76,8 +254,8 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: var(--font);
-  font-size: 15px;
-  line-height: 1.55;
+  font-size: var(--fs-base);
+  line-height: var(--leading-base);
   -webkit-font-smoothing: antialiased;
 }
 
@@ -94,9 +272,9 @@ h1,
 h2,
 h3 {
   margin: 0;
-  line-height: 1.25;
+  line-height: var(--leading-tight);
   color: var(--text-strong);
-  font-weight: 700;
+  font-weight: var(--weight-bold);
   letter-spacing: -0.01em;
 }
 
@@ -112,17 +290,24 @@ select {
   color: inherit;
 }
 
+@media (prefers-reduced-motion: no-preference) {
+  html.theme-switching,
+  html.theme-switching body {
+    transition: background-color var(--dur-slow) ease, color var(--dur-slow) ease;
+  }
+}
+
 .muted {
-  color: var(--muted);
+  color: var(--text-weak);
 }
 
 .small {
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
 }
 
 /* ---------- shared utilities ---------- */
 
-/* Panel surface: flat background, border, 12px rounding. */
+/* Panel surface: flat background, border, --radius-lg rounding. */
 .panel {
   background: var(--panel);
   border: 1px solid var(--border);
@@ -131,7 +316,7 @@ select {
 
 /* Borderless flat note row: vertical padding only, no rounding. */
 .note-row {
-  padding: 12px 0;
+  padding: var(--space-12) 0;
   border-radius: 0;
 }
 
@@ -150,28 +335,28 @@ select {
 .shell {
   display: grid;
   grid-template-columns: var(--rail-width) minmax(0, 1fr) var(--side-width);
-  gap: 28px;
-  max-width: 1240px;
+  gap: var(--space-28);
+  max-width: var(--shell-max-width);
   margin: 0 auto;
-  padding: 24px;
+  padding: var(--space-24);
   min-height: 100vh;
 }
 
 .rail {
   position: sticky;
-  top: 24px;
+  top: var(--space-24);
   align-self: start;
   display: flex;
   flex-direction: column;
-  gap: 20px;
-  height: calc(100vh - 48px);
+  gap: var(--space-20);
+  height: calc(100vh - var(--space-48));
 }
 
 .brand {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 6px 8px;
+  gap: var(--space-10);
+  padding: var(--space-6) var(--space-8);
 }
 
 /* Flat ember badge: the accent token on its own, no gradient wash and no glow. */
@@ -183,7 +368,7 @@ select {
   width: 38px;
   height: 38px;
   border-radius: var(--radius-lg);
-  color: var(--on-accent);
+  color: var(--text-on-accent);
   background: var(--accent);
 }
 
@@ -194,8 +379,8 @@ select {
 }
 
 .brand-name {
-  font-size: 1.15rem;
-  font-weight: 800;
+  font-size: var(--fs-lg);
+  font-weight: var(--weight-bold);
   letter-spacing: -0.02em;
   color: var(--text-strong);
 }
@@ -203,18 +388,18 @@ select {
 .nav {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--space-4);
 }
 
 .nav-link {
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 11px 14px;
-  border-radius: var(--radius);
-  color: var(--muted);
-  font-weight: 600;
-  transition: background 0.15s ease, color 0.15s ease;
+  gap: var(--space-14);
+  padding: var(--space-10) var(--space-14);
+  border-radius: var(--radius-md);
+  color: var(--nav-fg);
+  font-weight: var(--weight-semibold);
+  transition: background var(--dur-base) ease, color var(--dur-base) ease;
 }
 
 .nav-link .icon {
@@ -223,37 +408,37 @@ select {
 }
 
 .nav-link:hover {
-  background: var(--panel);
-  color: var(--text);
+  background: var(--surface-hover);
+  color: var(--nav-fg-hover);
 }
 
 .nav-link.router-link-active {
-  color: var(--accent);
-  background: var(--accent-soft);
+  color: var(--nav-active);
+  background: var(--surface-selected);
 }
 
 .rail-foot {
   margin-top: auto;
   display: flex;
-  gap: 8px;
-  padding: 0 6px;
+  gap: var(--space-8);
+  padding: 0 var(--space-6);
 }
 
 .main {
   min-width: 0;
-  padding-bottom: 60px;
+  padding-bottom: var(--space-64);
 }
 
 .card {
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  padding: 18px;
+  padding: var(--space-20);
 }
 
 .card-title {
-  font-size: 0.95rem;
-  margin-bottom: 12px;
+  font-size: var(--fs-md);
+  margin-bottom: var(--space-12);
 }
 
 /* ---------- controls ---------- */
@@ -262,20 +447,21 @@ select {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  padding: 9px 18px;
+  gap: var(--space-8);
+  padding: var(--space-10) var(--space-20);
   border: 0;
-  border-radius: var(--radius);
+  border-radius: var(--radius-md);
   background: var(--accent);
-  color: var(--on-accent);
-  font-weight: 700;
+  color: var(--text-on-accent);
+  font-weight: var(--weight-bold);
   cursor: pointer;
-  transition: transform 0.12s ease, background 0.15s ease, opacity 0.15s ease;
+  transition: transform var(--dur-fast) ease, background var(--dur-base) ease,
+    opacity var(--dur-base) ease;
 }
 
 .button:hover {
-  background: var(--accent-strong);
-  color: var(--on-accent);
+  background: var(--accent-hover);
+  color: var(--text-on-accent);
 }
 
 .button:active {
@@ -299,26 +485,32 @@ select {
 }
 
 .button.small {
-  padding: 6px 14px;
-  font-size: 0.85rem;
+  padding: var(--space-6) var(--space-14);
+  font-size: var(--fs-sm);
 }
 
 .button.danger {
   background: var(--danger);
-  color: #fff;
+  color: var(--text-on-status);
+}
+
+.button:focus-visible,
+.icon-button:focus-visible {
+  outline: var(--focus-outline);
+  outline-offset: 2px;
 }
 
 .icon-button {
   display: grid;
   place-items: center;
-  width: 40px;
-  height: 40px;
+  width: var(--touch-target);
+  height: var(--touch-target);
   border: 1px solid var(--border);
-  border-radius: 50%;
+  border-radius: var(--radius-full);
   background: var(--panel);
-  color: var(--muted);
+  color: var(--text-weak);
   cursor: pointer;
-  transition: color 0.15s ease, border-color 0.15s ease;
+  transition: color var(--dur-base) ease, border-color var(--dur-base) ease;
 }
 
 .icon-button:hover {
@@ -329,32 +521,38 @@ select {
 .field {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  margin-bottom: 14px;
+  gap: var(--space-6);
+  margin-bottom: var(--space-14);
 }
 
 .field label {
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--muted);
+  font-size: var(--fs-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--text-weak);
 }
 
 .input,
 .textarea {
   width: 100%;
-  padding: 11px 14px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--bg-raised);
+  padding: var(--space-10) var(--space-14);
+  border: 1px solid var(--input-border);
+  border-radius: var(--radius-md);
+  background: var(--surface-inset);
   color: var(--text);
   outline: none;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition: border-color var(--dur-base) ease,
+    box-shadow var(--dur-base) ease;
+}
+
+.input:hover,
+.textarea:hover {
+  border-color: var(--input-border-hover);
 }
 
 .input:focus,
 .textarea:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-soft);
+  box-shadow: 0 0 0 3px var(--focus-halo);
 }
 
 .textarea {
@@ -363,29 +561,29 @@ select {
 }
 
 .notice {
-  padding: 10px 14px;
-  border-radius: var(--radius);
-  font-size: 0.88rem;
-  margin-bottom: 14px;
+  padding: var(--space-10) var(--space-14);
+  border-radius: var(--radius-md);
+  font-size: var(--fs-sm);
+  margin-bottom: var(--space-14);
   border: 1px solid var(--border);
   background: var(--panel-2);
 }
 
 .notice.error {
-  border-color: color-mix(in srgb, var(--danger) 45%, var(--border));
-  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  border-color: var(--danger-border);
+  background: var(--danger-soft);
   color: var(--danger);
 }
 
 .notice.info {
-  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+  border-color: var(--accent-border);
   background: var(--accent-soft);
   color: var(--text);
 }
 
 .hint {
-  font-size: 0.78rem;
-  color: var(--muted);
+  font-size: var(--fs-xs);
+  color: var(--text-weak);
 }
 
 .hint.ok {
@@ -401,12 +599,12 @@ select {
 .page-title {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 18px;
+  gap: var(--space-12);
+  margin-bottom: var(--space-20);
 }
 
 .page-title h1 {
-  font-size: 1.4rem;
+  font-size: var(--fs-xl);
 }
 
 /* Calm empty state: a quiet glyph, a title, an optional line of help. Used by
@@ -415,20 +613,20 @@ select {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
-  padding: 48px 20px;
+  gap: var(--space-10);
+  padding: var(--space-48) var(--space-20);
   text-align: center;
-  color: var(--muted);
+  color: var(--text-weak);
 }
 
 .placeholder .icon {
   width: 30px;
   height: 30px;
-  color: var(--muted);
+  color: var(--text-weak);
 }
 
 .placeholder h2 {
-  font-size: 1.05rem;
+  font-size: var(--fs-lg);
 }
 
 /* ---------- auth ---------- */
@@ -443,8 +641,8 @@ select {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  padding: 48px clamp(24px, 6vw, 64px);
-  background: var(--bg-raised);
+  padding: var(--space-48) clamp(var(--space-24), 6vw, var(--space-64));
+  background: var(--surface-inset);
   border-right: 1px solid var(--border);
 }
 
@@ -453,13 +651,13 @@ select {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 18px;
-  padding: 64px;
+  gap: var(--space-20);
+  padding: var(--space-64);
   background: var(--bg);
 }
 
 .auth-aside h1 {
-  font-size: 2.4rem;
+  font-size: var(--fs-3xl);
   max-width: 12ch;
 }
 
