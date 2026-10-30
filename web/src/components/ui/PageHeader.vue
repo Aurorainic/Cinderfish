@@ -181,22 +181,23 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .page-header {
+  --page-header-bleed: var(--space-24);
   position: sticky;
   top: 0;
-  z-index: 20;
+  z-index: var(--z-sticky);
   display: flex;
   align-items: center;
   gap: 8px;
   min-height: 52px;
+  margin-inline: calc(-1 * var(--page-header-bleed));
+  padding-inline: var(--page-header-bleed);
   border-bottom: 1px solid var(--divider);
-  background: color-mix(in srgb, var(--panel) 86%, transparent);
-  -webkit-backdrop-filter: blur(14px) saturate(1.2);
-  backdrop-filter: blur(14px) saturate(1.2);
+  background: var(--panel);
 }
 
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+@media (max-width: 720px) {
   .page-header {
-    background: var(--panel);
+    --page-header-bleed: var(--space-12);
   }
 }
 

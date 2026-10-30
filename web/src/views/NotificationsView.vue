@@ -1,32 +1,69 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import { api } from "../api/client";
 import type { Notification } from "../api/types";
 import { session } from "../stores/session";
 import { setUnreadNotifications, streaming, unreadNotifications } from "../stores/streaming";
 import AppIcon from "../components/AppIcon.vue";
 import NotificationItem from "../components/NotificationItem.vue";
+import PageHeader from "../components/ui/PageHeader.vue";
 import PagedFeed from "../components/ui/PagedFeed.vue";
 import type { PagedFeedParams } from "../components/ui/PagedFeed.vue";
+import { usePageTitle } from "../composables/use-page-title";
 
 // Type tabs are pushed down to the endpoint as includeTypes, so every page
 // the feed receives is already of the selected type and an empty result means
 // the type really has no notifications.
 type Filter = "all" | "reaction" | "mention" | "renote";
 
+const FILTERS: readonly Filter[] = ["all", "reaction", "mention", "renote"];
+const LABELS: Record<Filter, string> = {
+  all: "全部",
+  reaction: "反应",
+  mention: "提及",
+  renote: "转贴",
+};
+
 const PAGE_SIZE = 20;
+
+const route = useRoute();
+const router = useRouter();
+
+usePageTitle("通知");
+
+const tabs = FILTERS.map((key) => ({ key, label: LABELS[key] }));
 
 const notifications = ref<Notification[]>([]);
 const marking = ref(false);
 const error = ref("");
-const filter = ref<Filter>("all");
 
-const filters: { id: Filter; label: string }[] = [
-  { id: "all", label: "全部" },
-  { id: "reaction", label: "反应" },
-  { id: "mention", label: "提及" },
-  { id: "renote", label: "转贴" },
-];
+const tab = computed<string>({
+  get() {
+    const raw = typeof route.query.tab === "string" ? route.query.tab : "";
+    return (FILTERS as readonly string[]).includes(raw) ? raw : "all";
+  },
+  set(value) {
+    if (route.query.tab === value) return;
+    void router.push({ query: { ...route.query, tab: value } });
+  },
+});
+
+function isFilter(value: string): value is Filter {
+  return (FILTERS as readonly string[]).includes(value);
+}
+
+const filter = computed<Filter>(() => (isFilter(tab.value) ? tab.value : "all"));
+
+watch(
+  () => route.query.tab,
+  () => {
+    const raw = typeof route.query.tab === "string" ? route.query.tab : "";
+    if (!raw || raw === tab.value) return;
+    void router.replace({ query: { ...route.query, tab: tab.value } });
+  },
+  { immediate: true },
+);
 
 function includeTypesFor(type: Filter): string[] | undefined {
   return type === "all" ? undefined : [type];
@@ -126,6 +163,25 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
+  <PageHeader v-model:tab="tab" title="通知" :tabs="session.me ? tabs : null">
+    <template v-if="session.me" #actions>
+      <span v-if="unreadNotifications" class="count" :title="`${unreadNotifications} 条未读`">
+        {{ unreadNotifications }}
+      </span>
+      <button
+        class="mark"
+        type="button"
+        :disabled="marking || unreadNotifications === 0"
+        :title="marking ? '处理中…' : '全部标为已读'"
+        :aria-label="marking ? '处理中…' : '全部标为已读'"
+        @click="markAllRead"
+      >
+        <AppIcon name="check" />
+        <span class="mark-label">{{ marking ? "处理中…" : "全部标为已读" }}</span>
+      </button>
+    </template>
+  </PageHeader>
+
   <div v-if="!session.me" class="card placeholder">
     <AppIcon name="bell" />
     <h2>需要登录</h2>
@@ -133,35 +189,7 @@ onBeforeUnmount(() => {
     <RouterLink to="/login" class="button small">登录</RouterLink>
   </div>
 
-  <template v-else>
-    <header class="page-title head">
-      <h1>通知</h1>
-      <span v-if="unreadNotifications" class="count">{{ unreadNotifications }} 条未读</span>
-      <button
-        class="button ghost small mark"
-        type="button"
-        :disabled="marking || unreadNotifications === 0"
-        @click="markAllRead"
-      >
-        <AppIcon name="check" />
-        {{ marking ? "处理中…" : "全部标为已读" }}
-      </button>
-    </header>
-
-    <nav class="filters" aria-label="通知类型">
-      <button
-        v-for="tab in filters"
-        :key="tab.id"
-        type="button"
-        class="filter"
-        :class="{ active: filter === tab.id }"
-        :aria-pressed="filter === tab.id"
-        @click="filter = tab.id"
-      >
-        {{ tab.label }}
-      </button>
-    </nav>
-
+  <div v-else class="page-body">
     <p v-if="error" class="notice error">{{ error }}</p>
 
     <div class="feed">
@@ -180,70 +208,58 @@ onBeforeUnmount(() => {
         <template #empty>{{ emptyText }}</template>
       </PagedFeed>
     </div>
-  </template>
+  </div>
 </template>
 
 <style scoped>
-.head {
-  flex-wrap: wrap;
+.page-body {
+  padding-top: var(--space-12);
 }
 
 .count {
   padding: 2px 9px;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   background: var(--accent-soft);
   color: var(--accent);
-  font-size: 0.78rem;
+  font-size: var(--fs-xs);
   font-weight: 700;
 }
 
 .mark {
-  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-weak);
+  font: inherit;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  cursor: pointer;
+  transition: color var(--dur-base) ease, background var(--dur-base) ease;
 }
 
 .mark .icon {
-  width: 14px;
-  height: 14px;
+  width: 15px;
+  height: 15px;
 }
 
-.filters {
-  display: flex;
-  gap: 4px;
-  padding: 4px;
-  margin-bottom: 14px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--panel);
-  width: fit-content;
-  max-width: 100%;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-
-.filters::-webkit-scrollbar {
-  display: none;
-}
-
-.filter {
-  flex: none;
-  padding: 6px 16px;
-  border: 0;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--muted);
-  font-weight: 600;
-  font-size: 0.88rem;
-  cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease;
-}
-
-.filter:hover {
+.mark:hover:not(:disabled) {
   color: var(--text);
+  background: var(--surface-hover);
 }
 
-.filter.active {
-  background: var(--accent);
-  color: var(--on-accent);
+.mark:focus-visible {
+  outline: var(--focus-outline);
+  outline-offset: 2px;
+}
+
+.mark:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
 /* Borderless rows carry their own hairline, so they must not be spaced. */
@@ -252,12 +268,14 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 520px) {
-  .mark {
-    margin-left: 0;
+  .mark-label {
+    display: none;
   }
 
-  .filter {
-    padding: 6px 13px;
+  .mark {
+    width: 34px;
+    padding: 0;
+    justify-content: center;
   }
 }
 </style>

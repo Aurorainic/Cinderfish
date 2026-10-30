@@ -1,18 +1,53 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
-import { useRoute } from "vue-router";
+import { computed, ref, watch } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import { api } from "../api/client";
 import type { Note, TimelineParams } from "../api/types";
 import AppIcon from "../components/AppIcon.vue";
 import NoteItem from "../components/note/Note.vue";
+import PageHeader from "../components/ui/PageHeader.vue";
 import PagedFeed from "../components/ui/PagedFeed.vue";
 import type { PagedFeedParams, PagedFeedResult } from "../components/ui/PagedFeed.vue";
+import { usePageTitle } from "../composables/use-page-title";
 
-const route = useRoute();
-const scope = ref<"local" | "global">("local");
-const tag = computed(() => (typeof route.query.tag === "string" ? route.query.tag : ""));
+type Scope = "local" | "global";
+
+const SCOPES: readonly Scope[] = ["local", "global"];
+const LABELS: Record<Scope, string> = { local: "本地", global: "全球" };
 
 const PAGE_SIZE = 20;
+
+const route = useRoute();
+const router = useRouter();
+
+usePageTitle("探索");
+
+const tabs = SCOPES.map((key) => ({ key, label: LABELS[key] }));
+
+const tag = computed(() => (typeof route.query.tag === "string" ? route.query.tag : ""));
+
+const tab = computed<string>({
+  get() {
+    const raw = typeof route.query.tab === "string" ? route.query.tab : "";
+    return (SCOPES as readonly string[]).includes(raw) ? raw : "local";
+  },
+  set(value) {
+    if (route.query.tab === value) return;
+    void router.push({ query: { ...route.query, tab: value } });
+  },
+});
+
+const scope = computed<Scope>(() => (tab.value === "global" ? "global" : "local"));
+
+watch(
+  () => route.query.tab,
+  () => {
+    const raw = typeof route.query.tab === "string" ? route.query.tab : "";
+    if (!raw || raw === tab.value) return;
+    void router.replace({ query: { ...route.query, tab: tab.value } });
+  },
+  { immediate: true },
+);
 
 const streamChannels = { local: "localTimeline", global: "globalTimeline" };
 
@@ -59,67 +94,40 @@ function onDeleted(id: string) {
 </script>
 
 <template>
-  <header class="page-title">
-    <h1>探索</h1>
-  </header>
+  <PageHeader v-model:tab="tab" title="探索" :tabs="tabs" />
 
-  <p v-if="tag" class="notice info">筛选话题：#{{ tag }}</p>
+  <div class="page-body">
+    <p v-if="tag" class="notice info">筛选话题：#{{ tag }}</p>
 
-  <nav class="tabs">
-    <button type="button" class="tab" :class="{ active: scope === 'local' }" @click="scope = 'local'">本地</button>
-    <button type="button" class="tab" :class="{ active: scope === 'global' }" @click="scope = 'global'">全球</button>
-  </nav>
-
-  <div class="explore-feed">
-    <PagedFeed
-      :key="`${scope}:${tag}`"
-      ref="feed"
-      :fetcher="fetcher"
-      :stream-channel="streamChannels[scope]"
-      :stream-filter="streamFilter"
-    >
-      <template #item="{ item }">
-        <NoteItem :note="toNote(item)" @deleted="onDeleted" />
-      </template>
-      <template #empty>
-        <div class="placeholder">
-          <AppIcon name="feather" />
-          <span>这里还没有笔记。</span>
-        </div>
-      </template>
-    </PagedFeed>
+    <div class="explore-feed">
+      <PagedFeed
+        :key="`${scope}:${tag}`"
+        ref="feed"
+        :fetcher="fetcher"
+        :stream-channel="streamChannels[scope]"
+        :stream-filter="streamFilter"
+      >
+        <template #item="{ item }">
+          <NoteItem :note="toNote(item)" @deleted="onDeleted" />
+        </template>
+        <template #empty>
+          <div class="placeholder">
+            <AppIcon name="feather" />
+            <span>这里还没有笔记。</span>
+          </div>
+        </template>
+      </PagedFeed>
+    </div>
   </div>
 </template>
 
 <style scoped>
+.page-body {
+  padding-top: var(--space-12);
+}
+
 /* Borderless rows supply their own hairline; drop PagedFeed's card gap. */
 .explore-feed :deep(.paged-feed) {
   gap: 0;
-}
-
-.tabs {
-  display: flex;
-  gap: 6px;
-  padding: 5px;
-  margin-bottom: 16px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--panel);
-  width: fit-content;
-}
-
-.tab {
-  padding: 7px 18px;
-  border: 0;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--muted);
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.tab.active {
-  background: var(--accent);
-  color: var(--on-accent);
 }
 </style>

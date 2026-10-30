@@ -1,97 +1,69 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from "vue";
+import { computed, watch } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import TimelineFeed from "../components/TimelineFeed.vue";
+import PageHeader from "../components/ui/PageHeader.vue";
+import { usePageTitle } from "../composables/use-page-title";
 import { isLoggedIn, session } from "../stores/session";
 
 type Source = "home" | "local" | "hybrid" | "global";
 
-const source = ref<Source>("local");
-const chosen = ref(false);
-
 // Misskey channel names: home reads as 首页, hybrid as 社交. Deck columns use
 // the same labels (stores/deck.ts), so both shells name a channel alike.
-const tabs: { id: Source; label: string; auth?: boolean }[] = [
-  { id: "home", label: "首页", auth: true },
-  { id: "local", label: "本地" },
-  { id: "hybrid", label: "社交", auth: true },
-  { id: "global", label: "全球" },
-];
+const CHANNELS: readonly Source[] = ["home", "local", "hybrid", "global"];
+const LABELS: Record<Source, string> = {
+  home: "首页",
+  local: "本地",
+  hybrid: "社交",
+  global: "全球",
+};
 
-function pick(id: Source) {
-  source.value = id;
-  chosen.value = true;
+const AUTH_CHANNELS: readonly string[] = ["home", "hybrid"];
+
+const route = useRoute();
+const router = useRouter();
+
+usePageTitle("时间线");
+
+function isChannel(value: string): value is Source {
+  return (CHANNELS as readonly string[]).includes(value);
 }
 
-// Logged-in users start on the home timeline, guests on local. The session
-// resolves asynchronously, so wait for it unless the user already picked.
+function isAvailable(value: string): value is Source {
+  return isChannel(value) && (isLoggedIn.value || !AUTH_CHANNELS.includes(value));
+}
+
+const tabs = computed(() =>
+  CHANNELS.filter((key) => isAvailable(key)).map((key) => ({ key, label: LABELS[key] })),
+);
+
+const tab = computed<string>({
+  get() {
+    const raw = typeof route.query.tab === "string" ? route.query.tab : "";
+    if (isAvailable(raw)) return raw;
+    return isLoggedIn.value ? "home" : "local";
+  },
+  set(value) {
+    if (route.query.tab === value) return;
+    void router.push({ query: { ...route.query, tab: value } });
+  },
+});
+
+const source = computed<Source>(() => (isChannel(tab.value) ? tab.value : "local"));
+
 watch(
-  () => session.ready,
-  (ready) => {
-    if (ready && !chosen.value) source.value = isLoggedIn.value ? "home" : "local";
+  [() => route.query.tab, () => session.ready, isLoggedIn],
+  () => {
+    if (!session.ready) return;
+    const raw = typeof route.query.tab === "string" ? route.query.tab : "";
+    if (!raw || raw === tab.value) return;
+    void router.replace({ query: { ...route.query, tab: tab.value } });
   },
   { immediate: true },
 );
-
-onMounted(() => {
-  if (session.ready && !chosen.value) source.value = isLoggedIn.value ? "home" : "local";
-});
 </script>
 
 <template>
-  <header class="page-title">
-    <h1>时间线</h1>
-  </header>
-
-  <nav class="tabs">
-    <button
-      v-for="tab in tabs"
-      :key="tab.id"
-      type="button"
-      class="tab"
-      :class="{ active: source === tab.id }"
-      @click="pick(tab.id)"
-    >
-      {{ tab.label }}
-      <span v-if="tab.auth && !isLoggedIn" class="lock" title="需要登录">·</span>
-    </button>
-  </nav>
-
+  <PageHeader v-model:tab="tab" title="时间线" :tabs="tabs" />
   <TimelineFeed :source="source" />
 </template>
-
-<style scoped>
-.tabs {
-  display: flex;
-  gap: 6px;
-  padding: 5px;
-  margin-bottom: 16px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--panel);
-  width: fit-content;
-}
-
-.tab {
-  padding: 7px 18px;
-  border: 0;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--muted);
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease;
-}
-
-.tab:hover {
-  color: var(--text);
-}
-
-.tab.active {
-  background: var(--accent);
-  color: var(--on-accent);
-}
-
-.lock {
-  opacity: 0.7;
-}
-</style>
