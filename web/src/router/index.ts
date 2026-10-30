@@ -41,10 +41,60 @@ export const router = createRouter({
       name: "explore",
       component: () => import("../views/ExploreView.vue"),
     },
+    // Settings is a two-column shell with one child page per tab; the child
+    // routes are named `settings-<tab>`, which is how the layout finds the
+    // active menu entry. `/settings` lands on the profile tab, and an unknown
+    // tab falls back to the same default instead of the 404 page.
     {
       path: "/settings",
       name: "settings",
       component: () => import("../views/SettingsView.vue"),
+      children: [
+        { path: "", name: "settings-index", redirect: { name: "settings-profile" } },
+        {
+          path: "profile",
+          name: "settings-profile",
+          component: () => import("../views/settings/ProfileSettings.vue"),
+        },
+        {
+          path: "appearance",
+          name: "settings-appearance",
+          component: () => import("../views/settings/AppearanceSettings.vue"),
+        },
+        {
+          path: "navigation",
+          name: "settings-navigation",
+          component: () => import("../views/settings/NavigationSettings.vue"),
+        },
+        {
+          path: "widgets",
+          name: "settings-widgets",
+          component: () => import("../views/settings/WidgetSettings.vue"),
+        },
+        {
+          path: "notifications",
+          name: "settings-notifications",
+          component: () => import("../views/settings/NotificationSettings.vue"),
+        },
+        {
+          path: "privacy",
+          name: "settings-privacy",
+          component: () => import("../views/settings/PrivacySettings.vue"),
+        },
+        {
+          path: "account",
+          name: "settings-account",
+          component: () => import("../views/settings/AccountSettings.vue"),
+        },
+        {
+          path: "about",
+          name: "settings-about",
+          component: () => import("../views/settings/AboutSettings.vue"),
+        },
+        // A redirect target written as a path instead of a route name keeps the
+        // captured `tab` param from being reported as discarded.
+        { path: ":tab(.*)", redirect: "/settings/profile" },
+      ],
     },
     {
       path: "/admin",
