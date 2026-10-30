@@ -3,36 +3,30 @@ import { computed, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import AppIcon from "../components/AppIcon.vue";
 import MobileNav from "../components/ui/MobileNav.vue";
+import NavDrawer from "../components/ui/NavDrawer.vue";
 import UserAvatar from "../components/UserAvatar.vue";
-import InstanceCard from "../components/widgets/InstanceCard.vue";
+import WidgetsDrawer from "../components/widgets/WidgetsDrawer.vue";
+import WidgetStack from "../components/widgets/WidgetStack.vue";
+import { navItemsFor } from "../nav";
 import { openPostForm } from "../os";
 import { instance, loadInstance } from "../stores/instance";
-import { isAdmin, refreshSession, session, signout } from "../stores/session";
+import { navPrefs } from "../stores/nav";
+import { refreshSession, session, signout } from "../stores/session";
 import { type ShellMode, setShellMode } from "../stores/shell";
-import { streaming, unreadNotifications } from "../stores/streaming";
+import { streaming } from "../stores/streaming";
+import { theme, toggleTheme } from "../stores/theme";
 
 const props = withDefaults(defineProps<{ mode?: ShellMode }>(), { mode: "universal" });
 
 const router = useRouter();
-const theme = ref(document.documentElement.dataset.theme ?? "dark");
+const drawerOpen = ref(false);
 
-function toggleTheme() {
-  theme.value = theme.value === "dark" ? "light" : "dark";
-  document.documentElement.dataset.theme = theme.value;
-  localStorage.setItem("cinderfish.theme", theme.value);
-}
-
-const nav = computed(() => {
-  const items = [
-    { to: "/", icon: "home", label: "时间线" },
-    { to: "/notifications", icon: "bell", label: "通知" },
-    { to: "/explore", icon: "compass", label: "探索" },
-    { to: "/settings", icon: "settings", label: "设置" },
-  ] as const;
-  return isAdmin.value ? [...items, { to: "/admin", icon: "shield", label: "管理" } as const] : items;
-});
+// Reads the registry's show()/badge() inside the computed, so an admin item or
+// an unread count appears without the rail knowing which item carries one.
+const nav = computed(() => navItemsFor(navPrefs.value.desktop));
 
 function handleSignout() {
+  drawerOpen.value = false;
   signout();
   router.push("/");
 }
@@ -40,6 +34,7 @@ function handleSignout() {
 // The layout switch is a preference, not a route: deck mode keeps the same
 // URL and only swaps what the main area renders.
 function toggleShellMode() {
+  drawerOpen.value = false;
   setShellMode(props.mode === "deck" ? "universal" : "deck");
 }
 
@@ -71,15 +66,21 @@ watch(
         <span class="compose-label">发帖</span>
       </button>
 
-      <nav class="nav">
-        <RouterLink v-for="item in nav" :key="item.to" :to="item.to" class="nav-link" :title="item.label">
+      <nav class="nav" aria-label="主导航">
+        <RouterLink
+          v-for="item in nav"
+          :key="item.key"
+          :to="item.def.to"
+          class="nav-link"
+          :title="item.def.label"
+        >
           <span class="nav-icon">
-            <AppIcon :name="item.icon" />
-            <span v-if="item.to === '/notifications' && unreadNotifications" class="nav-badge">
-              {{ unreadNotifications > 99 ? "99+" : unreadNotifications }}
+            <AppIcon :name="item.def.icon" />
+            <span v-if="item.badge" class="nav-badge">
+              {{ item.badge > 99 ? "99+" : item.badge }}
             </span>
           </span>
-          <span class="nav-label">{{ item.label }}</span>
+          <span class="nav-label">{{ item.def.label }}</span>
         </RouterLink>
       </nav>
 
@@ -111,10 +112,21 @@ watch(
     </main>
 
     <aside class="widgets">
-      <slot name="widgets"><InstanceCard /></slot>
+      <slot name="widgets"><WidgetStack /></slot>
     </aside>
 
-    <MobileNav />
+    <WidgetsDrawer />
+    <MobileNav @menu="drawerOpen = true" />
+
+    <NavDrawer
+      v-model:open="drawerOpen"
+      :me="session.me"
+      :mode="props.mode"
+      :theme="theme"
+      @toggle-theme="toggleTheme"
+      @toggle-mode="toggleShellMode"
+      @signout="handleSignout"
+    />
   </div>
 </template>
 
@@ -212,7 +224,7 @@ watch(
   min-width: 16px;
   height: 16px;
   padding: 0 4px;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   background: var(--accent);
   color: var(--on-accent);
   font-size: 0.65rem;
@@ -221,20 +233,31 @@ watch(
   text-align: center;
 }
 
-/* Widget column container; the default content is the InstanceCard stack. */
+/* The rail scrolls on its own when the account block and the nav no longer fit
+   the viewport, instead of pushing the document taller. */
+.rail {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* Widget column container; the default content is the widget stack. It scrolls
+   independently of the page so a tall stack never stretches the shell. */
 .widgets {
   position: sticky;
-  top: 24px;
+  top: var(--space-24);
   align-self: start;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--space-16);
+  max-height: calc(100dvh - var(--space-48));
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 @media (max-width: 1279px) {
   .shell {
-    grid-template-columns: 76px minmax(0, 1fr) var(--side-width);
-    gap: 20px;
+    grid-template-columns: var(--rail-width-collapsed) minmax(0, 1fr) var(--side-width);
+    gap: var(--space-20);
   }
 
   .brand {
@@ -288,7 +311,7 @@ watch(
 
 @media (max-width: 1099px) {
   .shell {
-    grid-template-columns: 76px minmax(0, 1fr);
+    grid-template-columns: var(--rail-width-collapsed) minmax(0, 1fr);
   }
 
   .widgets {
@@ -299,7 +322,8 @@ watch(
 @media (max-width: 720px) {
   .shell {
     display: block;
-    padding: 12px 12px calc(72px + env(safe-area-inset-bottom));
+    padding: var(--space-12) var(--space-12)
+      calc(var(--bottom-bar-height) + env(safe-area-inset-bottom));
   }
 
   .rail {
@@ -316,6 +340,26 @@ watch(
    applies. Kept last so its higher specificity wins over the breakpoints. */
 .shell[data-shell="deck"] {
   grid-template-columns: var(--rail-width) minmax(0, 1fr);
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* The deck strip owns the scrolling, so the main area stops being a scrolling
+   document: it becomes a flex column whose child grows into the remaining
+   height. This is the whole height chain — nothing below divides the viewport
+   by hand. */
+.shell[data-shell="deck"] .main {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.shell[data-shell="deck"] .rail {
+  height: calc(100dvh - var(--space-48));
 }
 
 .shell[data-shell="deck"] .widgets {
@@ -324,7 +368,19 @@ watch(
 
 @media (max-width: 1279px) {
   .shell[data-shell="deck"] {
-    grid-template-columns: 76px minmax(0, 1fr);
+    grid-template-columns: var(--rail-width-collapsed) minmax(0, 1fr);
+  }
+}
+
+/* On phones the shell stacks into a column for the deck strip; the bottom bar
+   floats over the reserved padding, so the strip stops above it. */
+@media (max-width: 720px) {
+  .shell[data-shell="deck"] {
+    display: flex;
+    flex-direction: column;
+    height: 100dvh;
+    padding: var(--space-12) var(--space-12)
+      calc(var(--bottom-bar-height) + env(safe-area-inset-bottom));
   }
 }
 </style>

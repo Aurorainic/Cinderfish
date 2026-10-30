@@ -89,9 +89,17 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
+/* The deck fills whatever the main area gives it: AppShell's `.main` is a flex
+   column in deck mode, so the height chain is flex and no viewport arithmetic
+   appears here. */
 .deck {
   position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
   min-width: 0;
+  min-height: 0;
+  height: 100%;
 }
 
 /* The strip is the only horizontal scroller: columns never widen the page, so
@@ -100,9 +108,9 @@ onBeforeUnmount(() => {
 .deck-strip {
   display: flex;
   align-items: stretch;
-  gap: 12px;
-  height: calc(100vh - 108px);
-  height: calc(100dvh - 108px);
+  gap: var(--space-12);
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-x: auto;
   overflow-y: hidden;
   scroll-snap-type: x mandatory;
@@ -218,19 +226,16 @@ onBeforeUnmount(() => {
   color: var(--muted);
 }
 
-/* On phones the shell stacks and reserves room for the bottom navigation. */
+/* On phones the shell stacks and reserves room for the bottom navigation, so
+   the strip only loses its width; the height still comes from the shell. */
 @media (max-width: 720px) {
-  .deck-strip {
-    height: calc(100dvh - 104px);
-  }
-
   .deck-add {
     width: 96px;
   }
 
   .add-menu {
-    right: 12px;
-    bottom: calc(80px + env(safe-area-inset-bottom));
+    right: var(--space-12);
+    bottom: calc(var(--bottom-bar-height) + var(--space-20) + env(safe-area-inset-bottom));
   }
 }
 </style>

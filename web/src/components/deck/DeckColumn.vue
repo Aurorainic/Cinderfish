@@ -5,9 +5,11 @@ import type { Notification } from "../../api/types";
 import {
   COLUMN_META,
   COLUMN_TYPES,
+  COLUMN_WIDTHS,
   moveColumn,
   removeColumn,
   setColumnType,
+  toggleColumnWidth,
   type ColumnConfig,
   type ColumnType,
 } from "../../stores/deck";
@@ -16,6 +18,7 @@ import AppIcon from "../AppIcon.vue";
 import NotificationItem from "../NotificationItem.vue";
 import TimelineFeed from "../TimelineFeed.vue";
 import PagedFeed from "../ui/PagedFeed.vue";
+import WidgetStack from "../widgets/WidgetStack.vue";
 import { interceptDeckClick } from "./deck-links";
 
 type TimelineSource = "home" | "local" | "hybrid" | "global";
@@ -28,16 +31,22 @@ const NOTIFICATION_PAGE_SIZE = 20;
 const meta = computed(() => COLUMN_META[props.column.type]);
 const isTimeline = computed(() => TIMELINE_TYPES.includes(props.column.type));
 const timelineSource = computed(() => props.column.type as TimelineSource);
+const widthAction = computed(() =>
+  props.column.width === COLUMN_WIDTHS[1]
+    ? `收窄列 · ${COLUMN_WIDTHS[0]}px`
+    : `加宽列 · ${COLUMN_WIDTHS[1]}px`,
+);
 
 // The explore column is a timeline column whose source the reader picks.
 const exploreScope = ref<"local" | "global">("local");
 
 function notificationFetcher(p: { untilId?: string }): Promise<Notification[]> {
-  return api.notifications({ limit: NOTIFICATION_PAGE_SIZE, untilId: p.untilId });
+  return api.notifications({ limit: NOTIFICATION_PAGE_SIZE, untilId: p.untilId, markAsRead: false });
 }
 
 const menuOpen = ref(false);
 const root = ref<HTMLElement | null>(null);
+const body = ref<HTMLElement | null>(null);
 
 function toggleMenu(): void {
   menuOpen.value = !menuOpen.value;
@@ -51,6 +60,19 @@ function chooseType(type: ColumnType): void {
 function shift(delta: number): void {
   moveColumn(props.column.id, props.index + delta);
   menuOpen.value = false;
+}
+
+function toggleWidth(): void {
+  toggleColumnWidth(props.column.id);
+  menuOpen.value = false;
+}
+
+function goTop(): void {
+  menuOpen.value = false;
+  body.value?.scrollTo({
+    top: 0,
+    behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+  });
 }
 
 function closeColumn(): void {
@@ -69,7 +91,13 @@ onBeforeUnmount(() => document.removeEventListener("pointerdown", onDocumentPoin
 </script>
 
 <template>
-  <section ref="root" class="deck-column" :aria-label="`${meta.label}列`" @keydown.escape="menuOpen = false">
+  <section
+    ref="root"
+    class="deck-column"
+    :style="{ '--column-width': `${column.width}px` }"
+    :aria-label="`${meta.label}列`"
+    @keydown.escape="menuOpen = false"
+  >
     <header class="col-head">
       <span class="col-icon" :title="meta.description"><AppIcon :name="meta.icon" /></span>
       <h2 class="col-title">{{ meta.label }}</h2>
@@ -85,6 +113,8 @@ onBeforeUnmount(() => document.removeEventListener("pointerdown", onDocumentPoin
       </button>
 
       <div v-if="menuOpen" class="col-menu" role="menu">
+        <button type="button" role="menuitem" class="menu-item" @click="goTop">回到顶部</button>
+        <div class="menu-sep" role="separator"></div>
         <p class="menu-label">数据源</p>
         <button
           v-for="type in COLUMN_TYPES"
@@ -102,16 +132,24 @@ onBeforeUnmount(() => document.removeEventListener("pointerdown", onDocumentPoin
         </button>
         <div class="menu-sep" role="separator"></div>
         <button type="button" role="menuitem" class="menu-item" :disabled="index === 0" @click="shift(-1)">
-          左移
+          上移
         </button>
         <button type="button" role="menuitem" class="menu-item" :disabled="index >= count - 1" @click="shift(1)">
-          右移
+          下移
+        </button>
+        <button type="button" role="menuitem" class="menu-item" @click="toggleWidth">
+          {{ widthAction }}
         </button>
         <button type="button" role="menuitem" class="menu-item danger" @click="closeColumn">关闭列</button>
       </div>
     </header>
 
-    <div class="col-body" @click.capture="interceptDeckClick">
+    <div
+      ref="body"
+      class="col-body"
+      :class="{ 'col-body--widgets': column.type === 'widgets' }"
+      @click.capture="interceptDeckClick"
+    >
       <TimelineFeed v-if="isTimeline" :source="timelineSource" :composer="false" />
 
       <template v-else-if="column.type === 'notifications'">
@@ -133,6 +171,8 @@ onBeforeUnmount(() => document.removeEventListener("pointerdown", onDocumentPoin
           <RouterLink to="/login" class="button small">登录</RouterLink>
         </div>
       </template>
+
+      <WidgetStack v-else-if="column.type === 'widgets'" :heading="false" />
 
       <template v-else>
         <nav class="scope" aria-label="探索范围">
@@ -161,12 +201,13 @@ onBeforeUnmount(() => document.removeEventListener("pointerdown", onDocumentPoin
 
 <style scoped>
 /* Fixed-width column that snap-scrolls as one page on narrow viewports; the
-   strip in DeckShell owns the scrolling, the column owns its size. */
+   strip in DeckShell owns the scrolling, the column owns its size. The width
+   comes from the persisted column config, so a strip can mix both sizes. */
 .deck-column {
   position: relative;
   display: flex;
   flex-direction: column;
-  flex: 0 0 350px;
+  flex: 0 0 var(--column-width, 350px);
   min-width: 0;
   height: 100%;
   background: var(--bg-raised);
@@ -309,6 +350,11 @@ onBeforeUnmount(() => document.removeEventListener("pointerdown", onDocumentPoin
   overflow-y: auto;
   overflow-x: hidden;
   overscroll-behavior: contain;
+}
+
+/* Feeds own their own row padding; the widget stack does not. */
+.col-body--widgets {
+  padding: var(--space-12);
 }
 
 .scope {
