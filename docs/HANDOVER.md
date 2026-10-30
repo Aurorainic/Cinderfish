@@ -193,31 +193,77 @@ M5 联邦路由见 §12.1。
 
 ```
 web/src/api/         类型（Misskey schema）与 fetch 客户端（ApiError 解析 error 信封）
-web/src/stores/      session（token + /api/i）、instance（meta）、streaming（WebSocket）、shell（universal/deck）、deck（列配置）
-web/src/lib/         MFM 渲染（先转义，再函数解析，最后生成链接）、emoji 目录、相对时间
+web/src/stores/      session（token + /api/i）、instance（meta）、streaming（WebSocket）、
+                     shell（universal/deck）、deck（列配置）、nav（导航偏好）、
+                     widgets（小组件栈）、theme（主题与 meta theme-color）
+web/src/lib/         MFM 渲染（先转义，再函数解析，最后生成链接）、emoji 目录、相对时间、
+                     hotkeys（单条笔记热键）、focus-sibling（上下焦点跳转）
+web/src/nav.ts       导航唯一真源（NavItemDef 注册表 + 默认桌面/移动顺序）
+web/src/widgets/     widget 注册表（registry.ts）
 web/src/os.ts        命令式 UI 总线：openPostForm / confirmDialog / openReactionPicker（单例弹层）
-web/src/components/  note/（Note、NoteHeader、NoteContent、NoteMedia、NoteFooter、RenoteBar、use-note）、
+web/src/composables/ use-page-title（document.title 栈式覆盖）
+web/src/components/  note/（Note、NoteHeader、NoteContent、NoteMedia、NoteFooter、NoteReactions、
+                       RenoteBar、NoteParent、NoteDetail、use-note）、
                      composer/PostForm、deck/（DeckColumn、DeckPageWindow、deck-links）、
-                     ui/（PagedFeed、PageWindow、EmojiPicker、MobileNav）、widgets/InstanceCard 等
+                     profile/（ProfileCard、ProfileSidebar）、
+                     ui/（PagedFeed、PageHeader、PageWindow、EmojiPicker、MobileNav、NavDrawer）、
+                     widgets/（WidgetStack、WidgetsDrawer、WidgetCard 与五个 widget）
 web/src/layouts/     AppShell（通用壳：可折叠侧栏 + 主列 + widget 栏）、DeckShell（横向列条）、AuthLayout
 web/src/views/       Timeline、Note、Notifications、Profile、Explore、Settings、Admin、Login、Signup
+web/src/views/settings/  设置左导航 + 8 个子页
+web/src/views/admin/     管理左导航 + 4 个分区
 ```
 
 ### 11.2 已完成的页面
 
-- **双壳自适应**：`stores/shell.ts` 记住 `universal` / `deck`（`localStorage["cinderfish.ui"]`）。通用壳 ≥1280px 是完整侧栏 232px，1280px 以下收成图标栏，1100px 以下隐藏 widget 栏，720px 以下换成五项底栏；deck 壳是 350px 列的横向 scroll-snap 列条，窄屏单列横滑、宽屏并列多列，列配置存 `localStorage["cinderfish.deck.columns"]`（非法值回退 `[local, notifications]`）。deck 模式下点笔记/头像走 `PageWindow` 覆盖层，不改 URL。
-- **时间线**：首页 / 本地 / 社交 / 全球四频道，统一由 `ui/PagedFeed` 承担无限滚动、去重、日期分隔行与断线重载；流式新笔记先累计成「N 条新笔记」浮标，点击才插入。
-- **发帖**：全局 `os.openPostForm()` 对话框（回复、引用、纯转贴），CW、可见性四态分段按钮（public/home/followers/specified 手动解析 `@user@host`）、仅本地、多文件上传、800ms 去抖草稿（`cinderfish.draft`）、Ctrl/Cmd+Enter 发布。
-- **笔记**：拆成 `note/` 下的编排层与部件，行式无卡片、`--divider` 分隔、转贴顶条、引用以 `nested` 态渲染、CW 横幅、1-4 图网格（敏感内容模糊遮罩）、container query 在 580/500/450px 降级；反应条对齐 Firefish（32px 胶囊、自己的反应 accent 实心 + 描边、`scaleIn`）。
-- **笔记详情**：单条笔记 `detail` 态（完整时间、footer 常显）+ 回复入口走全局对话框。
-- **反应**：`ui/EmojiPicker`（搜索 + 分类页签 + 最近使用，`cinderfish.recent-emojis`，键盘可导航）经 `os.openReactionPicker` 打开；`reactionAcceptance=likeOnly` 时只给星标按钮。
-- **MFM**：x2/x3/x4、spin/shake/jump/blink/rainbow/blur、center/small、fg/bg 颜色、mono/serif、plain，动效在 `styles/mfm.css` 且尊重 `prefers-reduced-motion`；未知函数降级为内文，`:shortcode:` 仍是纯文本。
-- **通知**：全部/反应/提及/转贴客户端筛选、行式排版、反应 emoji 走 emoji 目录、全部标为已读、侧栏未读徽标与流式同步。
-- **资料**：置顶笔记区（最多 5 条）+ 笔记/媒体/回复三 tab（`users/notes` 的 `withFiles` / `withReplies`），关注按钮，本人在通用壳内即时反映资料修改。
-- **设置**：个人资料段（昵称 50 字、简介 500 字、头像上传/移除 → `i/update`）、账户信息、主题（浅色/深色，本机持久化）、实例信息、退出登录。
-- **管理**：联邦模式三选一（public/allowlist/none，立即生效）、白名单增删，非管理员显示门禁卡片。
+参考边界固定：**Misskey 只作后端 API 契约来源，界面以 Firefish（主要）与 Iceshrimp（补充）为参考**，
+见 `docs/research/2026-10-30-firefish-ui-gap-analysis.md` 与执行计划
+`docs/superpowers/plans/2026-10-30-firefish-ui-replication.md`。
+
+- **令牌层**：`styles/main.css` 是唯一的令牌来源，分表面/描边/前景/强调/状态/内容语义/焦点与滚动条/
+  尺度（圆角 xs–full、间距 2–64、字号 2xs–3xl、字重、行高、动效、层级、布局宽度）几组。
+  双主题走 `data-theme`，`index.html` 在首个样式表之前用同步脚本定主题，首帧不闪白；
+  `stores/theme.ts` 统一负责应用、切换、跨标签同步与跟随系统，并同步 `meta theme-color`；
+  根节点带 `color-scheme`，原生控件与滚动条跟随主题。字号偏好写在 `views/settings/font-scale.ts`，
+  由 `main.ts` 在启动时应用为根字号（rem 刻度整体缩放）。
+- **双壳自适应**：`stores/shell.ts` 记住 `universal` / `deck`（`localStorage["cinderfish.ui"]`）。
+  通用壳 ≥1280px 是完整侧栏 232px，1280px 以下收成图标栏 76px，1100px 以下隐藏 widget 栏并改用
+  悬浮入口，720px 以下换成五项底栏（菜单/时间线/发帖/通知/探索）并由抽屉承载设置、管理、主题切换、
+  壳切换与退出登录；deck 壳是 350/420px 可切宽的横向 scroll-snap 列条，窄屏单列横滑、宽屏并列多列，
+  列配置存 `localStorage["cinderfish.deck.columns"]`，支持回到顶部、上移/下移与 widgets 列。
+  deck 模式下点笔记/头像走 `PageWindow` 覆盖层，不改 URL。壳层高度走 flex 链，没有魔法数。
+- **导航与 widget 配置**：`nav.ts` 是导航唯一真源，桌面与移动两组顺序存在 `cinderfish.ui` 的 `nav` 键；
+  widget 注册表 + `cinderfish.ui.widgets` 记录有序栈，右栏与抽屉共用 `WidgetStack`。
+  首版 widget：实例信息、关于链接、便签（localStorage）、通知、时间线（四源可切）。两者都能在设置页改。
+- **页头**：`ui/PageHeader` 是唯一的 sticky 页头（返回、标题、副标题、图标、tab 高亮条、动作插槽），
+  容器宽度 < 500px 折叠为两行；tab 状态写入 `route.query`，刷新保持、可分享、后退回上一个 tab。
+- **时间线**：首页 / 本地 / 社交 / 全球四频道，未登录不显示需要认证的两个频道；统一由 `ui/PagedFeed`
+  承担无限滚动、去重、日期分隔行与断线重载；流式新笔记先累计成「N 条新笔记」浮标，点击才插入。
+- **发帖**：全局 `os.openPostForm()` 对话框（回复、引用、纯转贴），CW、可见性四态分段按钮
+  （public/home/followers/specified 手动解析 `@user@host`）、仅本地、多文件上传、800ms 去抖草稿
+  （`cinderfish.draft`）、Ctrl/Cmd+Enter 发布。
+- **笔记**：单一 `<article>`（带 id/tabindex/aria-label），纯转贴不再套第二层容器；行式无卡片、
+  `--divider` 分隔；反应条并入 footer 首位，单行横滚 + 两侧渐隐遮罩，自己的反应置顶，未登录或远程
+  emoji 不可点；footer 常态 0.7 透明度、hover 与 focus-within 升到 1；引文在时间线是链接、在详情页是
+  1px `--renote` 边框卡片；父帖上下文由 `NoteParent` 画连接线；长文 15em 折叠 + 遮罩；container query
+  只有 500px 与 380px 两档，同时收字号与头像尺寸；单条笔记热键 r/e/q/j/k 与上下焦点跳转。
+  笔记详情抽成 `NoteDetail`，笔记页与 deck 覆盖层共用。
+- **反应**：`ui/EmojiPicker`（搜索 + 分类页签 + 最近使用，`cinderfish.recent-emojis`，键盘可导航）
+  经 `os.openReactionPicker` 打开；`reactionAcceptance=likeOnly` 时只给星标按钮。
+- **MFM**：x2/x3/x4、spin/shake/jump/blink/rainbow/blur、center/small、fg/bg 颜色、mono/serif、plain，
+  动效在 `styles/mfm.css` 且尊重 `prefers-reduced-motion`；未知函数降级为内文，`:shortcode:` 仍是纯文本。
+- **通知**：全部/反应/提及/转贴四 tab，筛选下推给后端 `includeTypes`（切 tab 重挂载，不会一边空态一边翻页），
+  行式排版、反应 emoji 走 emoji 目录、全部标为已读、侧栏未读徽标与流式同步。
+  被动视图（通知 widget、deck 通知列）显式传 `markAsRead: false`，不会因为渲染就清未读。
+- **资料**：置顶笔记区（最多 5 条）+ 笔记/媒体/回复三 tab；副栏（文件栅格 + 动态摘要）按页面自身宽度
+  < 1000px 并入主列，用 ResizeObserver 判定；关注中/关注者计数在没有对应端点时标注为暂不可用。
+- **设置**：`/settings/:tab` 嵌套路由，左导航分账户/客户端/其他三组，8 个子页
+  （个人资料、外观、导航、小组件、通知、隐私、账户、关于），未知 tab 回退个人资料。
+  外观页管主题与字号，导航页管桌面/移动两套顺序，小组件页管有序栈。
+- **管理**：`/admin?tab=` 的参数切换左导航（概览/用户/文件/设置），危险操作独立分区用
+  `--danger-soft` / `--danger-border` 标出，非管理员显示门禁卡片。
 - **探索**：本地/全球公开时间线，支持 `?tag=`（客户端过滤，仍能继续分页）。
-- **登录/注册**：真实 signin/signup，注册前检查用户名可用性，邀请码字段，注册关闭提示。
+- **登录/注册/404**：真实 signin/signup，注册前检查用户名可用性，邀请码字段，注册关闭提示；三页都有标题。
 
 
 ### 11.3 服务端托管
@@ -264,15 +310,40 @@ pnpm build    # 先 vue-tsc --noEmit，再输出 web/dist
 
 ### 11.7 已知缺口
 
-- **自定义 emoji 没有注册表**：`:shortcode:` 在 MFM 与通知里只按内置目录解析，解析不到就照原样显示；实例自定义 emoji 的注册、管理、picker 分组都在首版之外。
+- **自定义 emoji 没有注册表**：`:shortcode:` 在 MFM 与通知里只按内置目录解析，解析不到就照原样显示；实例自定义 emoji 的注册、管理、picker 分组都在首版之外。后端打包的 `emojis` / `reactionEmojis` 目前恒为空数组。
 - **没有搜索、没有用户列表页、没有投票接口**（前端只展示投票结果）。
-- **远程资料不能浏览**：`users/show` 只接受本地用户名；远程用户点击 `@user@host` 会得到说明卡片。
-- **管理面板只有联邦设置**：账户管理、封禁、邀请码管理尚未实现。
+- **远程资料不能浏览**：`users/show` 只接受本地用户名；远程用户点击 `@user@host` 会得到说明卡片。发帖器的 `specified` 仍允许手动输入远程 handle，后端并不会解析它。
+- **`users/following` / `users/followers` / `users/search` / `notes/mentions` / `notes/children` / `notes/featured` / `notes/reactions` 都不存在**：个人页的「关注中/关注者」计数标为暂不可用，笔记页只渲染 `note.reply` 这一层上下文，没有回复树与「谁反应了」浮层。
+- **改密码、封禁/静音列表、注销账户在前端与后端都未实现**：账户设置页如实标注为未开放，没有假按钮。
+- **管理面板范围有限**：实例级文件列表、注册模式在线切换、用户分页都没有端点，只能在页面上说明。管理页需要管理员账号才能看到分区。
 - **i18n 未做**：文案硬编码中文；主题只保留 `data-theme` 双主题 + CSS 变量，没有 Firefish 的 JSON5 主题 DSL。
 - **置顶不同步联邦**：actor 文档声明了 `featured` 集合，但没有对应路由与投递，置顶只在本实例生效。
 - **草稿只有一份**：`cinderfish.draft` 是单条草稿，时间线固定发帖器与全局对话框共用同一个键。
 - **deck 覆盖层单层**：deck 模式的 PageWindow 打开另一个笔记会替换当前页，没有窗口栈。
+- **同一条笔记跨列的状态不同步**：反应、删除、转贴的乐观更新只作用于当前组件实例，同一笔记出现在多个 deck 列时另一列不会跟着变。
 - **没有前端自动化测试**：验证靠 `vue-tsc` + 构建 + 真实浏览器手工走查；没有引入 vitest/playwright。
+
+### 11.8 复刻波次的验证证据（2026-10-30）
+
+门禁：`gofmt -l internal/ cmd/` 空、`go vet ./...` 通过、
+`CINDERFISH_TEST_DATABASE_URL=… CINDERFISH_TEST_REDIS_URL=… go test -count=1 ./...` 全绿（新增 8 个通知筛选与置读用例）、
+`cd web && pnpm typecheck && pnpm build` 均退出 0。
+
+真实实例浏览器走查（`web_dir` 指向当前 `web/dist`，独立库与端口 3213，明暗两套）：
+
+| 场景 | 结果 |
+|------|------|
+| 1440 / 1280 通用壳 | 三区成立：侧栏 232px + 主列 + widget 栏 300px，`scrollWidth == clientWidth` |
+| 1150 | 侧栏收成 76px 图标栏，widget 栏保留 |
+| 1099 / 900 | widget 栏隐藏，改用悬浮入口；无横向溢出 |
+| 720 / 500 / 380 | 侧栏隐藏，五项底栏（菜单/时间线/发帖/通知/探索）居中发帖；380px 页头折成两行 |
+| 抽屉 | 380px 从底栏菜单打开，含账号、发帖、导航与设置/主题/壳切换/退出，Esc 与遮罩可关 |
+| deck 1440 | 侧栏保留，两列并排 + 添加列槽位，列头菜单可回到顶部/加宽/下移 |
+| deck 720 | 单列满宽，列条 `scroll-snap-type: x mandatory`，可横滑到下一列 |
+| 笔记 | 无卡片边框，行间 1px 分隔；footer 常态 `opacity: .7`，`:focus-within` 实测变 1；日期分隔行正常 |
+| 主题 | 明暗两套在 1440 下均正确（`body` 背景分别为 `#f7f5f1` / `#0e0d12`），`color-scheme` 跟随 |
+| 小组件 | 齿轮进入编辑态：下拉添加、上移/下移/删除、恢复默认 |
+| 设置 / 管理 | `/settings/appearance` 左导航 + 右内容；`/admin?tab=users` 需管理员，非管理员显示门禁卡片 |
 
 ## 12. M5 联邦（ActivityPub）
 
