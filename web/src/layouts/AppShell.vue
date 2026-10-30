@@ -189,6 +189,8 @@ watch(
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  flex: none;
+  white-space: nowrap;
   padding: 6px 12px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -283,6 +285,7 @@ watch(
   }
 
   .account-chip {
+    flex: none;
     padding: 3px;
     border-radius: 50%;
   }

@@ -420,8 +420,24 @@ select {
 .rail-foot {
   margin-top: auto;
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: var(--space-8);
   padding: 0 var(--space-6);
+}
+
+/* The account chip needs a whole row: avatar, name, the mode switch and the two
+   icon buttons do not fit on one line at 232px, and squeezing the name down to
+   an ellipsis of one character is worse than a second row. Only applies to the
+   full-width rail; the collapsed rail stacks its footer vertically. */
+@media (min-width: 1280px) {
+  .rail-foot > :not(.account-chip) {
+    flex: none;
+  }
+
+  .rail-foot > .account-chip {
+    flex: 1 1 100%;
+  }
 }
 
 .main {
