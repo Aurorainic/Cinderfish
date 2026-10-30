@@ -46,15 +46,32 @@ SELECT pinned_note_ids FROM user_profiles WHERE user_id = $1
 // PinNote pins a note at the front of the user's pin list. Only the
 // note's author may pin it; pinning a note that is already pinned is a
 // no-op, and the list holds at most MaxPinnedNotes notes.
+//
+// The read-check-write sequence runs inside one transaction that locks
+// the user's profile row, so concurrent pins cannot both observe a
+// short list and push it past the limit or store the same id twice.
 func (s *Service) PinNote(ctx context.Context, userID, noteID string) error {
 	if err := s.pinTarget(ctx, noteID, userID); err != nil {
 		return err
 	}
 
-	pinned, err := s.PinnedNoteIDs(ctx, userID)
+	tx, err := s.pool.Begin(ctx)
 	if err != nil {
-		return err
+		return fmt.Errorf("account: pin note: %w", err)
 	}
+	// Rollback after a successful commit is a no-op.
+	defer func() { _ = tx.Rollback(context.WithoutCancel(ctx)) }()
+
+	// A missing profile row means an empty pin list, matching
+	// PinnedNoteIDs; the update below then affects no rows.
+	var pinned []string
+	err = tx.QueryRow(ctx, `
+SELECT pinned_note_ids FROM user_profiles WHERE user_id = $1 FOR UPDATE
+`, userID).Scan(&pinned)
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return fmt.Errorf("account: pin note: %w", err)
+	}
+
 	for _, id := range pinned {
 		if id == noteID {
 			return nil
@@ -64,11 +81,14 @@ func (s *Service) PinNote(ctx context.Context, userID, noteID string) error {
 		return ErrPinLimitExceeded
 	}
 
-	if _, err := s.pool.Exec(ctx, `
+	if _, err := tx.Exec(ctx, `
 UPDATE user_profiles
 SET pinned_note_ids = array_prepend($2::text, pinned_note_ids)
 WHERE user_id = $1
 `, userID, noteID); err != nil {
+		return fmt.Errorf("account: pin note: %w", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
 		return fmt.Errorf("account: pin note: %w", err)
 	}
 	return nil
