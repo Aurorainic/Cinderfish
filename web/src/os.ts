@@ -6,6 +6,8 @@ import type { Note } from "./api/types";
 import PostForm from "./components/composer/PostForm.vue";
 import EmojiPicker from "./components/ui/EmojiPicker.vue";
 import PageWindow from "./components/ui/PageWindow.vue";
+import { router } from "./router";
+import { session } from "./stores/session";
 
 let nextRequestId = 0;
 
@@ -37,8 +39,15 @@ const currentConfirm = computed(() => confirmQueue.value[0] ?? null);
 
 /** Open the global post form. The signature is frozen; `quote` marks the
  * renote target as a quote, which the form renders with a preview and submits
- * as renoteId plus text (the backend accepts both on one note). */
+ * as renoteId plus text (the backend accepts both on one note).
+ *
+ * The form itself is authenticated-only, so a guest goes to the login page
+ * instead of getting an empty dialog. */
 export function openPostForm(opts: PostFormOptions = {}): void {
+  if (!session.me) {
+    void router.push("/login");
+    return;
+  }
   postFormRequest.value = { ...opts, id: ++nextRequestId };
 }
 
