@@ -159,8 +159,10 @@ FROM notifications WHERE id = $1
 	return &n, nil
 }
 
-// List returns a user's notifications, newest first.
-func (s *NotificationService) List(ctx context.Context, recipientID string, limit int, sinceID, untilID string, excludeTypes []string) ([]*Notification, error) {
+// List returns a user's notifications, newest first. A nil includeTypes
+// leaves the type unfiltered, while an empty non-nil slice matches nothing,
+// which is what Misskey returns for an explicitly empty includeTypes.
+func (s *NotificationService) List(ctx context.Context, recipientID string, limit int, sinceID, untilID string, includeTypes, excludeTypes []string) ([]*Notification, error) {
 	if limit <= 0 {
 		limit = 10
 	}
@@ -173,9 +175,13 @@ SELECT id, recipient_id, type, notifier_id, note_id, reaction, is_read, created_
 FROM notifications WHERE recipient_id = $1`
 	args := []any{recipientID}
 
+	if includeTypes != nil {
+		args = append(args, includeTypes)
+		query += fmt.Sprintf(" AND type = ANY($%d)", len(args))
+	}
 	if len(excludeTypes) > 0 {
-		query += ` AND NOT (type = ANY($2))`
 		args = append(args, excludeTypes)
+		query += fmt.Sprintf(" AND NOT (type = ANY($%d))", len(args))
 	}
 	if sinceID != "" {
 		args = append(args, sinceID)
@@ -202,6 +208,20 @@ FROM notifications WHERE recipient_id = $1`
 		out = append(out, &n)
 	}
 	return out, rows.Err()
+}
+
+// MarkRead marks the given notifications of a user as read.
+func (s *NotificationService) MarkRead(ctx context.Context, recipientID string, ids []string) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	_, err := s.pool.Exec(ctx,
+		`UPDATE notifications SET is_read = TRUE WHERE recipient_id = $1 AND id = ANY($2)`,
+		recipientID, ids)
+	if err != nil {
+		return fmt.Errorf("note: mark notifications read: %w", err)
+	}
+	return nil
 }
 
 // MarkAllRead marks every notification of a user as read.

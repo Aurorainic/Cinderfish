@@ -9,9 +9,9 @@ import NotificationItem from "../components/NotificationItem.vue";
 import PagedFeed from "../components/ui/PagedFeed.vue";
 import type { PagedFeedParams } from "../components/ui/PagedFeed.vue";
 
-// Type tabs are a pure client-side view filter: the backend endpoint takes no
-// type parameter we need, and PagedFeed keeps paginating on the unfiltered
-// page while the filter only decides what is painted.
+// Type tabs are pushed down to the endpoint as includeTypes, so every page
+// the feed receives is already of the selected type and an empty result means
+// the type really has no notifications.
 type Filter = "all" | "reaction" | "mention" | "renote";
 
 const PAGE_SIZE = 20;
@@ -28,10 +28,9 @@ const filters: { id: Filter; label: string }[] = [
   { id: "renote", label: "转贴" },
 ];
 
-const itemFilter = computed(() => {
-  const type = filter.value;
-  return type === "all" ? undefined : (item: unknown) => (item as Notification).type === type;
-});
+function includeTypesFor(type: Filter): string[] | undefined {
+  return type === "all" ? undefined : [type];
+}
 
 const emptyText = computed(() => {
   switch (filter.value) {
@@ -46,8 +45,23 @@ const emptyText = computed(() => {
   }
 });
 
+// PagedFeed is keyed on the tab, so a switch remounts it and starts from an
+// empty, freshly fetched page for the new type instead of paginating on top
+// of the previous type's pages.
 async function fetcher(p: PagedFeedParams): Promise<Notification[]> {
-  return api.notifications({ limit: PAGE_SIZE, untilId: p.untilId || undefined });
+  return api.notifications({
+    limit: PAGE_SIZE,
+    untilId: p.untilId || undefined,
+    includeTypes: includeTypesFor(filter.value),
+    markAsRead: false,
+  });
+}
+
+function matchesFilter(item: unknown): boolean {
+  const types = includeTypesFor(filter.value);
+  if (!types) return true;
+  const type = (item as Notification | null)?.type;
+  return typeof type === "string" && types.includes(type);
 }
 
 // The unread badge lives in the store, shared with the shell navigation. Seed
@@ -152,11 +166,12 @@ onBeforeUnmount(() => {
 
     <div class="feed">
       <PagedFeed
+        :key="filter"
         :fetcher="fetcher"
         stream-channel="main"
         stream-type="notification"
         new-items-label="新通知"
-        :filter="itemFilter"
+        :stream-filter="matchesFilter"
         @items="onItems"
       >
         <template #item="{ item }">

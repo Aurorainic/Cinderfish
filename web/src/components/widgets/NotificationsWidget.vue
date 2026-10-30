@@ -39,7 +39,7 @@ watch(
 );
 
 function fetcher(p: { untilId?: string }): Promise<Notification[]> {
-  return api.notifications({ limit: PAGE_SIZE, untilId: p.untilId });
+  return api.notifications({ limit: PAGE_SIZE, untilId: p.untilId, markAsRead: false });
 }
 
 const marking = ref(false);

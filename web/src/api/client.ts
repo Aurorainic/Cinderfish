@@ -241,8 +241,16 @@ export const api = {
   homeTimeline: (params: TimelineParams = {}) =>
     post<Note[]>("/api/notes/timeline", params as Record<string, unknown>),
 
-  notifications: (params: { limit?: number; sinceId?: string; untilId?: string; markAsRead?: boolean } = {}) =>
-    post<Notification[]>("/api/notifications", params),
+  notifications: (
+    params: {
+      limit?: number;
+      sinceId?: string;
+      untilId?: string;
+      markAsRead?: boolean;
+      includeTypes?: string[];
+      excludeTypes?: string[];
+    } = {},
+  ) => post<Notification[]>("/api/notifications", params),
 
   markAllNotificationsRead: () => post<Record<string, never>>("/api/notifications/mark-all-as-read"),
 

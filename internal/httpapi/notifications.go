@@ -34,7 +34,7 @@ func (s *Server) handleNotifications(w http.ResponseWriter, r *http.Request) {
 		Limit        int      `json:"limit"`
 		SinceID      string   `json:"sinceId"`
 		UntilID      string   `json:"untilId"`
-		MarkAsRead   bool     `json:"markAsRead"`
+		MarkAsRead   *bool    `json:"markAsRead"`
 		IncludeTypes []string `json:"includeTypes"`
 		ExcludeTypes []string `json:"excludeTypes"`
 	}
@@ -49,18 +49,29 @@ func (s *Server) handleNotifications(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	exclude := body.ExcludeTypes
-	if body.MarkAsRead {
-		exclude = append(exclude, "read")
-	}
-
-	notifications, err := s.notifications.List(r.Context(), info.User.ID, body.Limit, body.SinceID, body.UntilID, exclude)
+	notifications, err := s.notifications.List(
+		r.Context(), info.User.ID, body.Limit, body.SinceID, body.UntilID,
+		body.IncludeTypes, body.ExcludeTypes)
 	if err != nil {
 		writeAPIError(w, &APIError{
 			Message: "Could not load the notifications.", Code: "INTERNAL_ERROR",
 			ID: errIDInternal, Kind: "server", Status: http.StatusInternalServerError,
 		})
 		return
+	}
+
+	if body.MarkAsRead == nil || *body.MarkAsRead {
+		ids := make([]string, 0, len(notifications))
+		for _, n := range notifications {
+			if !n.IsRead {
+				ids = append(ids, n.ID)
+			}
+		}
+		if markErr := s.notifications.MarkRead(r.Context(), info.User.ID, ids); markErr == nil {
+			for _, n := range notifications {
+				n.IsRead = true
+			}
+		}
 	}
 
 	out := make([]any, 0, len(notifications))
