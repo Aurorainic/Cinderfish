@@ -9,6 +9,9 @@ import NoteReactions from "./NoteReactions.vue";
 
 const props = defineProps<{
   note: Note;
+  // The note the row stands for when it differs from the displayed one, as in
+  // a pure renote where `note` is the renoted note. Pinning applies to it.
+  actionNote?: Note;
   reactions: Record<string, number>;
   reactionCount: number;
   myReaction?: string;
@@ -62,7 +65,8 @@ const pinning = ref(false);
 const pinNotice = ref("");
 
 const canPin = computed(() => !!props.isMine && !!session.me);
-const pinned = computed(() => session.me?.pinnedNoteIds?.includes(props.note.id) ?? false);
+const actionNoteId = computed(() => props.actionNote?.id ?? props.note.id);
+const pinned = computed(() => session.me?.pinnedNoteIds?.includes(actionNoteId.value) ?? false);
 const pinLabel = computed(() => (pinned.value ? "取消置顶" : "置顶笔记"));
 
 function menu() {
@@ -76,7 +80,7 @@ async function togglePin() {
   pinning.value = true;
   pinNotice.value = "";
   try {
-    const next = pinned.value ? await api.unpin(props.note.id) : await api.pin(props.note.id);
+    const next = pinned.value ? await api.unpin(actionNoteId.value) : await api.pin(actionNoteId.value);
     session.me = next;
   } catch (err) {
     if (err instanceof ApiError && err.code === "PIN_LIMIT_EXCEEDED") {

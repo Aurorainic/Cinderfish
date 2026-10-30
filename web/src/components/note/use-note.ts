@@ -7,7 +7,14 @@ import { isLoggedIn, session } from "../../stores/session";
 // Interaction state for a single note: optimistic reactions, renote and
 // delete. The DOM layer (Note.vue and its parts) only renders; every
 // mutation and its optimistic bookkeeping lives here.
-export function useNote(note: Ref<Note>) {
+//
+// `note` is the displayed note: for a pure renote that is the renoted note,
+// which is what reactions and renote target. `actionTarget` is the outer note
+// the row stands for; ownership and deletion apply to it, so a user can
+// delete their own pure renote even though the content belongs to someone
+// else. It defaults to the displayed note for callers that render a note
+// directly.
+export function useNote(note: Ref<Note>, actionTarget: Ref<Note> = note) {
   const router = useRouter();
   const route = useRoute();
 
@@ -27,7 +34,7 @@ export function useNote(note: Ref<Note>) {
     { immediate: true },
   );
 
-  const isMine = computed(() => !!session.me && session.me.id === note.value.userId);
+  const isMine = computed(() => !!session.me && session.me.id === actionTarget.value.userId);
 
   let noticeTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -99,7 +106,7 @@ export function useNote(note: Ref<Note>) {
     if (!window.confirm("删除这条笔记？")) return false;
     busy.value = true;
     try {
-      await api.deleteNote(note.value.id);
+      await api.deleteNote(actionTarget.value.id);
       return true;
     } catch (err) {
       flash(errorText(err, "删除失败"), 4000);

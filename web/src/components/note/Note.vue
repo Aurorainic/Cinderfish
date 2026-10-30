@@ -64,7 +64,7 @@ const accessibleLabel = computed(() => {
 });
 
 const { reactions, myReaction, reactionCount, isMine, busy, notice, toggleReaction, renote, remove } =
-  useNote(appearNote);
+  useNote(appearNote, computed(() => props.note));
 
 async function onRenote() {
   const created = await renote();
@@ -139,6 +139,7 @@ onBeforeUnmount(() => root.value?.removeEventListener("keydown", hotkeys));
       <NoteFooter
         ref="footer"
         :note="appearNote"
+        :action-note="note"
         :reactions="reactions"
         :my-reaction="myReaction"
         :reaction-count="reactionCount"
