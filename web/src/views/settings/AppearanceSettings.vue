@@ -1,14 +1,24 @@
 <script setup lang="ts">
-import { onMounted } from "vue";
+import { computed, onMounted } from "vue";
 import AppIcon from "../../components/AppIcon.vue";
-import { setTheme, theme, toggleTheme, type Theme } from "../../stores/theme";
+import {
+  setThemePreference,
+  systemTheme,
+  theme,
+  themePreference,
+  toggleTheme,
+  type ThemePreference,
+} from "../../stores/theme";
 import SettingsPage from "./SettingsPage.vue";
 import { applyFontScale, FONT_SCALES, fontScale, setFontScale } from "./font-scale";
 
-const themes: { id: Theme; label: string; icon: "sun" | "moon" }[] = [
+const themes: { id: ThemePreference; label: string; icon: "display" | "sun" | "moon" }[] = [
+  { id: "auto", label: "跟随系统", icon: "display" },
   { id: "light", label: "浅色", icon: "sun" },
   { id: "dark", label: "深色", icon: "moon" },
 ];
+
+const systemLabel = computed(() => (systemTheme() === "dark" ? "深色" : "浅色"));
 
 // The scale is applied on demand: the preference belongs to the device, and
 // the appearance page is where a reader expects to see it take effect.
@@ -21,26 +31,31 @@ onMounted(() => {
   <SettingsPage>
     <section class="card">
       <h2 class="card-title">主题</h2>
-      <p class="muted small">选择界面主题，选择会保存在这台设备上。</p>
+      <p class="muted small">
+        选择界面主题，选择会保存在这台设备上。跟随系统时，系统切换深浅色会立即生效。
+      </p>
       <div class="theme-options">
         <button
           v-for="option in themes"
           :key="option.id"
           type="button"
           class="theme-option"
-          :class="{ active: theme === option.id }"
-          :aria-pressed="theme === option.id"
-          @click="setTheme(option.id)"
+          :class="{ active: themePreference === option.id }"
+          :aria-pressed="themePreference === option.id"
+          @click="setThemePreference(option.id)"
         >
           <AppIcon :name="option.icon" />
           <span>{{ option.label }}</span>
-          <AppIcon v-if="theme === option.id" name="check" class="tick" />
+          <AppIcon v-if="themePreference === option.id" name="check" class="tick" />
         </button>
         <button type="button" class="theme-option switch" @click="toggleTheme()">
           <AppIcon :name="theme === 'dark' ? 'sun' : 'moon'" />
           <span>切换为{{ theme === "dark" ? "浅色" : "深色" }}</span>
         </button>
       </div>
+      <p v-if="themePreference === 'auto'" class="muted small hint">
+        当前系统为{{ systemLabel }}，界面正在跟随。
+      </p>
     </section>
 
     <section class="card">
@@ -119,6 +134,10 @@ onMounted(() => {
 
 .theme-option.switch {
   border-style: dashed;
+}
+
+.hint {
+  margin-top: var(--space-10);
 }
 
 .sample {

@@ -1,6 +1,7 @@
 import { ref } from "vue";
 
 export type Theme = "dark" | "light";
+export type ThemePreference = Theme | "auto";
 
 export const THEME_STORAGE_KEY = "cinderfish.theme";
 
@@ -13,6 +14,10 @@ export function isTheme(value: unknown): value is Theme {
   return value === "dark" || value === "light";
 }
 
+export function isThemePreference(value: unknown): value is ThemePreference {
+  return value === "auto" || isTheme(value);
+}
+
 function readDataset(): Theme | null {
   const current = document.documentElement.dataset.theme;
   return isTheme(current) ? current : null;
@@ -22,20 +27,22 @@ export function systemTheme(): Theme {
   return window.matchMedia(DARK_QUERY).matches ? "dark" : "light";
 }
 
-export function storedTheme(): Theme | null {
+export function storedThemePreference(): ThemePreference {
   try {
     const value = localStorage.getItem(THEME_STORAGE_KEY);
-    return isTheme(value) ? value : null;
+    return isThemePreference(value) ? value : "auto";
   } catch {
-    return null;
+    return "auto";
   }
 }
 
-export function resolveTheme(): Theme {
-  return storedTheme() ?? systemTheme();
+export function resolveTheme(preference: ThemePreference = storedThemePreference()): Theme {
+  return preference === "auto" ? systemTheme() : preference;
 }
 
-export const theme = ref<Theme>(readDataset() ?? resolveTheme());
+export const themePreference = ref<ThemePreference>(storedThemePreference());
+
+export const theme = ref<Theme>(readDataset() ?? resolveTheme(themePreference.value));
 
 let switchTimer = 0;
 
@@ -54,38 +61,64 @@ function markSwitch(): void {
   switchTimer = window.setTimeout(() => root.classList.remove(SWITCH_CLASS), SWITCH_MS);
 }
 
-function persist(next: Theme): void {
+function persist(preference: ThemePreference): void {
   try {
-    localStorage.setItem(THEME_STORAGE_KEY, next);
+    localStorage.setItem(THEME_STORAGE_KEY, preference);
   } catch {
     // Storage may be unavailable; the choice simply does not persist.
   }
 }
 
-export function applyTheme(next: Theme, options: { persist?: boolean } = {}): void {
+function paint(next: Theme): void {
   const changed = document.documentElement.dataset.theme !== next;
   theme.value = next;
   document.documentElement.dataset.theme = next;
-  if (options.persist !== false) persist(next);
   syncThemeColor();
   if (changed) markSwitch();
 }
 
+export function applyTheme(next: Theme, options: { persist?: boolean } = {}): void {
+  if (options.persist !== false) {
+    themePreference.value = next;
+    persist(next);
+  }
+  paint(next);
+}
+
+export function setThemePreference(preference: ThemePreference): void {
+  themePreference.value = preference;
+  persist(preference);
+  paint(resolveTheme(preference));
+}
+
 export function setTheme(next: Theme): void {
-  applyTheme(next);
+  setThemePreference(next);
 }
 
 export function toggleTheme(): Theme {
-  applyTheme(theme.value === "dark" ? "light" : "dark");
-  return theme.value;
+  const next: Theme = resolveTheme(themePreference.value) === "dark" ? "light" : "dark";
+  setThemePreference(next);
+  return next;
 }
 
 window.addEventListener("storage", (event) => {
   if (event.key !== THEME_STORAGE_KEY) return;
-  applyTheme(isTheme(event.newValue) ? event.newValue : systemTheme(), { persist: false });
+  const preference = isThemePreference(event.newValue) ? event.newValue : "auto";
+  themePreference.value = preference;
+  paint(resolveTheme(preference));
 });
 
-window.matchMedia(DARK_QUERY).addEventListener("change", () => {
-  if (storedTheme()) return;
-  applyTheme(systemTheme(), { persist: false });
+function syncWithSystem(): void {
+  if (themePreference.value !== "auto") return;
+  const next = systemTheme();
+  if (next !== theme.value) paint(next);
+}
+
+window.matchMedia(DARK_QUERY).addEventListener("change", syncWithSystem);
+
+// A background tab can miss the media change event, and some platforms only
+// report the new value once the window is focused again.
+window.addEventListener("focus", syncWithSystem);
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) syncWithSystem();
 });

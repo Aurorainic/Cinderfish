@@ -223,7 +223,11 @@ web/src/views/admin/     管理左导航 + 4 个分区
 - **令牌层**：`styles/main.css` 是唯一的令牌来源，分表面/描边/前景/强调/状态/内容语义/焦点与滚动条/
   尺度（圆角 xs–full、间距 2–64、字号 2xs–3xl、字重、行高、动效、层级、布局宽度）几组。
   双主题走 `data-theme`，`index.html` 在首个样式表之前用同步脚本定主题，首帧不闪白；
-  `stores/theme.ts` 统一负责应用、切换、跨标签同步与跟随系统，并同步 `meta theme-color`；
+  `stores/theme.ts` 统一负责应用、切换、跨标签同步与跟随系统，并同步 `meta theme-color`。
+  主题偏好有三个取值：`auto`（跟随系统，默认）、`light`、`dark`；`auto` 时系统切换深浅色会立即重绘，
+  并在窗口重新获得焦点或标签页可见时补一次同步（后台标签可能错过媒体查询事件）。
+  具体选择存 `localStorage["cinderfish.theme"]`，值为 `auto`/`light`/`dark`，缺失即视为 `auto`；
+  手动切换（设置页按钮或侧栏图标）会把偏好钉成显式的 `light`/`dark`。
   根节点带 `color-scheme`，原生控件与滚动条跟随主题。字号偏好写在 `views/settings/font-scale.ts`，
   由 `main.ts` 在启动时应用为根字号（rem 刻度整体缩放）。
 - **双壳自适应**：`stores/shell.ts` 记住 `universal` / `deck`（`localStorage["cinderfish.ui"]`）。
