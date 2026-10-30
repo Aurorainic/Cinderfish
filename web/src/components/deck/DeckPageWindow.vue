@@ -31,6 +31,7 @@ const user = ref<UserDetailed | null>(null);
 const userLoading = ref(false);
 const userError = ref("");
 const following = ref(false);
+const followPending = ref(false);
 const followBusy = ref(false);
 const followNotice = ref("");
 
@@ -62,6 +63,7 @@ async function loadUser(value: string): Promise<void> {
   userError.value = "";
   followNotice.value = "";
   following.value = false;
+  followPending.value = false;
   if (!value) return;
   if (host.value) {
     userError.value = "远程账户暂不可用：Cinderfish 目前只支持浏览本地账户的资料。";
@@ -69,7 +71,12 @@ async function loadUser(value: string): Promise<void> {
   }
   userLoading.value = true;
   try {
-    user.value = await api.usersShow({ username: username.value });
+    const fresh = await api.usersShow({ username: username.value });
+    user.value = fresh;
+    // The backend resolves the viewer's relationship, so the button starts in
+    // the right state instead of assuming "not following".
+    following.value = fresh.isFollowing ?? false;
+    followPending.value = fresh.hasPendingFollowRequestFromYou ?? false;
   } catch (err) {
     userError.value = errorMessage(err, "加载用户失败");
   } finally {
@@ -85,7 +92,7 @@ function profileNotesFetcher(p: { untilId?: string }): Promise<Note[]> {
 }
 
 async function follow(): Promise<void> {
-  if (!user.value || followBusy.value) return;
+  if (!user.value || followBusy.value || followPending.value) return;
   followBusy.value = true;
   followNotice.value = "";
   try {
@@ -141,6 +148,7 @@ function onNoteDeleted(id: string): void {
             @follow="follow"
             @unfollow="unfollow"
           />
+          <p v-if="followPending" class="notice info">关注请求已发送，等待对方确认。</p>
           <p v-if="followNotice" class="notice error">{{ followNotice }}</p>
           <PagedFeed :key="username" class="profile-feed" :fetcher="profileNotesFetcher">
             <template #item="{ item }">

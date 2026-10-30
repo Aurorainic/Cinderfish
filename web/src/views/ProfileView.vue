@@ -45,6 +45,7 @@ const missing = ref(false);
 const missingRemote = ref(false);
 
 const following = ref(false);
+const followPending = ref(false);
 const followBusy = ref(false);
 const followNotice = ref("");
 
@@ -163,6 +164,7 @@ async function load() {
   missing.value = false;
   missingRemote.value = false;
   following.value = false;
+  followPending.value = false;
   followNotice.value = "";
 
   if (!username) {
@@ -177,7 +179,12 @@ async function load() {
 
   loading.value = true;
   try {
-    user.value = await api.usersShow({ username });
+    const fresh = await api.usersShow({ username });
+    user.value = fresh;
+    // The backend resolves the viewer's relationship, so the button starts in
+    // the right state instead of assuming "not following".
+    following.value = fresh.isFollowing ?? false;
+    followPending.value = fresh.hasPendingFollowRequestFromYou ?? false;
   } catch (err) {
     if (err instanceof ApiError && err.status === 404) missing.value = true;
     else loadError.value = errorMessage(err, "加载用户失败");
@@ -211,7 +218,7 @@ watch(
 );
 
 async function follow() {
-  if (!user.value || followBusy.value) return;
+  if (!user.value || followBusy.value || followPending.value) return;
   followBusy.value = true;
   followNotice.value = "";
   try {
@@ -364,11 +371,12 @@ watch(
             v-else-if="isLoggedIn"
             type="button"
             class="button small"
-            :class="{ ghost: following }"
-            :disabled="followBusy"
+            :class="{ ghost: following || followPending }"
+            :disabled="followBusy || followPending"
             @click="toggleFollow"
           >
             <template v-if="followBusy">处理中…</template>
+            <template v-else-if="followPending">请求已发送</template>
             <template v-else-if="following">取消关注</template>
             <template v-else>关注</template>
           </button>

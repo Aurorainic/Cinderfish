@@ -29,6 +29,12 @@ export interface UserDetailed extends UserLite {
   isLocked: boolean;
   isSilenced: boolean;
   isSuspended: boolean;
+  // Relationship fields are relative to the authenticated viewer and are only
+  // present when `users/show` was called with a credential.
+  isFollowing?: boolean;
+  isFollowed?: boolean;
+  hasPendingFollowRequestFromYou?: boolean;
+  hasPendingFollowRequestToYou?: boolean;
   isModerator?: boolean;
   isAdmin?: boolean;
   description: string | null;
