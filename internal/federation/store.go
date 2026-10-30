@@ -373,6 +373,16 @@ SELECT count(*) FROM followings WHERE follower_id = $1 AND followee_id = $2
 	return err == nil && n > 0
 }
 
+// HasPendingFollowRequest reports whether follower has a follow request
+// awaiting approval by followee.
+func (s *Store) HasPendingFollowRequest(ctx context.Context, followerID, followeeID string) bool {
+	var n int
+	err := s.pool.QueryRow(ctx, `
+SELECT count(*) FROM follow_requests WHERE follower_id = $1 AND followee_id = $2
+	`, followerID, followeeID).Scan(&n)
+	return err == nil && n > 0
+}
+
 // DeleteNoteByAPID soft deletes a received note.
 func (s *Store) DeleteNoteByAPID(ctx context.Context, apID, actorUserID string) error {
 	ct, err := s.pool.Exec(ctx, `

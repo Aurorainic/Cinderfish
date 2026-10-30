@@ -83,6 +83,12 @@ func packUserDetailed(u *account.User, createdAt time.Time, isMe bool, prof *acc
 	packed["canChat"] = false
 	packed["roles"] = []any{}
 	packed["memo"] = nil
+	// The four relationship flags of UserDetailed. They default to false
+	// and are filled in by callers that know the viewer.
+	packed["isFollowing"] = false
+	packed["isFollowed"] = false
+	packed["hasPendingFollowRequestFromYou"] = false
+	packed["hasPendingFollowRequestToYou"] = false
 	return packed
 }
 
