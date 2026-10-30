@@ -1,9 +1,14 @@
 <script setup lang="ts">
-import { computed, toRef } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { useRouter } from "vue-router";
 import type { Note as NoteModel } from "../../api/types";
+import { focusNext, focusPrev } from "../../lib/focus-sibling";
+import { makeHotkey } from "../../lib/hotkeys";
+import { absoluteTime } from "../../lib/time";
 import NoteContent from "./NoteContent.vue";
 import NoteFooter from "./NoteFooter.vue";
 import NoteHeader from "./NoteHeader.vue";
+import NoteParent from "./NoteParent.vue";
 import RenoteBar from "./RenoteBar.vue";
 import { useNote } from "./use-note";
 
@@ -18,21 +23,14 @@ const emit = defineEmits<{
   renoted: [note: NoteModel];
 }>();
 
-const {
-  reactions,
-  myReaction,
-  reactionCount,
-  isMine,
-  busy,
-  notice,
-  toggleReaction,
-  renote,
-  remove,
-} = useNote(toRef(props, "note"));
+const router = useRouter();
+const root = ref<HTMLElement | null>(null);
+const footer = ref<InstanceType<typeof NoteFooter> | null>(null);
 
-// A note with a renote target and nothing of its own is a pure renote: the
-// bar names the renoter and the renoted note is rendered in full below it.
-// Anything with text, a CW, files or a poll is a quote and stays inline.
+// A note carrying a renote target and nothing of its own is a pure renote:
+// the bar names the renoter and the renoted note supplies header, content and
+// footer. Anything with text, a CW, files or a poll is a quote and keeps its
+// own content with the quoted note rendered as a card.
 const pureRenote = computed(() => {
   const note = props.note;
   if (!note.renote) return false;
@@ -40,6 +38,33 @@ const pureRenote = computed(() => {
     !!note.text?.trim() || !!note.cw || (note.files?.length ?? 0) > 0 || !!note.hasPoll;
   return !hasOwnContent;
 });
+
+const appearNote = computed<NoteModel>(() =>
+  pureRenote.value && props.note.renote ? props.note.renote : props.note,
+);
+
+const parentNote = computed(() => appearNote.value.reply ?? null);
+const quoteNote = computed(() => appearNote.value.renote ?? null);
+
+const quotePreview = computed(() => {
+  const target = quoteNote.value;
+  if (!target) return "";
+  return target.text?.trim().slice(0, 80) || target.user.username;
+});
+
+const accessibleLabel = computed(() => {
+  const note = appearNote.value;
+  const parts: string[] = [];
+  if (pureRenote.value) parts.push(`${props.note.user.username} 转贴`);
+  parts.push(note.user.username);
+  if (note.cw) parts.push(`内容警告：${note.cw}`);
+  if (note.text) parts.push(note.text.slice(0, 140));
+  parts.push(absoluteTime(note.createdAt));
+  return parts.join("；");
+});
+
+const { reactions, myReaction, reactionCount, isMine, busy, notice, toggleReaction, renote, remove } =
+  useNote(appearNote);
 
 async function onRenote() {
   const created = await renote();
@@ -49,51 +74,77 @@ async function onRenote() {
 async function onRemove() {
   if (await remove()) emit("deleted", props.note.id);
 }
+
+function openQuote(event: MouseEvent) {
+  const target = event.target instanceof Element ? event.target : null;
+  if (target?.closest("a, button")) return;
+  if (quoteNote.value) router.push(`/notes/${quoteNote.value.id}`);
+}
+
+// A click on the row body focuses the note so the shortcuts below apply; a
+// click on a link or control keeps its own focus.
+function onClick(event: MouseEvent) {
+  const target = event.target instanceof Element ? event.target : null;
+  if (target?.closest("a, button, input, textarea, select, [contenteditable]")) return;
+  root.value?.focus({ preventScroll: true });
+}
+
+const hotkeys = makeHotkey({
+  r: () => footer.value?.reply(),
+  "e|a|plus": () => footer.value?.react(),
+  q: () => footer.value?.renote(),
+  "up|k": () => {
+    if (root.value) focusPrev(root.value);
+  },
+  "down|j": () => {
+    if (root.value) focusNext(root.value);
+  },
+  esc: () => root.value?.blur(),
+  "m|o": () => footer.value?.menu(),
+});
+
+onMounted(() => root.value?.addEventListener("keydown", hotkeys));
+onBeforeUnmount(() => root.value?.removeEventListener("keydown", hotkeys));
 </script>
 
 <template>
-  <article v-if="pureRenote && note.renote" class="note is-renote">
-    <RenoteBar :note="note" />
-    <Note
-      :note="note.renote"
-      :detail="detail"
-      @reply="emit('reply', $event)"
-      @deleted="emit('deleted', $event)"
-      @renoted="emit('renoted', $event)"
-    />
-  </article>
-
-  <article v-else class="note" :class="{ nested, detail }">
+  <article
+    :id="appearNote.id"
+    ref="root"
+    class="note"
+    :class="{ nested, detail }"
+    tabindex="-1"
+    :aria-label="accessibleLabel"
+    @click="onClick"
+  >
     <div class="note-inner">
-      <NoteHeader :note="note" :nested="nested" :detail="detail" />
+      <NoteParent v-if="parentNote" :note="parentNote" />
 
-      <p v-if="note.reply" class="reply-context">
-        回复
-        <RouterLink :to="`/@${note.reply.user.username}`">@{{ note.reply.user.username }}</RouterLink>
-      </p>
+      <RenoteBar v-if="pureRenote" :note="note" />
 
-      <NoteContent
-        :note="note"
-        :nested="nested"
-        :reactions="reactions"
-        :my-reaction="myReaction"
-        @react="toggleReaction"
-      >
+      <NoteHeader :note="appearNote" :detail="detail" />
+
+      <NoteContent :note="appearNote" :nested="nested" :detail="detail">
         <template #quote>
-          <div v-if="note.renote" class="quote">
-            <Note :note="note.renote" nested />
+          <RouterLink v-if="quoteNote && !detail" :to="`/notes/${quoteNote.id}`" class="quote-link" @click.stop>
+            引用：{{ quotePreview }}
+          </RouterLink>
+          <div v-else-if="quoteNote" class="quote" @click.stop="openQuote">
+            <NoteHeader :note="quoteNote" radius="8px" />
+            <NoteContent :note="quoteNote" nested />
           </div>
         </template>
       </NoteContent>
 
       <NoteFooter
-        v-if="!nested"
-        :note="note"
-        :reaction-count="reactionCount"
+        ref="footer"
+        :note="appearNote"
+        :reactions="reactions"
         :my-reaction="myReaction"
+        :reaction-count="reactionCount"
         :busy="busy"
         :is-mine="isMine"
-        @reply="emit('reply', note)"
+        @reply="emit('reply', appearNote)"
         @renote="onRenote"
         @react="toggleReaction"
         @remove="onRemove"
@@ -108,33 +159,18 @@ async function onRemove() {
 /* Each row is its own size container, so the note adapts to a 350px deck
    column and a 680px main column without knowing anything about the shell. */
 .note {
+  position: relative;
   container-name: note;
   container-type: inline-size;
   padding: 0;
   border-bottom: 1px solid var(--divider);
-  border-radius: 0;
   background: transparent;
   min-width: 0;
 }
 
 .note-inner {
+  --avatar-size: 48px;
   padding: 12px 14px 8px;
-}
-
-/* Quoted note inside another note: indented, dashed rule, no card. */
-.note.nested {
-  border-bottom: 0;
-}
-
-.note.nested .note-inner {
-  padding: 10px 0 0 12px;
-  border-left: 2px dashed var(--border);
-}
-
-/* Pure renote: the bar and the renoted note paint their own padding and
-   hairline, so the wrapper stays empty. */
-.note.is-renote {
-  border-bottom: 0;
 }
 
 .note.detail {
@@ -145,30 +181,61 @@ async function onRemove() {
   padding: 16px 4px 12px;
 }
 
-/* Actions surface when the row is hovered or holds keyboard focus; the
-   footer itself keeps :focus-within so Tab reaches it while invisible. */
-.note:hover :deep(.foot),
-.note:focus-within :deep(.foot) {
+/* Keyboard focus draws a ring inside the row instead of a browser outline
+   that would be clipped by the container. */
+.note:focus-visible {
+  outline: none;
+}
+
+.note:focus-visible::after {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  z-index: 10;
+  inset: 0;
+  margin: auto;
+  width: calc(100% - 8px);
+  height: calc(100% - 8px);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  box-sizing: border-box;
+}
+
+/* The action row rests dimmed; hovering or focusing the row lifts it. The
+   reaction strip above it is not dimmed. */
+.note:hover :deep(.actions),
+.note:focus-within :deep(.actions) {
   opacity: 1;
-}
-
-/* The detail view never hides its actions. */
-.note.detail :deep(.foot) {
-  opacity: 1;
-}
-
-.reply-context {
-  margin-top: 4px;
-  font-size: 0.8rem;
-  color: var(--muted);
-}
-
-.reply-context a {
-  color: var(--mention);
 }
 
 .quote {
-  margin-top: 10px;
+  --avatar-size: 38px;
+  margin-top: 8px;
+  padding: 16px;
+  border: 1px solid var(--renote);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.quote:hover,
+.quote:focus-within {
+  background: var(--panel-2);
+}
+
+.quote-link {
+  display: block;
+  margin-top: 6px;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--renote);
+  font-size: 0.85rem;
+}
+
+.quote-link:hover {
+  color: var(--accent);
 }
 
 .notice {
@@ -177,15 +244,28 @@ async function onRemove() {
 }
 
 /* The container is the row itself, so only its descendants can query it. */
-@container note (max-width: 580px) {
+@container note (max-width: 500px) {
   .note-inner {
+    --avatar-size: 46px;
+    font-size: 0.975em;
     padding: 11px 12px 7px;
+  }
+
+  .quote {
+    padding: 12px;
   }
 }
 
-@container note (max-width: 450px) {
+@container note (max-width: 380px) {
   .note-inner {
+    --avatar-size: 40px;
+    font-size: 0.94em;
     padding: 10px 10px 6px;
+  }
+
+  .quote {
+    --avatar-size: 32px;
+    padding: 10px;
   }
 }
 </style>

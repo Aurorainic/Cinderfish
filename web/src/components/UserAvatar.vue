@@ -2,10 +2,24 @@
 import { computed } from "vue";
 import type { UserLite } from "../api/types";
 
-const props = defineProps<{ user: Pick<UserLite, "username" | "name" | "avatarUrl">; size?: number }>();
+const props = withDefaults(
+  defineProps<{
+    user: Pick<UserLite, "username" | "name" | "avatarUrl">;
+    size?: number | "inherit";
+    radius?: "50%" | "8px";
+  }>(),
+  { size: 40, radius: "50%" },
+);
 
 const initial = computed(() => (props.user.name || props.user.username || "?").slice(0, 1).toUpperCase());
-const style = computed(() => ({ width: `${props.size ?? 40}px`, height: `${props.size ?? 40}px` }));
+
+const length = computed(() => (props.size === "inherit" ? "var(--avatar-size, 40px)" : `${props.size}px`));
+
+const style = computed(() => ({
+  width: length.value,
+  height: length.value,
+  borderRadius: props.radius,
+}));
 </script>
 
 <template>
@@ -19,7 +33,9 @@ const style = computed(() => ({ width: `${props.size ?? 40}px`, height: `${props
   border-radius: 50%;
   object-fit: cover;
   background: var(--panel-2);
-  border: 1px solid var(--border);
+  /* Drawn inside the box so a radius change never shifts the layout around it. */
+  outline: 1px solid var(--border);
+  outline-offset: -1px;
 }
 
 .fallback {

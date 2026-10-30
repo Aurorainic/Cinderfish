@@ -6,7 +6,7 @@ import AppIcon from "../AppIcon.vue";
 import NoteVisibility from "./NoteVisibility.vue";
 import UserAvatar from "../UserAvatar.vue";
 
-// The bar above a pure renote: who renoted, when, and with what reach. The
+// The bar above a renoted note: who renoted, when, and with what reach. The
 // renoted note itself renders below with its own header.
 const props = defineProps<{ note: Note }>();
 
@@ -17,7 +17,7 @@ const target = computed(() => props.note.renote);
   <div v-if="target" class="renote-bar">
     <AppIcon name="renote" class="mark" />
     <RouterLink :to="`/@${note.user.username}`" class="avatar" tabindex="-1">
-      <UserAvatar :user="note.user" :size="20" />
+      <UserAvatar :user="note.user" size="inherit" />
     </RouterLink>
     <RouterLink :to="`/@${note.user.username}`" class="name">
       {{ note.user.name || note.user.username }}
@@ -32,10 +32,11 @@ const target = computed(() => props.note.renote);
 
 <style scoped>
 .renote-bar {
+  --avatar-size: 20px;
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 9px 14px 0;
+  padding: 0 0 6px;
   color: var(--renote);
   font-size: 0.8rem;
   min-width: 0;
@@ -79,9 +80,14 @@ const target = computed(() => props.note.renote);
   color: var(--accent);
 }
 
-@container note (max-width: 450px) {
+@container note (max-width: 500px) {
   .renote-bar {
-    padding: 8px 10px 0;
+    gap: 5px;
+  }
+}
+
+@container note (max-width: 380px) {
+  .renote-bar {
     font-size: 0.76rem;
   }
 

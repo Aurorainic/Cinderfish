@@ -29,12 +29,6 @@ export function useNote(note: Ref<Note>) {
 
   const isMine = computed(() => !!session.me && session.me.id === note.value.userId);
 
-  const sortedReactions = computed(() =>
-    Object.entries(reactions.value)
-      .filter(([, count]) => count > 0)
-      .sort((a, b) => b[1] - a[1]),
-  );
-
   let noticeTimer: ReturnType<typeof setTimeout> | undefined;
 
   function flash(text: string, ttl = 2000) {
@@ -119,7 +113,6 @@ export function useNote(note: Ref<Note>) {
     reactions,
     myReaction,
     reactionCount,
-    sortedReactions,
     isMine,
     busy,
     notice,

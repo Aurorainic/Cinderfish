@@ -121,7 +121,7 @@ const concealed = computed(() => hasSensitive.value && !revealed.value);
   max-height: 180px;
 }
 
-@container note (max-width: 450px) {
+@container note (max-width: 380px) {
   .item img {
     max-height: 240px;
   }

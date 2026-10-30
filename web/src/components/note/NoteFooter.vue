@@ -5,9 +5,11 @@ import type { Note } from "../../api/types";
 import { openReactionPicker } from "../../os";
 import { session } from "../../stores/session";
 import AppIcon from "../AppIcon.vue";
+import NoteReactions from "./NoteReactions.vue";
 
 const props = defineProps<{
   note: Note;
+  reactions: Record<string, number>;
   reactionCount: number;
   myReaction?: string;
   busy?: boolean;
@@ -31,8 +33,6 @@ const acceptance = computed<string | null>(() => props.note.reactionAcceptance ?
 
 const likeOnly = computed(() => acceptance.value !== null && LIKE_ONLY.has(acceptance.value));
 
-const reactionCount = computed(() => props.reactionCount);
-
 const reactButton = ref<HTMLButtonElement | null>(null);
 
 function onReact() {
@@ -42,6 +42,14 @@ function onReact() {
     return;
   }
   openReactionPicker((emoji) => emit("react", emoji), reactButton.value);
+}
+
+function reply() {
+  emit("reply");
+}
+
+function renote() {
+  emit("renote");
 }
 
 // Pinning is an action on the note itself, not on its content, so the menu
@@ -56,6 +64,11 @@ const pinNotice = ref("");
 const canPin = computed(() => !!props.isMine && !!session.me);
 const pinned = computed(() => session.me?.pinnedNoteIds?.includes(props.note.id) ?? false);
 const pinLabel = computed(() => (pinned.value ? "取消置顶" : "置顶笔记"));
+
+function menu() {
+  if (!canPin.value) return;
+  menuOpen.value = true;
+}
 
 async function togglePin() {
   menuOpen.value = false;
@@ -107,85 +120,117 @@ onBeforeUnmount(() => {
   document.removeEventListener("keydown", onKeydown);
   window.clearTimeout(noticeTimer);
 });
+
+defineExpose({ reply, react: onReact, renote, menu });
 </script>
 
 <template>
-  <footer class="foot" :class="{ busy }">
-    <button type="button" class="action" title="回复" :disabled="busy" @click="emit('reply')">
-      <AppIcon name="reply" />
-      <span v-if="note.repliesCount">{{ note.repliesCount }}</span>
-    </button>
-    <button type="button" class="action" title="转贴" :disabled="busy" @click="emit('renote')">
-      <AppIcon name="renote" />
-      <span v-if="note.renoteCount">{{ note.renoteCount }}</span>
-    </button>
-    <button
-      ref="reactButton"
-      type="button"
-      class="action"
-      :class="{ reacted: !!myReaction }"
-      :title="likeOnly ? (myReaction ? '取消星标' : '星标') : '反应'"
-      :aria-label="likeOnly ? '星标' : '添加反应'"
-      :aria-haspopup="likeOnly ? undefined : 'dialog'"
-      :disabled="busy"
-      @click="onReact"
-    >
-      <span v-if="likeOnly" class="star" aria-hidden="true">⭐</span>
-      <AppIcon v-else name="heart" />
-      <span v-if="reactionCount">{{ reactionCount }}</span>
-    </button>
-    <span v-if="pinNotice" class="pin-notice" role="status">{{ pinNotice }}</span>
-    <span class="spacer"></span>
-    <div v-if="canPin" class="menu-wrap">
+  <footer class="foot">
+    <NoteReactions
+      :reactions="reactions"
+      :my-reaction="myReaction"
+      :busy="busy"
+      @react="emit('react', $event)"
+    />
+
+    <div class="actions">
+      <button type="button" class="action" title="回复" :disabled="busy" @click="reply">
+        <AppIcon name="reply" />
+        <span v-if="note.repliesCount">{{ note.repliesCount }}</span>
+      </button>
+      <button type="button" class="action" title="转贴" :disabled="busy" @click="renote">
+        <AppIcon name="renote" />
+        <span v-if="note.renoteCount">{{ note.renoteCount }}</span>
+      </button>
       <button
-        ref="menuButton"
+        ref="reactButton"
         type="button"
         class="action"
-        title="更多"
-        aria-label="更多操作"
-        aria-haspopup="menu"
-        :aria-expanded="menuOpen"
-        :disabled="busy || pinning"
-        @click="menuOpen = !menuOpen"
+        :class="{ reacted: !!myReaction }"
+        :title="likeOnly ? (myReaction ? '取消星标' : '星标') : '反应'"
+        :aria-label="likeOnly ? '星标' : '添加反应'"
+        :aria-haspopup="likeOnly ? undefined : 'dialog'"
+        :disabled="busy"
+        @click="onReact"
       >
-        <AppIcon name="more" />
+        <span v-if="likeOnly" class="star" aria-hidden="true">⭐</span>
+        <AppIcon v-else name="heart" />
+        <span v-if="reactionCount">{{ reactionCount }}</span>
       </button>
-      <ul v-if="menuOpen" class="menu" role="menu">
-        <li role="none">
-          <button type="button" role="menuitem" class="menu-item" :disabled="pinning" @click="togglePin">
-            {{ pinLabel }}
+
+      <div class="tail">
+        <div v-if="canPin" class="menu-wrap">
+          <button
+            ref="menuButton"
+            type="button"
+            class="action"
+            title="更多"
+            aria-label="更多操作"
+            aria-haspopup="menu"
+            :aria-expanded="menuOpen"
+            :disabled="busy || pinning"
+            @click="menuOpen = !menuOpen"
+          >
+            <AppIcon name="more" />
           </button>
-        </li>
-      </ul>
+          <ul v-if="menuOpen" class="menu" role="menu">
+            <li role="none">
+              <button type="button" role="menuitem" class="menu-item" :disabled="pinning" @click="togglePin">
+                {{ pinLabel }}
+              </button>
+            </li>
+          </ul>
+        </div>
+        <button v-if="isMine" type="button" class="action danger" title="删除" :disabled="busy" @click="emit('remove')">
+          <AppIcon name="close" />
+        </button>
+      </div>
     </div>
-    <button v-if="isMine" type="button" class="action danger" title="删除" :disabled="busy" @click="emit('remove')">
-      <AppIcon name="close" />
-    </button>
+
+    <p v-if="pinNotice" class="pin-notice" role="status">{{ pinNotice }}</p>
   </footer>
 </template>
 
 <style scoped>
-/* Hidden until the row is hovered, but never hidden from keyboard users:
-   :focus-within keeps the actions reachable by Tab. */
+/* The reaction strip sits above the action row; only the actions dim at
+   rest, so reaction counts stay readable without hovering the row. */
 .foot {
-  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 6px;
+  min-width: 0;
+}
+
+.actions {
   display: flex;
   align-items: center;
   gap: 2px;
-  margin-top: 6px;
-  margin-left: -6px;
-  opacity: 0;
+  margin-inline-start: -6px;
+  opacity: 0.7;
   transition: opacity 0.12s ease;
 }
 
-.foot:focus-within,
-.foot:has(:focus-visible) {
-  opacity: 1;
+/* Equal shares, capped at 3.5em so a wide note does not stretch three icons
+   across the whole row the way a full-width bar would. */
+.actions > .action {
+  flex: 1 1 0;
+  max-width: 3.5em;
+  min-width: max-content;
+}
+
+.tail {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: none;
+  margin-inline-start: auto;
 }
 
 .action {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 4px;
   padding: 4px 8px;
   border: 0;
@@ -221,10 +266,6 @@ onBeforeUnmount(() => {
 .action.danger:focus-visible {
   color: var(--danger);
   background: color-mix(in srgb, var(--danger) 12%, transparent);
-}
-
-.spacer {
-  flex: 1;
 }
 
 .menu-wrap {
@@ -285,17 +326,9 @@ onBeforeUnmount(() => {
   min-width: 0;
 }
 
-/* Touch devices have no hover state, so the actions stay visible. */
-@media (hover: none) {
-  .foot {
-    opacity: 1;
-  }
-}
-
-@container note (max-width: 580px) {
-  .foot {
-    gap: 0;
-    margin-left: -4px;
+@container note (max-width: 500px) {
+  .actions {
+    margin-inline-start: -4px;
   }
 
   .action {
@@ -303,7 +336,7 @@ onBeforeUnmount(() => {
   }
 }
 
-@container note (max-width: 450px) {
+@container note (max-width: 380px) {
   .action {
     padding: 4px 6px;
     font-size: 0.76rem;

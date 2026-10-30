@@ -6,11 +6,15 @@ import UserAvatar from "../UserAvatar.vue";
 import NoteVisibility from "./NoteVisibility.vue";
 
 const props = withDefaults(
-  defineProps<{ note: Note; nested?: boolean; detail?: boolean }>(),
-  { nested: false, detail: false },
+  defineProps<{
+    note: Note;
+    detail?: boolean;
+    avatar?: boolean;
+    radius?: "50%" | "8px";
+  }>(),
+  { detail: false, avatar: true, radius: "50%" },
 );
 
-const avatarSize = computed(() => (props.nested ? 30 : 42));
 const timeText = computed(() =>
   props.detail ? absoluteTime(props.note.createdAt) : relativeTime(props.note.createdAt),
 );
@@ -19,8 +23,8 @@ const timeTitle = computed(() => absoluteTime(props.note.createdAt));
 
 <template>
   <header class="head">
-    <RouterLink :to="`/@${note.user.username}`" class="avatar" tabindex="-1">
-      <UserAvatar :user="note.user" :size="avatarSize" />
+    <RouterLink v-if="avatar" :to="`/@${note.user.username}`" class="avatar" tabindex="-1">
+      <UserAvatar :user="note.user" size="inherit" :radius="radius" />
     </RouterLink>
     <div class="who">
       <RouterLink :to="`/@${note.user.username}`" class="name">
@@ -94,16 +98,6 @@ const timeTitle = computed(() => absoluteTime(props.note.createdAt));
   flex: none;
 }
 
-@container note (max-width: 580px) {
-  .head {
-    gap: 9px;
-  }
-
-  .time {
-    font-size: 0.78rem;
-  }
-}
-
 @container note (max-width: 500px) {
   .head {
     gap: 8px;
@@ -122,7 +116,11 @@ const timeTitle = computed(() => absoluteTime(props.note.createdAt));
   }
 }
 
-@container note (max-width: 450px) {
+@container note (max-width: 380px) {
+  .head {
+    gap: 7px;
+  }
+
   .name {
     max-width: 46%;
   }
