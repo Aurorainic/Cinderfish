@@ -59,11 +59,18 @@ class StreamingClient {
     this.open();
   }
 
+  // stop closes the socket and forgets every subscription with it: the
+  // connection is gone, so replaying those connect frames on the next
+  // start() would re-subscribe channels whose components have unmounted.
   stop(): void {
     this.wanted = false;
     this.clearRetry();
     this.ws?.close();
     this.ws = null;
+    this.channelSubs.clear();
+    this.subsByWire.clear();
+    this.tokens.clear();
+    this.mainToken = "";
   }
 
   on(handler: StreamHandler): () => void {

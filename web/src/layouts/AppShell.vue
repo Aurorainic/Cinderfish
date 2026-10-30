@@ -381,6 +381,7 @@ watch(
   .shell[data-shell="deck"] {
     display: flex;
     flex-direction: column;
+    grid-template-columns: none;
     height: 100dvh;
     padding: var(--space-12) var(--space-12)
       calc(var(--bottom-bar-height) + env(safe-area-inset-bottom));

@@ -96,7 +96,7 @@ Global constraints: [粘贴全局约束]
 
 Do not trust the report — verify claims against the diff. Do not re-run tests the implementer already ran. Read-only: do not mutate the working tree or branch state. Do not spawn subagents.
 
-Output: 
+Output:
 ### Spec Compliance (✅/❌ + ⚠️ cannot-verify items)
 ### Strengths
 ### Issues (Critical / Important / Minor, each with file:line)
