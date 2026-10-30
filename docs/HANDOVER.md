@@ -349,6 +349,23 @@ pnpm build    # 先 vue-tsc --noEmit，再输出 web/dist
 | 小组件 | 齿轮进入编辑态：下拉添加、上移/下移/删除、恢复默认 |
 | 设置 / 管理 | `/settings/appearance` 左导航 + 右内容；`/admin?tab=users` 需管理员，非管理员显示门禁卡片 |
 
+### 11.9 全面代码审查与修复（2026-10-30）
+
+对 `main` 合并基线到 `7146e2b` 的前后端改动做了一次分域只读审查，已修复的问题：
+
+| 问题 | 修复 |
+|------|------|
+| 纯转贴把被转贴的原笔记当作操作对象，用户无法删除/置顶自己发布的转贴 | `useNote` 增加 `actionTarget`，`NoteFooter` 增加 `actionNote`；展示仍用 `appearNote`，删除与置顶落在外层笔记 |
+| `users/show` 不返回关注关系，刷新个人页后已关注对象仍显示「关注」 | 后端按 viewer 返回 `isFollowing`/`isFollowed`/`hasPendingFollowRequestFromYou`/`hasPendingFollowRequestToYou`（匿名恒为 false，坏 token 不报 401）；个人页与 deck 资料窗据此初始化，待对方确认时显示「请求已发送」 |
+| 并发置顶可突破 5 条上限或写入重复 id | `PinNote` 的读-检查-写放进一个事务并对 `user_profiles` 行 `FOR UPDATE`；补两个并发集成测试 |
+| 取消关注不重算 `followers_count` / `following_count`，计数永久偏高 | `Unfollow` 同步重算两个计数，测试断言关注/取关后分别为 1 / 0 |
+| `stop()` 后 `start()` 会重放已卸载组件的频道订阅 | `stop()` 清空 `channelSubs`/`subsByWire`/`tokens` 与 `mainToken` |
+| deck 移动端断点隐式覆盖 `grid-template-columns` | 720px 处显式 `grid-template-columns: none` |
+
+**审查中驳回的一条**：`notifications` 的 `markAsRead` 缺省为启用被判为与 Misskey 不符，实际上游 `upstream/.../i/notifications.ts` 的 `paramDef` 就是 `default: true`，当前实现正确，未改。
+
+仍留待决定：设置路由没有统一登录守卫（账户类子页目前各自处理）；deck 移动端几何没有自动化断言；关注请求没有撤销入口（后端无对应端点）。
+
 ## 12. M5 联邦（ActivityPub）
 
 源码对照记录见 `docs/research/2026-10-28-m5-federation-source-calibration.md`（逐条对照上游文件，含刻意偏离项）。
