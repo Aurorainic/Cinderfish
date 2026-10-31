@@ -1,6 +1,6 @@
 # Cinderfish 交接说明
 
-- 最后更新：2026-10-31（Iceshrimp 壳层重构，重写计划 Task 2）
+- 最后更新：2026-10-31（Iceshrimp 架构重写 Task 8：API 缺口审计与收尾）
 - 项目名 **Cinderfish**（2026-10-28 定名，Go module `github.com/Aurorainic/cinderfish`）
 - 仓库：当前目录 `/home/lainsaka/文档/MilnFish`，分支 `main`；远程 `origin` 为
   `https://github.com/Aurorainic/Cinderfish.git`（GitHub 仓库已更名，本地目录改名待办）
@@ -22,17 +22,22 @@ Go 单二进制的个人/极小规模联邦社交实例。后端契约是 **Miss
 | M6 前端 | ✅ | `9281a5c` |
 | M6.1 前端界面重构（Firefish/Misskey 风格、自适应 deck） | ✅ | `23ac6d7` … 见 git log |
 | M7 打磨 | ✅ | 见 git log（迁移工具、账号管理、性能基线、部署文档） |
+| 前端 Iceshrimp 架构重写（Task 1–8） | ✅ | `d414bd9` … `9167f1e`（分支 `frontend-ui-redesign`，见 §11.10–§11.15） |
 
 ## 3. 契约以源码为准
 
 `misskey-dev/misskey` 是 **AGPL-3.0-only**。实现任何端点前，先读源码的 `paramDef`（参数 JSON Schema）和 `res`（响应 schema），再查 `packages/misskey-js/src/api.types.ts` 的类型定义。官方文档是二手的，已发现多处与源码不一致。
 
-本地浅克隆：`/tmp/refcheck/misskey`（不入库，重启后丢失）。若被清理，用代理重建：
+本地参考克隆在本分支放在 `tmp/refcheck/`（`.gitignore` 覆盖，重启不丢）：`misskey`（**仅作 API 契约**）、`firefish`（前端主参考）、`iceshrimp`（Iceshrimp.NET，布局与交互参考）、`iceshrimp-vue`（Vue 版 fork，组件镜像来源）。重建：
 
 ```bash
-export https_proxy=http://127.0.0.1:19823 http_proxy=http://127.0.0.1:19823
-git clone --depth 1 --filter=blob:none --sparse https://github.com/misskey-dev/misskey.git /tmp/refcheck/misskey
-cd /tmp/refcheck/misskey && git sparse-checkout set packages/backend/src packages/misskey-js/src
+export https_proxy=http://127.0.0.1:19823 http_proxy=http://127.0.0.1:19823   # 仅 GitHub 需要
+git clone --depth 1 --filter=blob:none --sparse https://github.com/misskey-dev/misskey.git tmp/refcheck/misskey
+cd tmp/refcheck/misskey && git sparse-checkout set packages/backend/src packages/misskey-js/src packages/frontend/src
+# Firefish / Iceshrimp 走 Codeberg，不需要代理；Codeberg 偶发 504，重试或改用 archive/main.tar.gz
+git clone --depth 1 --filter=blob:none --sparse https://codeberg.org/firefish/firefish.git tmp/refcheck/firefish
+git clone --depth 1 --filter=blob:none --sparse https://codeberg.org/iceshrimp/Iceshrimp.NET.git tmp/refcheck/iceshrimp
+git clone --depth 1 --filter=blob:none --sparse https://codeberg.org/banaanihillo/iceshrimp.git tmp/refcheck/iceshrimp-vue
 ```
 
 后端源码全量约 11 MB；Streaming 实现在 `packages/backend/src/server/api/stream/`。
@@ -262,7 +267,8 @@ web/src/views/admin/     管理左导航 + 4 个分区
 - **MFM**：x2/x3/x4、spin/shake/jump/blink/rainbow/blur、center/small、fg/bg 颜色、mono/serif、plain，
   动效在 `styles/mfm.css` 且尊重 `prefers-reduced-motion`；未知函数降级为内文，`:shortcode:` 仍是纯文本。
 - **通知**：全部/反应/提及/转贴四 tab，筛选下推给后端 `includeTypes`（切 tab 重挂载，不会一边空态一边翻页），
-  行式排版、反应 emoji 走 emoji 目录、全部标为已读、侧栏未读徽标与流式同步。
+  行式排版、反应 emoji 走 emoji 目录、全部标为已读、侧栏未读徽标与流式同步。徽标初值由会话里的
+  `unreadNotificationsCount` 续上（`AppShell` 用 `setUnreadNotifications` 播种，见 §11.15），流式事件在此基础上自增。
   被动视图（通知 widget、deck 通知列）显式传 `markAsRead: false`，不会因为渲染就清未读。
 - **资料**：置顶笔记区（最多 5 条）+ 笔记/媒体/回复/关注中/关注者五个 tab（`?tab=`），
   置顶区与列表区各自带分区标题（`profile/ProfileSection`）；副栏（文件栅格 + 动态摘要）按页面自身宽度
@@ -323,12 +329,14 @@ pnpm build    # 先 vue-tsc --noEmit，再输出 web/dist
 
 ### 11.7 已知缺口
 
+**完整的 API 缺口分组表在 §11.15.2–§11.15.5**（(a) 数据够 / (b) 需 schema / (c) 上游没有）。这里是客户端侧的现状：
+
 - **自定义 emoji 没有注册表**：`:shortcode:` 在 MFM 与通知里只按内置目录解析，解析不到就照原样显示；实例自定义 emoji 的注册、管理、picker 分组都在首版之外。后端打包的 `emojis` / `reactionEmojis` 目前恒为空数组。
 - **没有搜索、没有用户列表页、没有投票接口**（前端只展示投票结果）。
 - **远程资料不能浏览**：`users/show` 只接受本地用户名；远程用户点击 `@user@host` 会得到说明卡片。发帖器的 `specified` 仍允许手动输入远程 handle，后端并不会解析它。
-- **`users/following` / `users/followers` / `users/search` / `notes/mentions` / `notes/children` / `notes/featured` / `notes/reactions` 都不存在**：个人页的「关注中/关注者」计数保持纯数字并注明列表接口未提供，两个 tab 渲染真实的不可用态（见 11.14）；笔记页只渲染 `note.reply` 这一层上下文，没有回复树与「谁反应了」浮层。
-- **改密码、封禁/静音列表、注销账户在前端与后端都未实现**：账户设置页如实标注为未开放，没有假按钮。
-- **管理面板范围有限**：实例级文件列表、注册模式在线切换、用户分页都没有端点，只能在页面上说明。管理页需要管理员账号才能看到分区。
+- **关注/粉丝列表、回复树、会话串、转贴列表、反应名单没有消费端**：`users/following` / `users/followers` / `notes/replies` / `notes/children` / `notes/conversation` / `notes/renotes` / `notes/reactions` 后端都不存在（数据模型够，见 §11.15.3）。个人页的「关注中/关注者」计数保持纯数字并注明列表接口未提供，两个 tab 渲染真实的不可用态（见 11.14）；笔记页只渲染 `note.reply` 这一层上下文，没有回复树与「谁反应了」浮层，也没有「查看对话」入口。
+- **改密码、封禁/静音列表、注销账户在前端与后端都未实现**：账户设置页如实标注为未开放，没有假按钮。屏蔽/静音与锁定账号的**表已存在**（`blocks`、`mutes`、`follow_requests`、`users.is_locked`），缺的是端点与 UI（§11.15.3）。
+- **管理面板范围有限**：实例级文件列表与注册模式在线切换都没有端点（后者要可写 meta + 配置热加载，§11.15.4），用户列表也只在 `AdminUsers.vue:42` 取前 50 条——`admin/show-users` 其实支持 `limit`/`offset`，缺的是分页 UI。管理页需要管理员账号才能看到分区。
 - **i18n 未做**：文案硬编码中文；主题只保留 `data-theme` 双主题 + CSS 变量，没有 Firefish 的 JSON5 主题 DSL。
 - **置顶不同步联邦**：actor 文档声明了 `featured` 集合，但没有对应路由与投递，置顶只在本实例生效。
 - **草稿只有一份**：`cinderfish.draft` 是单条草稿，时间线固定发帖器与全局对话框共用同一个键。
@@ -404,7 +412,7 @@ pnpm build    # 先 vue-tsc --noEmit，再输出 web/dist
 - 已记录的有意偏离（Fix round 1 审查确认，均为宽松而非报错方向）：`includeTypes`/`excludeTypes` 里的未知/废弃类型值按字面字符串接受（上游 paramDef 会校验枚举并返回 400）；`limit` 越界按钳制处理（上游同样应返回 400）。
 - 前端：`TimelineView`、`NotificationsView` 的页头 tabs 补图标（时间线四个 tab 与 `stores/deck.ts` 列图标同源；通知四 tab 用 bell/heart/reply/renote），使 PageHeader 的 >3-tab 图标折叠首次可达；`NotificationItem` 已读行按 Iceshrimp.NET `.notification.read { opacity: 0.7 }`（`NotificationComponent.razor.css` L12-14）降透明度，未读保持强调色高亮。
 - 验证：`go test -count=1 ./...`（含数据库与 Redis 集成）全绿、`gofmt -l`/`go vet` 干净、`pnpm typecheck`/`pnpm build` 通过；`git diff --check` 干净。内建浏览器实测（Go 二进制 @3991，`web/dist`，开发库，临时账号 t5alice/t5bob 已清理）：通知页 32 条种子通知分两页翻完无缺失无重复，全部→反应→全部 切换后重新挂载干净；四个时间线源 tab 各自加载对应流；流式新笔记以「1条新笔记」pill 出现、点开仅插入一次；widget 抽屉通知 widget 正常渲染。
-- 已知缺口（记录，未在本任务范围）：`users_pack.go:129` 的 `unreadNotificationsCount`/`hasUnreadNotification` 是硬编码 0/false，刷新后通知徽标与「全部标为已读」按钮不可用（只有流式推送会点亮），建议后续接 `NotificationService.UnreadCount`；纯转贴（renoteId）当前不产生 `renote` 通知（Task 5 只涉及通知查询/置读文件，未动通知创建点）。
+- 已知缺口（记录，未在本任务范围）：`users_pack.go:129` 的 `unreadNotificationsCount`/`hasUnreadNotification` 是硬编码 0/false，刷新后通知徽标与「全部标为已读」按钮不可用（只有流式推送会点亮），建议后续接 `NotificationService.UnreadCount`；纯转贴（renoteId）当前不产生 `renote` 通知（Task 5 只涉及通知查询/置读文件，未动通知创建点）。**Task 8 已把这两项补齐，见 §11.15.2。**
 
 ### 11.13 Note/时间线/ composer 边界对齐（2026-10-31，重写计划 Task 6）
 
@@ -463,6 +471,187 @@ pnpm build    # 先 vue-tsc --noEmit，再输出 web/dist
   `/settings/account`、`/admin?tab=users` 共 20 组全部 `scrollWidth == clientWidth` 且无未裁剪溢出元素。
 - **记录未做**：deck 列内的资料窗仅在代码层与 `ProfileView` 对齐（`NOT_FOLLOWING` + 分区标题），未在 deck 模式
   下重跑浏览器流程；`WidgetSettings` 设置页仍保留一份独立的排序 UI（与面板编辑态同源数据，未合并）。
+
+### 11.15 API 缺口审计、契约收尾与最终清理（2026-10-31，重写计划 Task 8）
+
+审计口径：把前端每个页面动作对回 Misskey 端点源码（`packages/backend/src/server/api/endpoints/...` 的 `paramDef`/`res`/`errors`，以及 `core/` 里实际执行语义的服务），再看它需要的表/列。
+**Misskey 只提供 API 契约；界面参考仍是 Firefish/Iceshrimp**（见 `AGENTS.md` 的参考边界）。
+本分支提交：`31b9137`（契约收尾与徽标播种）、`9167f1e`（转贴可见性收敛）、文档提交（本节）；更早的 `d414bd9`…`70509eb` 是 Task 2–7。
+
+#### 11.15.1 分组总览
+
+| 组 | 定义 | 条数 |
+|----|------|------|
+| **(a) 已实现** | 上游有契约、现有数据模型直接支撑、且改动小而自洽 | 5 |
+| **(a) 未实现** | 上游有契约、数据也够，但消费端是新页面/新交互，或需要一次跨端点的读路径整改 | 16 |
+| **(b) 需 schema/数据模型** | 上游有契约，但缺表、缺列，或需要新的后台任务（媒体清理、联邦投递、排行数据） | 12 |
+| **(c) 上游没有对应** | Misskey API 里不存在，只能是客户端行为或明确不在范围 | 6 |
+
+#### 11.15.2 (a) 已实现（五项，均先写失败测试）
+
+**1. MeDetailed 的未读通知状态**
+- 上游：`core/entities/UserEntityService.ts` L614-615（`hasUnreadNotification`、`unreadNotificationsCount`）、`models/json-schema/user.ts` L572。
+- 请求/响应：`POST /api/i`、`/api/i/update`、`/api/i/pin`、`/api/i/unpin` 的响应里，`unreadNotificationsCount` 为未读行数、`hasUnreadNotification` 为 `count > 0`。
+- 持久化：`notifications` 表 `WHERE recipient_id = $1 AND is_read = FALSE`，复用已有的 `NotificationService.UnreadCount`。
+- 前端消费：`layouts/AppShell.vue` 在会话就绪时用 `setUnreadNotifications` 播种 `stores/streaming.ts` 的 `unreadNotifications`；`nav.ts` 的 `UNREAD_SOURCES` 与侧栏/底栏徽标、`NotificationsView`/`widgets/NotificationsWidget`/`settings/NotificationSettings` 的「全部标为已读」按钮都读它。
+- 测试：`internal/httpapi/notifications_test.go` `TestIUnreadNotificationCount`（新账号 0/false → 他人反应后 1/true → `mark-all-as-read` 后 0/false）。修复前红：`unreadNotificationsCount = 0, want 1`。
+- 有意保留：`hasUnreadNotification` 是布尔投影而非"最近已读游标"；上游同一字段也是投影，行为一致。
+
+**2. 回复目标的可见性**
+- 上游：`core/NoteCreateService.ts` L373-393（顺序：存在 → 纯转贴 → `isVisibleForMe` → specified 扩权）与 `core/entities/NoteEntityService.ts` L294-344（`isVisibleForMe` 规则）；错误表在 `endpoints/notes/create.ts`。
+- 请求/响应：`POST /api/notes/create { replyId, visibility, … }`；错误 `400 CANNOT_REPLY_TO_AN_INVISIBLE_NOTE` / `b98980fa-3780-406c-a935-b6d0eeee10d1`，`400 CANNOT_REPLY_TO_SPECIFIED_VISIBILITY_NOTE_WITH_EXTENDED_VISIBILITY` / `ed940410-535c-4d5e-bfa3-af798671e93c`。
+- 持久化：`notes.visibility`、`note_visibilities.visible_user_id`、`followings(followee_id, follower_id)`、`notes.mentions`/`reply_user_id`；远程作者→远程读者的"假设互相关注"分支按 `notes.user_host` + `users.host` 还原（`internal/note/service.go` `noteVisibleToTx`）。
+- 前端消费：`components/composer/PostForm.vue` 的回复提交、`NoteFooter` 的回复按钮；错误信封经 `api/client.ts` 的 `ApiError` 直接展示 `message`。
+- 测试：`internal/httpapi/notes_test.go` `TestReplyTargetVisibility`（未列入 specified 名单的人被拒、被列入者不能把可见性放宽、followers 笔记在关注前后分别为拒/允、作者本人始终可回、公开笔记仍可回）。修复前红：`reply by unaddressed user: status 200`。
+- 未覆盖：block 检查（`blocks` 表存在但本波次未接）。
+
+**3. 回复 / 转贴 / 引用通知**
+- 上游：`core/NoteCreateService.ts` 的 `NotificationManager`（L66-160：自不通知、mention 被后续 reply/renote 覆盖、specified 只通知名单内、followers 不过滤）与创建点 L858-892（`reply`、`renote`/`quote`）。
+- 请求/响应：`POST /api/notes/create` 的副作用（无新增请求字段）；写入的通知 `type ∈ {reply, renote, quote}`、`note_id` = 新建笔记、`notifier_id` = 作者。
+- 持久化：`notifications(type, notifier_id, note_id)`；收件人必须是本地用户（`users.host IS NULL`，`NotificationService.CreateForLocal`），远程收件人由 ActivityPub 投递。
+- 前端消费：`components/NotificationItem.vue` 已有 `reply`/`renote`/`quote` 三套中文文案与图标，通知页「转贴」tab 用 `includeTypes: ["renote"]`。
+- 测试：`TestReplyAndRenoteNotifications`（回复通知的 noteId/userId、回复+提及只留一条 reply、自回复不通知、纯转贴 → renote、引用 → quote、自转贴不通知）、`TestNotificationRespectsNoteVisibility`（specified 回复不通知看不见它的目标）、`internal/note/reaction_test.go` `TestNotificationCreateForLocal`（远程收件人不落行）。修复前红：`reply notifications = 0, want 1`。
+- 已知偏差：上游按可见性给 followers 通知不过滤（上游 TODO 亦如此）；「转贴」tab 只查 `renote`，引用通知落在「全部」里（客户端 tab 未扩，记录为后续项）。
+
+**4. 纯转贴不可反应**
+- 上游：`core/ReactionService.ts` L115-118；错误表在 `endpoints/notes/reactions/create.ts`。
+- 请求/响应：`POST /api/notes/reactions/create` 对纯转贴返回 `400 CANNOT_REACT_TO_RENOTE` / `eaccdc08-ddef-43fe-908f-d108faad57f5`。
+- 持久化：判定用 `internal/note/renote.go` 的 `IsPureRenote`（`renote_id` 存在且 text/cw/poll/reply/files 都为空）；引用（quote）照旧可反应。
+- 前端消费：`components/note/use-note.ts` 已把反应目标指向被转贴笔记，纯转贴本身不渲染可点的反应条。
+- 测试：`TestCannotReactToPureRenote`（纯转贴 400，原笔记与引用 200）。修复前红：`react to pure renote: status 200`。
+
+**5. 转贴不放大被转贴笔记的受众**
+- 上游：`core/NoteCreateService.ts` L499-527（public 不变；home → 最多 home；自己的 followers → 最多 followers；specified 拒绝）与同段的 localOnly 继承。
+- 请求/响应：`POST /api/notes/create { renoteId }` 无新字段；`createdNote.visibility` / `createdNote.localOnly` 现在按被转贴笔记收敛，而不是客户端传来的默认 `public`。
+- 持久化：`notes.visibility`、`notes.local_only`；判定读取被转贴笔记的同名列（事务内已加载）。
+- 前端消费：`components/note/use-note.ts` 的转贴按钮只发 `{renoteId}`（Task 6 的决定：不做按可见性选择的转贴菜单），因此完全依赖服务端收敛。
+- 测试：`internal/httpapi/notes_test.go` `TestRenoteInheritsTargetVisibility`（home → home、自己的 followers → followers、localOnly → localOnly、引用同样收敛）。修复前红：`renote of a home note visibility = public, want home`。
+- 说明：这是 Task 6 同类可见性泄漏（followers 笔记被转成公开）的剩余一半——Task 6 只挡住了「不能转贴他人 followers 笔记」，没有收敛「home 笔记被转成 public」。
+
+#### 11.15.3 (a) 未实现：数据够，但消费端是新 UI 或需要跨端点整改
+
+| 端点 / 行为 | 上游源码 | 现有数据 | 前端消费点 | 本波次不做的原因 |
+|---|---|---|---|---|
+| `users/following` | `endpoints/users/following.ts`；响应 ref `Following`（`json-schema/following.ts`：`id/createdAt/followeeId/followerId/followee/follower`） | `followings(follower_id, followee_id, created_at)` + `users`/`user_profiles` | `views/ProfileView.vue:153-171` 的 following tab、`components/profile/ProfileCard.vue:62-71` 的计数 | 后端约百行，但消费端要从「不可用卡片」变成真实列表页（Following 对象、逐行关注状态、分页）——超出 Task 8「小而自洽」 |
+| `users/followers` | `endpoints/users/followers.ts` | 同上（方向相反，`followee_id` 为被看的人） | 同上 | 同上 |
+| `notes/replies` | `endpoints/notes/replies.ts`（`noteId` + `limit/sinceId/untilId/sinceDate/untilDate`） | `notes.reply_id`（`idx_notes_reply`） | `views/NoteView.vue:47`、`:96` 的回复区 | 需要分页组件 + 空态 + 线程语义，属新 UI |
+| `notes/children` | `endpoints/notes/children.ts` | `notes.reply_id` | 同上 | 同上 |
+| `notes/conversation` | `endpoints/notes/conversation.ts`（`limit`/`offset`） | `notes.reply_id`、`reply_user_id` | 笔记详情「查看对话」（目前无入口） | 上游 `offset` 语义需要向上递归/递归 CTE，工作量不小 |
+| `notes/renotes` | `endpoints/notes/renotes.ts` | `notes.renote_id`（`idx_notes_renote`） | 转贴计数点击列表（目前无入口） | 无消费端 |
+| `notes/reactions`（列表） | `endpoints/notes/reactions.ts`（`type` 过滤 + 分页） | `note_reactions` + `users` | 「谁反应了」浮层（目前无） | 无消费端 |
+| `i/notifications`（按类型计数） | `endpoints/i/notifications.ts` | `notifications` 按 `type` 聚合 | 通知设置页的分类计数（目前无） | 无消费端 |
+| `i/change-password` | `endpoints/i/change-password.ts` | `users.password_hash`（bcrypt） | `views/settings/AccountSettings.vue:66` | 改密后既有 token 是否失效是产品决定，本波次不碰认证语义 |
+| `blocking/create`、`blocking/delete`、`mute/create`、`mute/delete` | `endpoints/blocking/*`、`endpoints/mute/*` | `blocks`、`mutes` 表已存在（v1 schema） | `views/settings/PrivacySettings.vue:73-80` 的不可用清单 | 需要列表 UI + 时间线/通知/详情的过滤接线，属新功能 |
+| `following/requests/*`（锁定账号） | `endpoints/following/requests/*` | `follow_requests`、`users.is_locked` | `views/settings/PrivacySettings.vue:79`（关注审批） | 与上一条同批 |
+| `users/update` 的 `followersVisibility`/`followingVisibility` | `endpoints/users/update.ts` | `user_profiles.followers_visibility`/`following_visibility` | `views/settings/PrivacySettings.vue:55-70`（只读展示） | 要与 `users/following` 的可见性校验一起落地 |
+| `admin/drive/files` | `endpoints/admin/drive/files.ts` | `drive_files` | `views/admin/AdminFiles.vue:71` 占位 | 管理端列表 + 审核语义 |
+| `i/signin-history` | `endpoints/i/signin-history.ts` | `signins` | 账户设置（可选展示） | 无消费端 |
+| `notes/show`、`notes/reactions/create` 的**读可见性** | `endpoints/notes/show.ts`、`core/ReactionService.ts` L115-116（`isVisibleForMe`） | `noteVisibleToTx` 已存在（§11.15.2 第 2 项） | 所有笔记详情/反应入口 | 时间线已按可见性过滤，但详情仍按 id 直接可见；统一语义要一次读路径整改（show/reactions/notifications 打包），本波次只落地回复入径 |
+| `notes/search`、`users/search`、`notes/search-by-tag` | `endpoints/notes/search.ts` 等 | `notes.text`、`notes.tags`（无全文索引） | **无搜索 UI** | 需要索引 + 查询设计；前端也没有入口 |
+
+#### 11.15.4 (b) 上游有契约，但要动 schema 或数据模型
+
+| 端点 | 上游源码 | 缺什么 | 前端现状 |
+|---|---|---|---|
+| `i/delete-account` | `endpoints/i/delete-account.ts` | 除级联删除外还要媒体清理、AP `Delete` 投递、管理员保护策略 | `AccountSettings.vue:95-100` 标注不可用 |
+| `i/2fa/*` | `endpoints/i/2fa/*` | 需要 two-factor secret / 恢复码列（现无） | `AccountSettings.vue:73-74` |
+| `i/registry`、`i/registry/set` | `endpoints/i/registry/*` | 需要 `registry_items` 表 | 无（客户端偏好走 localStorage） |
+| `users/lists/*` | `endpoints/users/lists/*` | 需要 `user_list` / `user_list_membership` 表 | 无 |
+| `notes/favorites/*`、`i/favorites` | `endpoints/notes/favorites/*` | 需要 `note_favorites` 表 | 无 |
+| `announcements`、`i/announcements`、`i/read-announcement` | `endpoints/announcements.ts` 等 | 需要 `announcements` 表 + 已读游标 | 无 |
+| `notes/featured`、`hashtags/trend`、`charts/*` | `endpoints/notes/featured.ts`、`endpoints/charts/*` | 需要排行/图表数据（`events` 表未写入） | `ExploreView.vue` 没有趋势区 |
+| `federation/instances`、`admin/federation/instances` | `endpoints/federation/instances.ts` | 需要 `instances` 表（合并/封禁状态） | 管理端只有联邦模式与白名单 |
+| `admin/meta`、`admin/meta/update` | `endpoints/admin/meta.ts`、`endpoints/admin/meta/update.ts` | 注册模式/站点名/描述要能在线改：需要可写的 meta 模型 + 配置热加载语义（现在 `registration_mode` 只读自 TOML，改后必须重启） | `views/admin/AdminSettings.vue:278-290` 只展示当前模式并说明需重启 |
+| `admin/emoji/*` | `endpoints/admin/emoji/*` | 需要 `emoji` 表 | MFM 只认内置 emoji 目录 |
+| `channels/*` | `endpoints/channels/*` | 需要频道表与成员关系 | 无 |
+| `clips/*`、`antennas/*`、`pages/*`、`play/*`、`ads/*`、`gallery/*` | 各自目录 | 各自的表 | 无 |
+
+上游通知模型里还有一个内部列 `targetNoteId`（`models/Notification.ts` L43-44），它不出现在打包后的响应里；本实现的转贴通知用 `note_id` 指向转贴本身，被转贴笔记经 `notes.renote_id` 取回，因此**不需要新增列**。
+
+#### 11.15.5 (c) 上游没有对应（客户端行为或明确不做）
+
+| 行为 | 现状 |
+|---|---|
+| deck 列布局、列宽、列顺序 | 纯客户端：`stores/deck.ts` + `localStorage["cinderfish.deck.columns"]`，Misskey 无对应端点 |
+| 导航顺序与可视化编辑（桌面/移动两套） | 纯客户端：`stores/nav.ts` + `nav.ts` 注册表，`localStorage["cinderfish.ui"]` |
+| widget 栈与编辑态 | 纯客户端：`stores/widgets.ts` + `localStorage["cinderfish.ui.widgets"]`；编辑态不落盘 |
+| 主题（auto/light/dark）、字号 | 纯客户端：`stores/theme.ts`、`views/settings/font-scale.ts`，同步 `meta theme-color` |
+| 通知页「未读」视图 / 只读 tab | 客户端过滤（`markAsRead: false` + `includeTypes`），上游无「未读」端点 |
+| 自助找回密码（邮件重置） | Misskey 无此端点，本实现同样不做；改密属于 (a) §11.15.3，重置不在范围内 |
+
+#### 11.15.6 清理：没有可删的壳层包装
+
+第 3 步要求「只有在 grep 证明没有任何路由/导入/store/模板引用后才能删」。实测结论：**本波次没有可删文件**。
+
+- 可达性分析（脚本解析 `web/src` 里全部静态与动态 `import`，从 `src/main.ts` 出发）：`src` 下 101 个 `.vue`/`.ts` 文件里，除类型声明 `src/env.d.ts` 外全部可达；没有任何孤儿组件。
+- 逐个候选的存活证据（"仍被引用"即不可删）：
+
+  | 候选 | 存活引用 |
+  |---|---|
+  | `components/PagePlaceholder.vue` | `views/NotFoundView.vue:2` |
+  | `components/ProfileHeader.vue`（deck 资料卡） | `components/deck/DeckPageWindow.vue:9` |
+  | `components/ui/MobileNav.vue` / `NavDrawer.vue` | `components/layout/MobileSidebar.vue:3-4` |
+  | `components/TimelineFeed.vue` | `views/TimelineView.vue:4`、`components/deck/DeckColumn.vue:19`、`components/widgets/TimelineWidget.vue:3` |
+  | `components/ui/PageWindow.vue` | `components/deck/DeckPageWindow.vue:11`（`PostForm` 也经 `os.ts` 走同一弹层） |
+  | `views/SettingsView.vue` | `router/index.ts:52` 的路由组件（内部只渲染 `settings/SettingsLayout.vue`） |
+  | `views/AdminView.vue` | `router/index.ts:107` |
+  | `layouts/AuthLayout.vue` | `views/LoginView.vue:4`、`views/SignupView.vue:5` |
+  | `views/settings/menu.ts` | `views/settings/SettingsLayout.vue:8` |
+
+- 因此本波次**删除 0 个文件**。唯一"看起来像包装"的 `views/SettingsView.vue` 仍被路由引用，按规则不动；它的合并（路由直接指向 `settings/SettingsLayout.vue`）留给后续重构，并需同时改 `router/index.ts` 与 `web_test.go` 的深链断言。
+- 后端侧也没有删除：所有 `internal/httpapi` 处理器都在 `registerRoutes` 里有路由（`notes.go`/`notifications.go` 等只新增行为，未留死代码）。
+
+#### 11.15.7 最终门禁（2026-10-31，本分支实测输出）
+
+```
+$ gofmt -l internal/ cmd/
+（空）
+
+$ go vet ./...
+（退出 0，无输出）
+
+$ CINDERFISH_TEST_DATABASE_URL="postgres://cinderfish:cinderfish@localhost:5432/cinderfish_test" \
+  CINDERFISH_TEST_REDIS_URL="redis://127.0.0.1:6379/0" go test -count=1 ./...
+ok  	github.com/Aurorainic/cinderfish/internal/account	0.892s
+ok  	github.com/Aurorainic/cinderfish/internal/auth	0.043s
+ok  	github.com/Aurorainic/cinderfish/internal/config	0.004s
+ok  	github.com/Aurorainic/cinderfish/internal/federation	0.456s
+ok  	github.com/Aurorainic/cinderfish/internal/httpapi	10.953s
+ok  	github.com/Aurorainic/cinderfish/internal/idgen	0.002s
+ok  	github.com/Aurorainic/cinderfish/internal/media	11.054s
+ok  	github.com/Aurorainic/cinderfish/internal/note	0.875s
+ok  	github.com/Aurorainic/cinderfish/internal/streaming	0.708s
+（cmd/* 与 internal/db、internal/testdb 为 [no test files]）
+
+$ cd web && pnpm typecheck && pnpm build
+（vue-tsc 无输出；`vite build` ✓ built in 642ms，dist 产物正常）
+```
+
+**真实二进制 API 走查**（`go build -o /tmp/cf-t8 ./cmd/cinderfish`，配置 `/tmp/cf-t8.toml`：端口 3992、
+`web_dir` 指向本分支 `web/dist`、开发库 `cinderfish`、`registration_mode=admin`、`federation_mode=none`；
+临时账号 `t8m2`/`t8o2`）实测：
+
+| 场景 | 结果 |
+|---|---|
+| `/api/i` 新账号 | `unreadNotificationsCount=0, hasUnreadNotification=false` |
+| `t8o2` 反应 `t8m2` 的笔记 | `/api/i` → `1 / true` |
+| `t8o2` 回复 / 纯转贴 / 引用同一笔记 | `/api/notifications` 依次出现 `quote, renote, reply, reaction`（`noteId` 齐全），未读 4 |
+| `notifications/mark-all-as-read` | `/api/i` → `0 / false` |
+| 非关注者对 followers 笔记回复 | `400 CANNOT_REPLY_TO_AN_INVISIBLE_NOTE` / `b98980fa-…` |
+| 关注后再回复 | `200` |
+| 被列入 specified 名单者用 public 回复 | `400 CANNOT_REPLY_TO_SPECIFIED_VISIBILITY_NOTE_WITH_EXTENDED_VISIBILITY` / `ed940410-…`；改用 specified 回复 `200` |
+| 对纯转贴反应 | `400 CANNOT_REACT_TO_RENOTE` / `eaccdc08-…` |
+| `t8o2` 转贴 `t8m2` 的 home 笔记 | `createdNote.visibility` → `home` |
+| 转贴 localOnly 笔记 | `createdNote.localOnly` → `true` |
+| 四条时间线（local/global/hybrid/home） | 均 200 且返回非空 |
+| 匿名 `POST /api/meta`、`/api/notes/local-timeline` | `200`，本地时间线返回 5 条 |
+| 匿名 `notes/timeline`（home）、`notifications`、`/api/i` | 均 `401`（与前端对未登录隐藏这些入口一致） |
+| 匿名 `GET /`、`/notifications`、`/settings/appearance`、`/admin`（`Accept: text/html`） | 均 `200 text/html`，SPA 回退正常（deep link 可硬刷新） |
+
+**浏览器可视化走查未执行**：本轮内建浏览器返回 `BROWSER_USER_TAKEOVER`（用户接管了浏览器面板），
+工具契约要求当轮停止，因此 1440/1280/1100/840/720/600/380 的截图与溢出实测**没有做**。
+本波次的 UI 改动只有「徽标初值来自会话」这一处逻辑（无 CSS、无 DOM 结构变化，徽标渲染路径在 Task 3 已实测），
+但**按证据规则仍记为未验证**，见 §14。
 
 ## 12. M5 联邦（ActivityPub）
 
@@ -535,6 +724,7 @@ POST /inbox                            POST /users/{id}/inbox
 
 ## 14. 已知的未验证项
 
+- **浏览器可视化走查（Task 8 波次）未做**：2026-10-31 的最终轮，内建浏览器返回 `BROWSER_USER_TAKEOVER`（用户接管面板），按工具契约当轮停止。因此 1440/1280/1100/840/720/600/380 的截图、`scrollWidth` 溢出实测与登录态视觉复核**都没有执行**；同一轮的后端 API 走查（未读数、通知类型、回复可见性、纯转贴反应、四条时间线）已用真实二进制完成，见 §11.15.7。本波次没有改 CSS 或 DOM 结构，风险低，但不能当作已验证。
 - **S3 后端未做真实服务端验证**：只验证了编译、接口与 URL 生成逻辑。
 - **缩略图/WebP 生成未实现**：`drive_files.thumbnail_key` 字段已留，图片处理管道还没写。
 - **前端没有真实第三方客户端联调**：页面已在构建产物上用浏览器走查，但没有用 misskey-js 或 Misskey Web 前端连过本实例。
