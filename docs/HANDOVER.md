@@ -399,6 +399,18 @@ pnpm build    # 先 vue-tsc --noEmit，再输出 web/dist
 - 验证：`go test -count=1 ./...`（含数据库与 Redis 集成）全绿、`gofmt -l`/`go vet` 干净、`pnpm typecheck`/`pnpm build` 通过；`git diff --check` 干净。内建浏览器实测（Go 二进制 @3991，`web/dist`，开发库，临时账号 t5alice/t5bob 已清理）：通知页 32 条种子通知分两页翻完无缺失无重复，全部→反应→全部 切换后重新挂载干净；四个时间线源 tab 各自加载对应流；流式新笔记以「1条新笔记」pill 出现、点开仅插入一次；widget 抽屉通知 widget 正常渲染。
 - 已知缺口（记录，未在本任务范围）：`users_pack.go:129` 的 `unreadNotificationsCount`/`hasUnreadNotification` 是硬编码 0/false，刷新后通知徽标与「全部标为已读」按钮不可用（只有流式推送会点亮），建议后续接 `NotificationService.UnreadCount`；纯转贴（renoteId）当前不产生 `renote` 通知（Task 5 只涉及通知查询/置读文件，未动通知创建点）。
 
+### 11.13 Note/时间线/ composer 边界对齐（2026-10-31，重写计划 Task 6）
+
+- 对照 Misskey `server/api/endpoints/notes/create.ts`（renoteId 参数与 `cannotRenoteDueToVisibility`）与 `core/NoteCreateService.ts` L352-356 补齐后端规则：**followers 可见性的笔记只有作者本人可以转贴，specified 笔记一律不可转贴**。此前该规则缺失——`internal/httpapi/notes.go` 里错误 ID `be9529e9-…` 早已声明但从未产生，任何人都能把 followers 笔记转贴成公开笔记（可见性泄漏）。修复走 `internal/note/service.go`（错误 `ErrCannotRenoteDueToVisibility`）+ `httpapi` 错误映射，HTTP 响应与上游同形：`CANNOT_RENOTE_DUE_TO_VISIBILITY` / `be9529e9-fe72-4de0-ae43-0b363c4938af` / 400。
+- 修复一处真实前端缺陷：`/api/i/pin` 与 `/api/i/unpin` 的响应是不带 pin 列表的 MeDetailed，而 web 会话整体替换自身，导致置顶后菜单标签在下次 `/api/i` 前一直是「置顶笔记」（再点会重复 pin）。两个 handler 现在都调 `applyPinnedNotes`，响应自带最新列表（测试钉住）。
+- 前端按翻译契约（`docs/research/2026-10-31-iceshrimp-architecture-translation.md` §6/§13）对齐：
+  - `PagedFeed` 日期分组改为**本地时区完整年/月/日**比较（用 `Date` 解析 `createdAt`，不用 UTC 字符串前缀；本地 00:30 的笔记 UTC 前缀是前一天）。fork `MkDateSeparatedList` 的「只比日-月」分组按契约明确不照抄；分隔行 key 改用本地日期本身，分页 prepend/append 不再移位。
+  - `NoteFooter` 按 fork 的 footer 动作顺序（回复、转贴、反应、**引用**、菜单）补了独立「引用」按钮（对应 fork `MkQuoteButton`，此前 UI 完全没有引用入口），并在目标不可转贴（followers 非本人 / specified）时把转贴按钮替换为锁定禁用态（对应 `MkRenoteButton` 的 canRenote）。`Note.vue` 计算 `renotable`（public/home 或本人），引用与转贴共用同一门控。
+  - `TimelineFeed` 此前不转发 `@reply`，时间线里点「回复」无任何反应；现在与 NoteView 一样走 `os.openPostForm({ reply })`。纯转贴展示/操作目标分离（`useNote(note, actionTarget)`、pin 用 actionNote.id）保持不变，单行单 `<article>` 结构核对过与 fork 一致。
+- composer 决策：保留 prop 驱动组件不变。`os.openPostForm` 的全局弹层（OsOverlay → PageWindow）与时间线 `fixed` 内嵌是同一组件的两种挂法，草稿/可见性/回复/引用目标/附件状态已全部内聚在组件里，API 调用都在 `api/client.ts`——契约已满足，无需再动。
+- 验证：`go vet`、`gofmt -l internal/ cmd/`、`git diff --check` 全干净；`CINDERFISH_TEST_DATABASE_URL=… CINDERFISH_TEST_REDIS_URL=… go test -count=1 ./...` 全绿（新测试先失败后通过：`TestRenoteTargetVisibility` 在规则缺失时 200 泄漏、`TestIPinUnpinAndUsersShow` 的 pin 响应断言为空）；`pnpm typecheck`/`pnpm build` 通过。内建浏览器走查（Go 二进制 @3991，开发库，临时账号 t6alice/t6bob，已清理）：日期分隔线在本地 00:30 边界与 10-31/11-01 交界正确分组（修复前 UTC 前缀会错误拆分 10-31）；纯转贴行单 article 单 footer；回复/引用弹窗与发布、反应选择器、置顶/取消置顶标签翻转（pin 修复后）均正常。
+- 仍缺（按契约显式降级，不虚构）：`notes/conversation`、`notes/children`、`notes/replies`、`notes/renotes`、`users/following`、`users/followers` 端点不存在——会话串只有单层父笔记（`NoteParent`），转贴悬停用户列表省略，关注/粉丝列表维持 Task 7 的「暂不可用」态。转贴按钮保持单击直接 `notes/create {renoteId}`（默认 public），fork 的按可见性转贴菜单未引入（记录为决策，后端契约已支持）。
+
 ## 12. M5 联邦（ActivityPub）
 
 源码对照记录见 `docs/research/2026-10-28-m5-federation-source-calibration.md`（逐条对照上游文件，含刻意偏离项）。
