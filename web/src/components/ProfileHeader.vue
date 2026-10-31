@@ -3,6 +3,7 @@ import { computed } from "vue";
 import { useRoute } from "vue-router";
 import type { UserDetailed } from "../api/types";
 import UserAvatar from "./UserAvatar.vue";
+import { NAV_ITEM_DEFS } from "../nav";
 
 const props = defineProps<{
   user: UserDetailed;
@@ -46,7 +47,7 @@ function toggleFollow() {
         <UserAvatar class="avatar" :user="user" :size="96" />
 
         <div class="actions">
-          <RouterLink v-if="isSelf" to="/settings" class="button ghost small">编辑资料</RouterLink>
+          <RouterLink v-if="isSelf" :to="NAV_ITEM_DEFS.settings.to" class="button ghost small">编辑资料</RouterLink>
           <button
             v-else-if="loggedIn"
             type="button"

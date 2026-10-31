@@ -38,7 +38,7 @@ export const SETTINGS_TABS: readonly SettingsTab[] = [
   { key: "navigation", label: "导航", icon: "compass", group: "客户端" },
   { key: "widgets", label: "小组件", icon: "image", group: "客户端" },
   { key: "notifications", label: "通知", icon: "bell", group: "客户端", requiresAuth: true },
-  { key: "privacy", label: "隐私", icon: "shield", group: "其他" },
+  { key: "privacy", label: "隐私", icon: "shield", group: "其他", requiresAuth: true },
   { key: "account", label: "账户", icon: "settings", group: "其他", requiresAuth: true },
   { key: "about", label: "关于", icon: "globe", group: "其他" },
 ];

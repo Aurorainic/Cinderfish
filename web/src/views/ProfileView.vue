@@ -11,6 +11,7 @@ import PageHeader from "../components/ui/PageHeader.vue";
 import PagedFeed from "../components/ui/PagedFeed.vue";
 import type { PagedFeedParams, PagedFeedResult } from "../components/ui/PagedFeed.vue";
 import { usePageTitle } from "../composables/use-page-title";
+import { NAV_ITEM_DEFS } from "../nav";
 import { isLoggedIn, session } from "../stores/session";
 
 type Tab = "notes" | "media" | "replies";
@@ -366,7 +367,7 @@ watch(
     >
       <template #actions>
         <template v-if="viewUser">
-          <RouterLink v-if="isSelf" to="/settings" class="button ghost small">编辑资料</RouterLink>
+          <RouterLink v-if="isSelf" :to="NAV_ITEM_DEFS.settings.to" class="button ghost small">编辑资料</RouterLink>
           <button
             v-else-if="isLoggedIn"
             type="button"

@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from "vue-router";
+import { refreshSession, session } from "../stores/session";
 
 // SPA routes. The Go server reserves /api, /.well-known, /users, /media
 // and the other protocol namespaces; everything else falls through to
@@ -55,6 +56,7 @@ export const router = createRouter({
           path: "profile",
           name: "settings-profile",
           component: () => import("../views/settings/ProfileSettings.vue"),
+          meta: { requiresAuth: true },
         },
         {
           path: "appearance",
@@ -75,16 +77,19 @@ export const router = createRouter({
           path: "notifications",
           name: "settings-notifications",
           component: () => import("../views/settings/NotificationSettings.vue"),
+          meta: { requiresAuth: true },
         },
         {
           path: "privacy",
           name: "settings-privacy",
           component: () => import("../views/settings/PrivacySettings.vue"),
+          meta: { requiresAuth: true },
         },
         {
           path: "account",
           name: "settings-account",
           component: () => import("../views/settings/AccountSettings.vue"),
+          meta: { requiresAuth: true },
         },
         {
           path: "about",
@@ -100,6 +105,7 @@ export const router = createRouter({
       path: "/admin",
       name: "admin",
       component: () => import("../views/AdminView.vue"),
+      meta: { requiresAuth: true },
     },
     {
       path: "/:pathMatch(.*)*",
@@ -112,4 +118,19 @@ export const router = createRouter({
     if (to.hash) return { el: to.hash, behavior: "smooth" };
     return { top: 0 };
   },
+});
+
+// Account-only routes gate on the resolved session store, never on the raw
+// token: the guard awaits the shared refresh (it returns immediately when no
+// token is stored) so a deep link into a gated page either lands once the
+// account is loaded or sends the guest to /login with the original location
+// kept in `redirect`, which LoginView consumes after a successful signin.
+// Public routes — timeline, notes, profiles, explore, login, signup and the
+// client-only appearance/navigation/widgets preferences — are never gated.
+// Authorization itself stays server-side; this guard is UX only.
+router.beforeEach(async (to) => {
+  if (!to.meta.requiresAuth) return true;
+  if (!session.ready) await refreshSession();
+  if (session.me) return true;
+  return { path: "/login", query: { redirect: to.fullPath } };
 });

@@ -366,7 +366,7 @@ pnpm build    # 先 vue-tsc --noEmit，再输出 web/dist
 
 **审查中驳回的一条**：`notifications` 的 `markAsRead` 缺省为启用被判为与 Misskey 不符，实际上游 `upstream/.../i/notifications.ts` 的 `paramDef` 就是 `default: true`，当前实现正确，未改。
 
-仍留待决定：设置路由没有统一登录守卫（账户类子页目前各自处理）；deck 移动端几何没有自动化断言；关注请求没有撤销入口（后端无对应端点）。
+仍留待决定：deck 移动端几何没有自动化断言；关注请求没有撤销入口（后端无对应端点）。设置路由的统一登录守卫已在 11.11 落地。
 
 ### 11.10 Iceshrimp 壳层重构（2026-10-31，重写计划 Task 2）
 
@@ -377,6 +377,15 @@ pnpm build    # 先 vue-tsc --noEmit，再输出 web/dist
 - 断点定稿（fork 主源）：`1100/1090/500/1279/400`；`DeckShell` 与 widget 抽屉的 720 随之改为 500；`.auth` 布局断点保持 720（认证页独立于壳）。底栏 ≤400 收紧按钮尺寸。
 - 侧栏/壳几何样式从 `main.css` 移入各组件；`--rail-width` 改 250px、`--rail-width-collapsed` 80px、`--shell-max-width` 1280px。
 - 验证：`pnpm typecheck`、`pnpm build`、`go vet`、`go test` 全绿；浏览器实测 1440/1100/840/600/375 的 `scrollWidth/clientWidth` 全部相等（无水平溢出），1440 三区（250+主列+300）、1100 图标态+widget 列、840/600 widget 隐藏、375 抽屉+底栏（含 Esc 关闭、路由变化关闭）、登录页保持裸布局。移动宽度下内建浏览器无法截图，采用 DOM 快照 + 注入式几何探针测量（探针已移除）。
+
+### 11.11 导航集中与账户路由门禁（2026-10-31，重写计划 Task 3）
+
+- `web/src/nav.ts` 的 `NavItemDef` 补齐 `id`、`requiresAuth`、`mobile` 与可选 `unreadKey`：徽标不再用零散的闭包函数，`unreadKey` 指向 `nav.ts` 内的唯一 `UNREAD_SOURCES` 映射（目前仅 `notifications`，仍读 `stores/streaming` 的 `unreadNotifications`）；`DEFAULT_MOBILE_NAV` 改由 `mobile` 标记推导，`NAV_ITEM_KEYS` 改由定义对象推导。`isNavItemVisible` 同时尊重 `requiresAuth`（未登录隐藏）。
+- 路由元数据：`/settings/profile`、`/settings/notifications`、`/settings/privacy`、`/settings/account`、`/admin` 带 `meta.requiresAuth`；`/settings/appearance|navigation|widgets|about` 保持公开（纯客户端偏好）。`settings/menu.ts` 的 `privacy` 补上 `requiresAuth` 与路由一致。
+- `router/index.ts` 增加 `beforeEach` 守卫：命中 `meta.requiresAuth` 时等待共享的 `refreshSession()`（无 token 立即返回），`session.me` 为空则重定向 `/login?redirect=<fullPath>`，登录成功后 LoginView 用 `redirect` 参数回到原页。守卫只管 UX，授权仍在服务端；`/admin` 路由行为除守卫元数据外不变。
+- 散落的「设置」快捷入口（`ProfileHeader`、`ProfileView`、`InstanceWidget` 的 `/settings` 链接）改读 `NAV_ITEM_DEFS.settings.to`，导航单一来源原则成立。
+- 已知影响：未登录时点侧栏/抽屉的「设置」会因默认子页 `settings-profile` 受门禁而落到登录页（此前是渲染一份空的资料编辑表单）；深链 `/settings/<未知tab>` 对未登录用户同样经重定向落到登录页。
+- 验证：`pnpm typecheck`、`pnpm build`、`go vet` 全绿；`git diff --check` 干净。内建浏览器实测（Go 二进制 @3991，`web/dist`，开发库）：未登录深链 `/settings/account`、`/settings/privacy`、`/admin` 均跳 `/login?redirect=<原路径>`，登录后按 `redirect` 回 `/admin`；未登录 `/settings/appearance` 正常渲染且菜单带「需登录」注记；登录后侧栏五项（含管理员「管理」）与点击导航、返回键正常；流式推送后侧栏「通知」徽标出现「1」；非管理员会话侧栏无「管理」项（与改动前一致）。
 
 ## 12. M5 联邦（ActivityPub）
 

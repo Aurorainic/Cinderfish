@@ -2,6 +2,7 @@
 import { computed, onMounted } from "vue";
 import { instance, loadInstance } from "../../stores/instance";
 import { session } from "../../stores/session";
+import { NAV_ITEM_DEFS } from "../../nav";
 import WidgetCard from "./WidgetCard.vue";
 
 defineProps<{ widgetProps?: Record<string, unknown> }>();
@@ -45,7 +46,7 @@ onMounted(() => {
     <div class="actions">
       <template v-if="session.me">
         <RouterLink :to="`/@${session.me.username}`" class="button ghost small">我的主页</RouterLink>
-        <RouterLink to="/settings" class="button small">设置</RouterLink>
+        <RouterLink :to="NAV_ITEM_DEFS.settings.to" class="button small">设置</RouterLink>
       </template>
       <template v-else>
         <RouterLink to="/login" class="button ghost small">登录</RouterLink>
