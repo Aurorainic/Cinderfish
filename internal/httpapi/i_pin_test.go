@@ -40,6 +40,13 @@ func TestIPinUnpinAndUsersShow(t *testing.T) {
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("pin n2: status %d, body %v", resp.StatusCode, me)
 	}
+	// The pin response itself carries the fresh list: the web session
+	// replaces itself with it, so an empty pinnedNoteIds here would blank
+	// the footer's pinned label until the next /api/i.
+	pinList, ok := me["pinnedNoteIds"].([]any)
+	if !ok || len(pinList) != 2 || pinList[0] != n2 || pinList[1] != n1 {
+		t.Errorf("pin response pinnedNoteIds = %v, want [%s %s]", me["pinnedNoteIds"], n2, n1)
+	}
 
 	resp, show := post(t, ts, "/api/users/show", map[string]any{"userId": authorID})
 	if resp.StatusCode != http.StatusOK {
@@ -83,6 +90,9 @@ func TestIPinUnpinAndUsersShow(t *testing.T) {
 	resp, me = post(t, ts, "/api/i/unpin", map[string]any{"i": authorToken, "noteId": n2})
 	if resp.StatusCode != http.StatusOK || me["id"] != authorID {
 		t.Fatalf("unpin n2: status %d, body %v", resp.StatusCode, me)
+	}
+	if unpinList, ok := me["pinnedNoteIds"].([]any); !ok || len(unpinList) != 1 || unpinList[0] != n1 {
+		t.Errorf("unpin response pinnedNoteIds = %v, want [%s]", me["pinnedNoteIds"], n1)
 	}
 	_, show = post(t, ts, "/api/users/show", map[string]any{"userId": authorID})
 	ids = show["pinnedNoteIds"].([]any)

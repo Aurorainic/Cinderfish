@@ -78,5 +78,10 @@ func (s *Server) pinNote(w http.ResponseWriter, r *http.Request, pin bool) {
 
 	packed := packMeDetailed(info.User, info.User.CreatedAt, info.Token == nil, loadProfile(r.Context(), s, info.User.ID))
 	s.applyUserCounts(r.Context(), info.User.ID, packed)
+	// The pin state is the one field this response changes, so it must
+	// carry the fresh list: the web session replaces itself with the
+	// response, and an empty pinnedNoteIds would blank the footer's
+	// pinned/unpinned label until the next /api/i.
+	s.applyPinnedNotes(r.Context(), info.User.ID, packed)
 	writeJSON(w, http.StatusOK, packed)
 }
