@@ -218,6 +218,22 @@ watch(
   },
 );
 
+// following/create answers with the followee's UserLite only (Misskey
+// contract), so a pending request on a locked or remote account is read
+// back from users/show instead of being returned there.
+async function refreshRelation() {
+  if (!user.value) return;
+  try {
+    const fresh = await api.usersShow({ username: user.value.username });
+    if (!user.value) return;
+    following.value = fresh.isFollowing ?? false;
+    followPending.value = fresh.hasPendingFollowRequestFromYou ?? false;
+    if (typeof fresh.followersCount === "number") user.value.followersCount = fresh.followersCount;
+  } catch {
+    // The optimistic state from the follow call stands on a failed read.
+  }
+}
+
 async function follow() {
   if (!user.value || followBusy.value || followPending.value) return;
   followBusy.value = true;
@@ -226,10 +242,12 @@ async function follow() {
     await api.follow(user.value.id);
     following.value = true;
     user.value.followersCount += 1;
+    await refreshRelation();
   } catch (err) {
     if (err instanceof ApiError) {
       if (err.code === "ALREADY_FOLLOWING") {
         following.value = true;
+        await refreshRelation();
       } else if (err.status === 401) {
         followNotice.value = "登录状态已失效，请重新登录后再关注。";
       } else {

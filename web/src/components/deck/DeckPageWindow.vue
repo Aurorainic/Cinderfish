@@ -91,6 +91,22 @@ function profileNotesFetcher(p: { untilId?: string }): Promise<Note[]> {
   return api.usersNotes({ username: username.value, limit: PROFILE_PAGE_SIZE, untilId: p.untilId });
 }
 
+// following/create answers with the followee's UserLite only (Misskey
+// contract), so a pending request on a locked or remote account is read
+// back from users/show instead of being returned there.
+async function refreshRelation(): Promise<void> {
+  if (!user.value) return;
+  try {
+    const fresh = await api.usersShow({ username: user.value.username });
+    if (!user.value) return;
+    following.value = fresh.isFollowing ?? false;
+    followPending.value = fresh.hasPendingFollowRequestFromYou ?? false;
+    if (typeof fresh.followersCount === "number") user.value.followersCount = fresh.followersCount;
+  } catch {
+    // The optimistic state from the follow call stands on a failed read.
+  }
+}
+
 async function follow(): Promise<void> {
   if (!user.value || followBusy.value || followPending.value) return;
   followBusy.value = true;
@@ -99,6 +115,7 @@ async function follow(): Promise<void> {
     await api.follow(user.value.id);
     following.value = true;
     user.value.followersCount += 1;
+    await refreshRelation();
   } catch (err) {
     followNotice.value = errorMessage(err, "关注失败");
   } finally {
@@ -144,11 +161,11 @@ function onNoteDeleted(id: string): void {
             :is-self="isSelf"
             :logged-in="isLoggedIn"
             :following="following"
+            :pending="followPending"
             :follow-busy="followBusy"
             @follow="follow"
             @unfollow="unfollow"
           />
-          <p v-if="followPending" class="notice info">关注请求已发送，等待对方确认。</p>
           <p v-if="followNotice" class="notice error">{{ followNotice }}</p>
           <PagedFeed :key="username" class="profile-feed" :fetcher="profileNotesFetcher">
             <template #item="{ item }">

@@ -10,6 +10,9 @@ const props = defineProps<{
   isSelf: boolean;
   loggedIn: boolean;
   following: boolean;
+  // A pending follow request (locked or remote followee) keeps the button
+  // disabled until the other side answers.
+  pending?: boolean;
   followBusy: boolean;
 }>();
 
@@ -52,11 +55,12 @@ function toggleFollow() {
             v-else-if="loggedIn"
             type="button"
             class="button small"
-            :class="{ ghost: following }"
-            :disabled="followBusy"
+            :class="{ ghost: following || pending }"
+            :disabled="followBusy || pending"
             @click="toggleFollow"
           >
             <template v-if="followBusy">处理中…</template>
+            <template v-else-if="pending">请求已发送</template>
             <template v-else-if="following">取消关注</template>
             <template v-else>关注</template>
           </button>
