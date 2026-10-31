@@ -24,7 +24,9 @@ const style = computed(() => ({
 
 <template>
   <img v-if="user.avatarUrl" class="avatar" :src="user.avatarUrl" :alt="user.username" :style="style" />
-  <span v-else class="avatar fallback" :style="style">{{ initial }}</span>
+  <span v-else class="avatar fallback" :style="style">
+    <span class="letter">{{ initial }}</span>
+  </span>
 </template>
 
 <style scoped>
@@ -38,7 +40,22 @@ const style = computed(() => ({
   outline-offset: -1px;
 }
 
-.fallback {
+/* The box's own layout must not depend on the parent. A parent that styles
+   `.avatar` (the note header's link wrapper does) hands its `display` down to
+   this element, because Vue gives a child component's root the parent's
+   scope id. Naming the box as well as the state keeps this rule specific
+   enough to win that, so the box stays a grid. */
+.avatar.fallback {
+  display: grid;
+}
+
+/* The letter fills the box and centres itself inside it, so it stays centred
+   whatever the box's own `display` turns out to be: a leaked `display` on
+   the box changes how the box lays the letter out, but not where the letter
+   sits inside it. */
+.letter {
+  width: 100%;
+  height: 100%;
   display: grid;
   place-items: center;
   /* Parents often set line-height: 0 under an avatar to kill inline gaps; the
