@@ -25,3 +25,12 @@ export async function loadInstance(): Promise<void> {
   })();
   return inflight;
 }
+
+// An explicit re-read for the instance widget's refresh action and its error
+// state. The cached metadata is dropped first so the next load cannot answer
+// from it; an in-flight request is still shared rather than raced.
+export async function reloadInstance(): Promise<void> {
+  instance.meta = null;
+  instance.error = "";
+  await loadInstance();
+}

@@ -67,8 +67,11 @@ async function markAllRead(): Promise<void> {
 <template>
   <WidgetCard title="通知" icon="bell" :hint="hint" flush>
     <template #actions>
+      <RouterLink class="action" to="/notifications" title="打开通知页" aria-label="打开通知页">
+        <AppIcon name="bell" />
+      </RouterLink>
       <button
-        class="mark"
+        class="action"
         type="button"
         title="全部标为已读"
         aria-label="全部标为已读"
@@ -104,7 +107,7 @@ async function markAllRead(): Promise<void> {
 </template>
 
 <style scoped>
-.mark {
+.action {
   display: grid;
   place-items: center;
   width: 26px;
@@ -118,17 +121,26 @@ async function markAllRead(): Promise<void> {
   transition: color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
 }
 
-.mark:hover:not(:disabled) {
+a.action {
+  text-decoration: none;
+}
+
+.action:hover:not(:disabled) {
   border-color: var(--accent);
 }
 
-.mark:disabled {
+.action:disabled {
   color: var(--muted);
   opacity: 0.6;
   cursor: default;
 }
 
-.mark .icon {
+.action:focus-visible {
+  outline: var(--focus-outline);
+  outline-offset: 2px;
+}
+
+.action .icon {
   width: 13px;
   height: 13px;
 }

@@ -7,6 +7,7 @@ import AppIcon from "../AppIcon.vue";
 import NoteDetail from "../note/NoteDetail.vue";
 import NoteItem from "../note/Note.vue";
 import ProfileHeader from "../ProfileHeader.vue";
+import ProfileSection from "../profile/ProfileSection.vue";
 import PageWindow from "../ui/PageWindow.vue";
 import PagedFeed from "../ui/PagedFeed.vue";
 import { useFollowRelation } from "../../composables/use-follow-relation";
@@ -133,7 +134,19 @@ async function unfollow(): Promise<void> {
     following.value = false;
     user.value.followersCount = Math.max(0, user.value.followersCount - 1);
   } catch (err) {
-    followNotice.value = errorMessage(err, "取消关注失败");
+    // Same branches as ProfileView: a relation already gone answers
+    // NOT_FOLLOWING, which means the button was merely stale.
+    if (err instanceof ApiError) {
+      if (err.code === "NOT_FOLLOWING") {
+        following.value = false;
+      } else if (err.status === 401) {
+        followNotice.value = "登录状态已失效，请重新登录后再操作。";
+      } else {
+        followNotice.value = errorMessage(err, "取消关注失败");
+      }
+    } else {
+      followNotice.value = errorMessage(err, "取消关注失败");
+    }
   } finally {
     followBusy.value = false;
   }
@@ -168,17 +181,19 @@ function onNoteDeleted(id: string): void {
             @unfollow="unfollow"
           />
           <p v-if="followNotice" class="notice error">{{ followNotice }}</p>
-          <PagedFeed :key="username" class="profile-feed" :fetcher="profileNotesFetcher">
-            <template #item="{ item }">
-              <NoteItem :note="(item as Note)" @deleted="onNoteDeleted" />
-            </template>
-            <template #empty>
-              <div class="placeholder">
-                <AppIcon name="feather" />
-                <span>还没有笔记。</span>
-              </div>
-            </template>
-          </PagedFeed>
+          <ProfileSection class="profile-feed" title="最近的笔记" icon="feather" hint="按发布时间从新到旧" plain>
+            <PagedFeed :key="username" :fetcher="profileNotesFetcher">
+              <template #item="{ item }">
+                <NoteItem :note="(item as Note)" @deleted="onNoteDeleted" />
+              </template>
+              <template #empty>
+                <div class="placeholder">
+                  <AppIcon name="feather" />
+                  <span>还没有笔记。</span>
+                </div>
+              </template>
+            </PagedFeed>
+          </ProfileSection>
         </template>
       </template>
     </div>

@@ -239,8 +239,11 @@ web/src/views/admin/     管理左导航 + 4 个分区
   列配置存 `localStorage["cinderfish.deck.columns"]`，支持回到顶部、上移/下移与 widgets 列。
   deck 模式下点笔记/头像走 `PageWindow` 覆盖层，不改 URL。壳层高度走 flex 链，没有魔法数。
 - **导航与 widget 配置**：`nav.ts` 是导航唯一真源，桌面与移动两组顺序存在 `cinderfish.ui` 的 `nav` 键；
-  widget 注册表 + `cinderfish.ui.widgets` 记录有序栈，右栏与抽屉共用 `WidgetStack`。
-  首版 widget：实例信息、关于链接、便签（localStorage）、通知、时间线（四源可切）。两者都能在设置页改。
+  widget 注册表 + `cinderfish.ui.widgets` 记录有序栈，右栏（`layout/WidgetPanel` 标题+动作 + `WidgetStack`
+  列表）与抽屉（同一 stack，自己的标题与关闭）共用同一份编辑态（`stores/widgets` 的 `widgetEditing`，
+  不落盘）。每张卡片自带标题/动作/内容三段（`widgets/WidgetCard` + `#actions`）。
+  首版 widget：实例信息（刷新动作、失败重试）、关于（探索动作）、便签（保存动作）、通知（打开与全部已读）、
+  时间线（来源切换与高度在卡片动作区）。两者都能在设置页改。
 - **页头**：`ui/PageHeader` 是唯一的 sticky 页头（返回、标题、副标题、图标、tab 高亮条、动作插槽），
   容器宽度 < 500px 折叠为两行；tab 状态写入 `route.query`，刷新保持、可分享、后退回上一个 tab。
 - **时间线**：首页 / 本地 / 社交 / 全球四频道，未登录不显示需要认证的两个频道；统一由 `ui/PagedFeed`
@@ -261,13 +264,17 @@ web/src/views/admin/     管理左导航 + 4 个分区
 - **通知**：全部/反应/提及/转贴四 tab，筛选下推给后端 `includeTypes`（切 tab 重挂载，不会一边空态一边翻页），
   行式排版、反应 emoji 走 emoji 目录、全部标为已读、侧栏未读徽标与流式同步。
   被动视图（通知 widget、deck 通知列）显式传 `markAsRead: false`，不会因为渲染就清未读。
-- **资料**：置顶笔记区（最多 5 条）+ 笔记/媒体/回复三 tab；副栏（文件栅格 + 动态摘要）按页面自身宽度
-  < 1000px 并入主列，用 ResizeObserver 判定；关注中/关注者计数在没有对应端点时标注为暂不可用。
+- **资料**：置顶笔记区（最多 5 条）+ 笔记/媒体/回复/关注中/关注者五个 tab（`?tab=`），
+  置顶区与列表区各自带分区标题（`profile/ProfileSection`）；副栏（文件栅格 + 动态摘要）按页面自身宽度
+  < 1000px 并入主列，用 ResizeObserver 判定。只有帖子计数是可点的链接；关注中/关注者计数保持纯数字
+  并在卡片内注明「列表接口尚未提供」，对应两个 tab 渲染真实的不可用态（见 11.14）。
 - **设置**：`/settings/:tab` 嵌套路由，左导航分账户/客户端/其他三组，8 个子页
   （个人资料、外观、导航、小组件、通知、隐私、账户、关于），未知 tab 回退个人资料。
-  外观页管主题与字号，导航页管桌面/移动两套顺序，小组件页管有序栈。
-- **管理**：`/admin?tab=` 的参数切换左导航（概览/用户/文件/设置），危险操作独立分区用
-  `--danger-soft` / `--danger-border` 标出，非管理员显示门禁卡片。
+  左导航与右侧内容都渲染 `ui/SectionMenu`（fork `MkSuperMenu` 的对应物），窄容器（<600）收成一行
+  横向滚动的胶囊；外观页管主题与字号，导航页管桌面/移动两套顺序，小组件页管有序栈。
+- **管理**：`/admin?tab=` 的参数切换同一个 `ui/SectionMenu`（实例：概览/用户/文件；配置：设置），
+  危险操作独立分区用 `--danger-soft` / `--danger-border` 标出，非管理员显示门禁卡片
+  （登录态不同给出不同的说明与出口）。门禁卡片只是 UX，服务端 `requireAdmin` 才是边界。
 - **探索**：本地/全球公开时间线，支持 `?tag=`（客户端过滤，仍能继续分页）。
 - **登录/注册/404**：真实 signin/signup，注册前检查用户名可用性，邀请码字段，注册关闭提示；三页都有标题。
 
@@ -319,7 +326,7 @@ pnpm build    # 先 vue-tsc --noEmit，再输出 web/dist
 - **自定义 emoji 没有注册表**：`:shortcode:` 在 MFM 与通知里只按内置目录解析，解析不到就照原样显示；实例自定义 emoji 的注册、管理、picker 分组都在首版之外。后端打包的 `emojis` / `reactionEmojis` 目前恒为空数组。
 - **没有搜索、没有用户列表页、没有投票接口**（前端只展示投票结果）。
 - **远程资料不能浏览**：`users/show` 只接受本地用户名；远程用户点击 `@user@host` 会得到说明卡片。发帖器的 `specified` 仍允许手动输入远程 handle，后端并不会解析它。
-- **`users/following` / `users/followers` / `users/search` / `notes/mentions` / `notes/children` / `notes/featured` / `notes/reactions` 都不存在**：个人页的「关注中/关注者」计数标为暂不可用，笔记页只渲染 `note.reply` 这一层上下文，没有回复树与「谁反应了」浮层。
+- **`users/following` / `users/followers` / `users/search` / `notes/mentions` / `notes/children` / `notes/featured` / `notes/reactions` 都不存在**：个人页的「关注中/关注者」计数保持纯数字并注明列表接口未提供，两个 tab 渲染真实的不可用态（见 11.14）；笔记页只渲染 `note.reply` 这一层上下文，没有回复树与「谁反应了」浮层。
 - **改密码、封禁/静音列表、注销账户在前端与后端都未实现**：账户设置页如实标注为未开放，没有假按钮。
 - **管理面板范围有限**：实例级文件列表、注册模式在线切换、用户分页都没有端点，只能在页面上说明。管理页需要管理员账号才能看到分区。
 - **i18n 未做**：文案硬编码中文；主题只保留 `data-theme` 双主题 + CSS 变量，没有 Firefish 的 JSON5 主题 DSL。
@@ -410,6 +417,52 @@ pnpm build    # 先 vue-tsc --noEmit，再输出 web/dist
 - composer 决策：保留 prop 驱动组件不变。`os.openPostForm` 的全局弹层（OsOverlay → PageWindow）与时间线 `fixed` 内嵌是同一组件的两种挂法，草稿/可见性/回复/引用目标/附件状态已全部内聚在组件里，API 调用都在 `api/client.ts`——契约已满足，无需再动。
 - 验证：`go vet`、`gofmt -l internal/ cmd/`、`git diff --check` 全干净；`CINDERFISH_TEST_DATABASE_URL=… CINDERFISH_TEST_REDIS_URL=… go test -count=1 ./...` 全绿（新测试先失败后通过：`TestRenoteTargetVisibility` 在规则缺失时 200 泄漏、`TestIPinUnpinAndUsersShow` 的 pin 响应断言为空）；`pnpm typecheck`/`pnpm build` 通过。内建浏览器走查（Go 二进制 @3991，开发库，临时账号 t6alice/t6bob，已清理）：日期分隔线在本地 00:30 边界与 10-31/11-01 交界正确分组（修复前 UTC 前缀会错误拆分 10-31）；纯转贴行单 article 单 footer；回复/引用弹窗与发布、反应选择器、置顶/取消置顶标签翻转（pin 修复后）均正常。
 - 仍缺（按契约显式降级，不虚构）：`notes/conversation`、`notes/children`、`notes/replies`、`notes/renotes`、`users/following`、`users/followers` 端点不存在——会话串只有单层父笔记（`NoteParent`），转贴悬停用户列表省略，关注/粉丝列表维持 Task 7 的「暂不可用」态。转贴按钮保持单击直接 `notes/create {renoteId}`（默认 public），fork 的按可见性转贴菜单未引入（记录为决策，后端契约已支持）。
+
+### 11.14 个人页/设置/管理/widget 组合对齐（2026-10-31，重写计划 Task 7）
+
+- **个人页**：新增 `components/profile/ProfileSection.vue`（分区标题：图标 + 名称 + 计数徽章 + 说明 + 动作插槽；
+  `plain` 去卡片外框供 deck 资料窗复用）。置顶区与列表区都改成带标题的分区（「置顶笔记」带条数与说明、
+  「最近的笔记/媒体/回复」带排序说明），tab 键表扩为 `notes|media|replies|following|followers`，全部读写
+  `route.query.tab`（点 tab 写查询、点帖子计数回到裸 URL、刷新与分享保持）。>3 个 tab 时 PageHeader 的折叠
+  规则生效（非活动 tab 只留图标），与 fork `MkPageHeader` 一致。
+- **关注/关注者列表的真实降级**（对应翻译契约 §15.3）：两个 tab 不请求任何数据，渲染「关注/关注者列表暂不可用」，
+  说明后端尚无 `users/following`/`users/followers`，并显示用户资料里的真实计数（注明计数准确、列表待接口）。
+  `ProfileCard` 的三个计数里只有帖子是可点链接；另两个保持纯数字并在卡片内注明「列表接口尚未提供」。
+  deck 资料窗（`ProfileHeader` + `DeckPageWindow`）同样注明，并按 `ProfileView` 补上 `NOT_FOLLOWING` 分支
+  （此前取消关注遇到已失效关系只会抛「取消关注失败」）。
+- **设置与管理共用一套左菜单**：新增 `components/ui/SectionMenu.vue` + `ui/section-menu.ts`（分组条目
+  `{key,label,icon,to,note}`，对应 fork `MkSuperMenu`；宽屏竖排 sticky、窄容器一行横向滚动胶囊）。
+  `views/settings/SettingsMenu.vue` 删除，`settings/menu.ts` 导出 `settingsMenuDef()`；管理端 `AdminView`
+  用同一个组件渲染 `?tab=` 分组。两处都用容器宽度（<600）而非视口宽度判定窄态。
+- **修一处真实水平溢出**：设置页窄态把 `.body` 从 grid 切成 flex 列时继承了 `align-items: start`，flex 子项
+  因此按 max-content 定宽，横向滚动的菜单条把整页撑宽（600px 视口下文档 796px）。`.narrow .body` 显式
+  `align-items: stretch`，`SectionMenu` 窄态补 `width: 100%`/`min-width: 0`。该 bug 在 Task 2/3 的实现里已存在。
+- **管理门禁**：`/admin` 的非管理员卡片按登录态给不同文案与出口（已登录非管理员：说明服务端也会拒绝，出口
+  「回到时间线」；未登录：登录）。**授权边界仍是服务端**，新增测试钉住。
+- **widget 面板**：编辑态从 `WidgetStack` 局部状态提升到 `stores/widgets` 的 `widgetEditing`（UI 态，不落盘），
+  新增 `widgets/WidgetEditToggle.vue` 供右栏与抽屉共用；`WidgetPanel` 拥有标题与动作插槽（默认放编辑开关）、
+  `WidgetStack` 只负责有序列表（编辑态另有「在设置中管理小组件」入口）、`WidgetsDrawer` 头部为标题 + 编辑开关 + 关闭。
+  每张卡片经 `WidgetCard` 的标题/`#actions`/默认内容三段：实例卡新增「刷新实例信息」（`reloadInstance()`）与
+  失败行「实例信息加载失败 + 重试 + 原始错误」；关于卡把探索入口做成头部动作；通知卡新增「打开通知页」并保留
+  「全部标为已读」；时间线卡把高度选择器从工具条移进头部动作区，工具条只留来源分段。卡片用 `useId()` 绑定
+  `aria-labelledby`，一叠卡片在无障碍树里是带名字的区块而不是匿名 section。
+- **测试**：`internal/httpapi/admin_auth_test.go` 新增 `TestAdminEndpointsRequireAdministrator`——对全部七个
+  `/api/admin/*` 路由断言无凭证 401、非管理员 403 `FORBIDDEN`、管理员可通过门禁（载荷都设计成授权后才 400，
+  不污染共享测试库）。`web_test.go` 的 SPA 回退用例补上 `/settings/appearance`、`/settings/account`、`/admin`、
+  `/admin?tab=users`、`/@alice?tab=followers` 这些深链。反证：临时去掉 `handleAdminShowUsers` 的 `requireAdmin`
+  后该测试立刻失败（`without credential = 200` / `as non-admin = 200`），恢复后通过。
+- **验证**：`go vet ./...`、`gofmt -l internal/ cmd/`、`git diff --check` 干净；
+  `CINDERFISH_TEST_DATABASE_URL=… CINDERFISH_TEST_REDIS_URL=… go test -count=1 ./...` 全绿；
+  `pnpm typecheck`、`pnpm build` 通过。内建浏览器（Go 二进制 @3991、`web/dist`、开发库）实测：`/@uicheck`
+  置顶区 + 「最近的笔记」分区标题 + 帖子计数链接；`?tab=followers` 深链与 tab 点击写法、计数链接清空查询均正常；
+  `/settings/profile|appearance|account` 左菜单 + 右内容，`/settings/nope` 回退个人资料；未登录 `/settings/account`
+  跳 `/login?redirect=/settings/account`，登录后回跳原页；非管理员 `/admin?tab=users` 显示门禁卡、管理员显示
+  分组左菜单与用户分区；1024px 下右栏由悬浮「小组件」按钮 + 抽屉承担，抽屉头部标题/编辑/关闭齐全，编辑态删除到
+  空栈显示「还没有小组件…」、恢复默认可用；停掉后端后实例卡显示失败行与重试，重启后点重试恢复；溢出探针
+  （临时注入 `web/dist`，已删除）在 380/600/840/1440 × `/`、`/@uicheck`、`/settings/appearance`、
+  `/settings/account`、`/admin?tab=users` 共 20 组全部 `scrollWidth == clientWidth` 且无未裁剪溢出元素。
+- **记录未做**：deck 列内的资料窗仅在代码层与 `ProfileView` 对齐（`NOT_FOLLOWING` + 分区标题），未在 deck 模式
+  下重跑浏览器流程；`WidgetSettings` 设置页仍保留一份独立的排序 UI（与面板编辑态同源数据，未合并）。
 
 ## 12. M5 联邦（ActivityPub）
 

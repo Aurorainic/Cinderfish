@@ -1,4 +1,5 @@
 import type AppIcon from "../../components/AppIcon.vue";
+import type { SectionMenuGroup } from "../../components/ui/section-menu";
 
 // The icon names come from AppIcon's hand-written set. NavIcon is narrower
 // than that set, and the settings menu needs a couple of icons it does not
@@ -49,4 +50,20 @@ export function findSettingsTab(key: string): SettingsTab {
     SETTINGS_TABS.find((tab) => tab.key === DEFAULT_SETTINGS_TAB) ??
     SETTINGS_TABS[0]
   );
+}
+
+// Renders through the shared SectionMenu, so the settings column and the admin
+// column are the same composition. `loggedIn` only adds the "需登录" remark; the
+// route guard and the server still own the actual access checks.
+export function settingsMenuDef(loggedIn: boolean): SectionMenuGroup[] {
+  return SETTINGS_GROUPS.map((title) => ({
+    title,
+    items: SETTINGS_TABS.filter((tab) => tab.group === title).map((tab) => ({
+      key: tab.key,
+      label: tab.label,
+      icon: tab.icon,
+      to: `/settings/${tab.key}`,
+      note: tab.requiresAuth && !loggedIn ? "需登录" : undefined,
+    })),
+  }));
 }

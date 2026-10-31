@@ -1,37 +1,37 @@
 <script setup lang="ts">
-import { computed } from "vue";
-import AppIcon from "../../components/AppIcon.vue";
-import { isLoggedIn } from "../../stores/session";
-import { SETTINGS_GROUPS, SETTINGS_TABS } from "./menu";
+import AppIcon from "../AppIcon.vue";
+import type { SectionMenuGroup } from "./section-menu";
 
-// Wide: a sticky vertical menu under the page header. Narrow: the same items
-// collapse into one horizontally scrolling row above the content, which is how
-// Iceshrimp and Firefish hand the menu over to small screens.
-defineProps<{ active: string; narrow: boolean }>();
-
-const groups = computed(() =>
-  SETTINGS_GROUPS.map((title) => ({
-    title,
-    tabs: SETTINGS_TABS.filter((tab) => tab.group === title),
-  })),
+// The left column of a two-column settings/admin page. Wide: a sticky vertical
+// menu under the page header. Narrow: the same items collapse into one
+// horizontally scrolling row of chips above the content — the shape both
+// Iceshrimp and Firefish use when the menu has no room beside the content.
+withDefaults(
+  defineProps<{
+    def: readonly SectionMenuGroup[];
+    active: string;
+    narrow?: boolean;
+    label: string;
+  }>(),
+  { narrow: false },
 );
 </script>
 
 <template>
-  <nav class="settings-menu" :class="{ narrow }" aria-label="设置分类">
-    <div v-for="group in groups" :key="group.title" class="group">
-      <p v-if="!narrow" class="group-title">{{ group.title }}</p>
+  <nav class="section-menu" :class="{ narrow }" :aria-label="label">
+    <div v-for="(group, index) in def" :key="group.title ?? `group-${index}`" class="group">
+      <p v-if="group.title && !narrow" class="group-title">{{ group.title }}</p>
       <ul class="items">
-        <li v-for="tab in group.tabs" :key="tab.key">
+        <li v-for="item in group.items" :key="item.key">
           <RouterLink
-            :to="`/settings/${tab.key}`"
+            :to="item.to"
             class="item"
-            :class="{ active: tab.key === active }"
-            :aria-current="tab.key === active ? 'page' : undefined"
+            :class="{ active: item.key === active }"
+            :aria-current="item.key === active ? 'page' : undefined"
           >
-            <AppIcon class="item-icon" :name="tab.icon" />
-            <span class="item-label">{{ tab.label }}</span>
-            <span v-if="tab.requiresAuth && !isLoggedIn" class="item-note">需登录</span>
+            <AppIcon class="item-icon" :name="item.icon" />
+            <span class="item-label">{{ item.label }}</span>
+            <span v-if="item.note" class="item-note">{{ item.note }}</span>
           </RouterLink>
         </li>
       </ul>
@@ -40,7 +40,7 @@ const groups = computed(() =>
 </template>
 
 <style scoped>
-.settings-menu {
+.section-menu {
   position: sticky;
   top: calc(52px + var(--space-16));
   display: flex;
@@ -115,19 +115,23 @@ const groups = computed(() =>
 }
 
 /* Narrow: one scrolling row. The groups keep their markup but dissolve into
-   the row, so the items read as a single strip of chips. */
-.settings-menu.narrow {
+   the row, so the items read as a single strip of chips. The strip is clipped
+   by its own scroll box rather than by the page, hence width: 100%: the panel
+   that hosts it must never be widened by the chips' max-content width. */
+.section-menu.narrow {
   position: static;
   flex-direction: row;
   align-items: center;
   gap: 0;
+  width: 100%;
+  min-width: 0;
   padding-bottom: var(--space-2);
   overflow-x: auto;
   overscroll-behavior-x: contain;
   scrollbar-width: none;
 }
 
-.settings-menu.narrow::-webkit-scrollbar {
+.section-menu.narrow::-webkit-scrollbar {
   display: none;
 }
 

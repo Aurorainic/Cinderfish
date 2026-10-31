@@ -83,15 +83,17 @@ function toggleFollow() {
           <span class="value">{{ formatCount(user.notesCount) }}</span>
           <span class="label">笔记</span>
         </div>
-        <div class="counter">
+        <div class="counter" title="关注列表接口尚未提供，暂时只能查看数量">
           <span class="value">{{ formatCount(user.followingCount) }}</span>
           <span class="label">关注</span>
         </div>
-        <div class="counter">
+        <div class="counter" title="关注者列表接口尚未提供，暂时只能查看数量">
           <span class="value">{{ formatCount(user.followersCount) }}</span>
           <span class="label">关注者</span>
         </div>
       </div>
+
+      <p class="lists-note">关注与关注者列表接口尚未提供，这里只显示数量。</p>
     </div>
   </section>
 </template>
@@ -193,6 +195,13 @@ function toggleFollow() {
 .counter .label {
   font-size: 0.85rem;
   color: var(--muted);
+}
+
+.lists-note {
+  margin-top: 8px;
+  color: var(--text-faint);
+  font-size: 0.72rem;
+  line-height: 1.5;
 }
 
 @media (max-width: 480px) {

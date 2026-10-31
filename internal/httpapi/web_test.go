@@ -54,7 +54,20 @@ func TestWebServesRoot(t *testing.T) {
 
 func TestWebFallsBackToIndexForClientRoutes(t *testing.T) {
 	srv, _ := webServer(t)
-	for _, path := range []string{"/timeline", "/settings", "/@" + "alice", "/notes/abc123"} {
+	// Deep links that the client owns: the settings children and the admin
+	// sections are query/segment-driven routes, so a reload on one has to
+	// serve the shell and let vue-router rebuild the same state.
+	for _, path := range []string{
+		"/timeline",
+		"/settings",
+		"/settings/appearance",
+		"/settings/account",
+		"/admin",
+		"/admin?tab=users",
+		"/@" + "alice",
+		"/@" + "alice?tab=followers",
+		"/notes/abc123",
+	} {
 		req := httptest.NewRequest(http.MethodGet, path, nil)
 		req.Header.Set("Accept", "text/html,application/xhtml+xml")
 		rec := httptest.NewRecorder()

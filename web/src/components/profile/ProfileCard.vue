@@ -22,8 +22,10 @@ function formatCount(n: number): string {
   return n.toLocaleString("zh-CN");
 }
 
-// Only the note count has somewhere to go: the backend has no users/following
-// or users/followers endpoint, so those two counters stay inert and say why.
+// Only the note count has somewhere to go. The backend has no users/following
+// or users/followers endpoint, so those two counters stay plain numbers and the
+// note below them says why; linking them would promise a list that cannot be
+// rendered.
 const notesLink = computed(() => {
   const query = { ...route.query };
   delete query.tab;
@@ -55,15 +57,25 @@ const notesLink = computed(() => {
           <b>{{ formatCount(user.notesCount) }}</b>
           <span>帖子</span>
         </RouterLink>
-        <span class="counter" aria-disabled="true" title="暂不支持查看关注列表">
+        <span
+          class="counter"
+          :aria-label="`关注中 ${formatCount(user.followingCount)}，列表接口尚未提供`"
+          title="关注列表接口尚未提供，暂时只能查看数量"
+        >
           <b>{{ formatCount(user.followingCount) }}</b>
           <span>关注中</span>
         </span>
-        <span class="counter" aria-disabled="true" title="暂不支持查看关注者列表">
+        <span
+          class="counter"
+          :aria-label="`关注者 ${formatCount(user.followersCount)}，列表接口尚未提供`"
+          title="关注者列表接口尚未提供，暂时只能查看数量"
+        >
           <b>{{ formatCount(user.followersCount) }}</b>
           <span>关注者</span>
         </span>
       </div>
+
+      <p class="lists-note">关注与关注者列表接口尚未提供，这里只显示数量。</p>
     </div>
   </section>
 </template>
@@ -173,6 +185,13 @@ const notesLink = computed(() => {
 .counter.link:focus-visible {
   outline: var(--focus-outline);
   outline-offset: 2px;
+}
+
+.lists-note {
+  margin-top: var(--space-8);
+  color: var(--text-faint);
+  font-size: var(--fs-2xs);
+  line-height: 1.5;
 }
 
 @container profile-card (max-width: 420px) {

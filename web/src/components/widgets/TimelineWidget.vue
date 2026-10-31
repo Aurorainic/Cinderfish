@@ -54,7 +54,13 @@ function resize(event: Event): void {
 </script>
 
 <template>
-  <WidgetCard title="时间线" icon="home" flush>
+  <WidgetCard title="时间线" icon="home" hint="选择一个来源" flush>
+    <template #actions>
+      <select class="height-select" :value="height" aria-label="小组件高度" @change="resize">
+        <option v-for="option in heightOptions" :key="option" :value="option">{{ option }}px</option>
+      </select>
+    </template>
+
     <div class="toolbar">
       <nav class="segments" aria-label="时间线来源">
         <button
@@ -69,9 +75,6 @@ function resize(event: Event): void {
           {{ item.label }}
         </button>
       </nav>
-      <select class="height-select" :value="height" aria-label="小组件高度" @change="resize">
-        <option v-for="option in heightOptions" :key="option" :value="option">{{ option }}px</option>
-      </select>
     </div>
 
     <div class="scroll" :style="{ height: `${height}px` }">
@@ -82,17 +85,12 @@ function resize(event: Event): void {
 
 <style scoped>
 .toolbar {
-  display: flex;
-  align-items: center;
-  gap: 6px;
   padding: 8px 10px;
   border-bottom: 1px solid var(--divider);
 }
 
 .segments {
   display: flex;
-  flex: 1;
-  min-width: 0;
   gap: 2px;
   padding: 2px;
   border: 1px solid var(--border);

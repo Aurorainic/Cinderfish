@@ -91,6 +91,15 @@ function readStack(): WidgetInstance[] {
 
 export const widgetStack = ref<WidgetInstance[]>(readStack());
 
+// Edit mode belongs to the list, not to the surface that shows it: the panel and
+// the drawer each render their own header, and both edit the same ordered list.
+// It is UI state only and is never persisted.
+export const widgetEditing = ref(false);
+
+export function toggleWidgetEditing(): void {
+  widgetEditing.value = !widgetEditing.value;
+}
+
 // Watching the ref instead of persisting inside each mutator also covers
 // direct assignment, so the stored stack cannot drift from the rendered one.
 watch(

@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { useRoute } from "vue-router";
+import SectionMenu from "../../components/ui/SectionMenu.vue";
 import PageHeader from "../../components/ui/PageHeader.vue";
 import { usePageTitle } from "../../composables/use-page-title";
-import { session } from "../../stores/session";
-import SettingsMenu from "./SettingsMenu.vue";
-import { findSettingsTab } from "./menu";
+import { isLoggedIn, session } from "../../stores/session";
+import { findSettingsTab, settingsMenuDef } from "./menu";
 
 // Firefish collapses its settings menu at 600px; the same threshold is applied
 // to this column, which is already narrower than the viewport inside the shell.
@@ -22,6 +22,8 @@ const activeTab = computed(() => {
   const name = String(route.name ?? "").replace(/^settings-/, "");
   return findSettingsTab(name);
 });
+
+const menuDef = computed(() => settingsMenuDef(isLoggedIn.value));
 
 usePageTitle(() => activeTab.value.label);
 
@@ -55,7 +57,7 @@ onBeforeUnmount(() => {
     />
 
     <div class="body">
-      <SettingsMenu :active="activeTab.key" :narrow="narrow" />
+      <SectionMenu :def="menuDef" :active="activeTab.key" :narrow="narrow" label="设置分类" />
       <section class="content">
         <div v-if="!session.ready" class="card muted">正在读取会话…</div>
         <RouterView v-else />
@@ -85,6 +87,10 @@ onBeforeUnmount(() => {
 .narrow .body {
   display: flex;
   flex-direction: column;
+  /* The grid used align-items: start for the two columns; in the stacked flex
+     form that would size each row to its max-content width instead of the
+     column, and the scrolling menu strip would push the page wider. */
+  align-items: stretch;
   gap: var(--space-14);
   margin-top: var(--space-12);
 }

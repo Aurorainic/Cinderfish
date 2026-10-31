@@ -6,6 +6,7 @@ import type { Note, UserDetailed } from "../api/types";
 import AppIcon from "../components/AppIcon.vue";
 import NoteItem from "../components/note/Note.vue";
 import ProfileCard from "../components/profile/ProfileCard.vue";
+import ProfileSection from "../components/profile/ProfileSection.vue";
 import ProfileSidebar from "../components/profile/ProfileSidebar.vue";
 import PageHeader from "../components/ui/PageHeader.vue";
 import PagedFeed from "../components/ui/PagedFeed.vue";
@@ -15,20 +16,40 @@ import { useFollowRelation } from "../composables/use-follow-relation";
 import { NAV_ITEM_DEFS } from "../nav";
 import { isLoggedIn, session } from "../stores/session";
 
-type Tab = "notes" | "media" | "replies";
+type Tab = "notes" | "media" | "replies" | "following" | "followers";
+// The two follow lists have no endpoint yet; their tabs exist so the
+// unavailable state is reachable and shareable instead of silently falling
+// back to the note list.
+type ListTab = "following" | "followers";
+
+type SectionIcon = InstanceType<typeof AppIcon>["$props"]["name"];
 
 const TABS = [
   { key: "notes", label: "笔记", icon: "feather" },
   { key: "media", label: "媒体", icon: "image" },
   { key: "replies", label: "回复", icon: "reply" },
-] as const;
+  { key: "following", label: "关注中", icon: "user" },
+  { key: "followers", label: "关注者", icon: "users" },
+] as const satisfies readonly { key: Tab; label: string; icon: SectionIcon }[];
 
-const TAB_KEYS: readonly string[] = ["notes", "media", "replies"];
+const TAB_KEYS: readonly string[] = TABS.map((item) => item.key);
 
 const EMPTY_TEXT: Record<Tab, string> = {
   notes: "还没有发布任何笔记。",
   media: "还没有带媒体的笔记。",
   replies: "还没有回复过别人。",
+  following: "",
+  followers: "",
+};
+
+// Each tab names its section, so the list below the tab strip always says what
+// it is instead of relying on the tab alone.
+const SECTIONS: Record<Tab, { title: string; icon: SectionIcon; hint: string }> = {
+  notes: { title: "最近的笔记", icon: "feather", hint: "按发布时间从新到旧" },
+  media: { title: "最近的媒体", icon: "image", hint: "带附件的笔记" },
+  replies: { title: "最近的回复", icon: "reply", hint: "回复别人的笔记" },
+  following: { title: "关注中", icon: "user", hint: "这个账户关注的账户" },
+  followers: { title: "关注者", icon: "users", hint: "关注这个账户的账户" },
 };
 
 const PAGE_SIZE = 20;
@@ -97,6 +118,9 @@ const headerTitle = computed(() => displayName.value || acct.value);
 const headerSubtitle = computed(() => (acct.value ? `@${acct.value}` : ""));
 const pinnedNotes = computed(() => user.value?.pinnedNotes ?? []);
 const loginTarget = computed(() => ({ path: "/login", query: { redirect: route.fullPath } }));
+// The note list lives at the bare profile URL, so a counter or an unavailable
+// panel can point back at it without repeating the tab bookkeeping.
+const notesTabLink = computed(() => ({ path: route.path, query: { ...route.query, tab: undefined } }));
 
 usePageTitle(() => (displayName.value ? `${displayName.value} (@${handle.value.username})` : ""));
 
@@ -117,8 +141,40 @@ const tab = computed<string>({
 });
 
 const activeTab = computed<Tab>(() => (TAB_KEYS.includes(tab.value) ? (tab.value as Tab) : "notes"));
+const section = computed(() => SECTIONS[activeTab.value]);
 const emptyText = computed(() => EMPTY_TEXT[activeTab.value]);
 const feedKey = computed(() => `${handle.value.username}:${activeTab.value}`);
+
+const listTab = computed<ListTab | null>(() => {
+  if (activeTab.value === "following" || activeTab.value === "followers") return activeTab.value;
+  return null;
+});
+
+// The follow lists have no endpoint (users/following, users/followers are not
+// implemented), so the tab reports exactly that and never invents rows. The
+// count beside it comes from the user record and is accurate.
+const unavailable = computed(() => {
+  if (listTab.value === "followers") {
+    return {
+      endpoint: "users/followers",
+      title: "关注者列表暂不可用",
+      body: `后端还没有提供 users/followers 接口，这一页无法列出关注 @${acct.value} 的账户。`,
+      count: viewUser.value?.followersCount ?? 0,
+      countLabel: "关注者",
+    };
+  }
+  return {
+    endpoint: "users/following",
+    title: "关注列表暂不可用",
+    body: `后端还没有提供 users/following 接口，这一页无法列出 @${acct.value} 关注的账户。`,
+    count: viewUser.value?.followingCount ?? 0,
+    countLabel: "关注中",
+  };
+});
+
+function formatCount(n: number): string {
+  return n.toLocaleString("zh-CN");
+}
 
 interface NotesParams {
   username?: string;
@@ -438,11 +494,13 @@ watch(
       <div class="area-stack">
         <ProfileCard :user="viewUser" />
 
-        <section v-if="pinnedNotes.length" class="pinned" aria-labelledby="pinned-head">
-          <h2 id="pinned-head" class="pinned-head">
-            <AppIcon name="check" />
-            置顶笔记
-          </h2>
+        <ProfileSection
+          v-if="pinnedNotes.length"
+          title="置顶笔记"
+          icon="check"
+          :count="pinnedNotes.length"
+          hint="作者固定在个人页顶部的笔记"
+        >
           <div class="pinned-notes">
             <NoteItem
               v-for="note in pinnedNotes"
@@ -452,7 +510,7 @@ watch(
               @deleted="onDeleted"
             />
           </div>
-        </section>
+        </ProfileSection>
 
         <p v-else-if="isSelf" class="notice info pin-tip">
           置顶笔记会显示在个人页顶部，在笔记菜单中选择置顶。
@@ -462,17 +520,35 @@ watch(
       <ProfileSidebar class="area-side" :user="viewUser" />
 
       <div class="area-feed">
-        <PagedFeed ref="feed" :key="feedKey" :fetcher="fetcher" :page-size="PAGE_SIZE">
-          <template #item="{ item }">
-            <NoteItem :note="(item as Note)" @reply="onReply" @deleted="onDeleted" />
-          </template>
-          <template #empty>
-            <div class="placeholder">
-              <AppIcon name="feather" />
-              <span>{{ emptyText }}</span>
-            </div>
-          </template>
-        </PagedFeed>
+        <ProfileSection v-if="!listTab" :title="section.title" :icon="section.icon" :hint="section.hint">
+          <PagedFeed ref="feed" :key="feedKey" :fetcher="fetcher" :page-size="PAGE_SIZE">
+            <template #item="{ item }">
+              <NoteItem :note="(item as Note)" @reply="onReply" @deleted="onDeleted" />
+            </template>
+            <template #empty>
+              <div class="placeholder">
+                <AppIcon name="feather" />
+                <span>{{ emptyText }}</span>
+              </div>
+            </template>
+          </PagedFeed>
+        </ProfileSection>
+
+        <ProfileSection v-else :title="section.title" :icon="section.icon" :hint="section.hint">
+          <div class="unavailable">
+            <span class="unavailable-icon"><AppIcon :name="section.icon" /></span>
+            <h3 class="unavailable-title">{{ unavailable.title }}</h3>
+            <p class="small muted unavailable-body">{{ unavailable.body }}</p>
+            <p class="unavailable-count">
+              <b>{{ formatCount(unavailable.count) }}</b>
+              <span>{{ unavailable.countLabel }}</span>
+            </p>
+            <p class="unavailable-note">
+              数量来自用户资料，是准确的；接口就绪后列表会出现在这里。
+            </p>
+            <RouterLink :to="notesTabLink" class="button ghost small">查看笔记</RouterLink>
+          </div>
+        </ProfileSection>
       </div>
     </div>
   </div>
@@ -571,44 +647,68 @@ watch(
   min-width: 0;
 }
 
-/* Borderless rows: dividers come from the note itself, so no gap. */
-.area-feed :deep(.paged-feed) {
-  gap: 0;
-}
-
-.pinned {
-  padding: var(--space-10) var(--space-12) 0;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  background: var(--panel);
-  min-width: 0;
-}
-
-.pinned-head {
-  display: flex;
-  align-items: center;
-  gap: var(--space-6);
-  padding: 0 2px var(--space-4);
-  color: var(--accent);
-  font-size: var(--fs-sm);
-  font-weight: 700;
-}
-
-.pinned-head .icon {
-  width: 15px;
-  height: 15px;
-}
-
-.pinned-notes {
-  margin: 0 calc(-1 * var(--space-12));
-}
-
 .pinned-notes :deep(.note:last-child) {
   border-bottom: 0;
 }
 
 .pin-tip {
   margin: 0;
+}
+
+.unavailable {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-8);
+  padding: var(--space-32) var(--space-20);
+  text-align: center;
+}
+
+.unavailable-icon {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: var(--surface-inset);
+  color: var(--text-faint);
+}
+
+.unavailable-icon :deep(.icon) {
+  width: 22px;
+  height: 22px;
+}
+
+.unavailable-title {
+  font-size: var(--fs-md);
+}
+
+.unavailable-body {
+  max-width: 40ch;
+  margin: 0;
+}
+
+.unavailable-count {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-6);
+  margin-top: var(--space-4);
+  color: var(--text-weak);
+  font-size: var(--fs-sm);
+}
+
+.unavailable-count b {
+  color: var(--text-strong);
+  font-size: var(--fs-lg);
+  font-variant-numeric: tabular-nums;
+}
+
+.unavailable-note {
+  max-width: 42ch;
+  margin: 0 0 var(--space-6);
+  color: var(--text-faint);
+  font-size: var(--fs-2xs);
+  line-height: 1.5;
 }
 
 .skeleton {

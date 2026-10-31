@@ -1,12 +1,14 @@
 <script setup lang="ts">
-import { computed, onMounted } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import type { Component } from "vue";
 import { useRoute } from "vue-router";
 import AppIcon from "../components/AppIcon.vue";
+import SectionMenu from "../components/ui/SectionMenu.vue";
 import PageHeader from "../components/ui/PageHeader.vue";
+import type { SectionMenuGroup } from "../components/ui/section-menu";
 import { usePageTitle } from "../composables/use-page-title";
 import { instance, loadInstance } from "../stores/instance";
-import { isAdmin, session } from "../stores/session";
+import { isAdmin, isLoggedIn, session } from "../stores/session";
 import AdminFiles from "./admin/AdminFiles.vue";
 import AdminOverview from "./admin/AdminOverview.vue";
 import AdminSettings from "./admin/AdminSettings.vue";
@@ -14,12 +16,12 @@ import AdminUsers from "./admin/AdminUsers.vue";
 import { ADMIN_TABS, resolveAdminTab } from "./admin/tabs";
 import type { AdminTabKey } from "./admin/tabs";
 
-const TABS = ADMIN_TABS;
+// Same threshold and the same shared SectionMenu as the settings page, so the
+// two consoles read as one composition: icon menu on the left, one section on
+// the right, chips above the content when the column does not fit.
+const NARROW_THRESHOLD = 600;
 
-const GROUPS = [
-  { label: "实例", items: TABS.filter((item) => item.group === "实例") },
-  { label: "配置", items: TABS.filter((item) => item.group === "配置") },
-];
+const GROUP_TITLES = ["实例", "配置"] as const;
 
 const PAGES: Record<AdminTabKey, Component> = {
   overview: AdminOverview,
@@ -30,66 +32,90 @@ const PAGES: Record<AdminTabKey, Component> = {
 
 const route = useRoute();
 
+const rootEl = ref<HTMLElement | null>(null);
+const narrow = ref(false);
+
 usePageTitle("管理");
 
 // The tab lives in the query string rather than the route table, so
 // /admin?tab=users is directly shareable and the back button works.
 const tab = computed(() => resolveAdminTab(route.query.tab));
 
+const menuDef = computed<SectionMenuGroup[]>(() =>
+  GROUP_TITLES.map((title) => ({
+    title,
+    items: ADMIN_TABS.filter((item) => item.group === title).map((item) => ({
+      key: item.key,
+      label: item.label,
+      icon: item.icon,
+      to: { path: "/admin", query: { ...route.query, tab: item.key } },
+    })),
+  })).filter((group) => group.items.length > 0),
+);
+
 const page = computed(() => PAGES[tab.value]);
+
+let observer: ResizeObserver | null = null;
+
+function measure(): void {
+  narrow.value = (rootEl.value?.offsetWidth ?? 0) < NARROW_THRESHOLD;
+}
 
 onMounted(() => {
   void loadInstance();
+  measure();
+  if (!rootEl.value) return;
+  observer = new ResizeObserver(measure);
+  observer.observe(rootEl.value);
+});
+
+onBeforeUnmount(() => {
+  observer?.disconnect();
+  observer = null;
 });
 </script>
 
 <template>
-  <PageHeader
-    title="管理"
-    icon="shield"
-    :subtitle="instance.meta?.name ?? '实例控制台'"
-  />
+  <div ref="rootEl" class="admin-page">
+    <PageHeader title="管理" icon="shield" :subtitle="instance.meta?.name ?? '实例控制台'" />
 
-  <div class="admin-body">
-    <section v-if="!session.ready" class="card">
-      <p class="muted small">正在确认登录状态…</p>
-    </section>
+    <div class="admin-body">
+      <section v-if="!session.ready" class="card">
+        <p class="muted small">正在确认登录状态…</p>
+      </section>
 
-    <section v-else-if="!isAdmin" class="card gate">
-      <span class="gate-icon"><AppIcon name="shield" /></span>
-      <h2>需要管理员权限</h2>
-      <p class="muted gate-text">
-        这个页面只对实例管理员开放。请使用管理员账号登录后再访问。
-      </p>
-      <RouterLink to="/login" class="button">登录</RouterLink>
-    </section>
-
-    <div v-else class="admin-grid">
-      <nav class="admin-nav" aria-label="管理分区">
-        <div v-for="group in GROUPS" :key="group.label" class="nav-group">
-          <p class="nav-group-title">{{ group.label }}</p>
-          <RouterLink
-            v-for="item in group.items"
-            :key="item.key"
-            :to="{ path: '/admin', query: { ...route.query, tab: item.key } }"
-            class="admin-nav-link"
-            :class="{ active: item.key === tab }"
-            :aria-current="item.key === tab ? 'page' : undefined"
-          >
-            <AppIcon :name="item.icon" />
-            <span>{{ item.label }}</span>
-          </RouterLink>
+      <section v-else-if="!isAdmin" class="card gate">
+        <span class="gate-icon"><AppIcon name="shield" /></span>
+        <h2>需要管理员权限</h2>
+        <!-- The gate explains the state; it is not the access control. Every
+             admin endpoint answers FORBIDDEN on the server for this account. -->
+        <p class="muted gate-text">
+          <template v-if="isLoggedIn">
+            当前账号{{ session.me ? ` @${session.me.username}` : "" }}不是实例管理员，服务端也会拒绝管理接口的请求。
+          </template>
+          <template v-else>这个页面只对实例管理员开放。请使用管理员账号登录后再访问。</template>
+        </p>
+        <div class="gate-actions">
+          <RouterLink v-if="!isLoggedIn" to="/login" class="button">登录</RouterLink>
+          <RouterLink v-else to="/" class="button ghost">回到时间线</RouterLink>
         </div>
-      </nav>
+      </section>
 
-      <div class="admin-content">
-        <component :is="page" />
+      <div v-else class="admin-grid" :class="{ narrow }">
+        <SectionMenu :def="menuDef" :active="tab" :narrow="narrow" label="管理分区" />
+        <div class="admin-content">
+          <component :is="page" />
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <style scoped>
+.admin-page {
+  min-width: 0;
+}
+
 .admin-body {
   padding-top: var(--space-20);
 }
@@ -101,61 +127,10 @@ onMounted(() => {
   align-items: start;
 }
 
-.admin-nav {
-  position: sticky;
-  top: calc(52px + var(--space-16));
+.admin-grid.narrow {
   display: flex;
   flex-direction: column;
-  gap: var(--space-16);
-}
-
-.nav-group {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
-.nav-group-title {
-  margin-bottom: var(--space-6);
-  padding: 0 var(--space-12);
-  color: var(--text-faint);
-  font-size: var(--fs-2xs);
-  font-weight: var(--weight-bold);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.admin-nav-link {
-  display: flex;
-  align-items: center;
-  gap: var(--space-10);
-  padding: var(--space-8) var(--space-12);
-  border-radius: var(--radius-md);
-  color: var(--nav-fg);
-  font-size: var(--fs-sm);
-  font-weight: var(--weight-semibold);
-  transition: background var(--dur-base) ease, color var(--dur-base) ease;
-}
-
-.admin-nav-link .icon {
-  flex: none;
-  width: 18px;
-  height: 18px;
-}
-
-.admin-nav-link:hover {
-  background: var(--surface-hover);
-  color: var(--nav-fg-hover);
-}
-
-.admin-nav-link.active {
-  background: var(--surface-selected);
-  color: var(--accent);
-}
-
-.admin-nav-link:focus-visible {
-  outline: var(--focus-outline);
-  outline-offset: -2px;
+  gap: var(--space-14);
 }
 
 .admin-content {
@@ -194,43 +169,18 @@ onMounted(() => {
 }
 
 .gate-text {
-  max-width: 40ch;
-  margin-bottom: var(--space-4);
+  max-width: 44ch;
 }
 
-@media (max-width: 680px) {
+.gate-actions {
+  display: flex;
+  gap: var(--space-8);
+}
+
+@media (max-width: 720px) {
   .admin-grid {
     grid-template-columns: minmax(0, 1fr);
-    gap: var(--space-12);
-  }
-
-  .admin-nav {
-    position: static;
-    flex-direction: row;
-    align-items: center;
-    gap: var(--space-4);
-    padding-bottom: var(--space-4);
-    overflow-x: auto;
-    scrollbar-width: none;
-  }
-
-  .admin-nav::-webkit-scrollbar {
-    display: none;
-  }
-
-  .nav-group {
-    flex-direction: row;
-    align-items: center;
-    gap: var(--space-4);
-  }
-
-  .nav-group-title {
-    display: none;
-  }
-
-  .admin-nav-link {
-    padding: var(--space-8) var(--space-12);
-    white-space: nowrap;
+    gap: var(--space-14);
   }
 }
 </style>

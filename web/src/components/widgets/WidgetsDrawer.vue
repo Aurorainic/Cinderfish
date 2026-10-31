@@ -2,6 +2,7 @@
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import AppIcon from "../AppIcon.vue";
+import WidgetEditToggle from "./WidgetEditToggle.vue";
 import WidgetStack from "./WidgetStack.vue";
 
 // Below 1090px the shell hides the widget column, so the same stack moves into
@@ -89,12 +90,15 @@ onBeforeUnmount(() => {
         >
           <header class="panel-head">
             <h2>小组件</h2>
-            <button class="panel-close" type="button" title="关闭" aria-label="关闭" @click="close()">
-              <AppIcon name="close" />
-            </button>
+            <div class="panel-actions">
+              <WidgetEditToggle />
+              <button class="panel-close" type="button" title="关闭" aria-label="关闭" @click="close()">
+                <AppIcon name="close" />
+              </button>
+            </div>
           </header>
           <div class="panel-body">
-            <WidgetStack :heading="false" />
+            <WidgetStack />
           </div>
         </aside>
       </div>
@@ -170,12 +174,18 @@ onBeforeUnmount(() => {
   font-size: 1rem;
 }
 
+.panel-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
 .panel-close {
   display: grid;
   place-items: center;
   width: 30px;
   height: 30px;
-  margin-left: auto;
   padding: 0;
   border: 1px solid var(--border);
   border-radius: 50%;

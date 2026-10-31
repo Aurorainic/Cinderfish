@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import AppIcon from "../AppIcon.vue";
 import {
   addWidget,
@@ -7,17 +7,19 @@ import {
   removeWidget,
   resetWidgets,
   setWidgetProps,
+  widgetEditing,
   widgetStack,
 } from "../../stores/widgets";
 import { WIDGET_NAMES, WIDGETS, type WidgetName } from "../../widgets/registry";
 
-// The widget column and the narrow-screen drawer render the same stack, so the
-// order and props the reader sets in one show up in the other. There is no
-// drag library here: the edit list moves items with explicit up/down buttons.
-// `heading` is false inside the drawer, whose panel already carries the title.
-withDefaults(defineProps<{ heading?: boolean }>(), { heading: true });
+// The ordered list every widget surface renders: the right column and the
+// narrow-screen drawer show the same stack, so the order and props a reader sets
+// in one show up in the other. Ordering has no drag library here; the edit list
+// moves items with explicit up/down buttons. The title and the edit toggle live
+// in the surface header (WidgetPanel, WidgetsDrawer), which is why this
+// component starts at the list.
 
-const editing = ref(false);
+const editing = widgetEditing;
 const selected = ref<WidgetName | "">("");
 
 // Below 1090px the shell hides the whole column with display:none, but a
@@ -39,6 +41,12 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   window.removeEventListener("resize", measure);
+});
+
+// Leaving edit mode while the drawer is closed should not keep a picker open;
+// the selection is only meaningful inside the edit list.
+watch(editing, (value) => {
+  if (!value) selected.value = "";
 });
 
 // Only widgets that are not in the stack yet can be added; a stack holds one
@@ -71,21 +79,6 @@ function updateProps(id: string, patch: Record<string, unknown>): void {
 
 <template>
   <section ref="root" class="widget-stack" :class="{ editing }">
-    <header class="stack-head">
-      <h2 v-if="heading" class="stack-title">{{ editing ? "编辑小组件" : "小组件" }}</h2>
-      <button
-        class="stack-toggle"
-        :class="{ active: editing }"
-        type="button"
-        :aria-pressed="editing"
-        :title="editing ? '完成编辑' : '编辑小组件'"
-        :aria-label="editing ? '完成编辑' : '编辑小组件'"
-        @click="editing = !editing"
-      >
-        <AppIcon :name="editing ? 'check' : 'settings'" />
-      </button>
-    </header>
-
     <template v-if="editing">
       <div class="adder">
         <select
@@ -147,6 +140,7 @@ function updateProps(id: string, patch: Record<string, unknown>): void {
       </ul>
 
       <button class="button ghost small reset" type="button" @click="resetWidgets">恢复默认</button>
+      <RouterLink to="/settings/widgets" class="manage">在设置中管理小组件</RouterLink>
     </template>
 
     <div v-else-if="laidOut" class="stack-list">
@@ -168,51 +162,6 @@ function updateProps(id: string, patch: Record<string, unknown>): void {
   flex-direction: column;
   gap: 12px;
   min-width: 0;
-}
-
-.stack-head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0 2px;
-}
-
-.stack-title {
-  color: var(--muted);
-  font-size: 0.76rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-}
-
-.stack-toggle {
-  display: grid;
-  place-items: center;
-  width: 28px;
-  height: 28px;
-  margin-left: auto;
-  padding: 0;
-  border: 1px solid var(--border);
-  border-radius: 50%;
-  background: var(--panel);
-  color: var(--muted);
-  cursor: pointer;
-  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
-}
-
-.stack-toggle:hover {
-  color: var(--accent);
-  border-color: var(--accent);
-}
-
-.stack-toggle.active {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--on-accent);
-}
-
-.stack-toggle .icon {
-  width: 15px;
-  height: 15px;
 }
 
 .stack-list {
@@ -361,5 +310,17 @@ function updateProps(id: string, patch: Record<string, unknown>): void {
 
 .reset {
   align-self: flex-start;
+}
+
+.manage {
+  align-self: flex-start;
+  color: var(--accent);
+  font-size: 0.76rem;
+  font-weight: 600;
+}
+
+.manage:focus-visible {
+  outline: var(--focus-outline);
+  outline-offset: 2px;
 }
 </style>

@@ -1,22 +1,27 @@
 <script setup lang="ts">
+import { useId } from "vue";
 import AppIcon from "../AppIcon.vue";
 import type { WidgetIcon } from "../../widgets/registry";
 
 // The card every widget sits in: one header row (icon, title, optional hint,
 // header actions) above a body the widget fills. `flush` removes the body
-// padding for widgets that paint their own edge-to-edge rows.
+// padding for widgets that paint their own edge-to-edge rows. The title is the
+// card's accessible name, so a stack of cards reads as a list of labelled
+// regions instead of anonymous sections.
 withDefaults(
   defineProps<{ title: string; icon: WidgetIcon; hint?: string; flush?: boolean }>(),
   { hint: "", flush: false },
 );
+
+const titleId = useId();
 </script>
 
 <template>
-  <section class="widget">
+  <section class="widget" :aria-labelledby="titleId">
     <header class="widget-head">
       <span class="widget-icon"><AppIcon :name="icon" /></span>
       <div class="widget-heading">
-        <h2 class="widget-title">{{ title }}</h2>
+        <h2 :id="titleId" class="widget-title">{{ title }}</h2>
         <p v-if="hint" class="widget-hint">{{ hint }}</p>
       </div>
       <div class="widget-actions"><slot name="actions" /></div>
