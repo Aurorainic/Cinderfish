@@ -158,7 +158,7 @@ func (s *Service) Create(ctx context.Context, p CreateParams) (*Note, error) {
 			}
 			return nil, err
 		}
-		if parent.RenoteID != nil {
+		if parent.IsPureRenote() {
 			return nil, ErrCannotReplyToPureRenote
 		}
 		replyUserID = &parent.UserID
@@ -174,7 +174,7 @@ func (s *Service) Create(ctx context.Context, p CreateParams) (*Note, error) {
 			}
 			return nil, err
 		}
-		if target.RenoteID != nil {
+		if target.IsPureRenote() {
 			return nil, ErrCannotRenoteToPureRenote
 		}
 		if target.Visibility == VisibilityFollowers && target.UserID != p.UserID {

@@ -512,6 +512,62 @@ func TestRenoteTargetVisibility(t *testing.T) {
 	createNote(t, ts, tokenA, map[string]any{"renoteId": followers})
 }
 
+// A quote (renoteId + own text/cw/files/poll/reply) is NOT a pure renote:
+// upstream checks isRenote(target) && !isQuote(target)
+// (core/NoteCreateService.ts L335/L384, misc/is-renote.ts), so quotes
+// stay replyable and renotable while pure renotes are rejected with the
+// upstream error codes.
+func TestQuoteReplyAndRenoteTargets(t *testing.T) {
+	ts := newTestServer(t, "open")
+	_, tokenA := createUser(t, ts, uniqueName(t)+"a")
+	_, tokenB := createUser(t, ts, uniqueName(t)+"b")
+
+	original := createNote(t, ts, tokenA, map[string]any{"text": "original"})
+	quote := createNote(t, ts, tokenB, map[string]any{"renoteId": original, "text": "a quote"})
+	pureRenote := createNote(t, ts, tokenB, map[string]any{"renoteId": original})
+
+	// Replying to a pure renote is rejected.
+	resp, body := post(t, ts, "/api/notes/create", map[string]any{"i": tokenA, "replyId": pureRenote, "text": "reply to renote"})
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("reply to pure renote: status %d, body %v", resp.StatusCode, body)
+	}
+	if errObj, _ := body["error"].(map[string]any); errObj["code"] != "CANNOT_REPLY_TO_A_PURE_RENOTE" {
+		t.Errorf("code = %v, want CANNOT_REPLY_TO_A_PURE_RENOTE", errObj["code"])
+	}
+
+	// Renoting a pure renote is rejected.
+	resp, body = post(t, ts, "/api/notes/create", map[string]any{"i": tokenA, "renoteId": pureRenote})
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("renote of pure renote: status %d, body %v", resp.StatusCode, body)
+	}
+	if errObj, _ := body["error"].(map[string]any); errObj["code"] != "CANNOT_RENOTE_TO_A_PURE_RENOTE" {
+		t.Errorf("code = %v, want CANNOT_RENOTE_TO_A_PURE_RENOTE", errObj["code"])
+	}
+
+	// Replying to a quote targets the quote itself.
+	reply := createNote(t, ts, tokenA, map[string]any{"replyId": quote, "text": "reply to quote"})
+	resp, body = post(t, ts, "/api/notes/show", map[string]any{"noteId": reply})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("show reply: status %d, body %v", resp.StatusCode, body)
+	}
+	if body["replyId"] != quote {
+		t.Errorf("replyId = %v, want %v", body["replyId"], quote)
+	}
+	if parent, ok := body["reply"].(map[string]any); !ok || parent["id"] != quote {
+		t.Errorf("embedded reply = %v, want the quote", body["reply"])
+	}
+
+	// Renoting a quote targets the quote itself.
+	renote := createNote(t, ts, tokenA, map[string]any{"renoteId": quote})
+	resp, body = post(t, ts, "/api/notes/show", map[string]any{"noteId": renote})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("show renote: status %d, body %v", resp.StatusCode, body)
+	}
+	if body["renoteId"] != quote {
+		t.Errorf("renoteId = %v, want %v", body["renoteId"], quote)
+	}
+}
+
 func TestSpecifiedVisibility(t *testing.T) {
 	ts := newTestServer(t, "open")
 	_, tokenA := createUser(t, ts, uniqueName(t)+"a")

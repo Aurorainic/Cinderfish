@@ -31,13 +31,14 @@ const footer = ref<InstanceType<typeof NoteFooter> | null>(null);
 
 // A note carrying a renote target and nothing of its own is a pure renote:
 // the bar names the renoter and the renoted note supplies header, content and
-// footer. Anything with text, a CW, files or a poll is a quote and keeps its
-// own content with the quoted note rendered as a card.
+// footer. Anything with text, a CW, a reply pointer, files or a poll is a
+// quote and keeps its own content with the quoted note rendered as a card.
+// Mirrors Misskey's isQuote (misc/is-renote.ts), which counts replyId too.
 const pureRenote = computed(() => {
   const note = props.note;
   if (!note.renote) return false;
   const hasOwnContent =
-    !!note.text?.trim() || !!note.cw || (note.files?.length ?? 0) > 0 || !!note.hasPoll;
+    !!note.text?.trim() || !!note.cw || !!note.reply || (note.files?.length ?? 0) > 0 || !!note.hasPoll;
   return !hasOwnContent;
 });
 
