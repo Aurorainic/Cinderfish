@@ -111,10 +111,14 @@ var (
 	ErrNoSuchRenoteTarget       = errors.New("note: no such renote target")
 	ErrCannotRenoteToPureRenote = errors.New("note: cannot renote to a pure renote")
 	ErrCannotReplyToPureRenote  = errors.New("note: cannot reply to a pure renote")
-	ErrEmptyNote                = errors.New("note: a note needs text, files or a poll")
-	ErrTextTooLong              = errors.New("note: text is too long")
-	ErrInvalidVisibility        = errors.New("note: invalid visibility")
-	ErrPollExpired              = errors.New("note: poll is already expired")
+	// Mirrors Misskey's cannotRenoteDueToVisibility: a followers-only note
+	// can only be renoted by its author, and a specified note cannot be
+	// renoted at all (core/NoteCreateService.ts L352-356).
+	ErrCannotRenoteDueToVisibility = errors.New("note: renote target visibility forbids the renote")
+	ErrEmptyNote                   = errors.New("note: a note needs text, files or a poll")
+	ErrTextTooLong                 = errors.New("note: text is too long")
+	ErrInvalidVisibility           = errors.New("note: invalid visibility")
+	ErrPollExpired                 = errors.New("note: poll is already expired")
 )
 
 // Create stores a new note.
@@ -172,6 +176,12 @@ func (s *Service) Create(ctx context.Context, p CreateParams) (*Note, error) {
 		}
 		if target.RenoteID != nil {
 			return nil, ErrCannotRenoteToPureRenote
+		}
+		if target.Visibility == VisibilityFollowers && target.UserID != p.UserID {
+			return nil, ErrCannotRenoteDueToVisibility
+		}
+		if target.Visibility == VisibilitySpecified {
+			return nil, ErrCannotRenoteDueToVisibility
 		}
 		renoteUserID = &target.UserID
 		renoteUserHost = target.UserHost

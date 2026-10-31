@@ -149,6 +149,11 @@ func (s *Server) writeNoteError(w http.ResponseWriter, err error) {
 			Message: "You can not reply to a pure Renote.", Code: "CANNOT_REPLY_TO_A_PURE_RENOTE",
 			ID: errIDCannotReplyPureRenote, Kind: "client", Status: http.StatusBadRequest,
 		})
+	case errors.Is(err, note.ErrCannotRenoteDueToVisibility):
+		writeAPIError(w, &APIError{
+			Message: "You can not Renote due to target visibility.", Code: "CANNOT_RENOTE_DUE_TO_VISIBILITY",
+			ID: errIDCannotRenoteVis, Kind: "client", Status: http.StatusBadRequest,
+		})
 	case errors.Is(err, note.ErrTextTooLong):
 		writeAPIError(w, &APIError{
 			Message: "Note is too long.", Code: "NOTE_TOO_LONG",

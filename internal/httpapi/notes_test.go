@@ -472,6 +472,46 @@ func TestRenote(t *testing.T) {
 	}
 }
 
+// Misskey rejects renoting a followers-only note by anyone but its author
+// and rejects renoting a specified note outright (core/NoteCreateService.ts
+// L352-356, cannotRenoteDueToVisibility be9529e9-fe72-4de0-ae43-0b363c4938af).
+func TestRenoteTargetVisibility(t *testing.T) {
+	ts := newTestServer(t, "open")
+	_, tokenA := createUser(t, ts, uniqueName(t)+"a")
+	idB, tokenB := createUser(t, ts, uniqueName(t)+"b")
+
+	followers := createNote(t, ts, tokenA, map[string]any{
+		"text":       "followers only",
+		"visibility": "followers",
+	})
+	specified := createNote(t, ts, tokenA, map[string]any{
+		"text":           "just for you",
+		"visibility":     "specified",
+		"visibleUserIds": []string{idB},
+	})
+
+	resp, body := post(t, ts, "/api/notes/create", map[string]any{"i": tokenB, "renoteId": followers})
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("renote followers as other: status %d, body %v", resp.StatusCode, body)
+	}
+	errObj, _ := body["error"].(map[string]any)
+	if errObj["code"] != "CANNOT_RENOTE_DUE_TO_VISIBILITY" {
+		t.Errorf("code = %v, want CANNOT_RENOTE_DUE_TO_VISIBILITY", errObj["code"])
+	}
+
+	resp, body = post(t, ts, "/api/notes/create", map[string]any{"i": tokenB, "renoteId": specified})
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("renote specified: status %d, body %v", resp.StatusCode, body)
+	}
+	errObj, _ = body["error"].(map[string]any)
+	if errObj["code"] != "CANNOT_RENOTE_DUE_TO_VISIBILITY" {
+		t.Errorf("code = %v, want CANNOT_RENOTE_DUE_TO_VISIBILITY", errObj["code"])
+	}
+
+	// The author may still renote their own followers note.
+	createNote(t, ts, tokenA, map[string]any{"renoteId": followers})
+}
+
 func TestSpecifiedVisibility(t *testing.T) {
 	ts := newTestServer(t, "open")
 	_, tokenA := createUser(t, ts, uniqueName(t)+"a")
