@@ -25,14 +25,6 @@ export type NavIcon =
   | "close"
   | "flame";
 
-export interface NavItemDef {
-  label: string;
-  icon: NavIcon;
-  to: string;
-  show?: () => boolean;
-  badge?: () => number;
-}
-
 export type NavKey = "timeline" | "notifications" | "explore" | "settings" | "admin";
 
 // Unread indicators are declared by key instead of per-item badge closures, so
