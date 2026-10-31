@@ -17,12 +17,20 @@ import { usePageTitle } from "../composables/use-page-title";
 // the type really has no notifications.
 type Filter = "all" | "reaction" | "mention" | "renote";
 
+type TabIcon = "bell" | "heart" | "reply" | "renote";
+
 const FILTERS: readonly Filter[] = ["all", "reaction", "mention", "renote"];
 const LABELS: Record<Filter, string> = {
   all: "全部",
   reaction: "反应",
   mention: "提及",
   renote: "转贴",
+};
+const TAB_ICONS: Record<Filter, TabIcon> = {
+  all: "bell",
+  reaction: "heart",
+  mention: "reply",
+  renote: "renote",
 };
 
 const PAGE_SIZE = 20;
@@ -32,7 +40,7 @@ const router = useRouter();
 
 usePageTitle("通知");
 
-const tabs = FILTERS.map((key) => ({ key, label: LABELS[key] }));
+const tabs = FILTERS.map((key) => ({ key, label: LABELS[key], icon: TAB_ICONS[key] }));
 
 const notifications = ref<Notification[]>([]);
 const marking = ref(false);

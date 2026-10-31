@@ -9,13 +9,14 @@ import { isLoggedIn, session } from "../stores/session";
 type Source = "home" | "local" | "hybrid" | "global";
 
 // Misskey channel names: home reads as 首页, hybrid as 社交. Deck columns use
-// the same labels (stores/deck.ts), so both shells name a channel alike.
+// the same labels (stores/deck.ts), so both shells name a channel alike — the
+// icons are shared with the deck column definitions for the same reason.
 const CHANNELS: readonly Source[] = ["home", "local", "hybrid", "global"];
-const LABELS: Record<Source, string> = {
-  home: "首页",
-  local: "本地",
-  hybrid: "社交",
-  global: "全球",
+const TAB_META: Record<Source, { label: string; icon: "home" | "globe" | "feather" | "compass" }> = {
+  home: { label: "首页", icon: "home" },
+  local: { label: "本地", icon: "globe" },
+  hybrid: { label: "社交", icon: "feather" },
+  global: { label: "全球", icon: "compass" },
 };
 
 const AUTH_CHANNELS: readonly string[] = ["home", "hybrid"];
@@ -34,7 +35,11 @@ function isAvailable(value: string): value is Source {
 }
 
 const tabs = computed(() =>
-  CHANNELS.filter((key) => isAvailable(key)).map((key) => ({ key, label: LABELS[key] })),
+  CHANNELS.filter((key) => isAvailable(key)).map((key) => ({
+    key,
+    label: TAB_META[key].label,
+    icon: TAB_META[key].icon,
+  })),
 );
 
 const tab = computed<string>({

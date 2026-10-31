@@ -79,7 +79,7 @@ const timeTitle = computed(() => absoluteTime(props.notification.createdAt));
   <RouterLink
     :to="to"
     class="item"
-    :class="[`tone-${meta.tone}`, { unread: !notification.isRead }]"
+    :class="[`tone-${meta.tone}`, { unread: !notification.isRead, read: notification.isRead }]"
   >
     <span class="badge">
       <AppIcon :name="meta.icon" />
@@ -143,6 +143,12 @@ const timeTitle = computed(() => absoluteTime(props.notification.createdAt));
 
 .item.unread:hover {
   background: color-mix(in srgb, var(--accent) 11%, transparent);
+}
+
+/* Iceshrimp.NET dims read rows with .notification.read { opacity: 0.7 }
+   (NotificationComponent.razor.css L12-14); unread keeps full emphasis. */
+.item.read {
+  opacity: 0.7;
 }
 
 .badge {
