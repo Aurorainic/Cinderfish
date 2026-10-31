@@ -178,11 +178,13 @@ SELECT id, recipient_id, type, notifier_id, note_id, reaction, is_read, created_
 FROM notifications WHERE recipient_id = $1`
 	args := []any{recipientID}
 
+	// Misskey's getNotifications filters with include-wins semantics
+	// (packages/backend/src/core/NotificationService.ts L302-306): a
+	// non-empty includeTypes takes precedence and excludeTypes is ignored.
 	if includeTypes != nil {
 		args = append(args, includeTypes)
 		query += fmt.Sprintf(" AND type = ANY($%d)", len(args))
-	}
-	if len(excludeTypes) > 0 {
+	} else if len(excludeTypes) > 0 {
 		args = append(args, excludeTypes)
 		query += fmt.Sprintf(" AND NOT (type = ANY($%d))", len(args))
 	}

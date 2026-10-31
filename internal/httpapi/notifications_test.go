@@ -147,16 +147,46 @@ func notificationIDsOf(list []map[string]any) []string {
 	return out
 }
 
+// TestNotificationsCombinedIncludeAndExclude pins Misskey's include-wins
+// semantics (packages/backend/src/core/NotificationService.ts L302-306):
+// a non-empty includeTypes takes precedence and excludeTypes is ignored,
+// whatever it names.
 func TestNotificationsCombinedIncludeAndExclude(t *testing.T) {
 	ts, tokenA, _ := seedNotificationSeries(t)
 
+	unfiltered := orderedNotifications(t, ts, tokenA)
+
+	// Include wins: exclude mention is ignored while include covers both
+	// types, so the page is identical to the unfiltered one.
 	list := fetchNotifications(t, ts, tokenA, map[string]any{
 		"markAsRead":   false,
 		"includeTypes": []string{"mention", "reaction"},
 		"excludeTypes": []string{"mention"},
 	})
-	if got, want := notificationTypesOf(list), []string{"reaction", "reaction"}; !reflect.DeepEqual(got, want) {
-		t.Errorf("include mention+reaction, exclude mention = %v, want %v", got, want)
+	if got, want := notificationIDsOf(list), notificationIDsOf(unfiltered); !reflect.DeepEqual(got, want) {
+		t.Errorf("include mention+reaction with exclude mention = %v, want %v (include wins)", got, want)
+	}
+
+	// Include-only still filters to the named types.
+	mentions := fetchNotifications(t, ts, tokenA, map[string]any{
+		"markAsRead":   false,
+		"includeTypes": []string{"mention"},
+	})
+	for _, n := range mentions {
+		if n["type"] != "mention" {
+			t.Errorf("include mention-only returned a %v notification", n["type"])
+		}
+	}
+
+	// Exclude-only keeps filtering out the named types.
+	noMentions := fetchNotifications(t, ts, tokenA, map[string]any{
+		"markAsRead":   false,
+		"excludeTypes": []string{"mention"},
+	})
+	for _, n := range noMentions {
+		if n["type"] == "mention" {
+			t.Errorf("exclude mention returned a mention notification")
+		}
 	}
 }
 

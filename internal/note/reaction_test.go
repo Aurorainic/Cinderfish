@@ -147,6 +147,9 @@ func TestNotificationListExcludeTypes(t *testing.T) {
 	}
 }
 
+// TestNotificationListIncludeAndExclude pins Misskey's include-wins
+// semantics (packages/backend/src/core/NotificationService.ts L302-306):
+// a non-empty includeTypes takes precedence and excludeTypes is ignored.
 func TestNotificationListIncludeAndExclude(t *testing.T) {
 	f := newNotificationFixture(t)
 	f.seed(t, "01", f.readerID, "reaction")
@@ -154,10 +157,17 @@ func TestNotificationListIncludeAndExclude(t *testing.T) {
 	f.seed(t, "03", f.readerID, "renote")
 	f.seed(t, "04", f.readerID, "reaction")
 
+	// Include covers both types, so the exclude clause is ignored.
 	got := f.ids(f.list(t, []string{"reaction", "mention"}, []string{"mention"}))
-	want := []string{"04", "01"}
+	want := []string{"04", "02", "01"}
 	if !reflect.DeepEqual(got, want) {
-		t.Errorf("include reaction+mention, exclude mention = %v, want %v", got, want)
+		t.Errorf("include reaction+mention, exclude mention = %v, want %v (include wins)", got, want)
+	}
+
+	// Exclude still applies on its own.
+	got = f.ids(f.list(t, nil, []string{"renote"}))
+	if want := []string{"04", "02", "01"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("exclude renote alone = %v, want %v", got, want)
 	}
 }
 

@@ -389,10 +389,12 @@ pnpm build    # 先 vue-tsc --noEmit，再输出 web/dist
 
 ### 11.12 通知契约核对与时间线 tab 图标（2026-10-31，重写计划 Task 5）
 
-- 对照 Misskey `packages/backend/src/server/api/endpoints/i/notifications.ts` 的 `paramDef` 与 `core/QueryService.ts` 的 `makePaginationQuery` 逐条核对现有实现：`includeTypes`/`excludeTypes` 已在 SQL 的 WHERE 内、`LIMIT` 之前生效（此前一个波次已修复）；显式空 `includeTypes` 返回 `[]`、`excludeTypes` 全排除返回空、默认 limit 10、上限 100，均与上游一致。
+- 对照 Misskey `packages/backend/src/server/api/endpoints/i/notifications.ts` 的 `paramDef` 与 `core/QueryService.ts` 的 `makePaginationQuery` 逐条核对现有实现：`includeTypes`/`excludeTypes` 在 SQL 的 WHERE 内、`LIMIT` 之前生效（此前一个波次已修复）；显式空 `includeTypes` 返回 `[]`、默认 limit 10、上限 100，与上游一致。
+- `includeTypes`/`excludeTypes` 的组合语义按上游 `core/NotificationService.ts` `getNotifications`（L302-306）的 include-wins 处理：**includeTypes 非空时生效并忽略 excludeTypes**，exclude 只在 include 为空时应用（Fix round 1 修正——此前两者按 AND 叠加，属错误偏离）。
 - 修正一处真实偏差：`sinceId` 单独出现（无 `untilId`）时 Misskey 返回**升序**余页（`makePaginationQuery` L58-60），此前实现固定 `ORDER BY id DESC`。`internal/note/reaction.go` 的 `NotificationService.List` 现按 sinceId-only → `ASC`、其余 → `DESC` 排序。
 - `markAsRead` 语义维持现状（缺省/`true` 把**本次返回的通知**置读，`false` 不触碰），与上游「watermark 全量置读」有意保留差异：通知页与被动视图（widget、deck 列）都显式传 `markAsRead: false`，靠「全部标为已读」按钮落库并广播 `readAllNotifications`；见 11.2 的注释。
-- 测试新增（先写失败再修）：`internal/note/reaction_test.go` `TestNotificationListSinceIdAscending`（修复前失败）；`internal/httpapi/notifications_test.go` 新增 `TestNotificationsFilteredCursorPagination`（limit=2 逐页取完一条 mention 流，断言无跳过无重复）、`TestNotificationsCombinedIncludeAndExclude`、`TestNotificationsSinceIdAscending`。
+- 测试新增（先写失败再修）：`internal/note/reaction_test.go` `TestNotificationListSinceIdAscending`（修复前失败）；`internal/httpapi/notifications_test.go` 新增 `TestNotificationsFilteredCursorPagination`（limit=2 逐页取完一条 mention 流，断言无跳过无重复）、`TestNotificationsSinceIdAscending`。组合过滤用例（`TestNotificationsCombinedIncludeAndExclude`、`TestNotificationListIncludeAndExclude`）在 Fix round 1 重写为钉住 include-wins 语义（重写后、实现修复前为失败状态）。
+- 已记录的有意偏离（Fix round 1 审查确认，均为宽松而非报错方向）：`includeTypes`/`excludeTypes` 里的未知/废弃类型值按字面字符串接受（上游 paramDef 会校验枚举并返回 400）；`limit` 越界按钳制处理（上游同样应返回 400）。
 - 前端：`TimelineView`、`NotificationsView` 的页头 tabs 补图标（时间线四个 tab 与 `stores/deck.ts` 列图标同源；通知四 tab 用 bell/heart/reply/renote），使 PageHeader 的 >3-tab 图标折叠首次可达；`NotificationItem` 已读行按 Iceshrimp.NET `.notification.read { opacity: 0.7 }`（`NotificationComponent.razor.css` L12-14）降透明度，未读保持强调色高亮。
 - 验证：`go test -count=1 ./...`（含数据库与 Redis 集成）全绿、`gofmt -l`/`go vet` 干净、`pnpm typecheck`/`pnpm build` 通过；`git diff --check` 干净。内建浏览器实测（Go 二进制 @3991，`web/dist`，开发库，临时账号 t5alice/t5bob 已清理）：通知页 32 条种子通知分两页翻完无缺失无重复，全部→反应→全部 切换后重新挂载干净；四个时间线源 tab 各自加载对应流；流式新笔记以「1条新笔记」pill 出现、点开仅插入一次；widget 抽屉通知 widget 正常渲染。
 - 已知缺口（记录，未在本任务范围）：`users_pack.go:129` 的 `unreadNotificationsCount`/`hasUnreadNotification` 是硬编码 0/false，刷新后通知徽标与「全部标为已读」按钮不可用（只有流式推送会点亮），建议后续接 `NotificationService.UnreadCount`；纯转贴（renoteId）当前不产生 `renote` 通知（Task 5 只涉及通知查询/置读文件，未动通知创建点）。
