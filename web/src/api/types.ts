@@ -29,8 +29,10 @@ export interface UserDetailed extends UserLite {
   isLocked: boolean;
   isSilenced: boolean;
   isSuspended: boolean;
-  // Relationship fields are relative to the authenticated viewer and are only
-  // present when `users/show` was called with a credential.
+  // Relationship fields are relative to the authenticated viewer. The
+  // backend always emits them (false for an anonymous or invalid-token
+  // viewer), but they stay optional so payloads produced before the field
+  // existed still typecheck; callers fall back to false.
   isFollowing?: boolean;
   isFollowed?: boolean;
   hasPendingFollowRequestFromYou?: boolean;

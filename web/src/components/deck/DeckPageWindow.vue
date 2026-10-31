@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { api } from "../../api/client";
+import { api, ApiError } from "../../api/client";
 import type { Note, UserDetailed } from "../../api/types";
 import { isLoggedIn, session } from "../../stores/session";
 import AppIcon from "../AppIcon.vue";
@@ -9,6 +9,7 @@ import NoteItem from "../note/Note.vue";
 import ProfileHeader from "../ProfileHeader.vue";
 import PageWindow from "../ui/PageWindow.vue";
 import PagedFeed from "../ui/PagedFeed.vue";
+import { useFollowRelation } from "../../composables/use-follow-relation";
 import { closeDeckPage, deckPage } from "./deck-page";
 import { interceptDeckClick } from "./deck-links";
 
@@ -92,20 +93,9 @@ function profileNotesFetcher(p: { untilId?: string }): Promise<Note[]> {
 }
 
 // following/create answers with the followee's UserLite only (Misskey
-// contract), so a pending request on a locked or remote account is read
-// back from users/show instead of being returned there.
-async function refreshRelation(): Promise<void> {
-  if (!user.value) return;
-  try {
-    const fresh = await api.usersShow({ username: user.value.username });
-    if (!user.value) return;
-    following.value = fresh.isFollowing ?? false;
-    followPending.value = fresh.hasPendingFollowRequestFromYou ?? false;
-    if (typeof fresh.followersCount === "number") user.value.followersCount = fresh.followersCount;
-  } catch {
-    // The optimistic state from the follow call stands on a failed read.
-  }
-}
+// contract), so the relationship after a follow is read back from
+// users/show instead of being returned there; see useFollowRelation.
+const { refreshRelation } = useFollowRelation(user, following, followPending);
 
 async function follow(): Promise<void> {
   if (!user.value || followBusy.value || followPending.value) return;
@@ -117,7 +107,18 @@ async function follow(): Promise<void> {
     user.value.followersCount += 1;
     await refreshRelation();
   } catch (err) {
-    followNotice.value = errorMessage(err, "关注失败");
+    if (err instanceof ApiError) {
+      if (err.code === "ALREADY_FOLLOWING") {
+        following.value = true;
+        await refreshRelation();
+      } else if (err.status === 401) {
+        followNotice.value = "登录状态已失效，请重新登录后再关注。";
+      } else {
+        followNotice.value = errorMessage(err, "关注失败");
+      }
+    } else {
+      followNotice.value = errorMessage(err, "关注失败");
+    }
   } finally {
     followBusy.value = false;
   }

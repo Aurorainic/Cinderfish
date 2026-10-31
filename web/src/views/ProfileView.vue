@@ -11,6 +11,7 @@ import PageHeader from "../components/ui/PageHeader.vue";
 import PagedFeed from "../components/ui/PagedFeed.vue";
 import type { PagedFeedParams, PagedFeedResult } from "../components/ui/PagedFeed.vue";
 import { usePageTitle } from "../composables/use-page-title";
+import { useFollowRelation } from "../composables/use-follow-relation";
 import { NAV_ITEM_DEFS } from "../nav";
 import { isLoggedIn, session } from "../stores/session";
 
@@ -219,20 +220,9 @@ watch(
 );
 
 // following/create answers with the followee's UserLite only (Misskey
-// contract), so a pending request on a locked or remote account is read
-// back from users/show instead of being returned there.
-async function refreshRelation() {
-  if (!user.value) return;
-  try {
-    const fresh = await api.usersShow({ username: user.value.username });
-    if (!user.value) return;
-    following.value = fresh.isFollowing ?? false;
-    followPending.value = fresh.hasPendingFollowRequestFromYou ?? false;
-    if (typeof fresh.followersCount === "number") user.value.followersCount = fresh.followersCount;
-  } catch {
-    // The optimistic state from the follow call stands on a failed read.
-  }
-}
+// contract), so the relationship after a follow is read back from
+// users/show instead of being returned there; see useFollowRelation.
+const { refreshRelation } = useFollowRelation(user, following, followPending);
 
 async function follow() {
   if (!user.value || followBusy.value || followPending.value) return;
