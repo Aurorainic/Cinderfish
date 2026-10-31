@@ -58,6 +58,10 @@ function reply() {
 }
 
 function renote() {
+  // The button is disabled when the target is not renotable; the gate lives
+  // here as well so the `q` hotkey and any other caller are refused
+  // identically instead of firing a request the backend must reject.
+  if (props.renotable === false) return;
   emit("renote");
 }
 

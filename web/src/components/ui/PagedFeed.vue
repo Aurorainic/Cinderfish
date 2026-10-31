@@ -212,10 +212,17 @@ const rows = computed<Row[]>(() => {
   list.forEach((item, index) => {
     const day = localDayOf(item);
     if (day && prevDay && day !== prevDay) {
-      // Keyed by the local date alone: a separator is only emitted when the
-      // day changes, so each date appears at most once and the key survives
-      // prepends and appends without shifting.
-      out.push({ kind: "date", key: `d-${day}`, label: dateLabel(day) });
+      // Keyed by the local date plus the id of the group's first item: the
+      // same day can legitimately arrive in two separate runs (a delayed or
+      // out-of-order stream insert), and a date-only key would make those two
+      // separators collide. The first item's id keeps each key unique without
+      // shifting on prepends or appends; id-less items fall back to their
+      // position, as the item rows below do.
+      out.push({
+        kind: "date",
+        key: `d-${day}-${idOf(item) || `row-${index}`}`,
+        label: dateLabel(day),
+      });
     }
     if (day) prevDay = day;
     out.push({ kind: "item", key: idOf(item) || `row-${index}`, item });

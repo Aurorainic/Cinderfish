@@ -11,7 +11,7 @@ import { session } from "./stores/session";
 
 let nextRequestId = 0;
 
-type PostFormOptions = { reply?: Note; renote?: Note; quote?: boolean };
+type PostFormOptions = { reply?: Note; renote?: Note };
 type PostFormRequest = PostFormOptions & { id: number };
 
 const postFormRequest = ref<PostFormRequest | null>(null);
@@ -37,9 +37,9 @@ const confirmQueue = ref<ConfirmRequest[]>([]);
 
 const currentConfirm = computed(() => confirmQueue.value[0] ?? null);
 
-/** Open the global post form. The signature is frozen; `quote` marks the
- * renote target as a quote, which the form renders with a preview and submits
- * as renoteId plus text (the backend accepts both on one note).
+/** Open the global post form. The signature is frozen; a `renote` target is
+ * rendered as a quote preview and submitted as renoteId plus text (the backend
+ * accepts both on one note).
  *
  * The form itself is authenticated-only, so a guest goes to the login page
  * instead of getting an empty dialog. */

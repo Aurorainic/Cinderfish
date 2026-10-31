@@ -38,7 +38,7 @@ const pureRenote = computed(() => {
   const note = props.note;
   if (!note.renote) return false;
   const hasOwnContent =
-    !!note.text?.trim() || !!note.cw || !!note.reply || (note.files?.length ?? 0) > 0 || !!note.hasPoll;
+    !!note.text?.trim() || !!note.cw || !!note.replyId || (note.files?.length ?? 0) > 0 || !!note.hasPoll;
   return !hasOwnContent;
 });
 
