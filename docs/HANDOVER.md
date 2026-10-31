@@ -1,6 +1,6 @@
 # Cinderfish 交接说明
 
-- 最后更新：2026-10-29（M6 前端完成）
+- 最后更新：2026-10-31（Iceshrimp 壳层重构，重写计划 Task 2）
 - 项目名 **Cinderfish**（2026-10-28 定名，Go module `github.com/Aurorainic/cinderfish`）
 - 仓库：当前目录 `/home/lainsaka/文档/MilnFish`，分支 `main`；远程 `origin` 为
   `https://github.com/Aurorainic/Cinderfish.git`（GitHub 仓库已更名，本地目录改名待办）
@@ -207,8 +207,9 @@ web/src/components/  note/（Note、NoteHeader、NoteContent、NoteMedia、NoteF
                      composer/PostForm、deck/（DeckColumn、DeckPageWindow、deck-links）、
                      profile/（ProfileCard、ProfileSidebar）、
                      ui/（PagedFeed、PageHeader、PageWindow、EmojiPicker、MobileNav、NavDrawer）、
+                     layout/（Sidebar、WidgetPanel、MobileSidebar——壳层三件套）、
                      widgets/（WidgetStack、WidgetsDrawer、WidgetCard 与五个 widget）
-web/src/layouts/     AppShell（通用壳：可折叠侧栏 + 主列 + widget 栏）、DeckShell（横向列条）、AuthLayout
+web/src/layouts/     AppShell（组合 Sidebar | 主列 | WidgetPanel）、DeckShell（横向列条）、AuthLayout
 web/src/views/       Timeline、Note、Notifications、Profile、Explore、Settings、Admin、Login、Signup
 web/src/views/settings/  设置左导航 + 8 个子页
 web/src/views/admin/     管理左导航 + 4 个分区
@@ -217,7 +218,8 @@ web/src/views/admin/     管理左导航 + 4 个分区
 ### 11.2 已完成的页面
 
 参考边界固定：**Misskey 只作后端 API 契约来源，界面以 Firefish（主要）与 Iceshrimp（补充）为参考**，
-见 `docs/research/2026-10-30-firefish-ui-gap-analysis.md` 与执行计划
+见 `docs/research/2026-10-30-firefish-ui-gap-analysis.md`、
+`docs/research/2026-10-31-iceshrimp-architecture-translation.md` 与执行计划
 `docs/superpowers/plans/2026-10-30-firefish-ui-replication.md`。
 
 - **令牌层**：`styles/main.css` 是唯一的令牌来源，分表面/描边/前景/强调/状态/内容语义/焦点与滚动条/
@@ -365,6 +367,16 @@ pnpm build    # 先 vue-tsc --noEmit，再输出 web/dist
 **审查中驳回的一条**：`notifications` 的 `markAsRead` 缺省为启用被判为与 Misskey 不符，实际上游 `upstream/.../i/notifications.ts` 的 `paramDef` 就是 `default: true`，当前实现正确，未改。
 
 仍留待决定：设置路由没有统一登录守卫（账户类子页目前各自处理）；deck 移动端几何没有自动化断言；关注请求没有撤销入口（后端无对应端点）。
+
+### 11.10 Iceshrimp 壳层重构（2026-10-31，重写计划 Task 2）
+
+按 `docs/research/2026-10-31-iceshrimp-architecture-translation.md` 的翻译契约把壳外壳拆成三个子组件，`AppShell.vue` 只保留组合与壳级断点：
+
+- 新增 `web/src/components/layout/Sidebar.vue`（桌面侧栏，消费 `nav.ts` 注册表；250px 全宽 / 80px 图标态，≤1279 收缩——fork `$nav-width`/`$nav-icon-only-width`）、`WidgetPanel.vue`（右列 300px，≤1090 隐藏，与 `WidgetsDrawer` 悬浮按钮的可见区间对齐为 ≥1091）、`MobileSidebar.vue`（≤500 移动开关；组合既有 `NavDrawer` 抽屉与 `MobileNav` 底栏，二者行为已满足契约故保留内部实现，仅把抽屉开关状态从 AppShell 移入）。
+- `PageHeader.vue` 补齐契约项：>3 个 tab 时非活动 tab 折叠为图标（有图标者），动作区标签 ≤1090 隐藏（`.action-label` 约定，通知页已接入），移动断点随壳从 720 改为 500。
+- 断点定稿（fork 主源）：`1100/1090/500/1279/400`；`DeckShell` 与 widget 抽屉的 720 随之改为 500；`.auth` 布局断点保持 720（认证页独立于壳）。底栏 ≤400 收紧按钮尺寸。
+- 侧栏/壳几何样式从 `main.css` 移入各组件；`--rail-width` 改 250px、`--rail-width-collapsed` 80px、`--shell-max-width` 1280px。
+- 验证：`pnpm typecheck`、`pnpm build`、`go vet`、`go test` 全绿；浏览器实测 1440/1100/840/600/375 的 `scrollWidth/clientWidth` 全部相等（无水平溢出），1440 三区（250+主列+300）、1100 图标态+widget 列、840/600 widget 隐藏、375 抽屉+底栏（含 Esc 关闭、路由变化关闭）、登录页保持裸布局。移动宽度下内建浏览器无法截图，采用 DOM 快照 + 注入式几何探针测量（探针已移除）。
 
 ## 12. M5 联邦（ActivityPub）
 

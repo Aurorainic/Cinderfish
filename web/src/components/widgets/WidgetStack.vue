@@ -20,7 +20,7 @@ withDefaults(defineProps<{ heading?: boolean }>(), { heading: true });
 const editing = ref(false);
 const selected = ref<WidgetName | "">("");
 
-// Below 1100px the shell hides the whole column with display:none, but a
+// Below 1090px the shell hides the whole column with display:none, but a
 // mounted component keeps running: its feeds would fetch and subscribe with
 // nothing on screen. A hidden subtree has no layout, so a zero-width reading
 // is the signal to stop rendering the widgets. The drawer's own stack sits in

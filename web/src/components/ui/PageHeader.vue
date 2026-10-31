@@ -52,6 +52,12 @@ const tabsList = computed<PageHeaderTab[]>(() =>
   (props.tabs ?? []).map((item) => (typeof item === "string" ? { key: item, label: item } : item)),
 );
 
+// The fork's MkPageHeader collapses when more than three tabs compete for the
+// row (fork/components/global/MkPageHeader.vue L74): non-active tabs shrink to
+// their icon, the active one keeps its label. Tabs without an icon stay
+// labelled, since an icon-only tab with no icon would be an empty button.
+const collapseTabs = computed(() => tabsList.value.length > 3);
+
 const markerStyle = computed(() => ({
   width: `${marker.value.width}px`,
   transform: `translateX(${marker.value.x}px)`,
@@ -162,7 +168,11 @@ onBeforeUnmount(() => {
         type="button"
         role="tab"
         class="tab"
-        :class="{ active: item.key === tab }"
+        :class="{
+          active: item.key === tab,
+          collapsed: collapseTabs && item.key !== tab && item.icon,
+        }"
+        :title="collapseTabs && item.key !== tab && item.icon ? item.label : undefined"
         :aria-selected="item.key === tab"
         @click="select(item.key)"
       >
@@ -195,7 +205,7 @@ onBeforeUnmount(() => {
   background: var(--panel);
 }
 
-@media (max-width: 720px) {
+@media (max-width: 500px) {
   .page-header {
     --page-header-bleed: var(--space-12);
   }
@@ -328,6 +338,16 @@ onBeforeUnmount(() => {
   color: var(--accent);
 }
 
+/* Collapsed (icon-only) state for non-active tabs when more than three tabs
+   share the header row, mirroring the fork's MkPageHeader collapse. */
+.tab.collapsed {
+  padding: 0 12px;
+}
+
+.tab.collapsed .tab-label {
+  display: none;
+}
+
 .tab-icon {
   width: 17px;
   height: 17px;
@@ -402,5 +422,15 @@ onBeforeUnmount(() => {
 
 .is-narrow .title {
   font-size: 1rem;
+}
+
+/* Section action labels collapse to icons once the widget column is gone
+   (≤1090px — the label-collapse middle state evidenced in .NET's
+   MainLayout.razor.css, re-based onto the fork's 1090 threshold). Slot
+   content opts in with the `action-label` class next to its icon. */
+@media (max-width: 1090px) {
+  .actions :deep(.action-label) {
+    display: none;
+  }
 }
 </style>

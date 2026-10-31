@@ -4,8 +4,8 @@ import { useRoute } from "vue-router";
 import AppIcon from "../AppIcon.vue";
 import WidgetStack from "./WidgetStack.vue";
 
-// Below 1100px the shell hides the widget column, so the same stack moves into
-// a right-hand drawer behind a floating button. Above 1100px the button is
+// Below 1090px the shell hides the widget column, so the same stack moves into
+// a right-hand drawer behind a floating button. Above 1090px the button is
 // hidden and the drawer is unreachable; a resize past the breakpoint closes it
 // so an open panel can never sit on top of the restored column.
 const open = ref(false);
@@ -49,7 +49,7 @@ watch(open, (value) => {
 
 onMounted(() => {
   document.addEventListener("keydown", onKeydown);
-  desktop = window.matchMedia("(min-width: 1100px)");
+  desktop = window.matchMedia("(min-width: 1091px)");
   desktop.addEventListener("change", onViewportChange);
 });
 
@@ -223,7 +223,7 @@ onBeforeUnmount(() => {
   transform: translateX(100%);
 }
 
-@media (max-width: 720px) {
+@media (max-width: 500px) {
   .widget-fab {
     inset-block-end: calc(72px + env(safe-area-inset-bottom) + 12px);
     inset-inline-end: 12px;
@@ -241,7 +241,7 @@ onBeforeUnmount(() => {
 
 /* The universal shell shows the real column from here up, and deck mode hides
    it altogether; either way the floating entry has no job. */
-@media (min-width: 1100px) {
+@media (min-width: 1091px) {
   .widget-fab {
     display: none;
   }

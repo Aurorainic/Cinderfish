@@ -85,7 +85,7 @@ const slots = computed<BarSlot[]>(() => {
   display: none;
 }
 
-@media (max-width: 720px) {
+@media (max-width: 500px) {
   .mobile-nav {
     position: fixed;
     inset: auto 0 0 0;
@@ -98,6 +98,33 @@ const slots = computed<BarSlot[]>(() => {
     background: color-mix(in srgb, var(--bg-raised) 94%, transparent);
     border-top: 1px solid var(--border);
     backdrop-filter: blur(12px);
+  }
+}
+
+/* Below 400px (fork universal.vue L620) the buttons narrow so five keys still
+   fit a small phone: tighter padding and a smaller label. */
+@media (max-width: 400px) {
+  .nav-item {
+    padding: 5px 0;
+  }
+
+  .nav-item .icon {
+    width: 19px;
+    height: 19px;
+  }
+
+  .compose-mark {
+    width: 30px;
+    height: 24px;
+  }
+
+  .compose-mark .icon {
+    width: 16px;
+    height: 16px;
+  }
+
+  .nav-label {
+    font-size: 0.62rem;
   }
 }
 

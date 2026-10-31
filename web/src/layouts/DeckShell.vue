@@ -228,7 +228,7 @@ onBeforeUnmount(() => {
 
 /* On phones the shell stacks and reserves room for the bottom navigation, so
    the strip only loses its width; the height still comes from the shell. */
-@media (max-width: 720px) {
+@media (max-width: 500px) {
   .deck-add {
     width: 96px;
   }

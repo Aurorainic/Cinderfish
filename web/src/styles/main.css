@@ -151,10 +151,12 @@
   --z-toast: 1200;
 
   /* ---------- layout ---------- */
-  --rail-width: 232px;
-  --rail-width-collapsed: 76px;
+  /* Sidebar widths follow the Iceshrimp fork: 250px full, 80px icon-only
+     (fork/ui/_common_/navbar.vue: $nav-width / $nav-icon-only-width). */
+  --rail-width: 250px;
+  --rail-width-collapsed: 80px;
   --side-width: 300px;
-  --shell-max-width: 1240px;
+  --shell-max-width: 1280px;
   --bottom-bar-height: 66px;
   --touch-target: 40px;
 
@@ -332,25 +334,12 @@ select {
 
 /* ---------- shell ---------- */
 
-.shell {
-  display: grid;
-  grid-template-columns: var(--rail-width) minmax(0, 1fr) var(--side-width);
-  gap: var(--space-28);
-  max-width: var(--shell-max-width);
-  margin: 0 auto;
-  padding: var(--space-24);
-  min-height: 100vh;
-}
-
-.rail {
-  position: sticky;
-  top: var(--space-24);
-  align-self: start;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-20);
-  height: calc(100vh - var(--space-48));
-}
+/* The three-region geometry (Sidebar | main | WidgetPanel) and every shell
+   breakpoint live in the components that own them: AppShell.vue composes the
+   grid, Sidebar.vue owns the 250/80 collapse at 1280px, WidgetPanel.vue hides
+   at 1090px, MobileSidebar.vue owns the 500px mobile switch and the 400px
+   bottom-bar refinement. What stays here is shared chrome: the brand mark,
+   cards and controls. */
 
 .brand {
   display: flex;
@@ -383,66 +372,6 @@ select {
   font-weight: var(--weight-bold);
   letter-spacing: -0.02em;
   color: var(--text-strong);
-}
-
-.nav {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-}
-
-.nav-link {
-  display: flex;
-  align-items: center;
-  gap: var(--space-14);
-  padding: var(--space-10) var(--space-14);
-  border-radius: var(--radius-md);
-  color: var(--nav-fg);
-  font-weight: var(--weight-semibold);
-  transition: background var(--dur-base) ease, color var(--dur-base) ease;
-}
-
-.nav-link .icon {
-  width: 22px;
-  height: 22px;
-}
-
-.nav-link:hover {
-  background: var(--surface-hover);
-  color: var(--nav-fg-hover);
-}
-
-.nav-link.router-link-active {
-  color: var(--nav-active);
-  background: var(--surface-selected);
-}
-
-.rail-foot {
-  margin-top: auto;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-8);
-  padding: 0 var(--space-6);
-}
-
-/* The account chip needs a whole row: avatar, name, the mode switch and the two
-   icon buttons do not fit on one line at 232px, and squeezing the name down to
-   an ellipsis of one character is worse than a second row. Only applies to the
-   full-width rail; the collapsed rail stacks its footer vertically. */
-@media (min-width: 1280px) {
-  .rail-foot > :not(.account-chip) {
-    flex: none;
-  }
-
-  .rail-foot > .account-chip {
-    flex: 1 1 100%;
-  }
-}
-
-.main {
-  min-width: 0;
-  padding-bottom: var(--space-64);
 }
 
 .card {
@@ -668,10 +597,11 @@ select {
 
 /* ---------- responsive ---------- */
 
-/* Shell breakpoints belong to the components that own them: the rail collapse
-   (1280px) and the widget column (1100px) live in AppShell.vue, and the
-   bottom bar (720px) in MobileNav.vue. What stays here is cross-page layout
-   that no single component owns. */
+/* Shell breakpoints belong to the components that own them: the sidebar icon
+   collapse (1280px) lives in Sidebar.vue, the widget column (1090px) in
+   WidgetPanel.vue, the mobile switch (500px) and the 400px bottom-bar
+   refinement in MobileSidebar.vue. What stays here is cross-page layout that
+   no single component owns. */
 
 @media (max-width: 720px) {
   .auth {

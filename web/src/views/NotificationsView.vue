@@ -177,7 +177,7 @@ onBeforeUnmount(() => {
         @click="markAllRead"
       >
         <AppIcon name="check" />
-        <span class="mark-label">{{ marking ? "处理中…" : "全部标为已读" }}</span>
+        <span class="mark-label action-label">{{ marking ? "处理中…" : "全部标为已读" }}</span>
       </button>
     </template>
   </PageHeader>
@@ -265,17 +265,5 @@ onBeforeUnmount(() => {
 /* Borderless rows carry their own hairline, so they must not be spaced. */
 .feed :deep(.paged-feed) {
   gap: 0;
-}
-
-@media (max-width: 520px) {
-  .mark-label {
-    display: none;
-  }
-
-  .mark {
-    width: 34px;
-    padding: 0;
-    justify-content: center;
-  }
 }
 </style>
