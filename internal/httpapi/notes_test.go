@@ -589,6 +589,134 @@ func TestSpecifiedVisibility(t *testing.T) {
 	}
 }
 
+// Misskey refuses a reply the replier could not read and refuses to widen
+// a specified note's audience
+// (core/NoteCreateService.ts L373-393, core/entities/NoteEntityService.ts
+// L294-344): a reply target invisible to the replier is
+// CANNOT_REPLY_TO_AN_INVISIBLE_NOTE, and replying to a specified note with
+// any other visibility is
+// CANNOT_REPLY_TO_SPECIFIED_VISIBILITY_NOTE_WITH_EXTENDED_VISIBILITY.
+func TestReplyTargetVisibility(t *testing.T) {
+	// The follower case needs following/create, which only runs with the
+	// federation store attached.
+	ts := newFederationServer(t, "public").ts
+	idA, tokenA := createUser(t, ts, uniqueName(t)+"a")
+	idB, tokenB := createUser(t, ts, uniqueName(t)+"b")
+	_, tokenC := createUser(t, ts, uniqueName(t)+"c")
+
+	// A specified note addressed to B only.
+	specified := createNote(t, ts, tokenA, map[string]any{
+		"text":           "just for b",
+		"visibility":     "specified",
+		"visibleUserIds": []string{idB},
+	})
+
+	resp, body := post(t, ts, "/api/notes/create", map[string]any{
+		"i": tokenC, "replyId": specified, "text": "let me in",
+		"visibility": "specified", "visibleUserIds": []string{idA},
+	})
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("reply by unaddressed user: status %d, body %v", resp.StatusCode, body)
+	}
+	errObj, _ := body["error"].(map[string]any)
+	if errObj["code"] != "CANNOT_REPLY_TO_AN_INVISIBLE_NOTE" {
+		t.Errorf("code = %v, want CANNOT_REPLY_TO_AN_INVISIBLE_NOTE", errObj["code"])
+	}
+	if errObj["id"] != "b98980fa-3780-406c-a935-b6d0eeee10d1" {
+		t.Errorf("id = %v, want b98980fa-3780-406c-a935-b6d0eeee10d1", errObj["id"])
+	}
+
+	// The addressed user must keep the note specified.
+	resp, body = post(t, ts, "/api/notes/create", map[string]any{
+		"i": tokenB, "replyId": specified, "text": "public answer",
+	})
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("widening reply: status %d, body %v", resp.StatusCode, body)
+	}
+	errObj, _ = body["error"].(map[string]any)
+	if errObj["code"] != "CANNOT_REPLY_TO_SPECIFIED_VISIBILITY_NOTE_WITH_EXTENDED_VISIBILITY" {
+		t.Errorf("code = %v, want CANNOT_REPLY_TO_SPECIFIED_VISIBILITY_NOTE_WITH_EXTENDED_VISIBILITY", errObj["code"])
+	}
+	if errObj["id"] != "ed940410-535c-4d5e-bfa3-af798671e93c" {
+		t.Errorf("id = %v, want ed940410-535c-4d5e-bfa3-af798671e93c", errObj["id"])
+	}
+
+	// Staying specified is accepted.
+	createNote(t, ts, tokenB, map[string]any{
+		"replyId": specified, "text": "keeping it private",
+		"visibility": "specified", "visibleUserIds": []string{idA},
+	})
+
+	// A followers-only note is invisible to a non-follower, visible to a
+	// follower.
+	followers := createNote(t, ts, tokenA, map[string]any{
+		"text": "followers only", "visibility": "followers",
+	})
+	resp, body = post(t, ts, "/api/notes/create", map[string]any{
+		"i": tokenC, "replyId": followers, "text": "not a follower",
+	})
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("reply by non-follower: status %d, body %v", resp.StatusCode, body)
+	}
+	errObj, _ = body["error"].(map[string]any)
+	if errObj["code"] != "CANNOT_REPLY_TO_AN_INVISIBLE_NOTE" {
+		t.Errorf("non-follower code = %v, want CANNOT_REPLY_TO_AN_INVISIBLE_NOTE", errObj["code"])
+	}
+
+	if resp, out := post(t, ts, "/api/following/create", map[string]any{
+		"i": tokenC, "userId": idA,
+	}); resp.StatusCode != http.StatusOK {
+		t.Fatalf("follow: status %d, body %v", resp.StatusCode, out)
+	}
+	createNote(t, ts, tokenC, map[string]any{"replyId": followers, "text": "now I can"})
+
+	// The author always sees their own note.
+	createNote(t, ts, tokenA, map[string]any{"replyId": followers, "text": "self reply"})
+
+	// A public target stays replyable by anyone.
+	open := createNote(t, ts, tokenA, map[string]any{"text": "open book"})
+	createNote(t, ts, tokenC, map[string]any{"replyId": open, "text": "sure"})
+}
+
+// Misskey rejects a reaction on a pure renote; a quote is reactable like any
+// other note (core/ReactionService.ts L115-118, notes/reactions/create.ts
+// cannotReactToRenote eaccdc08-ddef-43fe-908f-d108faad57f5).
+func TestCannotReactToPureRenote(t *testing.T) {
+	ts := newTestServer(t, "open")
+	_, tokenA := createUser(t, ts, uniqueName(t)+"a")
+	_, tokenB := createUser(t, ts, uniqueName(t)+"b")
+
+	original := createNote(t, ts, tokenA, map[string]any{"text": "original"})
+	pure := createNote(t, ts, tokenB, map[string]any{"renoteId": original})
+
+	resp, body := post(t, ts, "/api/notes/reactions/create", map[string]any{
+		"i": tokenA, "noteId": pure, "reaction": "👍",
+	})
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("react to pure renote: status %d, body %v", resp.StatusCode, body)
+	}
+	errObj, _ := body["error"].(map[string]any)
+	if errObj["code"] != "CANNOT_REACT_TO_RENOTE" {
+		t.Errorf("code = %v, want CANNOT_REACT_TO_RENOTE", errObj["code"])
+	}
+	if errObj["id"] != "eaccdc08-ddef-43fe-908f-d108faad57f5" {
+		t.Errorf("id = %v, want eaccdc08-ddef-43fe-908f-d108faad57f5", errObj["id"])
+	}
+
+	// The original and a quote stay reactable.
+	if resp, out := post(t, ts, "/api/notes/reactions/create", map[string]any{
+		"i": tokenA, "noteId": original, "reaction": "👍",
+	}); resp.StatusCode != http.StatusOK {
+		t.Errorf("react to the original: status %d, body %v", resp.StatusCode, out)
+	}
+	quote := createNote(t, ts, tokenB, map[string]any{"renoteId": original, "text": "a quote"})
+	if resp, out := post(t, ts, "/api/notes/reactions/create", map[string]any{
+		"i": tokenA, "noteId": quote, "reaction": "👍",
+	}); resp.StatusCode != http.StatusOK {
+		t.Errorf("react to a quote: status %d, body %v", resp.StatusCode, out)
+	}
+}
+
 func TestDriveFileLifecycle(t *testing.T) {
 	ts := newTestServer(t, "open")
 	_, token := createUser(t, ts, uniqueName(t))

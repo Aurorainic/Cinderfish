@@ -283,6 +283,168 @@ func TestNotificationsMarkAsReadDefaultsToTrue(t *testing.T) {
 	}
 }
 
+// MeDetailed carries the unread notification state
+// (packages/backend/src/core/entities/UserEntityService.ts L614-615):
+// unreadNotificationsCount is the number of unread rows and
+// hasUnreadNotification is unread > 0. The web shell badge and the
+// "mark all as read" button both read these.
+func TestIUnreadNotificationCount(t *testing.T) {
+	ts := newTestServer(t, "open")
+	nameA := uniqueName(t) + "a"
+	_, tokenA := createUser(t, ts, nameA)
+	_, tokenB := createUser(t, ts, uniqueName(t)+"b")
+
+	resp, me := post(t, ts, "/api/i", map[string]any{"i": tokenA})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("/api/i: status %d, body %v", resp.StatusCode, me)
+	}
+	if me["unreadNotificationsCount"] != float64(0) {
+		t.Errorf("unreadNotificationsCount = %v, want 0 for a fresh account", me["unreadNotificationsCount"])
+	}
+	if me["hasUnreadNotification"] != false {
+		t.Errorf("hasUnreadNotification = %v, want false for a fresh account", me["hasUnreadNotification"])
+	}
+
+	id := createNote(t, ts, tokenA, map[string]any{"text": "react to me"})
+	post(t, ts, "/api/notes/reactions/create", map[string]any{
+		"i": tokenB, "noteId": id, "reaction": "🎉",
+	})
+
+	resp, me = post(t, ts, "/api/i", map[string]any{"i": tokenA})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("/api/i after a reaction: status %d, body %v", resp.StatusCode, me)
+	}
+	if me["unreadNotificationsCount"] != float64(1) {
+		t.Errorf("unreadNotificationsCount = %v, want 1", me["unreadNotificationsCount"])
+	}
+	if me["hasUnreadNotification"] != true {
+		t.Errorf("hasUnreadNotification = %v, want true", me["hasUnreadNotification"])
+	}
+
+	if resp, body := post(t, ts, "/api/notifications/mark-all-as-read", map[string]any{"i": tokenA}); resp.StatusCode != http.StatusOK {
+		t.Fatalf("mark-all-as-read: status %d, body %v", resp.StatusCode, body)
+	}
+
+	resp, me = post(t, ts, "/api/i", map[string]any{"i": tokenA})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("/api/i after mark-all-as-read: status %d, body %v", resp.StatusCode, me)
+	}
+	if me["unreadNotificationsCount"] != float64(0) || me["hasUnreadNotification"] != false {
+		t.Errorf("unread state after mark-all-as-read = %v/%v, want 0/false",
+			me["unreadNotificationsCount"], me["hasUnreadNotification"])
+	}
+}
+
+// notificationsOfType filters a notification list to one type.
+func notificationsOfType(list []map[string]any, typ string) []map[string]any {
+	out := make([]map[string]any, 0, len(list))
+	for _, n := range list {
+		if n["type"] == typ {
+			out = append(out, n)
+		}
+	}
+	return out
+}
+
+// New notes notify their reply target and the author of the renoted note
+// (packages/backend/src/core/NoteCreateService.ts L858-892). The
+// notification carries the new note's id, and a reply that also mentions
+// its target yields one "reply" notification, not a reply and a mention
+// (NotificationManager.push, L84-107).
+func TestReplyAndRenoteNotifications(t *testing.T) {
+	ts := newTestServer(t, "open")
+	nameA := uniqueName(t) + "a"
+	_, tokenA := createUser(t, ts, nameA)
+	idB, tokenB := createUser(t, ts, uniqueName(t)+"b")
+
+	parent := createNote(t, ts, tokenA, map[string]any{"text": "parent"})
+
+	replyID := createNote(t, ts, tokenB, map[string]any{"text": "a reply", "replyId": parent})
+	replies := notificationsOfType(fetchNotifications(t, ts, tokenA, map[string]any{"markAsRead": false}), "reply")
+	if len(replies) != 1 {
+		t.Fatalf("reply notifications = %d, want 1", len(replies))
+	}
+	if replies[0]["noteId"] != replyID {
+		t.Errorf("reply notification noteId = %v, want %s", replies[0]["noteId"], replyID)
+	}
+	if replies[0]["userId"] != idB {
+		t.Errorf("reply notification userId = %v, want %s", replies[0]["userId"], idB)
+	}
+
+	// A reply that mentions the same user is still a single reply.
+	createNote(t, ts, tokenB, map[string]any{
+		"text": "@" + nameA + " mention and reply", "replyId": parent,
+	})
+	list := fetchNotifications(t, ts, tokenA, map[string]any{"markAsRead": false})
+	if got := len(notificationsOfType(list, "reply")); got != 2 {
+		t.Errorf("reply notifications = %d, want 2", got)
+	}
+	if got := len(notificationsOfType(list, "mention")); got != 0 {
+		t.Errorf("mention notifications = %d, want 0 (the reply reason wins)", got)
+	}
+
+	// Replying to one's own note notifies nobody.
+	createNote(t, ts, tokenA, map[string]any{"text": "talking to myself", "replyId": parent})
+	list = fetchNotifications(t, ts, tokenA, map[string]any{"markAsRead": false})
+	if got := len(notificationsOfType(list, "reply")); got != 2 {
+		t.Errorf("self reply produced a notification: reply count = %d, want 2", got)
+	}
+
+	// A pure renote notifies the original author as "renote".
+	renoteID := createNote(t, ts, tokenB, map[string]any{"renoteId": parent})
+	list = fetchNotifications(t, ts, tokenA, map[string]any{"markAsRead": false})
+	renotes := notificationsOfType(list, "renote")
+	if len(renotes) != 1 {
+		t.Fatalf("renote notifications = %d, want 1", len(renotes))
+	}
+	if renotes[0]["noteId"] != renoteID {
+		t.Errorf("renote notification noteId = %v, want %s", renotes[0]["noteId"], renoteID)
+	}
+
+	// A quote is its own type (misc/is-renote.ts isQuote).
+	quoteID := createNote(t, ts, tokenB, map[string]any{"renoteId": parent, "text": "quoting"})
+	list = fetchNotifications(t, ts, tokenA, map[string]any{"markAsRead": false})
+	quotes := notificationsOfType(list, "quote")
+	if len(quotes) != 1 {
+		t.Fatalf("quote notifications = %d, want 1", len(quotes))
+	}
+	if quotes[0]["noteId"] != quoteID {
+		t.Errorf("quote notification noteId = %v, want %s", quotes[0]["noteId"], quoteID)
+	}
+
+	// Renoting one's own note notifies nobody.
+	createNote(t, ts, tokenA, map[string]any{"renoteId": parent})
+	list = fetchNotifications(t, ts, tokenA, map[string]any{"markAsRead": false})
+	if got := len(notificationsOfType(list, "renote")); got != 1 {
+		t.Errorf("self renote produced a notification: renote count = %d, want 1", got)
+	}
+}
+
+// A specified note only notifies the users it is addressed to
+// (NotificationManager.notify, packages/backend/src/core/NoteCreateService.ts
+// L100-140), so a reply whose audience excludes its own target does not
+// notify that target.
+func TestNotificationRespectsNoteVisibility(t *testing.T) {
+	ts := newTestServer(t, "open")
+	_, tokenA := createUser(t, ts, uniqueName(t)+"a")
+	_, tokenB := createUser(t, ts, uniqueName(t)+"b")
+	idC, tokenC := createUser(t, ts, uniqueName(t)+"c")
+
+	parent := createNote(t, ts, tokenA, map[string]any{"text": "parent"})
+	createNote(t, ts, tokenB, map[string]any{
+		"replyId": parent, "text": "for c only",
+		"visibility": "specified", "visibleUserIds": []string{idC},
+	})
+
+	if got := fetchNotifications(t, ts, tokenA, map[string]any{"markAsRead": false}); len(got) != 0 {
+		t.Errorf("reply target got %d notifications for a note it cannot read: %v",
+			len(got), notificationTypesOf(got))
+	}
+	if got := fetchNotifications(t, ts, tokenC, map[string]any{"markAsRead": false}); len(got) != 0 {
+		t.Errorf("addressed bystander got %d notifications: %v", len(got), notificationTypesOf(got))
+	}
+}
+
 func TestNotificationsMarkAsReadOnlyTouchesReturnedTypes(t *testing.T) {
 	ts, tokenA := seedTwoNotificationTypes(t)
 

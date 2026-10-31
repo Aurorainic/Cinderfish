@@ -254,3 +254,45 @@ func TestNotificationMarkRead(t *testing.T) {
 		t.Errorf("MarkRead with no ids: %v", err)
 	}
 }
+
+// CreateForLocal mirrors Misskey's local-only notification fan-out
+// (core/NoteCreateService.ts L863/L884: a target with a host gets no
+// notification row; ActivityPub delivers its copy instead).
+func TestNotificationCreateForLocal(t *testing.T) {
+	f := newNotificationFixture(t)
+	ctx := context.Background()
+
+	remoteID := f.prefix + "-remote"
+	if _, err := f.pool.Exec(ctx,
+		`INSERT INTO users (id, username, username_lower, host) VALUES ($1, $2, lower($2), 'remote.example')`,
+		remoteID, remoteID); err != nil {
+		t.Fatalf("insert remote user: %v", err)
+	}
+
+	id, created, err := f.service().CreateForLocal(ctx, f.otherID, "reply", &f.readerID, nil, nil)
+	if err != nil {
+		t.Fatalf("CreateForLocal(local): %v", err)
+	}
+	if !created || id == "" {
+		t.Fatalf("CreateForLocal(local) = (%q, %v), want a created row", id, created)
+	}
+	if _, err := f.service().Get(ctx, id); err != nil {
+		t.Errorf("created notification is not readable: %v", err)
+	}
+
+	_, created, err = f.service().CreateForLocal(ctx, remoteID, "reply", &f.readerID, nil, nil)
+	if err != nil {
+		t.Fatalf("CreateForLocal(remote): %v", err)
+	}
+	if created {
+		t.Error("CreateForLocal recorded a notification for a remote user")
+	}
+	var count int
+	if err := f.pool.QueryRow(ctx,
+		`SELECT count(*) FROM notifications WHERE recipient_id = $1`, remoteID).Scan(&count); err != nil {
+		t.Fatalf("count remote notifications: %v", err)
+	}
+	if count != 0 {
+		t.Errorf("remote recipient has %d notification rows, want 0", count)
+	}
+}

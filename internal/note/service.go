@@ -115,10 +115,19 @@ var (
 	// can only be renoted by its author, and a specified note cannot be
 	// renoted at all (core/NoteCreateService.ts L352-356).
 	ErrCannotRenoteDueToVisibility = errors.New("note: renote target visibility forbids the renote")
-	ErrEmptyNote                   = errors.New("note: a note needs text, files or a poll")
-	ErrTextTooLong                 = errors.New("note: text is too long")
-	ErrInvalidVisibility           = errors.New("note: invalid visibility")
-	ErrPollExpired                 = errors.New("note: poll is already expired")
+	// Mirrors Misskey's cannotReplyToInvisibleNote: the reply target must
+	// be readable by the replier (core/entities/NoteEntityService.ts
+	// isVisibleForMe).
+	ErrCannotReplyToInvisibleNote = errors.New("note: reply target is not visible to the replier")
+	// Mirrors Misskey's
+	// cannotReplyToSpecifiedVisibilityNoteWithExtendedVisibility: a
+	// specified note may only be answered with another specified note, so
+	// its audience is never widened (core/NoteCreateService.ts L391-393).
+	ErrCannotWidenSpecifiedReply = errors.New("note: a specified note can only be answered by a specified note")
+	ErrEmptyNote                 = errors.New("note: a note needs text, files or a poll")
+	ErrTextTooLong               = errors.New("note: text is too long")
+	ErrInvalidVisibility         = errors.New("note: invalid visibility")
+	ErrPollExpired               = errors.New("note: poll is already expired")
 )
 
 // Create stores a new note.
@@ -160,6 +169,18 @@ func (s *Service) Create(ctx context.Context, p CreateParams) (*Note, error) {
 		}
 		if parent.IsPureRenote() {
 			return nil, ErrCannotReplyToPureRenote
+		}
+		// Misskey's order: existence, pure renote, visibility, then the
+		// specified-audience rule (core/NoteCreateService.ts L373-393).
+		visible, err := noteVisibleToTx(ctx, tx, parent, p.UserID)
+		if err != nil {
+			return nil, err
+		}
+		if !visible {
+			return nil, ErrCannotReplyToInvisibleNote
+		}
+		if parent.Visibility == VisibilitySpecified && p.Visibility != VisibilitySpecified {
+			return nil, ErrCannotWidenSpecifiedReply
 		}
 		replyUserID = &parent.UserID
 	}
@@ -298,6 +319,66 @@ func (s *Service) Get(ctx context.Context, id string) (*Note, error) {
 func getNoteTx(ctx context.Context, tx pgx.Tx, id string) (*Note, error) {
 	row := tx.QueryRow(ctx, noteSelect+` WHERE n.id = $1 AND n.deleted_at IS NULL`, id)
 	return scanNote(row)
+}
+
+// noteVisibleToTx reports whether userID may read n, mirroring Misskey's
+// NoteEntityService.isVisibleForMe
+// (core/entities/NoteEntityService.ts L294-344): a specified note is
+// visible to its author and its audience, a followers note to its author,
+// the user it replies to, the users it mentions and its author's
+// followers.
+func noteVisibleToTx(ctx context.Context, tx pgx.Tx, n *Note, userID string) (bool, error) {
+	switch n.Visibility {
+	case VisibilitySpecified:
+		if userID == n.UserID {
+			return true, nil
+		}
+		var addressed bool
+		if err := tx.QueryRow(ctx, `
+SELECT EXISTS (SELECT 1 FROM note_visibilities WHERE note_id = $1 AND visible_user_id = $2)
+`, n.ID, userID).Scan(&addressed); err != nil {
+			return false, fmt.Errorf("note: check specified audience: %w", err)
+		}
+		return addressed, nil
+
+	case VisibilityFollowers:
+		if userID == n.UserID {
+			return true, nil
+		}
+		if n.ReplyUserID != nil && *n.ReplyUserID == userID {
+			return true, nil
+		}
+		for _, mentioned := range n.Mentions {
+			if mentioned == userID {
+				return true, nil
+			}
+		}
+		var following bool
+		if err := tx.QueryRow(ctx, `
+SELECT EXISTS (SELECT 1 FROM followings WHERE followee_id = $1 AND follower_id = $2)
+`, n.UserID, userID).Scan(&following); err != nil {
+			return false, fmt.Errorf("note: check follow: %w", err)
+		}
+		if following {
+			return true, nil
+		}
+		// Two remote users' follow relationship is unknowable here, so
+		// upstream assumes it exists (NoteEntityService.ts L336-342).
+		if n.UserHost == nil || *n.UserHost == "" {
+			return false, nil
+		}
+		var viewerHost *string
+		if err := tx.QueryRow(ctx, `SELECT host FROM users WHERE id = $1`, userID).Scan(&viewerHost); err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return false, nil
+			}
+			return false, fmt.Errorf("note: check viewer host: %w", err)
+		}
+		return viewerHost != nil && *viewerHost != "", nil
+
+	default:
+		return true, nil
+	}
 }
 
 // noteSelect is the shared column list for loading notes. The table is

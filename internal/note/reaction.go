@@ -143,6 +143,26 @@ VALUES ($1, $2, $3, $4, $5, $6)
 	return id, nil
 }
 
+// CreateForLocal records a notification only when the recipient is a
+// local user, mirroring Misskey's local-only fan-out: a reply or renote
+// aimed at a remote note's author is delivered over ActivityPub instead
+// (core/NoteCreateService.ts L861-892). The boolean reports whether a row
+// was created, so the caller knows whether to announce it.
+func (s *NotificationService) CreateForLocal(ctx context.Context, recipientID, notifType string, notifierID, noteID *string, reaction *string) (string, bool, error) {
+	id := newID()
+	ct, err := s.pool.Exec(ctx, `
+INSERT INTO notifications (id, recipient_id, type, notifier_id, note_id, reaction)
+SELECT $1, u.id, $3, $4, $5, $6 FROM users u WHERE u.id = $2 AND u.host IS NULL
+`, id, recipientID, notifType, notifierID, noteID, reaction)
+	if err != nil {
+		return "", false, fmt.Errorf("note: create notification: %w", err)
+	}
+	if ct.RowsAffected() == 0 {
+		return "", false, nil
+	}
+	return id, true, nil
+}
+
 // Get loads one notification by id.
 func (s *NotificationService) Get(ctx context.Context, id string) (*Notification, error) {
 	var n Notification

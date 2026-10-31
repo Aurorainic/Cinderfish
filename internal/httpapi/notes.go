@@ -16,9 +16,12 @@ const (
 	errIDNoSuchReplyTarget     = "749ee0f6-d3da-459a-bf02-282e2da4292c"
 	errIDCannotReplyInvisible  = "b98980fa-3780-406c-a935-b6d0eeee10d1"
 	errIDCannotReplyPureRenote = "3ac74a84-8fd5-4bb0-870f-01804f82ce15"
-	errIDNoteTooLong           = "6d51c8a2-1e1e-4f7f-b1c9-9f5a0e2d0f3b"
-	errIDNoteEmpty             = "8f7d1c2e-2b1c-4a3e-9c5a-1e2d3c4b5a6f"
-	errIDNoSuchNote            = "24fcbfc6-2e37-42b6-8388-c29b3861a08d"
+	// CANNOT_REPLY_TO_SPECIFIED_VISIBILITY_NOTE_WITH_EXTENDED_VISIBILITY
+	errIDCannotReplySpecifiedExtended = "ed940410-535c-4d5e-bfa3-af798671e93c"
+	errIDNoteTooLong                  = "6d51c8a2-1e1e-4f7f-b1c9-9f5a0e2d0f3b"
+	errIDNoteEmpty                    = "8f7d1c2e-2b1c-4a3e-9c5a-1e2d3c4b5a6f"
+	errIDNoSuchNote                   = "24fcbfc6-2e37-42b6-8388-c29b3861a08d"
+	errIDCannotReactToRenote          = "eaccdc08-ddef-43fe-908f-d108faad57f5"
 )
 
 // handleNotesCreate implements POST /api/notes/create.
@@ -97,8 +100,8 @@ func (s *Server) handleNotesCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Notify the users the note is addressed to.
-	s.notifyMentioned(r, n, info.User.ID)
+	// Notify the users the note reaches.
+	s.notifyNoteCreated(r, n, info.User.ID)
 	// Fan the note out to the streaming timelines and main channels.
 	s.publishNoteCreated(n, info.User.ID)
 
@@ -108,20 +111,71 @@ func (s *Server) handleNotesCreate(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// notifyMentioned creates mention notifications.
-func (s *Server) notifyMentioned(r *http.Request, n *note.Note, actorID string) {
-	if len(n.Mentions) == 0 {
+// notifyNoteCreated queues the notifications a new note produces, in
+// Misskey's order and with its precedence: mentions first, then the reply
+// target, then the author of the renoted note, where a later non-mention
+// reason replaces an earlier mention of the same user
+// (core/NoteCreateService.ts NotificationManager, L66-160 and L858-892).
+// The note's author never notifies themselves, a specified note notifies
+// only its audience, and a remote recipient gets no row because
+// ActivityPub carries that copy.
+func (s *Server) notifyNoteCreated(r *http.Request, n *note.Note, actorID string) {
+	if s.notifications == nil {
 		return
 	}
-	for _, target := range n.Mentions {
-		if target == actorID {
+
+	reasons := make(map[string]string, len(n.Mentions)+2)
+	targets := make([]string, 0, len(n.Mentions)+2)
+	push := func(target, reason string) {
+		if target == "" || target == actorID {
+			return
+		}
+		if _, seen := reasons[target]; seen {
+			if reason != "mention" {
+				reasons[target] = reason
+			}
+			return
+		}
+		reasons[target] = reason
+		targets = append(targets, target)
+	}
+
+	for _, mentioned := range n.Mentions {
+		push(mentioned, "mention")
+	}
+	if n.ReplyID != nil && n.ReplyUserID != nil {
+		push(*n.ReplyUserID, "reply")
+	}
+	if n.RenoteID != nil && n.RenoteUserID != nil {
+		reason := "renote"
+		if n.IsQuote() {
+			reason = "quote"
+		}
+		push(*n.RenoteUserID, reason)
+	}
+	if len(targets) == 0 {
+		return
+	}
+
+	addressed := map[string]bool{}
+	if n.Visibility == note.VisibilitySpecified {
+		for _, id := range s.notes.VisibleUserIDs(r.Context(), n.ID) {
+			addressed[id] = true
+		}
+	}
+
+	for _, target := range targets {
+		if n.Visibility == note.VisibilitySpecified && !addressed[target] {
 			continue
 		}
-		notificationID, err := s.notifications.CreateReturningID(r.Context(), target, "mention", &actorID, &n.ID, nil)
-		if err != nil {
+		notificationID, created, err := s.notifications.CreateForLocal(
+			r.Context(), target, reasons[target], &actorID, &n.ID, nil)
+		if err != nil || !created {
 			continue
 		}
-		s.publishMentionEvent(n, target)
+		if reasons[target] == "mention" {
+			s.publishMentionEvent(n, target)
+		}
 		s.publishNotificationCreated(notificationID, target)
 	}
 }
@@ -148,6 +202,17 @@ func (s *Server) writeNoteError(w http.ResponseWriter, err error) {
 		writeAPIError(w, &APIError{
 			Message: "You can not reply to a pure Renote.", Code: "CANNOT_REPLY_TO_A_PURE_RENOTE",
 			ID: errIDCannotReplyPureRenote, Kind: "client", Status: http.StatusBadRequest,
+		})
+	case errors.Is(err, note.ErrCannotReplyToInvisibleNote):
+		writeAPIError(w, &APIError{
+			Message: "You cannot reply to an invisible Note.", Code: "CANNOT_REPLY_TO_AN_INVISIBLE_NOTE",
+			ID: errIDCannotReplyInvisible, Kind: "client", Status: http.StatusBadRequest,
+		})
+	case errors.Is(err, note.ErrCannotWidenSpecifiedReply):
+		writeAPIError(w, &APIError{
+			Message: "You cannot reply to a specified visibility note with extended visibility.",
+			Code:    "CANNOT_REPLY_TO_SPECIFIED_VISIBILITY_NOTE_WITH_EXTENDED_VISIBILITY",
+			ID:      errIDCannotReplySpecifiedExtended, Kind: "client", Status: http.StatusBadRequest,
 		})
 	case errors.Is(err, note.ErrCannotRenoteDueToVisibility):
 		writeAPIError(w, &APIError{
@@ -300,6 +365,16 @@ func (s *Server) handleNotesReactionsCreate(w http.ResponseWriter, r *http.Reque
 		writeAPIError(w, &APIError{
 			Message: "No such note.", Code: "NO_SUCH_NOTE",
 			ID: errIDNoSuchNote, Kind: "client", Status: http.StatusNotFound,
+		})
+		return
+	}
+
+	// Misskey refuses reactions on a pure renote: the reaction belongs to
+	// the renoted note (core/ReactionService.ts L115-118).
+	if n.IsPureRenote() {
+		writeAPIError(w, &APIError{
+			Message: "You cannot react to Renote.", Code: "CANNOT_REACT_TO_RENOTE",
+			ID: errIDCannotReactToRenote, Kind: "client", Status: http.StatusBadRequest,
 		})
 		return
 	}

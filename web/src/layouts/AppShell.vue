@@ -8,7 +8,7 @@ import WidgetsDrawer from "../components/widgets/WidgetsDrawer.vue";
 import { loadInstance } from "../stores/instance";
 import { refreshSession, session, signout } from "../stores/session";
 import { type ShellMode, setShellMode } from "../stores/shell";
-import { streaming } from "../stores/streaming";
+import { streaming, setUnreadNotifications } from "../stores/streaming";
 import { toggleTheme } from "../stores/theme";
 
 const props = withDefaults(defineProps<{ mode?: ShellMode }>(), { mode: "universal" });
@@ -36,6 +36,20 @@ onMounted(() => {
 watch(
   () => session.token,
   () => streaming.restart(),
+);
+
+// The unread badge lives in the shared streaming store. Seed it from the
+// session payload (/api/i carries unreadNotificationsCount and
+// hasUnreadNotification) so a cold load lands on the right number instead of
+// zero, and re-seed when the account changes. Live streaming events increment
+// the store from there.
+watch(
+  () => session.me?.id ?? "",
+  () => {
+    const count = session.me?.unreadNotificationsCount;
+    setUnreadNotifications(typeof count === "number" ? count : 0);
+  },
+  { immediate: true },
 );
 </script>
 

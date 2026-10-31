@@ -17,3 +17,10 @@ func (n *Note) IsPureRenote() bool {
 	}
 	return true
 }
+
+// IsQuote reports whether the note renotes another one and adds content of
+// its own (Misskey's isQuote in packages/backend/src/misc/is-renote.ts).
+// It selects the "quote" notification type over "renote".
+func (n *Note) IsQuote() bool {
+	return n.RenoteID != nil && !n.IsPureRenote()
+}
