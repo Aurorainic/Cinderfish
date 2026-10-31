@@ -17,12 +17,18 @@ const props = defineProps<{
   myReaction?: string;
   busy?: boolean;
   isMine?: boolean;
+  // Whether the displayed note may be renoted: Misskey allows public and
+  // home notes, and a followers note only for its author (the backend
+  // enforces CANNOT_RENOTE_DUE_TO_VISIBILITY). Specified notes are never
+  // renotable. False renders the locked disabled button like MkRenoteButton.
+  renotable?: boolean;
 }>();
 
 const emit = defineEmits<{
   reply: [];
   renote: [];
   react: [emoji: string];
+  quote: [];
   remove: [];
 }>();
 
@@ -142,9 +148,25 @@ defineExpose({ reply, react: onReact, renote, menu });
         <AppIcon name="reply" />
         <span v-if="note.repliesCount">{{ note.repliesCount }}</span>
       </button>
-      <button type="button" class="action" title="转贴" :disabled="busy" @click="renote">
+      <button
+        v-if="renotable !== false"
+        type="button"
+        class="action"
+        title="转贴"
+        :disabled="busy"
+        @click="renote"
+      >
         <AppIcon name="renote" />
         <span v-if="note.renoteCount">{{ note.renoteCount }}</span>
+      </button>
+      <button
+        v-else
+        type="button"
+        class="action"
+        title="此笔记的可见性不允许转贴"
+        disabled
+      >
+        <AppIcon name="lock" />
       </button>
       <button
         ref="reactButton"
@@ -160,6 +182,17 @@ defineExpose({ reply, react: onReact, renote, menu });
         <span v-if="likeOnly" class="star" aria-hidden="true">⭐</span>
         <AppIcon v-else name="heart" />
         <span v-if="reactionCount">{{ reactionCount }}</span>
+      </button>
+
+      <button
+        v-if="renotable !== false"
+        type="button"
+        class="action"
+        title="引用"
+        :disabled="busy"
+        @click="emit('quote')"
+      >
+        <AppIcon name="quote" />
       </button>
 
       <div class="tail">

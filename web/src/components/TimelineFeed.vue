@@ -3,6 +3,7 @@ import { computed, ref } from "vue";
 import { api } from "../api/client";
 import type { Note, TimelineParams } from "../api/types";
 import { isLoggedIn } from "../stores/session";
+import { openPostForm } from "../os";
 import AppIcon from "./AppIcon.vue";
 import PostForm from "./composer/PostForm.vue";
 import NoteItem from "./note/Note.vue";
@@ -68,6 +69,12 @@ function onDeleted(id: string) {
   feed.value?.remove(id);
 }
 
+// Replies go through the shared os.openPostForm dialog like everywhere else;
+// quotes are opened by Note.vue itself, so only the reply event is wired here.
+function onReply(note: Note) {
+  openPostForm({ reply: note });
+}
+
 function toNote(item: unknown): Note {
   return item as Note;
 }
@@ -96,7 +103,7 @@ function toNote(item: unknown): Note {
       :stream-filter="streamFilter"
     >
       <template #item="{ item }">
-        <NoteItem :note="toNote(item)" @deleted="onDeleted" />
+        <NoteItem :note="toNote(item)" @deleted="onDeleted" @reply="onReply" />
       </template>
       <template #empty>
         <div class="placeholder">

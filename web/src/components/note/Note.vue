@@ -5,6 +5,8 @@ import type { Note as NoteModel } from "../../api/types";
 import { focusNext, focusPrev } from "../../lib/focus-sibling";
 import { makeHotkey } from "../../lib/hotkeys";
 import { absoluteTime } from "../../lib/time";
+import { openPostForm } from "../../os";
+import { session } from "../../stores/session";
 import NoteContent from "./NoteContent.vue";
 import NoteFooter from "./NoteFooter.vue";
 import NoteHeader from "./NoteHeader.vue";
@@ -66,9 +68,25 @@ const accessibleLabel = computed(() => {
 const { reactions, myReaction, reactionCount, isMine, busy, notice, toggleReaction, renote, remove } =
   useNote(appearNote, computed(() => props.note));
 
+// Misskey's renote gate: public and home notes can be renoted by anyone, a
+// followers note only by its author, a specified note by nobody
+// (MkRenoteButton canRenote). The backend answers CANNOT_RENOTE_DUE_TO_
+// VISIBILITY otherwise; the lock here keeps the same rule visible.
+const renotable = computed(() => {
+  const visibility = appearNote.value.visibility;
+  return visibility === "public" || visibility === "home" || appearNote.value.userId === session.me?.id;
+});
+
 async function onRenote() {
   const created = await renote();
   if (created) emit("renoted", created);
+}
+
+// The fork keeps quote as its own footer action (MkQuoteButton) instead of
+// burying it in the renote button; it opens the composer with the renote
+// target, which the form submits as renoteId plus text.
+function onQuote() {
+  openPostForm({ renote: appearNote.value });
 }
 
 async function onRemove() {
@@ -145,9 +163,11 @@ onBeforeUnmount(() => root.value?.removeEventListener("keydown", hotkeys));
         :reaction-count="reactionCount"
         :busy="busy"
         :is-mine="isMine"
+        :renotable="renotable"
         @reply="emit('reply', appearNote)"
         @renote="onRenote"
         @react="toggleReaction"
+        @quote="onQuote"
         @remove="onRemove"
       />
 

@@ -178,13 +178,24 @@ function scrollToTop() {
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
-// Date separators: a centered small row is inserted whenever the UTC date of
-// two adjacent items differs. Items without createdAt never split the list.
+// Date separators: a centered small row is inserted whenever the local
+// calendar date of two adjacent items differs. The comparison uses the full
+// local year/month/day — the fork's MkDateSeparatedList (L33-37) compares
+// day-of-month only and merges different years, which is deliberately not
+// copied — and parses createdAt with Date so the grouping follows the
+// viewer's timezone instead of the UTC string prefix (a note written at
+// 00:30 local is October 31 locally even though its UTC string says 30).
+// Items without a parseable createdAt never split the list.
 type Row = { kind: "date"; key: string; label: string } | { kind: "item"; key: string; item: unknown };
 
-function dayOf(item: unknown): string {
+function localDayOf(item: unknown): string {
   const createdAt = (item as { createdAt?: unknown } | null)?.createdAt;
-  return typeof createdAt === "string" && /^\d{4}-\d{2}-\d{2}/.test(createdAt) ? createdAt.slice(0, 10) : "";
+  if (typeof createdAt !== "string") return "";
+  const date = new Date(createdAt);
+  if (Number.isNaN(date.getTime())) return "";
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${date.getFullYear()}-${month}-${day}`;
 }
 
 function dateLabel(day: string): string {
@@ -199,9 +210,12 @@ const rows = computed<Row[]>(() => {
   const out: Row[] = [];
   let prevDay = "";
   list.forEach((item, index) => {
-    const day = dayOf(item);
+    const day = localDayOf(item);
     if (day && prevDay && day !== prevDay) {
-      out.push({ kind: "date", key: `d-${day}-${index}`, label: dateLabel(day) });
+      // Keyed by the local date alone: a separator is only emitted when the
+      // day changes, so each date appears at most once and the key survives
+      // prepends and appends without shifting.
+      out.push({ kind: "date", key: `d-${day}`, label: dateLabel(day) });
     }
     if (day) prevDay = day;
     out.push({ kind: "item", key: idOf(item) || `row-${index}`, item });
