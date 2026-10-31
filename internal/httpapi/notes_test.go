@@ -717,6 +717,52 @@ func TestCannotReactToPureRenote(t *testing.T) {
 	}
 }
 
+// A renote never widens its target's audience: Misskey rewrites the
+// renote's visibility from the target (core/NoteCreateService.ts L499-527)
+// and copies localOnly, so a home note renoted by a client that sent the
+// default public stays home.
+func TestRenoteInheritsTargetVisibility(t *testing.T) {
+	ts := newTestServer(t, "open")
+	_, tokenA := createUser(t, ts, uniqueName(t)+"a")
+	_, tokenB := createUser(t, ts, uniqueName(t)+"b")
+
+	showVisibility := func(id string) (any, any) {
+		t.Helper()
+		resp, body := post(t, ts, "/api/notes/show", map[string]any{"noteId": id})
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("show %s: status %d, body %v", id, resp.StatusCode, body)
+		}
+		return body["visibility"], body["localOnly"]
+	}
+
+	home := createNote(t, ts, tokenA, map[string]any{"text": "home note", "visibility": "home"})
+	homeRenote := createNote(t, ts, tokenB, map[string]any{"renoteId": home})
+	if vis, _ := showVisibility(homeRenote); vis != "home" {
+		t.Errorf("renote of a home note visibility = %v, want home", vis)
+	}
+
+	// The author may renote their own followers note; the renote stays
+	// followers-only.
+	followers := createNote(t, ts, tokenA, map[string]any{"text": "followers only", "visibility": "followers"})
+	ownRenote := createNote(t, ts, tokenA, map[string]any{"renoteId": followers})
+	if vis, _ := showVisibility(ownRenote); vis != "followers" {
+		t.Errorf("renote of an own followers note visibility = %v, want followers", vis)
+	}
+
+	// localOnly is inherited too.
+	local := createNote(t, ts, tokenA, map[string]any{"text": "local only", "localOnly": true})
+	localRenote := createNote(t, ts, tokenB, map[string]any{"renoteId": local})
+	if _, localOnly := showVisibility(localRenote); localOnly != true {
+		t.Errorf("renote of a local-only note localOnly = %v, want true", localOnly)
+	}
+
+	// A quote inherits the same way.
+	quote := createNote(t, ts, tokenB, map[string]any{"renoteId": home, "text": "quoting"})
+	if vis, _ := showVisibility(quote); vis != "home" {
+		t.Errorf("quote of a home note visibility = %v, want home", vis)
+	}
+}
+
 func TestDriveFileLifecycle(t *testing.T) {
 	ts := newTestServer(t, "open")
 	_, token := createUser(t, ts, uniqueName(t))

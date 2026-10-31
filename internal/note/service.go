@@ -204,6 +204,23 @@ func (s *Service) Create(ctx context.Context, p CreateParams) (*Note, error) {
 		if target.Visibility == VisibilitySpecified {
 			return nil, ErrCannotRenoteDueToVisibility
 		}
+		// A renote never widens its target's audience
+		// (core/NoteCreateService.ts L499-527): home stays at most home,
+		// an own followers note stays at most followers, and a local-only
+		// note keeps a renote local.
+		switch target.Visibility {
+		case VisibilityHome:
+			if p.Visibility == VisibilityPublic {
+				p.Visibility = VisibilityHome
+			}
+		case VisibilityFollowers:
+			if p.Visibility == VisibilityPublic || p.Visibility == VisibilityHome {
+				p.Visibility = VisibilityFollowers
+			}
+		}
+		if target.LocalOnly {
+			p.LocalOnly = true
+		}
 		renoteUserID = &target.UserID
 		renoteUserHost = target.UserHost
 	}
