@@ -141,8 +141,8 @@
 | `web/src/layouts/AppShell.vue` | `fork/ui/universal.vue` | 三区模板不变；断点复核按 §12；抽屉/底部条与 fork 的 menuDrawer/widgetsDrawer 对应 |
 | `web/src/components/layout/Sidebar.vue`（新建） | `fork/ui/_common_/navbar.vue` | 只消费 `web/src/nav.ts` 导出；宽度 250/80 两档、≤1279 图标态；不含 fork 的 `MkLaunchPad`"更多"机制 |
 | `web/src/components/layout/MobileSidebar.vue`（新建） | `fork/ui/_common_/navbar-for-mobile.vue` | 抽屉 + 底栏共用同一 nav 注册表；路由变化即关闭（对应 `universal.vue:250–253`） |
-| `web/src/components/layout/WidgetPanel.vue`（新建） | `fork/ui/universal.widgets.vue` + `MkWidgets` | 渲染既有 `web/src/widgets/registry.ts` 的 stack；≤1099 隐藏；编辑态沿用上下移按钮（不引入拖拽库） |
-| `web/src/components/ui/PageHeader.vue`（改造） | `fork/components/global/MkPageHeader.vue` | 保留计划接口：`title`/`back`/`tabs` + `#actions` slot（fork 用 `actions` 数组，Cinderfish 用 slot，二选一以计划为准——slot 保留）；补齐：tab 高亮条 `getBoundingClientRect` 精确测量、>3 tab 折叠、窄容器 `<500`、≤1099 动作标签隐藏 |
+| `web/src/components/layout/WidgetPanel.vue`（新建） | `fork/ui/universal.widgets.vue` + `MkWidgets` | 渲染既有 `web/src/widgets/registry.ts` 的 stack；≤1090 隐藏；编辑态沿用上下移按钮（不引入拖拽库） |
+| `web/src/components/ui/PageHeader.vue`（改造） | `fork/components/global/MkPageHeader.vue` | 保留计划接口：`title`/`back`/`tabs` + `#actions` slot（fork 用 `actions` 数组，Cinderfish 用 slot，二选一以计划为准——slot 保留）；补齐：tab 高亮条 `getBoundingClientRect` 精确测量、>3 tab 折叠、窄容器 `<500`、≤1090 动作标签隐藏 |
 | `web/src/nav.ts` + `web/src/stores/nav.ts` | `fork/navbar.ts` + `defaultStore.state.menu` | 已是单一注册表（`NavKey`/`NAV_ITEM_DEFS`/badge/show）；Task 3 补 `requiresAuth`/`mobile` 字段与路由守卫 |
 | `web/src/components/TimelineFeed.vue` | `fork/components/MkTimeline.vue` | 保留 `source → api + streaming` 双映射结构；Cinderfish 仅支持 `local/global/hybrid/home` 四源（无 social/recommended/antenna/list/channel） |
 | `web/src/components/ui/PagedFeed.vue` | `fork/components/MkPagination.vue` + `MkNotes.vue` | 保留（fetcher 注入式设计已等价）；补日期分组与 `prepend` 队列语义对齐 fork |
