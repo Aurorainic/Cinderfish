@@ -21,7 +21,9 @@ const (
 	errIDNoteTooLong                  = "6d51c8a2-1e1e-4f7f-b1c9-9f5a0e2d0f3b"
 	errIDNoteEmpty                    = "8f7d1c2e-2b1c-4a3e-9c5a-1e2d3c4b5a6f"
 	errIDNoSuchNote                   = "24fcbfc6-2e37-42b6-8388-c29b3861a08d"
-	errIDCannotReactToRenote          = "eaccdc08-ddef-43fe-908f-d108faad57f5"
+	// notes/reactions/create has its own NO_SUCH_NOTE id.
+	errIDNoSuchNoteReaction  = "033d0620-5bfe-4027-965d-980b0c85a3ea"
+	errIDCannotReactToRenote = "eaccdc08-ddef-43fe-908f-d108faad57f5"
 )
 
 // handleNotesCreate implements POST /api/notes/create.
@@ -115,7 +117,7 @@ func (s *Server) handleNotesCreate(w http.ResponseWriter, r *http.Request) {
 // Misskey's order and with its precedence: mentions first, then the reply
 // target, then the author of the renoted note, where a later non-mention
 // reason replaces an earlier mention of the same user
-// (core/NoteCreateService.ts NotificationManager, L66-160 and L858-892).
+// (core/NoteCreateService.ts NotificationManager, L64-162 and L856-895).
 // The note's author never notifies themselves, a specified note notifies
 // only its audience, and a remote recipient gets no row because
 // ActivityPub carries that copy.
@@ -364,13 +366,13 @@ func (s *Server) handleNotesReactionsCreate(w http.ResponseWriter, r *http.Reque
 	if err != nil {
 		writeAPIError(w, &APIError{
 			Message: "No such note.", Code: "NO_SUCH_NOTE",
-			ID: errIDNoSuchNote, Kind: "client", Status: http.StatusNotFound,
+			ID: errIDNoSuchNoteReaction, Kind: "client", Status: http.StatusNotFound,
 		})
 		return
 	}
 
 	// Misskey refuses reactions on a pure renote: the reaction belongs to
-	// the renoted note (core/ReactionService.ts L115-118).
+	// the renoted note (core/ReactionService.ts L121-123).
 	if n.IsPureRenote() {
 		writeAPIError(w, &APIError{
 			Message: "You cannot react to Renote.", Code: "CANNOT_REACT_TO_RENOTE",

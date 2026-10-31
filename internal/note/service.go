@@ -122,7 +122,7 @@ var (
 	// Mirrors Misskey's
 	// cannotReplyToSpecifiedVisibilityNoteWithExtendedVisibility: a
 	// specified note may only be answered with another specified note, so
-	// its audience is never widened (core/NoteCreateService.ts L391-393).
+	// its audience is never widened (core/NoteCreateService.ts L388-390).
 	ErrCannotWidenSpecifiedReply = errors.New("note: a specified note can only be answered by a specified note")
 	ErrEmptyNote                 = errors.New("note: a note needs text, files or a poll")
 	ErrTextTooLong               = errors.New("note: text is too long")
@@ -171,7 +171,7 @@ func (s *Service) Create(ctx context.Context, p CreateParams) (*Note, error) {
 			return nil, ErrCannotReplyToPureRenote
 		}
 		// Misskey's order: existence, pure renote, visibility, then the
-		// specified-audience rule (core/NoteCreateService.ts L373-393).
+		// specified-audience rule (core/NoteCreateService.ts L374-406).
 		visible, err := noteVisibleToTx(ctx, tx, parent, p.UserID)
 		if err != nil {
 			return nil, err
@@ -181,6 +181,24 @@ func (s *Service) Create(ctx context.Context, p CreateParams) (*Note, error) {
 		}
 		if parent.Visibility == VisibilitySpecified && p.Visibility != VisibilitySpecified {
 			return nil, ErrCannotWidenSpecifiedReply
+		}
+		// A reply never widens its target's audience either
+		// (core/NoteCreateService.ts L544-573): a public reply to a home
+		// note becomes home, a public or home reply to a followers note
+		// becomes followers, and a local-only target keeps the reply
+		// local.
+		switch parent.Visibility {
+		case VisibilityHome:
+			if p.Visibility == VisibilityPublic {
+				p.Visibility = VisibilityHome
+			}
+		case VisibilityFollowers:
+			if p.Visibility == VisibilityPublic || p.Visibility == VisibilityHome {
+				p.Visibility = VisibilityFollowers
+			}
+		}
+		if parent.LocalOnly {
+			p.LocalOnly = true
 		}
 		replyUserID = &parent.UserID
 	}
@@ -205,7 +223,7 @@ func (s *Service) Create(ctx context.Context, p CreateParams) (*Note, error) {
 			return nil, ErrCannotRenoteDueToVisibility
 		}
 		// A renote never widens its target's audience
-		// (core/NoteCreateService.ts L499-527): home stays at most home,
+		// (core/NoteCreateService.ts L499-530): home stays at most home,
 		// an own followers note stays at most followers, and a local-only
 		// note keeps a renote local.
 		switch target.Visibility {
@@ -340,7 +358,7 @@ func getNoteTx(ctx context.Context, tx pgx.Tx, id string) (*Note, error) {
 
 // noteVisibleToTx reports whether userID may read n, mirroring Misskey's
 // NoteEntityService.isVisibleForMe
-// (core/entities/NoteEntityService.ts L294-344): a specified note is
+// (core/entities/NoteEntityService.ts L308-359): a specified note is
 // visible to its author and its audience, a followers note to its author,
 // the user it replies to, the users it mentions and its author's
 // followers.
@@ -380,7 +398,7 @@ SELECT EXISTS (SELECT 1 FROM followings WHERE followee_id = $1 AND follower_id =
 			return true, nil
 		}
 		// Two remote users' follow relationship is unknowable here, so
-		// upstream assumes it exists (NoteEntityService.ts L336-342).
+		// upstream assumes it exists (NoteEntityService.ts L347-354).
 		if n.UserHost == nil || *n.UserHost == "" {
 			return false, nil
 		}

@@ -284,7 +284,7 @@ func TestNotificationsMarkAsReadDefaultsToTrue(t *testing.T) {
 }
 
 // MeDetailed carries the unread notification state
-// (packages/backend/src/core/entities/UserEntityService.ts L614-615):
+// (packages/backend/src/core/entities/UserEntityService.ts L612 and L614):
 // unreadNotificationsCount is the number of unread rows and
 // hasUnreadNotification is unread > 0. The web shell badge and the
 // "mark all as read" button both read these.
@@ -347,10 +347,10 @@ func notificationsOfType(list []map[string]any, typ string) []map[string]any {
 }
 
 // New notes notify their reply target and the author of the renoted note
-// (packages/backend/src/core/NoteCreateService.ts L858-892). The
+// (packages/backend/src/core/NoteCreateService.ts L856-895). The
 // notification carries the new note's id, and a reply that also mentions
 // its target yields one "reply" notification, not a reply and a mention
-// (NotificationManager.push, L84-107).
+// (NotificationManager.push, L85-103).
 func TestReplyAndRenoteNotifications(t *testing.T) {
 	ts := newTestServer(t, "open")
 	nameA := uniqueName(t) + "a"
@@ -422,7 +422,7 @@ func TestReplyAndRenoteNotifications(t *testing.T) {
 
 // A specified note only notifies the users it is addressed to
 // (NotificationManager.notify, packages/backend/src/core/NoteCreateService.ts
-// L100-140), so a reply whose audience excludes its own target does not
+// L105-142), so a reply whose audience excludes its own target does not
 // notify that target.
 func TestNotificationRespectsNoteVisibility(t *testing.T) {
 	ts := newTestServer(t, "open")

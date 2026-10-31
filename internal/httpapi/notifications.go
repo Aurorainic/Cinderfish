@@ -21,7 +21,7 @@ func (s *Server) markAllNotificationsRead(ctx context.Context, userID string) er
 }
 
 // applyUnreadNotifications fills the MeDetailed unread state from the
-// notification table (core/entities/UserEntityService.ts L614-615):
+// notification table (core/entities/UserEntityService.ts L612 and L614):
 // unreadNotificationsCount is the number of unread rows and
 // hasUnreadNotification says whether there are any. The shell badge and
 // the notifications page's "mark all as read" button read both.

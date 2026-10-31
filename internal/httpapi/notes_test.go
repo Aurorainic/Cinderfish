@@ -363,6 +363,23 @@ func TestReactions(t *testing.T) {
 	if body["reactionCount"] != float64(0) {
 		t.Errorf("reactionCount after delete = %v, want 0", body["reactionCount"])
 	}
+
+	// The endpoint has its own NO_SUCH_NOTE id
+	// (notes/reactions/create.ts 033d0620-5bfe-4027-965d-980b0c85a3ea),
+	// not the one notes/show uses.
+	resp, body = post(t, ts, "/api/notes/reactions/create", map[string]any{
+		"i": tokenB, "noteId": "no-such-note", "reaction": "👍",
+	})
+	if resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("reactions/create on an unknown note: status %d, body %v", resp.StatusCode, body)
+	}
+	errObj, _ := body["error"].(map[string]any)
+	if errObj["code"] != "NO_SUCH_NOTE" {
+		t.Errorf("code = %v, want NO_SUCH_NOTE", errObj["code"])
+	}
+	if errObj["id"] != "033d0620-5bfe-4027-965d-980b0c85a3ea" {
+		t.Errorf("id = %v, want 033d0620-5bfe-4027-965d-980b0c85a3ea", errObj["id"])
+	}
 }
 
 func TestReactionCreatesNotification(t *testing.T) {
@@ -591,8 +608,8 @@ func TestSpecifiedVisibility(t *testing.T) {
 
 // Misskey refuses a reply the replier could not read and refuses to widen
 // a specified note's audience
-// (core/NoteCreateService.ts L373-393, core/entities/NoteEntityService.ts
-// L294-344): a reply target invisible to the replier is
+// (core/NoteCreateService.ts L374-406, core/entities/NoteEntityService.ts
+// L308-359): a reply target invisible to the replier is
 // CANNOT_REPLY_TO_AN_INVISIBLE_NOTE, and replying to a specified note with
 // any other visibility is
 // CANNOT_REPLY_TO_SPECIFIED_VISIBILITY_NOTE_WITH_EXTENDED_VISIBILITY.
@@ -679,7 +696,7 @@ func TestReplyTargetVisibility(t *testing.T) {
 }
 
 // Misskey rejects a reaction on a pure renote; a quote is reactable like any
-// other note (core/ReactionService.ts L115-118, notes/reactions/create.ts
+// other note (core/ReactionService.ts L121-123, notes/reactions/create.ts
 // cannotReactToRenote eaccdc08-ddef-43fe-908f-d108faad57f5).
 func TestCannotReactToPureRenote(t *testing.T) {
 	ts := newTestServer(t, "open")
@@ -718,7 +735,7 @@ func TestCannotReactToPureRenote(t *testing.T) {
 }
 
 // A renote never widens its target's audience: Misskey rewrites the
-// renote's visibility from the target (core/NoteCreateService.ts L499-527)
+// renote's visibility from the target (core/NoteCreateService.ts L499-530)
 // and copies localOnly, so a home note renoted by a client that sent the
 // default public stays home.
 func TestRenoteInheritsTargetVisibility(t *testing.T) {
@@ -760,6 +777,83 @@ func TestRenoteInheritsTargetVisibility(t *testing.T) {
 	quote := createNote(t, ts, tokenB, map[string]any{"renoteId": home, "text": "quoting"})
 	if vis, _ := showVisibility(quote); vis != "home" {
 		t.Errorf("quote of a home note visibility = %v, want home", vis)
+	}
+}
+
+// A reply never widens its target's audience: Misskey narrows a reply's
+// visibility from the replied-to note and copies its local-only flag
+// (core/NoteCreateService.ts L544-573), so a public reply to a home note
+// stays home and a public reply to a followers-only note stays
+// followers-only.
+func TestReplyInheritsTargetVisibility(t *testing.T) {
+	// The followers case needs following/create, which only runs with the
+	// federation store attached.
+	ts := newFederationServer(t, "public").ts
+	_, tokenA := createUser(t, ts, uniqueName(t)+"a")
+	idA := ""
+	_, tokenB := createUser(t, ts, uniqueName(t)+"b")
+
+	show := func(id string) (any, any) {
+		t.Helper()
+		resp, body := post(t, ts, "/api/notes/show", map[string]any{"noteId": id})
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("show %s: status %d, body %v", id, resp.StatusCode, body)
+		}
+		return body["visibility"], body["localOnly"]
+	}
+
+	home := createNote(t, ts, tokenA, map[string]any{"text": "home note", "visibility": "home"})
+	homeReply := createNote(t, ts, tokenB, map[string]any{"replyId": home, "text": "public answer"})
+	if vis, _ := show(homeReply); vis != "home" {
+		t.Errorf("public reply to a home note visibility = %v, want home", vis)
+	}
+
+	// The author id is only needed for the follow below.
+	resp, me := post(t, ts, "/api/i", map[string]any{"i": tokenA})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("/api/i: status %d, body %v", resp.StatusCode, me)
+	}
+	idA, _ = me["id"].(string)
+
+	followers := createNote(t, ts, tokenA, map[string]any{"text": "followers only", "visibility": "followers"})
+	if resp, out := post(t, ts, "/api/following/create", map[string]any{
+		"i": tokenB, "userId": idA,
+	}); resp.StatusCode != http.StatusOK {
+		t.Fatalf("follow: status %d, body %v", resp.StatusCode, out)
+	}
+	followersReply := createNote(t, ts, tokenB, map[string]any{"replyId": followers, "text": "follower answer"})
+	if vis, _ := show(followersReply); vis != "followers" {
+		t.Errorf("public reply to a followers note visibility = %v, want followers", vis)
+	}
+
+	// An explicitly narrower visibility is kept as is.
+	narrow := createNote(t, ts, tokenB, map[string]any{
+		"replyId": home, "text": "already narrow", "visibility": "followers",
+	})
+	if vis, _ := show(narrow); vis != "followers" {
+		t.Errorf("followers reply to a home note visibility = %v, want followers", vis)
+	}
+
+	// The same visibility stays.
+	equal := createNote(t, ts, tokenB, map[string]any{
+		"replyId": home, "text": "home answer", "visibility": "home",
+	})
+	if vis, _ := show(equal); vis != "home" {
+		t.Errorf("home reply to a home note visibility = %v, want home", vis)
+	}
+
+	// A public target keeps the reply public.
+	public := createNote(t, ts, tokenA, map[string]any{"text": "public note"})
+	publicReply := createNote(t, ts, tokenB, map[string]any{"replyId": public, "text": "still public"})
+	if vis, _ := show(publicReply); vis != "public" {
+		t.Errorf("reply to a public note visibility = %v, want public", vis)
+	}
+
+	// localOnly is inherited too.
+	local := createNote(t, ts, tokenA, map[string]any{"text": "local only", "localOnly": true})
+	localReply := createNote(t, ts, tokenB, map[string]any{"replyId": local, "text": "local answer"})
+	if _, localOnly := show(localReply); localOnly != true {
+		t.Errorf("reply to a local-only note localOnly = %v, want true", localOnly)
 	}
 }
 

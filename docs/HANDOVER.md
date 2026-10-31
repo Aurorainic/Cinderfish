@@ -482,31 +482,34 @@ pnpm build    # 先 vue-tsc --noEmit，再输出 web/dist
 
 | 组 | 定义 | 条数 |
 |----|------|------|
-| **(a) 已实现** | 上游有契约、现有数据模型直接支撑、且改动小而自洽 | 5 |
-| **(a) 未实现** | 上游有契约、数据也够，但消费端是新页面/新交互，或需要一次跨端点的读路径整改 | 16 |
+| **(a) 已实现** | 上游有契约、现有数据模型直接支撑、且改动小而自洽 | 6 |
+| **(a) 未实现** | 上游有契约、数据也够，但消费端是新页面/新交互，或需要一次跨端点的读路径整改 | 15 |
 | **(b) 需 schema/数据模型** | 上游有契约，但缺表、缺列，或需要新的后台任务（媒体清理、联邦投递、排行数据） | 12 |
 | **(c) 上游没有对应** | Misskey API 里不存在，只能是客户端行为或明确不在范围 | 6 |
 
-#### 11.15.2 (a) 已实现（五项，均先写失败测试）
+#### 11.15.2 (a) 已实现（六项，均先写失败测试）
 
 **1. MeDetailed 的未读通知状态**
-- 上游：`core/entities/UserEntityService.ts` L614-615（`hasUnreadNotification`、`unreadNotificationsCount`）、`models/json-schema/user.ts` L572。
+- 上游：`core/entities/UserEntityService.ts` L612（`hasUnreadNotification`）与 L614（`unreadNotificationsCount`）、`models/json-schema/user.ts` L572。
 - 请求/响应：`POST /api/i`、`/api/i/update`、`/api/i/pin`、`/api/i/unpin` 的响应里，`unreadNotificationsCount` 为未读行数、`hasUnreadNotification` 为 `count > 0`。
 - 持久化：`notifications` 表 `WHERE recipient_id = $1 AND is_read = FALSE`，复用已有的 `NotificationService.UnreadCount`。
 - 前端消费：`layouts/AppShell.vue` 在会话就绪时用 `setUnreadNotifications` 播种 `stores/streaming.ts` 的 `unreadNotifications`；`nav.ts` 的 `UNREAD_SOURCES` 与侧栏/底栏徽标、`NotificationsView`/`widgets/NotificationsWidget`/`settings/NotificationSettings` 的「全部标为已读」按钮都读它。
 - 测试：`internal/httpapi/notifications_test.go` `TestIUnreadNotificationCount`（新账号 0/false → 他人反应后 1/true → `mark-all-as-read` 后 0/false）。修复前红：`unreadNotificationsCount = 0, want 1`。
 - 有意保留：`hasUnreadNotification` 是布尔投影而非"最近已读游标"；上游同一字段也是投影，行为一致。
 
-**2. 回复目标的可见性**
-- 上游：`core/NoteCreateService.ts` L373-393（顺序：存在 → 纯转贴 → `isVisibleForMe` → specified 扩权）与 `core/entities/NoteEntityService.ts` L294-344（`isVisibleForMe` 规则）；错误表在 `endpoints/notes/create.ts`。
+**2. 回复目标的可见性与回复的受众收敛**
+- 上游：`core/NoteCreateService.ts` L374-406（顺序：存在 → 纯转贴 → `isVisibleForMe` → specified 扩权）与 `core/entities/NoteEntityService.ts` L308-359（`isVisibleForMe` 规则）；错误表在 `endpoints/notes/create.ts`。
 - 请求/响应：`POST /api/notes/create { replyId, visibility, … }`；错误 `400 CANNOT_REPLY_TO_AN_INVISIBLE_NOTE` / `b98980fa-3780-406c-a935-b6d0eeee10d1`，`400 CANNOT_REPLY_TO_SPECIFIED_VISIBILITY_NOTE_WITH_EXTENDED_VISIBILITY` / `ed940410-535c-4d5e-bfa3-af798671e93c`。
 - 持久化：`notes.visibility`、`note_visibilities.visible_user_id`、`followings(followee_id, follower_id)`、`notes.mentions`/`reply_user_id`；远程作者→远程读者的"假设互相关注"分支按 `notes.user_host` + `users.host` 还原（`internal/note/service.go` `noteVisibleToTx`）。
 - 前端消费：`components/composer/PostForm.vue` 的回复提交、`NoteFooter` 的回复按钮；错误信封经 `api/client.ts` 的 `ApiError` 直接展示 `message`。
 - 测试：`internal/httpapi/notes_test.go` `TestReplyTargetVisibility`（未列入 specified 名单的人被拒、被列入者不能把可见性放宽、followers 笔记在关注前后分别为拒/允、作者本人始终可回、公开笔记仍可回）。修复前红：`reply by unaddressed user: status 200`。
+- **回复的受众收敛**（Fix round 1 补上，reviewer I1）：上游在 `core/NoteCreateService.ts` L544-573 于上述检查之后再收敛回复的可见性——public 回复 home 笔记 → home，public/home 回复 followers 笔记 → followers，`reply.localOnly` 让回复也 `localOnly`。`internal/note/service.go` 的 Create 现在照同一顺序收尾（纯转贴检查 → 可见性 → specified 扩权 → 收敛），写库前改写 `p.Visibility`/`p.LocalOnly`。这条此前缺失：**关注者可以在编辑器里选 public 回复 followers 笔记，回复被存成公开**，而 `packNoteDetail` 会把父帖内容嵌进这条更宽可见的回复里。
+- 测试（先红后绿）：`TestReplyInheritsTargetVisibility`——public 回复 home → home、public 回复 followers → followers、localOnly 继承、显式更窄（followers 回复 home）保持、同宽（home 回复 home）保持、public 笔记回复仍 public。修复前红：`public reply to a home note visibility = public, want home`（另两条同理）。
+- composer 决策（保持不动，记录理由）：Iceshrimp 的 `MkPostForm.vue` L479-496 会在回复时把可见性预置为父帖的取值（并对 specified 拉取收件人）。Cinderfish 的 `PostForm` 没有按用户保存的默认可见性，`specified` 收件人是一行手填 handle 而不是 id 集合，照抄需要额外的 users/show 反查并把父帖受众回填到输入框；reviewer 明确「服务端收敛是契约、composer 提示可选」。本波次只做服务端收敛，composer 仍显示用户选的可见性，实际落库更窄——记录为已知 UX 偏差（不是契约偏差）。
 - 未覆盖：block 检查（`blocks` 表存在但本波次未接）。
 
 **3. 回复 / 转贴 / 引用通知**
-- 上游：`core/NoteCreateService.ts` 的 `NotificationManager`（L66-160：自不通知、mention 被后续 reply/renote 覆盖、specified 只通知名单内、followers 不过滤）与创建点 L858-892（`reply`、`renote`/`quote`）。
+- 上游：`core/NoteCreateService.ts` 的 `NotificationManager`（L64-162；`push` L85-103、`notify` L105-162：自不通知、mention 被后续 reply/renote 覆盖、specified 只通知名单内、followers 不过滤）与创建点 L856-895（`reply` L861-877、`renote`/`quote` L879-892）。
 - 请求/响应：`POST /api/notes/create` 的副作用（无新增请求字段）；写入的通知 `type ∈ {reply, renote, quote}`、`note_id` = 新建笔记、`notifier_id` = 作者。
 - 持久化：`notifications(type, notifier_id, note_id)`；收件人必须是本地用户（`users.host IS NULL`，`NotificationService.CreateForLocal`），远程收件人由 ActivityPub 投递。
 - 前端消费：`components/NotificationItem.vue` 已有 `reply`/`renote`/`quote` 三套中文文案与图标，通知页「转贴」tab 用 `includeTypes: ["renote"]`。
@@ -514,14 +517,15 @@ pnpm build    # 先 vue-tsc --noEmit，再输出 web/dist
 - 已知偏差：上游按可见性给 followers 通知不过滤（上游 TODO 亦如此）；「转贴」tab 只查 `renote`，引用通知落在「全部」里（客户端 tab 未扩，记录为后续项）。
 
 **4. 纯转贴不可反应**
-- 上游：`core/ReactionService.ts` L115-118；错误表在 `endpoints/notes/reactions/create.ts`。
+- 上游：`core/ReactionService.ts` L121-123；错误表在 `endpoints/notes/reactions/create.ts`。
 - 请求/响应：`POST /api/notes/reactions/create` 对纯转贴返回 `400 CANNOT_REACT_TO_RENOTE` / `eaccdc08-ddef-43fe-908f-d108faad57f5`。
 - 持久化：判定用 `internal/note/renote.go` 的 `IsPureRenote`（`renote_id` 存在且 text/cw/poll/reply/files 都为空）；引用（quote）照旧可反应。
 - 前端消费：`components/note/use-note.ts` 已把反应目标指向被转贴笔记，纯转贴本身不渲染可点的反应条。
 - 测试：`TestCannotReactToPureRenote`（纯转贴 400，原笔记与引用 200）。修复前红：`react to pure renote: status 200`。
+- 同一 handler 的 `NO_SUCH_NOTE` 用自己的 id：`endpoints/notes/reactions/create.ts` 的 `033d0620-5bfe-4027-965d-980b0c85a3ea`，不再借用 `notes/show` 的 `24fcbfc6-…`（Fix round 1，M4；`TestReactions` 末尾断言）。
 
 **5. 转贴不放大被转贴笔记的受众**
-- 上游：`core/NoteCreateService.ts` L499-527（public 不变；home → 最多 home；自己的 followers → 最多 followers；specified 拒绝）与同段的 localOnly 继承。
+- 上游：`core/NoteCreateService.ts` L499-530（public 不变；home → 最多 home；自己的 followers → 最多 followers；specified 拒绝）与同段的 localOnly 继承（L526-528）。
 - 请求/响应：`POST /api/notes/create { renoteId }` 无新字段；`createdNote.visibility` / `createdNote.localOnly` 现在按被转贴笔记收敛，而不是客户端传来的默认 `public`。
 - 持久化：`notes.visibility`、`notes.local_only`；判定读取被转贴笔记的同名列（事务内已加载）。
 - 前端消费：`components/note/use-note.ts` 的转贴按钮只发 `{renoteId}`（Task 6 的决定：不做按可见性选择的转贴菜单），因此完全依赖服务端收敛。
@@ -539,7 +543,6 @@ pnpm build    # 先 vue-tsc --noEmit，再输出 web/dist
 | `notes/conversation` | `endpoints/notes/conversation.ts`（`limit`/`offset`） | `notes.reply_id`、`reply_user_id` | 笔记详情「查看对话」（目前无入口） | 上游 `offset` 语义需要向上递归/递归 CTE，工作量不小 |
 | `notes/renotes` | `endpoints/notes/renotes.ts` | `notes.renote_id`（`idx_notes_renote`） | 转贴计数点击列表（目前无入口） | 无消费端 |
 | `notes/reactions`（列表） | `endpoints/notes/reactions.ts`（`type` 过滤 + 分页） | `note_reactions` + `users` | 「谁反应了」浮层（目前无） | 无消费端 |
-| `i/notifications`（按类型计数） | `endpoints/i/notifications.ts` | `notifications` 按 `type` 聚合 | 通知设置页的分类计数（目前无） | 无消费端 |
 | `i/change-password` | `endpoints/i/change-password.ts` | `users.password_hash`（bcrypt） | `views/settings/AccountSettings.vue:66` | 改密后既有 token 是否失效是产品决定，本波次不碰认证语义 |
 | `blocking/create`、`blocking/delete`、`mute/create`、`mute/delete` | `endpoints/blocking/*`、`endpoints/mute/*` | `blocks`、`mutes` 表已存在（v1 schema） | `views/settings/PrivacySettings.vue:73-80` 的不可用清单 | 需要列表 UI + 时间线/通知/详情的过滤接线，属新功能 |
 | `following/requests/*`（锁定账号） | `endpoints/following/requests/*` | `follow_requests`、`users.is_locked` | `views/settings/PrivacySettings.vue:79`（关注审批） | 与上一条同批 |
@@ -548,6 +551,10 @@ pnpm build    # 先 vue-tsc --noEmit，再输出 web/dist
 | `i/signin-history` | `endpoints/i/signin-history.ts` | `signins` | 账户设置（可选展示） | 无消费端 |
 | `notes/show`、`notes/reactions/create` 的**读可见性** | `endpoints/notes/show.ts`、`core/ReactionService.ts` L115-116（`isVisibleForMe`） | `noteVisibleToTx` 已存在（§11.15.2 第 2 项） | 所有笔记详情/反应入口 | 时间线已按可见性过滤，但详情仍按 id 直接可见；统一语义要一次读路径整改（show/reactions/notifications 打包），本波次只落地回复入径 |
 | `notes/search`、`users/search`、`notes/search-by-tag` | `endpoints/notes/search.ts` 等 | `notes.text`、`notes.tags`（无全文索引） | **无搜索 UI** | 需要索引 + 查询设计；前端也没有入口 |
+
+**回复的受众收敛已在 Fix round 1 落地**（§11.15.2 第 2 项），因此不在上表：首轮只做了「回复目标可见性」的拒绝，漏掉了「回复本身按目标收敛可见性/localOnly」，reviewer 以 Important 指出后补齐（`core/NoteCreateService.ts` L544-573）。
+
+**已实现的端点不在这张表里，但有一处路径偏差要记住（Fix round 1，M3）**：上游的通知列表端点是 `i/notifications`（`endpoints/i/notifications.ts`，注册为 `POST /api/i/notifications`，`paramDef` 有 `includeTypes`/`excludeTypes`/`limit`/`sinceId`/`untilId`，`res` 是 `Notification[]`），本实现把它注册在 `POST /api/notifications`——**路径不同，行为已实现**（前端 `api/client.ts` 与全部测试都用 `/api/notifications`）。Task 5 的 `notifications/mark-all-as-read` 路径与上游一致。本轮不改路由（改路径会同时改动前端、全部通知测试与既有部署的客户端），记录为已知偏差；若将来要对齐，建议在新旧两个路径上同时注册、旧路径标记为别名。
 
 #### 11.15.4 (b) 上游有契约，但要动 schema 或数据模型
 
@@ -612,24 +619,24 @@ $ go vet ./...
 
 $ CINDERFISH_TEST_DATABASE_URL="postgres://cinderfish:cinderfish@localhost:5432/cinderfish_test" \
   CINDERFISH_TEST_REDIS_URL="redis://127.0.0.1:6379/0" go test -count=1 ./...
-ok  	github.com/Aurorainic/cinderfish/internal/account	0.892s
-ok  	github.com/Aurorainic/cinderfish/internal/auth	0.043s
-ok  	github.com/Aurorainic/cinderfish/internal/config	0.004s
-ok  	github.com/Aurorainic/cinderfish/internal/federation	0.456s
-ok  	github.com/Aurorainic/cinderfish/internal/httpapi	10.953s
-ok  	github.com/Aurorainic/cinderfish/internal/idgen	0.002s
-ok  	github.com/Aurorainic/cinderfish/internal/media	11.054s
-ok  	github.com/Aurorainic/cinderfish/internal/note	0.875s
-ok  	github.com/Aurorainic/cinderfish/internal/streaming	0.708s
+ok  	github.com/Aurorainic/cinderfish/internal/account	1.124s
+ok  	github.com/Aurorainic/cinderfish/internal/auth	0.041s
+ok  	github.com/Aurorainic/cinderfish/internal/config	0.005s
+ok  	github.com/Aurorainic/cinderfish/internal/federation	0.476s
+ok  	github.com/Aurorainic/cinderfish/internal/httpapi	10.650s
+ok  	github.com/Aurorainic/cinderfish/internal/idgen	0.003s
+ok  	github.com/Aurorainic/cinderfish/internal/media	0.269s
+ok  	github.com/Aurorainic/cinderfish/internal/note	0.172s
+ok  	github.com/Aurorainic/cinderfish/internal/streaming	0.709s
 （cmd/* 与 internal/db、internal/testdb 为 [no test files]）
 
 $ cd web && pnpm typecheck && pnpm build
-（vue-tsc 无输出；`vite build` ✓ built in 642ms，dist 产物正常）
+（vue-tsc 无输出；`vite build` ✓ built in 605ms，dist 产物正常）
 ```
 
 **真实二进制 API 走查**（`go build -o /tmp/cf-t8 ./cmd/cinderfish`，配置 `/tmp/cf-t8.toml`：端口 3992、
 `web_dir` 指向本分支 `web/dist`、开发库 `cinderfish`、`registration_mode=admin`、`federation_mode=none`；
-临时账号 `t8m2`/`t8o2`）实测：
+临时账号 `t8m2`/`t8o2`，Fix round 1 用 `t8m3`/`t8o3` 复测）实测：
 
 | 场景 | 结果 |
 |---|---|
@@ -641,6 +648,11 @@ $ cd web && pnpm typecheck && pnpm build
 | 关注后再回复 | `200` |
 | 被列入 specified 名单者用 public 回复 | `400 CANNOT_REPLY_TO_SPECIFIED_VISIBILITY_NOTE_WITH_EXTENDED_VISIBILITY` / `ed940410-…`；改用 specified 回复 `200` |
 | 对纯转贴反应 | `400 CANNOT_REACT_TO_RENOTE` / `eaccdc08-…` |
+| `t8o3` 用 public 回复 `t8m3` 的 home 笔记 | `createdNote.visibility` → `home` |
+| `t8o3` 用 public 回复 `t8m3` 的 followers 笔记（已关注） | `createdNote.visibility` → `followers` |
+| 回复 localOnly 笔记 | `createdNote.localOnly` → `true`（visibility 仍 public） |
+| public 回复 public 笔记 / followers 回复 home 笔记 | `public` / `followers`（不放大、显式更窄保持） |
+| 对不存在的笔记反应 | `404 NO_SUCH_NOTE` / `033d0620-5bfe-4027-965d-980b0c85a3ea` |
 | `t8o2` 转贴 `t8m2` 的 home 笔记 | `createdNote.visibility` → `home` |
 | 转贴 localOnly 笔记 | `createdNote.localOnly` → `true` |
 | 四条时间线（local/global/hybrid/home） | 均 200 且返回非空 |
