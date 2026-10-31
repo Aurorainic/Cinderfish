@@ -387,6 +387,16 @@ pnpm build    # 先 vue-tsc --noEmit，再输出 web/dist
 - 已知影响：未登录时点侧栏/抽屉的「设置」会因默认子页 `settings-profile` 受门禁而落到登录页（此前是渲染一份空的资料编辑表单）；深链 `/settings/<未知tab>` 对未登录用户同样经重定向落到登录页。
 - 验证：`pnpm typecheck`、`pnpm build`、`go vet` 全绿；`git diff --check` 干净。内建浏览器实测（Go 二进制 @3991，`web/dist`，开发库）：未登录深链 `/settings/account`、`/settings/privacy`、`/admin` 均跳 `/login?redirect=<原路径>`，登录后按 `redirect` 回 `/admin`；未登录 `/settings/appearance` 正常渲染且菜单带「需登录」注记；登录后侧栏五项（含管理员「管理」）与点击导航、返回键正常；流式推送后侧栏「通知」徽标出现「1」；非管理员会话侧栏无「管理」项（与改动前一致）。
 
+### 11.12 通知契约核对与时间线 tab 图标（2026-10-31，重写计划 Task 5）
+
+- 对照 Misskey `packages/backend/src/server/api/endpoints/i/notifications.ts` 的 `paramDef` 与 `core/QueryService.ts` 的 `makePaginationQuery` 逐条核对现有实现：`includeTypes`/`excludeTypes` 已在 SQL 的 WHERE 内、`LIMIT` 之前生效（此前一个波次已修复）；显式空 `includeTypes` 返回 `[]`、`excludeTypes` 全排除返回空、默认 limit 10、上限 100，均与上游一致。
+- 修正一处真实偏差：`sinceId` 单独出现（无 `untilId`）时 Misskey 返回**升序**余页（`makePaginationQuery` L58-60），此前实现固定 `ORDER BY id DESC`。`internal/note/reaction.go` 的 `NotificationService.List` 现按 sinceId-only → `ASC`、其余 → `DESC` 排序。
+- `markAsRead` 语义维持现状（缺省/`true` 把**本次返回的通知**置读，`false` 不触碰），与上游「watermark 全量置读」有意保留差异：通知页与被动视图（widget、deck 列）都显式传 `markAsRead: false`，靠「全部标为已读」按钮落库并广播 `readAllNotifications`；见 11.2 的注释。
+- 测试新增（先写失败再修）：`internal/note/reaction_test.go` `TestNotificationListSinceIdAscending`（修复前失败）；`internal/httpapi/notifications_test.go` 新增 `TestNotificationsFilteredCursorPagination`（limit=2 逐页取完一条 mention 流，断言无跳过无重复）、`TestNotificationsCombinedIncludeAndExclude`、`TestNotificationsSinceIdAscending`。
+- 前端：`TimelineView`、`NotificationsView` 的页头 tabs 补图标（时间线四个 tab 与 `stores/deck.ts` 列图标同源；通知四 tab 用 bell/heart/reply/renote），使 PageHeader 的 >3-tab 图标折叠首次可达；`NotificationItem` 已读行按 Iceshrimp.NET `.notification.read { opacity: 0.7 }`（`NotificationComponent.razor.css` L12-14）降透明度，未读保持强调色高亮。
+- 验证：`go test -count=1 ./...`（含数据库与 Redis 集成）全绿、`gofmt -l`/`go vet` 干净、`pnpm typecheck`/`pnpm build` 通过；`git diff --check` 干净。内建浏览器实测（Go 二进制 @3991，`web/dist`，开发库，临时账号 t5alice/t5bob 已清理）：通知页 32 条种子通知分两页翻完无缺失无重复，全部→反应→全部 切换后重新挂载干净；四个时间线源 tab 各自加载对应流；流式新笔记以「1条新笔记」pill 出现、点开仅插入一次；widget 抽屉通知 widget 正常渲染。
+- 已知缺口（记录，未在本任务范围）：`users_pack.go:129` 的 `unreadNotificationsCount`/`hasUnreadNotification` 是硬编码 0/false，刷新后通知徽标与「全部标为已读」按钮不可用（只有流式推送会点亮），建议后续接 `NotificationService.UnreadCount`；纯转贴（renoteId）当前不产生 `renote` 通知（Task 5 只涉及通知查询/置读文件，未动通知创建点）。
+
 ## 12. M5 联邦（ActivityPub）
 
 源码对照记录见 `docs/research/2026-10-28-m5-federation-source-calibration.md`（逐条对照上游文件，含刻意偏离项）。
