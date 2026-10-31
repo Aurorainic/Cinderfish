@@ -60,19 +60,26 @@ func TestAdminEndpointsRequireAdministrator(t *testing.T) {
 		method string
 		path   string
 		body   map[string]any
+		// want is the status the handler answers once the guard has passed:
+		// 200 where the call succeeds, 400 where the body fails validation
+		// after authorization. Pinning it stops a handler that starts
+		// answering 500 from counting as "the guard opened".
+		want int
 	}
 	// Every body is one the handler rejects *after* authorization — an empty
 	// username, an unknown mode, a missing host, self-suspension — so the
 	// administrator leg proves the guard opened without mutating the shared
-	// test database that the neighbouring tests run against.
+	// test database that the neighbouring tests run against. The two
+	// success rows are read-only or idempotent (listing users, unsuspending an
+	// account that is not suspended).
 	calls := []call{
-		{http.MethodPost, "/api/admin/accounts/create", map[string]any{"username": "", "password": ""}},
-		{http.MethodPost, "/api/admin/show-users", map[string]any{}},
-		{http.MethodPost, "/api/admin/suspend-user", map[string]any{"userId": adminID}},
-		{http.MethodPost, "/api/admin/unsuspend-user", map[string]any{"userId": plainID}},
-		{http.MethodPost, "/api/admin/federation/mode", map[string]any{"mode": "sometimes"}},
-		{http.MethodGet, "/api/admin/federation/allowlist", nil},
-		{http.MethodPost, "/api/admin/federation/allowlist", map[string]any{"host": ""}},
+		{http.MethodPost, "/api/admin/accounts/create", map[string]any{"username": "", "password": ""}, http.StatusBadRequest},
+		{http.MethodPost, "/api/admin/show-users", map[string]any{}, http.StatusOK},
+		{http.MethodPost, "/api/admin/suspend-user", map[string]any{"userId": adminID}, http.StatusBadRequest},
+		{http.MethodPost, "/api/admin/unsuspend-user", map[string]any{"userId": plainID}, http.StatusOK},
+		{http.MethodPost, "/api/admin/federation/mode", map[string]any{"mode": "sometimes"}, http.StatusBadRequest},
+		{http.MethodGet, "/api/admin/federation/allowlist", nil, http.StatusOK},
+		{http.MethodPost, "/api/admin/federation/allowlist", map[string]any{"host": ""}, http.StatusBadRequest},
 	}
 
 	for _, c := range calls {
@@ -95,10 +102,12 @@ func TestAdminEndpointsRequireAdministrator(t *testing.T) {
 			t.Errorf("%s as non-admin: body = %v, want an error envelope", name, out)
 		}
 
-		// The administrator clears the same guard, which proves the 403 above
-		// came from the admin check and not from an unrelated parse failure.
-		if status, _ := adminRequest(t, f.ts, c.method, c.path, adminToken, c.body); status == http.StatusUnauthorized || status == http.StatusForbidden {
-			t.Errorf("%s as admin = %d, want the guard to let it through", name, status)
+		// The administrator clears the guard and reaches the handler's own
+		// answer, which proves the 403 above came from the admin check rather
+		// than from an unrelated failure.
+		status, out = adminRequest(t, f.ts, c.method, c.path, adminToken, c.body)
+		if status != c.want {
+			t.Errorf("%s as admin = %d, want %d (body %v)", name, status, c.want, out)
 		}
 	}
 }

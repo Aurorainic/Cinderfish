@@ -152,11 +152,11 @@ const listTab = computed<ListTab | null>(() => {
 
 // The follow lists have no endpoint (users/following, users/followers are not
 // implemented), so the tab reports exactly that and never invents rows. The
-// count beside it comes from the user record and is accurate.
+// body names the missing endpoint; the count beside it comes from the user
+// record and is accurate.
 const unavailable = computed(() => {
   if (listTab.value === "followers") {
     return {
-      endpoint: "users/followers",
       title: "关注者列表暂不可用",
       body: `后端还没有提供 users/followers 接口，这一页无法列出关注 @${acct.value} 的账户。`,
       count: viewUser.value?.followersCount ?? 0,
@@ -164,7 +164,6 @@ const unavailable = computed(() => {
     };
   }
   return {
-    endpoint: "users/following",
     title: "关注列表暂不可用",
     body: `后端还没有提供 users/following 接口，这一页无法列出 @${acct.value} 关注的账户。`,
     count: viewUser.value?.followingCount ?? 0,

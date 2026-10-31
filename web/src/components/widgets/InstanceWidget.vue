@@ -8,9 +8,6 @@ import WidgetCard from "./WidgetCard.vue";
 
 defineProps<{ widgetProps?: Record<string, unknown> }>();
 
-const fallbackDescription =
-  "一个个人或极小规模的联邦社交实例。后端遵循 Misskey API，通信层使用 ActivityPub。";
-
 const federationLabels: Record<string, string> = {
   all: "开放联邦",
   specified: "仅白名单",
@@ -18,7 +15,10 @@ const federationLabels: Record<string, string> = {
 };
 
 const name = computed(() => instance.meta?.name ?? "Cinderfish");
-const description = computed(() => instance.meta?.description || fallbackDescription);
+// The card only ever prints what the instance reported. A missing description
+// reads as missing; there is no stand-in blurb for an instance nobody wrote one
+// for, and nothing is shown while the first read is still running.
+const description = computed(() => instance.meta?.description ?? "");
 const version = computed(() => (instance.meta?.version ? `v${instance.meta.version}` : ""));
 const federation = computed(() => {
   const mode = instance.meta?.federation;
@@ -26,12 +26,21 @@ const federation = computed(() => {
 });
 
 const refreshing = ref(false);
+const refreshError = ref("");
+// A failed refresh keeps the metadata that is already loaded, so the only
+// failure worth reporting here is one the widget has no data behind: either the
+// refresh it just ran or the shared first load.
+const failure = computed(() => refreshError.value || instance.error);
+const loading = computed(() => instance.meta === null && !failure.value);
 
 async function refresh(): Promise<void> {
   if (refreshing.value) return;
   refreshing.value = true;
+  refreshError.value = "";
   try {
     await reloadInstance();
+  } catch (err) {
+    refreshError.value = err instanceof Error && err.message ? err.message : String(err);
   } finally {
     refreshing.value = false;
   }
@@ -46,31 +55,36 @@ onMounted(() => {
 </script>
 
 <template>
-  <WidgetCard :title="name" icon="flame" hint="个人联邦实例">
+  <WidgetCard :title="name" icon="flame">
     <template #actions>
       <button
         class="refresh"
         type="button"
         title="刷新实例信息"
         aria-label="刷新实例信息"
-        :disabled="refreshing"
+        :disabled="refreshing || loading"
         @click="refresh"
       >
         <AppIcon name="renote" />
       </button>
     </template>
 
-    <p class="desc">{{ description }}</p>
+    <p v-if="loading" class="desc state" aria-live="polite">正在读取实例信息…</p>
 
-    <div v-if="version || federation" class="facts">
-      <span v-if="version" class="fact">{{ version }}</span>
-      <span v-if="federation" class="fact">{{ federation }}</span>
-    </div>
+    <template v-else>
+      <p v-if="description" class="desc">{{ description }}</p>
+      <p v-else-if="instance.meta" class="desc state">这个实例还没有填写简介。</p>
 
-    <p v-if="instance.error" class="notice error failure" :title="instance.error">
-      <span>实例信息加载失败</span>
+      <div v-if="version || federation" class="facts">
+        <span v-if="version" class="fact">{{ version }}</span>
+        <span v-if="federation" class="fact">{{ federation }}</span>
+      </div>
+    </template>
+
+    <p v-if="failure" class="notice error failure" :title="failure">
+      <span>{{ instance.meta ? "实例信息刷新失败" : "实例信息加载失败" }}</span>
       <button type="button" class="button ghost small" :disabled="refreshing" @click="refresh">重试</button>
-      <span class="failure-detail">{{ instance.error }}</span>
+      <span class="failure-detail">{{ failure }}</span>
     </p>
 
     <div class="actions">
@@ -121,6 +135,12 @@ onMounted(() => {
   color: var(--muted);
   font-size: 0.85rem;
   line-height: 1.6;
+}
+
+/* A loading or "no description" line is a state, not instance prose. */
+.desc.state {
+  color: var(--text-faint);
+  font-style: italic;
 }
 
 .facts {

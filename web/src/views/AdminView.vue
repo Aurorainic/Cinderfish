@@ -14,14 +14,16 @@ import AdminOverview from "./admin/AdminOverview.vue";
 import AdminSettings from "./admin/AdminSettings.vue";
 import AdminUsers from "./admin/AdminUsers.vue";
 import { ADMIN_TABS, resolveAdminTab } from "./admin/tabs";
-import type { AdminTabKey } from "./admin/tabs";
+import type { AdminTabDef, AdminTabKey } from "./admin/tabs";
 
 // Same threshold and the same shared SectionMenu as the settings page, so the
 // two consoles read as one composition: icon menu on the left, one section on
 // the right, chips above the content when the column does not fit.
 const NARROW_THRESHOLD = 600;
 
-const GROUP_TITLES = ["实例", "配置"] as const;
+// Taken from the tab declaration order instead of restating the group labels:
+// adding a group in tabs.ts is enough for it to appear here.
+const GROUPS: readonly AdminTabDef["group"][] = [...new Set(ADMIN_TABS.map((item) => item.group))];
 
 const PAGES: Record<AdminTabKey, Component> = {
   overview: AdminOverview,
@@ -42,7 +44,7 @@ usePageTitle("管理");
 const tab = computed(() => resolveAdminTab(route.query.tab));
 
 const menuDef = computed<SectionMenuGroup[]>(() =>
-  GROUP_TITLES.map((title) => ({
+  GROUPS.map((title) => ({
     title,
     items: ADMIN_TABS.filter((item) => item.group === title).map((item) => ({
       key: item.key,
@@ -130,6 +132,10 @@ onBeforeUnmount(() => {
 .admin-grid.narrow {
   display: flex;
   flex-direction: column;
+  /* The grid above aligns its two columns to the start; in the stacked flex
+     form that would size each row to its max-content width and let the
+     scrolling menu strip widen the page. Same fix as SettingsLayout. */
+  align-items: stretch;
   gap: var(--space-14);
 }
 

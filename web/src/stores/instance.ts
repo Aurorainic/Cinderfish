@@ -26,11 +26,15 @@ export async function loadInstance(): Promise<void> {
   return inflight;
 }
 
-// An explicit re-read for the instance widget's refresh action and its error
-// state. The cached metadata is dropped first so the next load cannot answer
-// from it; an in-flight request is still shared rather than raced.
+// An explicit re-read, used by the instance widget's refresh action. Unlike the
+// first load it never clears what is already in the store: a failed refresh
+// leaves the sidebar brand, the composer's length limit and the about copy
+// usable, and the error is thrown to the caller instead of being published
+// app-wide, so only the widget that asked for the refresh reports it.
 export async function reloadInstance(): Promise<void> {
-  instance.meta = null;
+  // Join a first load that is already running rather than racing it; that load
+  // reports its own failure through `instance.error`.
+  if (inflight) await inflight;
+  instance.meta = await api.meta();
   instance.error = "";
-  await loadInstance();
 }
