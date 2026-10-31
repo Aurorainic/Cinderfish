@@ -161,6 +161,36 @@ func TestNotificationListIncludeAndExclude(t *testing.T) {
 	}
 }
 
+// TestNotificationListSinceIdAscending pins Misskey's makePaginationQuery
+// semantics (packages/backend/src/core/QueryService.ts L58-60): a sinceId
+// without untilId pages upward in ascending id order, the direction used by
+// "load newer" cursors.
+func TestNotificationListSinceIdAscending(t *testing.T) {
+	f := newNotificationFixture(t)
+	f.seed(t, "01", f.readerID, "mention")
+	f.seed(t, "02", f.readerID, "reaction")
+	f.seed(t, "03", f.readerID, "mention")
+	f.seed(t, "04", f.readerID, "renote")
+
+	// sinceId alone: the page holds everything after it, oldest first.
+	got, err := f.service().List(context.Background(), f.readerID, 20, f.prefix+"-01", "", nil, nil)
+	if err != nil {
+		t.Fatalf("List(sinceId): %v", err)
+	}
+	if want := []string{"02", "03", "04"}; !reflect.DeepEqual(f.ids(got), want) {
+		t.Errorf("sinceId-only List = %v, want %v (ascending)", f.ids(got), want)
+	}
+
+	// sinceId with untilId pages between the two cursors, newest first.
+	got, err = f.service().List(context.Background(), f.readerID, 20, f.prefix+"-01", f.prefix+"-04", nil, nil)
+	if err != nil {
+		t.Fatalf("List(sinceId,untilId): %v", err)
+	}
+	if want := []string{"03", "02"}; !reflect.DeepEqual(f.ids(got), want) {
+		t.Errorf("sinceId+untilId List = %v, want %v (descending)", f.ids(got), want)
+	}
+}
+
 func TestNotificationMarkRead(t *testing.T) {
 	f := newNotificationFixture(t)
 	ctx := context.Background()

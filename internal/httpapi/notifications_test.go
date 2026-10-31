@@ -5,6 +5,7 @@ import (
 	"net/http/httptest"
 	"reflect"
 	"testing"
+	"time"
 )
 
 // fetchNotifications posts to /api/notifications with a bearer token and
@@ -99,6 +100,132 @@ func TestNotificationsExcludeTypes(t *testing.T) {
 	all := fetchNotifications(t, ts, tokenA, map[string]any{"markAsRead": false})
 	if got, want := notificationTypesOf(all), []string{"mention", "reaction"}; !reflect.DeepEqual(got, want) {
 		t.Errorf("unfiltered list = %v, want %v", got, want)
+	}
+}
+
+// seedNotificationSeries creates, in chronological order, three mention
+// notes and two distinct reactions from user B aimed at user A, so the
+// notification stream interleaves two types. The sleeps keep the
+// millisecond-stamped ids monotonic.
+func seedNotificationSeries(t *testing.T) (ts *httptest.Server, tokenA string, order []string) {
+	t.Helper()
+	ts = newTestServer(t, "open")
+	nameA := uniqueName(t) + "a"
+	_, tokenA = createUser(t, ts, nameA)
+	_, tokenB := createUser(t, ts, uniqueName(t)+"b")
+
+	id := createNote(t, ts, tokenA, map[string]any{"text": "notify me"})
+	time.Sleep(5 * time.Millisecond)
+	for _, step := range []struct{ kind, emoji string }{
+		{"mention", ""}, {"reaction", "🎉"}, {"mention", ""}, {"reaction", "👍"}, {"mention", ""},
+	} {
+		if step.kind == "mention" {
+			createNote(t, ts, tokenB, map[string]any{"text": "@" + nameA + " ping"})
+		} else {
+			post(t, ts, "/api/notes/reactions/create", map[string]any{
+				"i": tokenB, "noteId": id, "reaction": step.emoji,
+			})
+		}
+		time.Sleep(5 * time.Millisecond)
+		order = append(order, step.kind)
+	}
+	return ts, tokenA, order
+}
+
+// orderedNotifications fetches everything with markAsRead=false and returns
+// the item maps newest first, matching the endpoint's ordering.
+func orderedNotifications(t *testing.T, ts *httptest.Server, tokenA string) []map[string]any {
+	t.Helper()
+	return fetchNotifications(t, ts, tokenA, map[string]any{"markAsRead": false})
+}
+
+func notificationIDsOf(list []map[string]any) []string {
+	out := make([]string, 0, len(list))
+	for _, n := range list {
+		out = append(out, n["id"].(string))
+	}
+	return out
+}
+
+func TestNotificationsCombinedIncludeAndExclude(t *testing.T) {
+	ts, tokenA, _ := seedNotificationSeries(t)
+
+	list := fetchNotifications(t, ts, tokenA, map[string]any{
+		"markAsRead":   false,
+		"includeTypes": []string{"mention", "reaction"},
+		"excludeTypes": []string{"mention"},
+	})
+	if got, want := notificationTypesOf(list), []string{"reaction", "reaction"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("include mention+reaction, exclude mention = %v, want %v", got, want)
+	}
+}
+
+// TestNotificationsFilteredCursorPagination paginates a filtered stream and
+// checks the pages join without gaps or repeats: the union of the paged
+// fetches must equal one unfiltered-by-cursor fetch of the same type.
+func TestNotificationsFilteredCursorPagination(t *testing.T) {
+	ts, tokenA, order := seedNotificationSeries(t)
+
+	var paged []string
+	untilID := ""
+	for round := 0; round < 10; round++ {
+		params := map[string]any{
+			"markAsRead":   false,
+			"includeTypes": []string{"mention"},
+			"limit":        2,
+		}
+		if untilID != "" {
+			params["untilId"] = untilID
+		}
+		page := fetchNotifications(t, ts, tokenA, params)
+		if len(page) == 0 {
+			break
+		}
+		for _, n := range page {
+			paged = append(paged, n["id"].(string))
+		}
+		untilID = page[len(page)-1]["id"].(string)
+	}
+
+	expected := make([]string, 0, len(order))
+	for _, n := range orderedNotifications(t, ts, tokenA) {
+		if n["type"] == "mention" {
+			expected = append(expected, n["id"].(string))
+		}
+	}
+	if !reflect.DeepEqual(paged, expected) {
+		t.Errorf("paged mention stream = %v, want the full ordered mention list %v", paged, expected)
+	}
+	seen := map[string]bool{}
+	for _, id := range paged {
+		if seen[id] {
+			t.Errorf("notification %s appeared twice across pages", id)
+		}
+		seen[id] = true
+	}
+}
+
+// TestNotificationsSinceIdAscending pins Misskey's makePaginationQuery
+// semantics (packages/backend/src/core/QueryService.ts L58-60): sinceId
+// without untilId returns the newer remainder in ascending order.
+func TestNotificationsSinceIdAscending(t *testing.T) {
+	ts, tokenA, _ := seedNotificationSeries(t)
+
+	all := orderedNotifications(t, ts, tokenA)
+	if len(all) < 3 {
+		t.Fatalf("seeded %d notifications, want at least 3", len(all))
+	}
+	oldest := all[len(all)-1]["id"].(string)
+
+	page := fetchNotifications(t, ts, tokenA, map[string]any{
+		"markAsRead": false, "sinceId": oldest, "limit": 10,
+	})
+	want := make([]string, 0, len(all)-1)
+	for i := len(all) - 2; i >= 0; i-- {
+		want = append(want, all[i]["id"].(string))
+	}
+	if got := notificationIDsOf(page); !reflect.DeepEqual(got, want) {
+		t.Errorf("sinceId-only page = %v, want %v (ascending)", got, want)
 	}
 }
 

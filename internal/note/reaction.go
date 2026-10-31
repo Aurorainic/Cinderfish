@@ -159,9 +159,12 @@ FROM notifications WHERE id = $1
 	return &n, nil
 }
 
-// List returns a user's notifications, newest first. A nil includeTypes
-// leaves the type unfiltered, while an empty non-nil slice matches nothing,
-// which is what Misskey returns for an explicitly empty includeTypes.
+// List returns a user's notifications, newest first unless a sinceId is
+// given without untilId, in which case the page is the newer remainder in
+// ascending order (Misskey's makePaginationQuery semantics). A nil
+// includeTypes leaves the type unfiltered, while an empty non-nil slice
+// matches nothing, which is what Misskey returns for an explicitly empty
+// includeTypes.
 func (s *NotificationService) List(ctx context.Context, recipientID string, limit int, sinceID, untilID string, includeTypes, excludeTypes []string) ([]*Notification, error) {
 	if limit <= 0 {
 		limit = 10
@@ -191,7 +194,14 @@ FROM notifications WHERE recipient_id = $1`
 		args = append(args, untilID)
 		query += fmt.Sprintf(" AND id < $%d", len(args))
 	}
-	query += fmt.Sprintf(" ORDER BY id DESC LIMIT %d", limit)
+	// Misskey's makePaginationQuery (packages/backend/src/core/QueryService.ts
+	// L54-62): a sinceId without untilId pages upward in ascending order, the
+	// direction a "load newer" cursor expects; everything else is newest first.
+	order := "DESC"
+	if sinceID != "" && untilID == "" {
+		order = "ASC"
+	}
+	query += fmt.Sprintf(" ORDER BY id %s LIMIT %d", order, limit)
 
 	rows, err := s.pool.Query(ctx, query, args...)
 	if err != nil {
