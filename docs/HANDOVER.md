@@ -372,7 +372,7 @@ pnpm build    # 先 vue-tsc --noEmit，再输出 web/dist
 
 按 `docs/research/2026-10-31-iceshrimp-architecture-translation.md` 的翻译契约把壳外壳拆成三个子组件，`AppShell.vue` 只保留组合与壳级断点：
 
-- 新增 `web/src/components/layout/Sidebar.vue`（桌面侧栏，消费 `nav.ts` 注册表；250px 全宽 / 80px 图标态，≤1279 收缩——fork `$nav-width`/`$nav-icon-only-width`）、`WidgetPanel.vue`（右列 300px，≤1090 隐藏，与 `WidgetsDrawer` 悬浮按钮的可见区间对齐为 ≥1091）、`MobileSidebar.vue`（≤500 移动开关；组合既有 `NavDrawer` 抽屉与 `MobileNav` 底栏，二者行为已满足契约故保留内部实现，仅把抽屉开关状态从 AppShell 移入）。
+- 新增 `web/src/components/layout/Sidebar.vue`（桌面侧栏，消费 `nav.ts` 注册表；250px 全宽 / 80px 图标态，≤1279 收缩——fork `$nav-width`/`$nav-icon-only-width`）、`WidgetPanel.vue`（右列 300px，≤1090 隐藏，与 `WidgetsDrawer` 悬浮按钮的可见区间对齐为 ≥1091）、`MobileSidebar.vue`（≤500 移动开关；组合既有 `NavDrawer` 抽屉与 `MobileNav` 底栏，二者行为已满足契约故保留内部实现，仅把抽屉开关状态从 AppShell 移入）。`AppShell` 继续挂载 `WidgetsDrawer`：≤1090px 时 widget 入口由其悬浮按钮与抽屉承担，501–1090 与 ≤500 两个区间都保持可达。
 - `PageHeader.vue` 补齐契约项：>3 个 tab 时非活动 tab 折叠为图标（有图标者），动作区标签 ≤1090 隐藏（`.action-label` 约定，通知页已接入），移动断点随壳从 720 改为 500。
 - 断点定稿（fork 主源）：`1100/1090/500/1279/400`；`DeckShell` 与 widget 抽屉的 720 随之改为 500；`.auth` 布局断点保持 720（认证页独立于壳）。底栏 ≤400 收紧按钮尺寸。
 - 侧栏/壳几何样式从 `main.css` 移入各组件；`--rail-width` 改 250px、`--rail-width-collapsed` 80px、`--shell-max-width` 1280px。

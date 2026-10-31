@@ -4,8 +4,8 @@ import WidgetStack from "../widgets/WidgetStack.vue";
 // The right-hand widget column, the Cinderfish counterpart of
 // fork/ui/universal.widgets.vue. It only mounts the existing widget stack —
 // ordering, editing and data fetching stay in the widgets module — and it
-// disappears entirely below 1090px, where WidgetsDrawer takes over the same
-// stack behind the floating button.
+// disappears entirely below 1090px, where the WidgetsDrawer (mounted by
+// AppShell) offers the same stack behind a floating fab.
 </script>
 
 <template>

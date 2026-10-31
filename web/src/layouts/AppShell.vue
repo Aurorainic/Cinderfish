@@ -4,6 +4,7 @@ import { useRouter } from "vue-router";
 import MobileSidebar from "../components/layout/MobileSidebar.vue";
 import Sidebar from "../components/layout/Sidebar.vue";
 import WidgetPanel from "../components/layout/WidgetPanel.vue";
+import WidgetsDrawer from "../components/widgets/WidgetsDrawer.vue";
 import { loadInstance } from "../stores/instance";
 import { refreshSession, session, signout } from "../stores/session";
 import { type ShellMode, setShellMode } from "../stores/shell";
@@ -56,6 +57,11 @@ watch(
     </main>
 
     <WidgetPanel v-if="props.mode === 'universal'" />
+
+    <!-- Below 1090px the panel is hidden and the same stack moves into this
+         drawer behind its floating fab; the fab hides itself above 1090px, so
+         widget access survives every width. -->
+    <WidgetsDrawer />
 
     <!-- Below 500px the sidebar is gone and the same registry renders through
          the drawer + bottom bar. -->

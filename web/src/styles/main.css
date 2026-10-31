@@ -599,9 +599,9 @@ select {
 
 /* Shell breakpoints belong to the components that own them: the sidebar icon
    collapse (1280px) lives in Sidebar.vue, the widget column (1090px) in
-   WidgetPanel.vue, the mobile switch (500px) and the 400px bottom-bar
-   refinement in MobileSidebar.vue. What stays here is cross-page layout that
-   no single component owns. */
+   WidgetPanel.vue, the mobile switch (500px) in MobileSidebar.vue, and the
+   400px bottom-bar refinement in MobileNav.vue. What stays here is
+   cross-page layout that no single component owns. */
 
 @media (max-width: 720px) {
   .auth {

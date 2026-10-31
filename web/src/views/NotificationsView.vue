@@ -262,6 +262,16 @@ onBeforeUnmount(() => {
   cursor: default;
 }
 
+/* When PageHeader collapses the action label (≤1090px) the button becomes
+   icon-only and shrinks to a square. */
+@media (max-width: 1090px) {
+  .mark {
+    width: 34px;
+    padding: 0;
+    justify-content: center;
+  }
+}
+
 /* Borderless rows carry their own hairline, so they must not be spaced. */
 .feed :deep(.paged-feed) {
   gap: 0;
