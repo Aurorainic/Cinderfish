@@ -16,7 +16,7 @@
 </template>
 
 <script lang="ts" setup>
-import MkButton from "@/components/ui/MkButton.vue";
+import MkButton from "./MkButton.vue";
 
 // Local UI strings (hardcoded Chinese until a shared i18n layer exists).
 const strings = {

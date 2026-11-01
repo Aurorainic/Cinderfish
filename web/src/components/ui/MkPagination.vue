@@ -72,9 +72,9 @@ import {
 	watch,
 	type Ref,
 } from "vue";
-import MkButton from "@/components/ui/MkButton.vue";
-import MkError from "@/components/ui/MkError.vue";
-import MkLoading from "@/components/ui/MkLoading.vue";
+import MkButton from "./MkButton.vue";
+import MkError from "./MkError.vue";
+import MkLoading from "./MkLoading.vue";
 
 // Local UI strings (hardcoded Chinese until a shared i18n layer exists).
 const strings = {

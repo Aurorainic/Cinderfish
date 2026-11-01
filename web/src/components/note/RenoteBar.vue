@@ -1,98 +1,98 @@
-<script setup lang="ts">
-import { computed } from "vue";
-import type { Note } from "../../api/types";
-import { absoluteTime, relativeTime } from "../../lib/time";
-import AppIcon from "../AppIcon.vue";
-import NoteVisibility from "./NoteVisibility.vue";
-import UserAvatar from "../UserAvatar.vue";
-
-// The bar above a renoted note: who renoted, when, and with what reach. The
-// renoted note itself renders below with its own header.
-const props = defineProps<{ note: Note }>();
-
-const target = computed(() => props.note.renote);
-</script>
-
+// SPDX-License-Identifier: AGPL-3.0-only
+// Ported from firefish@02c31e0:packages/client/src/components/note/MkRenoteBar.vue
+//
+// Dropped: the multi-renote avatar list (needs notes/renotes; TODO) and the
+// renote-menu on the timestamp for pure renotes by me (deletion goes through
+// the footer's more-menu on the renote itself, since Cinderfish renders each
+// renote as its own row).
 <template>
-  <div v-if="target" class="renote-bar">
-    <AppIcon name="renote" class="mark" />
-    <RouterLink :to="`/@${note.user.username}`" class="avatar" tabindex="-1">
-      <UserAvatar :user="note.user" size="inherit" />
-    </RouterLink>
-    <RouterLink :to="`/@${note.user.username}`" class="name">
-      {{ note.user.name || note.user.username }}
-    </RouterLink>
-    <span class="verb">转贴了</span>
-    <RouterLink :to="`/notes/${note.id}`" class="time" :title="absoluteTime(note.createdAt)">
-      {{ relativeTime(note.createdAt) }}
-    </RouterLink>
-    <NoteVisibility :visibility="note.visibility" :local-only="note.localOnly" />
-  </div>
+	<div class="renote">
+		<AppIcon name="renote" class="mark" />
+		<span class="text">
+			<MkAvatar class="avatar" :user="note.user" />
+			<MkA class="name" :to="userPage" @click.stop>
+				<MkUserName :user="note.user" />
+			</MkA>
+			{{ i18n.ts.renotedBy }}
+		</span>
+		<div class="info">
+			<span class="time">
+				<MkTime :time="note.createdAt" />
+			</span>
+			<Visibility :note="note" />
+		</div>
+	</div>
 </template>
 
+<script lang="ts" setup>
+import { computed } from "vue";
+import type { Note } from "../../api/types";
+import AppIcon from "../AppIcon.vue";
+import MkA from "../ui/MkA.vue";
+import MkAvatar from "../ui/MkAvatar.vue";
+import MkTime from "../ui/MkTime.vue";
+import MkUserName from "../ui/MkUserName.vue";
+import Visibility from "./Visibility.vue";
+import { i18n } from "../../i18n";
+
+const props = defineProps<{
+	note: Note;
+	appearNote: Note;
+}>();
+
+const userPage = computed(
+	() => `/@${props.note.user.username}${props.note.user.host ? `@${props.note.user.host}` : ""}`,
+);
+
+</script>
+
 <style scoped>
-.renote-bar {
-  --avatar-size: 20px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 0 0 6px;
-  color: var(--renote);
-  font-size: 0.8rem;
-  min-width: 0;
+.renote {
+	display: flex;
+	align-items: center;
+	white-space: pre;
+	color: var(--renote);
+	cursor: pointer;
 }
 
 .mark {
-  width: 0.95rem;
-  height: 0.95rem;
-  flex: none;
+	margin-inline-end: 4px;
+	flex-shrink: 0;
 }
 
 .avatar {
-  line-height: 0;
-  flex: none;
+	inline-size: 1.2em;
+	block-size: 1.2em;
+	border-radius: 2em;
+	overflow: hidden;
+	margin-inline-end: 0.4em;
+	flex-shrink: 0;
+}
+
+.text {
+	overflow: hidden;
+	flex-shrink: 1;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
 .name {
-  color: var(--renote);
-  font-weight: 700;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 40%;
+	font-weight: bold;
+	color: inherit;
 }
 
-.name:hover {
-  color: var(--accent);
-}
-
-.verb,
-.time {
-  color: var(--muted);
-  flex: none;
+.info {
+	margin-inline-start: auto;
+	font-size: 0.9em;
+	display: flex;
+	align-items: center;
+	flex-shrink: 0;
 }
 
 .time {
-  margin-left: auto;
-}
-
-.time:hover {
-  color: var(--accent);
-}
-
-@container note (max-width: 500px) {
-  .renote-bar {
-    gap: 5px;
-  }
-}
-
-@container note (max-width: 380px) {
-  .renote-bar {
-    font-size: 0.76rem;
-  }
-
-  .name {
-    max-width: 32%;
-  }
+	flex-shrink: 0;
+	color: inherit;
+	display: inline-flex;
+	align-items: center;
 }
 </style>

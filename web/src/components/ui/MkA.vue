@@ -2,7 +2,7 @@
 // Ported from firefish@02c31e0:packages/client/src/components/global/MkA.vue
 //
 // Firefish builds its own router on top of vue-router and renders a plain
-// <a>; here the standard RouterLink is used and only middle/ctrl-free plain
+// a plain anchor; here the standard RouterLink is used and only middle/ctrl-free plain
 // clicks are intercepted for window behaviour. The right-click "open in
 // window" context menu is dropped: TODO Cinderfish lacks the os.contextMenu
 // / os.pageWindow runtime surface that menu depends on.
@@ -19,11 +19,6 @@
 <script lang="ts" setup>
 import { computed } from "vue";
 import { RouterLink, useRouter } from "vue-router";
-
-// Local UI strings (hardcoded Chinese until a shared i18n layer exists).
-const strings = {
-	copyLink: "复制链接",
-};
 
 const props = withDefaults(
 	defineProps<{

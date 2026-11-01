@@ -1,297 +1,270 @@
-<script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+// SPDX-License-Identifier: AGPL-3.0-only
+// Ported from firefish@02c31e0:packages/client/src/components/MkNote.vue
+//
+// Dropped versus the original, with reasons:
+// - Word soft-mute (check-word-mute): the mutedWords store slice and the
+//   matching engine are not ported (TODO).
+// - noteViewInterruptors (plugins): Cinderfish has no plugin runtime.
+// - Renote aggregation (the `renotes` prop and multi-avatar renote bar):
+//   Cinderfish has no notes/renotes endpoint, so a renote renders its own
+//   single bar. TODO: aggregate renotes when the endpoint exists.
+// - v-vibrate and context menu: no vibrate runtime; the context menu items
+//   all live in the footer's more-menu already.
+<template>
+	<div v-if="!isDeleted" ref="el" class="note-container" tabindex="-1">
+		<NoteSub
+			v-if="appearNote.reply && !detailedView && !collapsedReply"
+			:note="appearNote.reply"
+			class="reply-to"
+		/>
+		<div v-if="!detailedView" class="note-context" @click="noteClick">
+			<NoteHeaderInfo :note="note" :appear-note="appearNote" :collapsed-reply="collapsedReply && !!appearNote.reply" :pinned="pinned" />
+			<RenoteBar :note="note" :appear-note="appearNote" />
+		</div>
+		<article class="article" :style="{ cursor: expandOnNoteClick && !detailedView ? 'pointer' : '' }" @click="noteClick">
+			<div class="main">
+				<div class="header-container">
+					<MkAvatar class="avatar" :user="appearNote.user" />
+					<NoteHeader class="header" :note="appearNote" />
+				</div>
+				<div class="body">
+					<NoteContent
+						:note="appearNote"
+						:detailed="true"
+						:detailed-view="detailedView"
+						@push="(e) => router.push(`/notes/${e.id}`)"
+					/>
+				</div>
+				<NoteFooter
+					class="footer"
+					ref="footerEl"
+					:note="appearNote"
+					:detailed-view="detailedView"
+					@deleted="isDeleted = true"
+					@event:focus="focus"
+					@event:blur="blur"
+					@renoted="onRenoted"
+				/>
+			</div>
+		</article>
+	</div>
+</template>
+
+<script lang="ts" setup>
+import { computed, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
-import type { Note as NoteModel } from "../../api/types";
+import type { Note } from "../../api/types";
 import { focusNext, focusPrev } from "../../lib/focus-sibling";
-import { makeHotkey } from "../../lib/hotkeys";
-import { absoluteTime } from "../../lib/time";
-import { openPostForm } from "../../os";
-import { session } from "../../stores/session";
+import MkAvatar from "../ui/MkAvatar.vue";
 import NoteContent from "./NoteContent.vue";
 import NoteFooter from "./NoteFooter.vue";
 import NoteHeader from "./NoteHeader.vue";
-import NoteParent from "./NoteParent.vue";
+import NoteHeaderInfo from "./NoteHeaderInfo.vue";
+import NoteSub from "./NoteSub.vue";
 import RenoteBar from "./RenoteBar.vue";
-import { useNote } from "./use-note";
+import { defaultStore } from "../../store/firefish-store";
+import { useNoteCapture } from "./use-note-capture";
 
 const props = withDefaults(
-  defineProps<{ note: NoteModel; nested?: boolean; detail?: boolean }>(),
-  { nested: false, detail: false },
+	defineProps<{
+		note: Note;
+		pinned?: boolean;
+		detailedView?: boolean;
+		collapsedReply?: boolean;
+	}>(),
+	{
+		pinned: false,
+		detailedView: false,
+		collapsedReply: false,
+	},
 );
-
-const emit = defineEmits<{
-  reply: [note: NoteModel];
-  deleted: [id: string];
-  renoted: [note: NoteModel];
-}>();
 
 const router = useRouter();
-const root = ref<HTMLElement | null>(null);
-const footer = ref<InstanceType<typeof NoteFooter> | null>(null);
 
-// A note carrying a renote target and nothing of its own is a pure renote:
-// the bar names the renoter and the renoted note supplies header, content and
-// footer. Anything with text, a CW, a reply pointer, files or a poll is a
-// quote and keeps its own content with the quoted note rendered as a card.
-// Mirrors Misskey's isQuote (misc/is-renote.ts), which counts replyId too.
-const pureRenote = computed(() => {
-  const note = props.note;
-  if (!note.renote) return false;
-  const hasOwnContent =
-    !!note.text?.trim() || !!note.cw || !!note.replyId || (note.files?.length ?? 0) > 0 || !!note.hasPoll;
-  return !hasOwnContent;
-});
+const keymap = {
+	r: () => footerEl.value?.reply(),
+	"e|a|plus": () => footerEl.value?.react(),
+	"up|k": focusBefore,
+	"down|j": focusAfter,
+	esc: blur,
+	"m|o": () => footerEl.value?.menu(),
+};
 
-const appearNote = computed<NoteModel>(() =>
-  pureRenote.value && props.note.renote ? props.note.renote : props.note,
+const el = ref<HTMLElement | null>(null);
+const footerEl = ref<InstanceType<typeof NoteFooter> | null>(null);
+
+const expandOnNoteClick = defaultStore.reactiveState.expandOnNoteClick;
+
+const isDeleted = ref(false);
+
+const isRenote = computed(
+	() =>
+		props.note.renote != null &&
+		props.note.text == null &&
+		props.note.fileIds.length === 0 &&
+		props.note.poll == null,
+);
+const appearNote = computed(() => (isRenote.value ? (props.note.renote as Note) : props.note));
+
+// The innerNote ref mirrors the props note so the streaming capture can
+// mutate reactions in place without touching the store's copy.
+const innerNote = ref(props.note);
+watch(
+	() => props.note,
+	(n) => {
+		innerNote.value = n;
+	},
 );
 
-const parentNote = computed(() => appearNote.value.reply ?? null);
-const quoteNote = computed(() => appearNote.value.renote ?? null);
-
-const quotePreview = computed(() => {
-  const target = quoteNote.value;
-  if (!target) return "";
-  return target.text?.trim().slice(0, 80) || target.user.username;
+useNoteCapture({
+	rootEl: el,
+	note: innerNote,
+	isDeletedRef: isDeleted,
 });
 
-const accessibleLabel = computed(() => {
-  const note = appearNote.value;
-  const parts: string[] = [];
-  if (pureRenote.value) parts.push(`${props.note.user.username} 转贴`);
-  parts.push(note.user.username);
-  if (note.cw) parts.push(`内容警告：${note.cw}`);
-  if (note.text) parts.push(note.text.slice(0, 140));
-  parts.push(absoluteTime(note.createdAt));
-  return parts.join("；");
+function focus() {
+	el.value?.focus();
+}
+
+function blur() {
+	el.value?.blur();
+}
+
+function focusBefore() {
+	focusPrev(el.value);
+}
+
+function focusAfter() {
+	focusNext(el.value);
+}
+
+function noteClick(e: MouseEvent) {
+	if (
+		document.getSelection()?.type === "Range" ||
+		props.detailedView ||
+		!expandOnNoteClick.value
+	) {
+		e.stopPropagation();
+	} else {
+		const target = e.target instanceof Element ? e.target : null;
+		if (target?.closest("a, button, input, textarea, select, [contenteditable]")) return;
+		router.push(`/notes/${appearNote.value.id}`);
+	}
+}
+
+function onRenoted() {
+	appearNote.value.renoteCount += 1;
+}
+
+onMounted(() => {
+	el.value?.addEventListener("keydown", keymap as unknown as EventListener);
 });
-
-const { reactions, myReaction, reactionCount, isMine, busy, notice, toggleReaction, renote, remove } =
-  useNote(appearNote, computed(() => props.note));
-
-// Misskey's renote gate: public and home notes can be renoted by anyone, a
-// followers note only by its author, a specified note by nobody
-// (MkRenoteButton canRenote). The backend answers CANNOT_RENOTE_DUE_TO_
-// VISIBILITY otherwise; the lock here keeps the same rule visible.
-const renotable = computed(() => {
-  const visibility = appearNote.value.visibility;
-  return visibility === "public" || visibility === "home" || appearNote.value.userId === session.me?.id;
-});
-
-async function onRenote() {
-  const created = await renote();
-  if (created) emit("renoted", created);
-}
-
-// The fork keeps quote as its own footer action (MkQuoteButton) instead of
-// burying it in the renote button; it opens the composer with the renote
-// target, which the form submits as renoteId plus text.
-function onQuote() {
-  openPostForm({ renote: appearNote.value });
-}
-
-async function onRemove() {
-  if (await remove()) emit("deleted", props.note.id);
-}
-
-function openQuote(event: MouseEvent) {
-  const target = event.target instanceof Element ? event.target : null;
-  if (target?.closest("a, button")) return;
-  if (quoteNote.value) router.push(`/notes/${quoteNote.value.id}`);
-}
-
-// A click on the row body focuses the note so the shortcuts below apply; a
-// click on a link or control keeps its own focus.
-function onClick(event: MouseEvent) {
-  const target = event.target instanceof Element ? event.target : null;
-  if (target?.closest("a, button, input, textarea, select, [contenteditable]")) return;
-  root.value?.focus({ preventScroll: true });
-}
-
-const hotkeys = makeHotkey({
-  r: () => footer.value?.reply(),
-  "e|a|plus": () => footer.value?.react(),
-  q: () => footer.value?.renote(),
-  "up|k": () => {
-    if (root.value) focusPrev(root.value);
-  },
-  "down|j": () => {
-    if (root.value) focusNext(root.value);
-  },
-  esc: () => root.value?.blur(),
-  "m|o": () => footer.value?.menu(),
-});
-
-onMounted(() => root.value?.addEventListener("keydown", hotkeys));
-onBeforeUnmount(() => root.value?.removeEventListener("keydown", hotkeys));
 </script>
 
-<template>
-  <article
-    :id="appearNote.id"
-    ref="root"
-    class="note"
-    :class="{ nested, detail }"
-    tabindex="-1"
-    :aria-label="accessibleLabel"
-    @click="onClick"
-  >
-    <div class="note-inner">
-      <NoteParent v-if="parentNote" :note="parentNote" />
-
-      <RenoteBar v-if="pureRenote" :note="note" />
-
-      <NoteHeader :note="appearNote" :detail="detail" />
-
-      <NoteContent :note="appearNote" :nested="nested" :detail="detail">
-        <template #quote>
-          <RouterLink v-if="quoteNote && !detail" :to="`/notes/${quoteNote.id}`" class="quote-link" @click.stop>
-            引用：{{ quotePreview }}
-          </RouterLink>
-          <div v-else-if="quoteNote" class="quote" @click.stop="openQuote">
-            <NoteHeader :note="quoteNote" radius="8px" />
-            <NoteContent :note="quoteNote" nested />
-          </div>
-        </template>
-      </NoteContent>
-
-      <NoteFooter
-        ref="footer"
-        :note="appearNote"
-        :action-note="note"
-        :reactions="reactions"
-        :my-reaction="myReaction"
-        :reaction-count="reactionCount"
-        :busy="busy"
-        :is-mine="isMine"
-        :renotable="renotable"
-        @reply="emit('reply', appearNote)"
-        @renote="onRenote"
-        @react="toggleReaction"
-        @quote="onQuote"
-        @remove="onRemove"
-      />
-
-      <p v-if="notice" class="notice small">{{ notice }}</p>
-    </div>
-  </article>
-</template>
-
 <style scoped>
-/* Each row is its own size container, so the note adapts to a 350px deck
-   column and a 680px main column without knowing anything about the shell. */
-.note {
-  position: relative;
-  container-name: note;
-  container-type: inline-size;
-  padding: 0;
-  border-bottom: 1px solid var(--divider);
-  background: transparent;
-  min-width: 0;
+.note-container {
+	position: relative;
+	transition: box-shadow 0.1s ease;
+	font-size: 1.05em;
+	overflow: clip;
+	contain: content;
+	-webkit-tap-highlight-color: transparent;
 }
 
-.note-inner {
-  --avatar-size: 48px;
-  /* Firefish MkNote.vue .article: padding 20px top, 32px sides, 10px
-     bottom, root font-size 1.05em. */
-  padding: 14px 22px 10px;
-  font-size: 1.05em;
+.note-container:focus-visible {
+	outline: none;
 }
 
-.note.detail {
-  border-bottom: 0;
+.note-container:focus-visible::after {
+	content: "";
+	pointer-events: none;
+	display: block;
+	position: absolute;
+	z-index: 10;
+	inset: 0;
+	margin: auto;
+	inline-size: calc(100% - 8px);
+	block-size: calc(100% - 8px);
+	border: solid 1px var(--focus);
+	border-radius: var(--radius, 8px);
+	box-sizing: border-box;
 }
 
-.note.detail .note-inner {
-  padding: 16px 4px 12px;
+.note-container > .article > .main:hover :deep(.footer .button),
+.note-container > .article > .main:focus-within :deep(.footer .button) {
+	opacity: 1;
 }
 
-/* Keyboard focus draws a ring inside the row instead of a browser outline
-   that would be clipped by the container. */
-.note:focus-visible {
-  outline: none;
+.note-context {
+	position: relative;
+	padding-block-start: 0;
+	padding-inline: 32px;
+	display: flex;
+	flex-wrap: wrap;
+	z-index: 1;
 }
 
-.note:focus-visible::after {
-  content: "";
-  pointer-events: none;
-  position: absolute;
-  z-index: 10;
-  inset: 0;
-  margin: auto;
-  width: calc(100% - 8px);
-  height: calc(100% - 8px);
-  border: 1px solid var(--accent);
-  border-radius: var(--radius-sm);
-  box-sizing: border-box;
+.article {
+	position: relative;
+	overflow: clip;
+	padding-block-start: 20px;
+	padding-inline: 32px;
+	padding-block-end: 10px;
 }
 
-/* The action row rests dimmed; hovering or focusing the row lifts it. The
-   reaction strip above it is not dimmed. */
-.note:hover :deep(.actions),
-.note:focus-within :deep(.actions) {
-  opacity: 1;
+.header-container {
+	display: flex;
+	position: relative;
+	z-index: 2;
 }
 
-.quote {
-  --avatar-size: 38px;
-  margin-top: 8px;
-  padding: 16px;
-  border: 1px solid var(--renote);
-  border-radius: 8px;
-  cursor: pointer;
-  transition: background 0.2s ease;
+.avatar {
+	flex-shrink: 0;
+	display: block;
+	margin-inline-end: 14px;
+	inline-size: var(--avatarSize, 48px);
+	block-size: var(--avatarSize, 48px);
 }
 
-.quote:hover,
-.quote:focus-within {
-  background: var(--panel-2);
+.header {
+	inline-size: 0;
+	flex-grow: 1;
 }
 
-.quote-link {
-  display: block;
-  margin-top: 6px;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--renote);
-  font-size: 0.85rem;
+.main {
+	flex: 1;
+	min-inline-size: 0;
 }
 
-.quote-link:hover {
-  color: var(--accent);
+.body {
+	margin-block-start: 0.7em;
 }
 
-.notice {
-  margin-top: 8px;
-  color: var(--danger);
+@media (max-width: 500px) {
+	.note-container {
+		font-size: 0.975em;
+	}
+
+	.note-context {
+		padding-inline: 16px;
+	}
+
+	.article {
+		padding-block-start: 18px;
+		padding-inline: 16px;
+		padding-block-end: 8px;
+	}
+
+	.avatar {
+		margin-inline-end: 10px;
+		inline-size: var(--avatarSize, 46px);
+		block-size: var(--avatarSize, 46px);
+	}
 }
 
-/* The container is the row itself, so only its descendants can query it. */
-@container note (max-width: 500px) {
-  .note-inner {
-    --avatar-size: 46px;
-    font-size: 0.975em;
-    /* Firefish .max-width_500px .article: 18px top, 16px sides, 8px bottom. */
-    padding: 13px 16px 8px;
-  }
-
-  .quote {
-    padding: 12px;
-  }
-}
-
-@container note (max-width: 380px) {
-  .note-inner {
-    --avatar-size: 40px;
-    font-size: 0.94em;
-    padding: 10px 10px 6px;
-  }
-
-  .quote {
-    --avatar-size: 32px;
-    padding: 10px;
-  }
+@media (max-width: 350px) {
+	.avatar {
+		--avatarSize: 40px;
+	}
 }
 </style>

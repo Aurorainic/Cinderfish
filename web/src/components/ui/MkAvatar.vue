@@ -36,7 +36,7 @@
 <script lang="ts" setup>
 import { computed, ref, watch } from "vue";
 import type { UserLite } from "../../api/types";
-import MkA from "@/components/ui/MkA.vue";
+import MkA from "./MkA.vue";
 
 const props = withDefaults(
 	defineProps<{
