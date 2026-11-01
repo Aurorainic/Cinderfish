@@ -233,23 +233,25 @@ defineExpose({ reply, react: onReact, renote, menu });
 </template>
 
 <style scoped>
-/* The reaction strip sits above the action row; only the actions dim at
-   rest, so reaction counts stay readable without hovering the row. */
+/* Firefish MkNoteFooter.vue .footer: flex row, margin-top 0.4em, buttons with
+   flex-grow 1 capped at 3.5em, opacity 0.7 at rest, count offset 8px. The
+   reaction strip sits above the action row; only the actions dim at rest. */
 .foot {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  margin-top: 6px;
+  margin-top: 0.4em;
   min-width: 0;
 }
 
 .actions {
   display: flex;
   align-items: center;
-  gap: 2px;
-  margin-inline-start: -6px;
+  flex-wrap: wrap;
+  gap: 0;
+  margin-inline-start: -0.5em;
   opacity: 0.7;
-  transition: opacity 0.12s ease;
+  transition: opacity 0.2s ease;
 }
 
 /* Equal shares, capped at 3.5em so a wide note does not stretch three icons
@@ -272,21 +274,28 @@ defineExpose({ reply, react: onReact, renote, menu });
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
-  padding: 4px 8px;
+  gap: 0;
+  padding: 8px;
   border: 0;
-  border-radius: var(--radius-sm);
+  border-radius: 0;
   background: transparent;
   color: var(--muted);
   cursor: pointer;
-  font-size: 0.8rem;
+  font-size: 0.9rem;
   line-height: 1.5;
+  transition: opacity 0.2s ease;
+}
+
+/* Firefish offsets the count from the icon with an 8px margin. */
+.action .count {
+  margin-inline-start: 8px;
+  opacity: 0.7;
 }
 
 .action:hover,
 .action:focus-visible {
-  color: var(--accent);
-  background: var(--accent-soft);
+  color: var(--fgHighlighted);
+  background: transparent;
 }
 
 .action.reacted {
