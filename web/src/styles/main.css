@@ -1,718 +1,1160 @@
-/* Cinderfish frontend: Firefish original restoration. Colour tokens derive
-   from Firefish's default dark theme (themes/_dark.json5 @02c31e0): black
-   page background, panels lifted 3%, the #86b300 accent, #dadada foreground
-   and its content semantics (link/renote/hashtag/CW). The light theme mirrors
-   themes/_light.json5 the same way. Scale, motion and layer tokens stay
-   structural; the light theme in [data-theme="light"] and the dark theme
-   below stay in sync. */
-
-/* Firefish's camelCase token names, aliased onto the tokens below. */
+/*
+ * SPDX-License-Identifier: AGPL-3.0-only
+ * Ported from firefish@02c31e0:packages/client/src/style.scss
+ *
+ * Cinderfish global style system. Ports Firefish's global stylesheet
+ * (src/style.scss) and its default theme token sets (src/themes/_dark.json5
+ * and src/themes/_light.json5 @02c31e0) to plain CSS with CSS custom
+ * properties — no Sass, no theme compiler.
+ *
+ * Adaptations:
+ * - Firefish expands theme-compiler functions like `:alpha<0.15<@accent`;
+ *   here every derived token is a static value or a `color-mix()` expression
+ *   with the same intent.
+ * - Firefish swaps a compiled theme class on <html>; Cinderfish follows the
+ *   OS via `prefers-color-scheme` with a manual `html[data-theme]` override.
+ * - Atkinson Hyperlegible @font-face rules are dropped (no static font
+ *   assets). TODO: serve the webfonts from Cinderfish static assets.
+ * - Icon-font `ph-*` classes are not ported. TODO: icon strategy.
+ */
+/* Firefish camelCase aliases kept for tokens not redefined below. */
 @import "./firefish-tokens.css";
 
+/* ------------------------------------------------------------------ */
+/* Structure tokens (style.scss :root)                                 */
+/* ------------------------------------------------------------------ */
+
 :root {
-  color-scheme: dark;
-  accent-color: var(--accent);
+	--radius: 12px;
+	--marginFull: 16px;
+	--marginHalf: 10px;
+	--avatarSize: 48px;
 
-  /* ---------- surfaces (Firefish _dark.json5: bg #000, panel = lighten 3) ---------- */
-  --bg: #000000;
-  --theme-color: #000000;
-  --panel: #0d0d0d;
-  --panel-2: #171717;
-  --surface-inset: #070707;
-  --surface-hover: rgba(255, 255, 255, 0.06);
-  --surface-selected: color-mix(in srgb, var(--accent) 18%, transparent);
-  --popup-bg: #171717;
-  --window-header-bg: rgba(255, 255, 255, 0.05);
-  --overlay-bg: rgba(0, 0, 0, 0.5);
-  --overlay-blur: 12px;
-
-  /* ---------- accent (Firefish default #86b300) ---------- */
-  --accent: #86b300;
-  --accent-hover: #9bcc1a;
-  --accent-active: #6f9300;
-  --accent-soft: color-mix(in srgb, var(--accent) 15%, transparent);
-  --accent-border: color-mix(in srgb, var(--accent) 42%, var(--border));
-  --text-on-accent: #ffffff;
-
-  /* ---------- lines (Firefish divider rgba(255,255,255,.1)) ---------- */
-  --border: rgba(255, 255, 255, 0.1);
-  --border-strong: rgba(255, 255, 255, 0.16);
-  --divider: rgba(255, 255, 255, 0.1);
-  --input-border: rgba(255, 255, 255, 0.1);
-  --input-border-hover: rgba(255, 255, 255, 0.2);
-  --input-border-invalid: var(--danger);
-
-  /* ---------- foreground (Firefish fg #dadada) ---------- */
-  --text: #dadada;
-  --text-strong: #ffffff;
-  --text-weak: color-mix(in srgb, var(--text) 75%, transparent);
-  --text-faint: color-mix(in srgb, var(--text) 50%, transparent);
-  --text-date: var(--text);
-  --text-on-status: #ffffff;
-
-  /* ---------- status (Firefish success/error/warn) ---------- */
-  --danger: #ec4137;
-  --danger-soft: color-mix(in srgb, var(--danger) 14%, transparent);
-  --danger-border: color-mix(in srgb, var(--danger) 45%, var(--border));
-  --success: #86b300;
-  --success-soft: color-mix(in srgb, var(--success) 14%, transparent);
-  --warn: #ecb637;
-  --warn-bg: #42321c;
-  --warn-fg: #ffbd3e;
-  --info-bg: #253142;
-  --info-fg: #ffffff;
-
-  /* ---------- content semantics (Firefish link/hashtag/renote) ---------- */
-  --link: #44a4c1;
-  --link-hover: #6fc0d8;
-  --renote: #229e82;
-  --mention: var(--accent);
-  --mention-me: var(--accent);
-  --hashtag: #ff9156;
-  --cw-bg: #687390;
-  --cw-fg: #393f4f;
-  --cw-hover-bg: #707b97;
-
-  /* ---------- navigation (Firefish navBg = panel, navActive = accent) ---------- */
-  --nav-bg: var(--panel);
-  --nav-fg: var(--text);
-  --nav-fg-hover: color-mix(in srgb, var(--text) 82%, #ffffff);
-  --nav-active: var(--accent);
-  --nav-indicator: var(--accent);
-  --badge-bg: #31b1ce;
-  --badge-fg: #ffffff;
-
-  /* ---------- focus, scrollbar, selection ---------- */
-  --focus-ring: var(--accent);
-  --focus-outline: 2px solid var(--focus-ring);
-  --focus-halo: color-mix(in srgb, var(--accent) 24%, transparent);
-  --scrollbar-thumb: rgba(255, 255, 255, 0.2);
-  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.4);
-  --scrollbar-size: 8px;
-  --selection-bg: color-mix(in srgb, var(--accent) 32%, transparent);
-  --selection-fg: var(--text-strong);
-
-  /* ---------- shadow (Firefish shadow rgba(0,0,0,.3)) ---------- */
-  --shadow-color: rgba(0, 0, 0, 0.3);
-  --shadow-popover: 0 2px 10px var(--shadow-color);
-  --shadow-modal: 0 8px 32px var(--shadow-color);
-
-  /* ---------- radius ---------- */
-  --radius-xs: 4px;
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 14px;
-  --radius-full: 999px;
-
-  /* ---------- space ---------- */
-  --space-2: 2px;
-  --space-4: 4px;
-  --space-6: 6px;
-  --space-8: 8px;
-  --space-10: 10px;
-  --space-12: 12px;
-  --space-14: 14px;
-  --space-16: 16px;
-  --space-20: 20px;
-  --space-24: 24px;
-  --space-28: 28px;
-  --space-32: 32px;
-  --space-40: 40px;
-  --space-48: 48px;
-  --space-64: 64px;
-
-  /* ---------- type ---------- */
-  --font: "Inter", "Noto Sans SC", -apple-system, BlinkMacSystemFont, "Segoe UI",
-    sans-serif;
-  --font-mono: ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas,
-    monospace;
-  --fs-2xs: 0.68rem;
-  --fs-xs: 0.76rem;
-  --fs-sm: 0.85rem;
-  --fs-md: 0.95rem;
-  --fs-base: 0.9375rem;
-  --fs-lg: 1.15rem;
-  --fs-xl: 1.5rem;
-  --fs-2xl: 1.9rem;
-  --fs-3xl: 2.4rem;
-  --weight-regular: 400;
-  --weight-medium: 500;
-  --weight-semibold: 600;
-  --weight-bold: 700;
-  --leading-tight: 1.25;
-  --leading-base: 1.55;
-  --leading-relaxed: 1.65;
-
-  /* ---------- motion ---------- */
-  --dur-fast: 0.12s;
-  --dur-base: 0.15s;
-  --dur-slow: 0.3s;
-  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
-  --ease-emphasized: cubic-bezier(0, 0.5, 0.5, 1);
-
-  /* ---------- layers ---------- */
-  --z-sticky: 20;
-  --z-popover: 60;
-  --z-window: 1000;
-  --z-overlay: 1100;
-  --z-toast: 1200;
-
-  /* ---------- layout ---------- */
-  /* Sidebar widths follow the Iceshrimp fork: 250px full, 80px icon-only
-     (fork/ui/_common_/navbar.vue: $nav-width / $nav-icon-only-width). The shell
-     cap is the third column's budget plus the main column at its widest, so a
-     wide monitor centres the app instead of stretching the reading column. */
-  --rail-width: 250px;
-  --rail-width-collapsed: 80px;
-  --side-width: 300px;
-  --shell-max-width: 1360px;
-  --bottom-bar-height: 66px;
-  --touch-target: 40px;
-
-  /* ---------- legacy aliases ---------- */
-  --muted: var(--text-weak);
-  --on-accent: var(--text-on-accent);
-  --accent-strong: var(--accent-hover);
-  --bg-raised: var(--surface-inset);
-  --radius: var(--radius-md);
-  --shadow-sm: var(--shadow-popover);
+	--margin: var(--marginFull);
 }
 
+@media (max-width: 500px) {
+	:root {
+		--margin: var(--marginHalf);
+	}
+}
+
+/* ------------------------------------------------------------------ */
+/* Default (dark) theme — ported from themes/_dark.json5               */
+/* ------------------------------------------------------------------ */
+
+:root {
+	color-scheme: dark;
+	accent-color: var(--accent);
+
+	/* surfaces */
+	--bg: #000000;
+	--htmlThemeColor: var(--bg);
+	--panel: color-mix(in srgb, var(--bg) 97%, #ffffff); /* :lighten<3<@bg */
+	--panelHighlight: color-mix(in srgb, var(--panel) 97%, #ffffff); /* :lighten<3<@panel */
+	--panelHeaderBg: var(--panelHighlight); /* :lighten<3<@panel */
+	--panelHeaderFg: var(--fg);
+	--panelHeaderDivider: rgba(0, 0, 0, 0);
+	--acrylicBg: color-mix(in srgb, var(--bg) 50%, transparent); /* :alpha<0.5<@bg */
+	--acrylicPanel: color-mix(in srgb, var(--panel) 50%, transparent); /* :alpha<0.5<@panel */
+	--windowHeader: color-mix(in srgb, var(--panel) 85%, transparent); /* :alpha<0.85<@panel */
+	--popup: var(--panelHighlight); /* :lighten<3<@panel */
+	--header: color-mix(in srgb, var(--panel) 70%, transparent); /* :alpha<0.7<@panel */
+	--shadow: rgba(0, 0, 0, 0.3);
+	--wallpaperOverlay: rgba(0, 0, 0, 0.5);
+
+	/* foreground */
+	--fg: #dadada;
+	--fgTransparentWeak: color-mix(in srgb, var(--fg) 75%, transparent); /* :alpha<0.75<@fg */
+	--fgTransparent: color-mix(in srgb, var(--fg) 50%, transparent); /* :alpha<0.5<@fg */
+	--fgHighlighted: color-mix(in srgb, var(--fg) 97%, #ffffff); /* :lighten<3<@fg */
+	--fgOnAccent: #ffffff;
+	--dateLabelFg: var(--fg);
+
+	/* accent */
+	--accent: #86b300;
+	--accentDarken: color-mix(in srgb, var(--accent) 90%, #000000); /* :darken<10<@accent */
+	--accentLighten: color-mix(in srgb, var(--accent) 90%, #ffffff); /* :lighten<10<@accent */
+	--accentedBg: color-mix(in srgb, var(--accent) 15%, transparent); /* :alpha<0.15<@accent */
+	--focus: color-mix(in srgb, var(--accent) 30%, transparent); /* :alpha<0.3<@accent */
+
+	/* accent ramps (Firefish's numbered extension tokens) */
+	--X8: color-mix(in srgb, var(--accent) 95%, #ffffff); /* :lighten<5<@accent */
+	--X9: color-mix(in srgb, var(--accent) 95%, #000000); /* :darken<5<@accent */
+	--X10: color-mix(in srgb, var(--accent) 40%, transparent); /* :alpha<0.4<@accent */
+	--X11: rgba(0, 0, 0, 0.3);
+	--X12: rgba(255, 255, 255, 0.1);
+	--X13: rgba(255, 255, 255, 0.15);
+	--X14: color-mix(in srgb, var(--navBg) 50%, transparent); /* :alpha<0.5<@navBg */
+	--X15: color-mix(in srgb, var(--panel) 0%, transparent); /* :alpha<0<@panel */
+	--X16: color-mix(in srgb, var(--panel) 70%, transparent); /* :alpha<0.7<@panel */
+	--X17: color-mix(in srgb, var(--bg) 80%, transparent); /* :alpha<0.8<@bg */
+	--X2: color-mix(in srgb, var(--panel) 98%, #000000); /* :darken<2<@panel */
+	--X3: rgba(255, 255, 255, 0.05);
+	--X4: rgba(255, 255, 255, 0.1);
+	--X5: rgba(255, 255, 255, 0.05);
+	--X6: rgba(255, 255, 255, 0.15);
+	--X7: rgba(255, 255, 255, 0.05);
+
+	/* lines */
+	--divider: rgba(255, 255, 255, 0.1);
+	/* Firefish has no separate hairline token; components asked for one. */
+	--hairline: color-mix(in srgb, var(--divider) 50%, transparent);
+
+	/* navigation */
+	--navBg: var(--panel);
+	--navFg: var(--fg);
+	--navHoverFg: color-mix(in srgb, var(--fg) 83%, #ffffff); /* :lighten<17<@fg */
+	--navActive: var(--accent);
+	--navIndicator: var(--indicator);
+
+	/* content semantics */
+	--link: #44a4c1;
+	--hashtag: #ff9156;
+	--mention: var(--accent);
+	--mentionMe: var(--mention);
+	--renote: #229e82;
+	--cwBg: #687390;
+	--cwFg: #393f4f;
+	--cwHoverBg: #707b97;
+
+	/* status */
+	--success: #86b300;
+	--error: #ec4137;
+	--warn: #ecb637;
+	--badge: #31b1ce;
+	--indicator: var(--accent);
+	--infoBg: #253142;
+	--infoFg: #ffffff;
+	--infoWarnBg: #42321c;
+	--infoWarnFg: #ffbd3e;
+	--switchBg: rgba(255, 255, 255, 0.15);
+	--switchOffBg: rgba(255, 255, 255, 0.1);
+	--switchOffFg: var(--fg);
+	--switchOnBg: var(--accentedBg);
+	--switchOnFg: var(--accent);
+
+	/* controls */
+	--buttonBg: rgba(255, 255, 255, 0.05);
+	--buttonHoverBg: rgba(255, 255, 255, 0.1);
+	--buttonGradateA: var(--accent);
+	/* :hue<20<@accent — the theme compiler's hue rotation has no plain-CSS
+	   equivalent; #a3b300 is hue +20deg of #86b300. */
+	--buttonGradateB: #a3b300;
+	--inputBorder: rgba(255, 255, 255, 0.1);
+	--inputBorderHover: rgba(255, 255, 255, 0.2);
+	--listItemHoverBg: rgba(255, 255, 255, 0.03);
+	--driveFolderBg: color-mix(in srgb, var(--accent) 30%, transparent); /* :alpha<0.3<@accent */
+
+	/* overlays and scrollbars */
+	--modalBg: rgba(0, 0, 0, 0.5);
+	--scrollbarHandle: rgba(255, 255, 255, 0.2);
+	--scrollbarHandleHover: rgba(255, 255, 255, 0.4);
+
+	/* code highlighting */
+	--codeString: #ffb675;
+	--codeNumber: #cfff9e;
+	--codeBoolean: #c59eff;
+
+	/* gradients (style.scss) */
+	--gradient: hsl(0, 0%, 0%) 0%, hsla(0, 0%, 0%, 0.987) 8.1%,
+		hsla(0, 0%, 0%, 0.951) 15.5%, hsla(0, 0%, 0%, 0.896) 22.5%,
+		hsla(0, 0%, 0%, 0.825) 29%, hsla(0, 0%, 0%, 0.741) 35.3%,
+		hsla(0, 0%, 0%, 0.648) 41.2%, hsla(0, 0%, 0%, 0.55) 47.1%,
+		hsla(0, 0%, 0%, 0.45) 52.9%, hsla(0, 0%, 0%, 0.352) 58.8%,
+		hsla(0, 0%, 0%, 0.259) 64.7%, hsla(0, 0%, 0%, 0.175) 71%,
+		hsla(0, 0%, 0%, 0.104) 77.5%, hsla(0, 0%, 0%, 0.049) 84.5%,
+		hsla(0, 0%, 0%, 0.013) 91.9%, hsla(0, 0%, 0%, 0) 100%;
+
+	/* logical gradient directions, flipped by html[dir="rtl"] / vertical writing */
+	--gradient-to-block-start: to top;
+	--gradient-to-block-end: to bottom;
+	--gradient-to-inline-start: to left;
+	--gradient-to-inline-end: to right;
+}
+
+/* ------------------------------------------------------------------ */
+/* Light theme — ported from themes/_light.json5                       */
+/* ------------------------------------------------------------------ */
+
 :root[data-theme="light"] {
-  color-scheme: light;
+	color-scheme: light;
 
-  /* Firefish _light.json5: bg #fff, panel = lighten 3, fg #5f5f5f. */
-  --bg: #ffffff;
-  --theme-color: #ffffff;
-  --panel: #f7f7f7;
-  --panel-2: #ececec;
-  --surface-inset: #f0f0f0;
-  --surface-hover: rgba(0, 0, 0, 0.06);
-  --popup-bg: #f7f7f7;
-  --window-header-bg: rgba(0, 0, 0, 0.03);
-  --overlay-bg: rgba(0, 0, 0, 0.3);
+	--bg: #ffffff;
+	--panel: color-mix(in srgb, var(--bg) 97%, #000000); /* :lighten<3<@bg of #fff */
+	--panelHighlight: color-mix(in srgb, var(--panel) 97%, #000000); /* :darken<3<@panel */
+	--panelHeaderBg: color-mix(in srgb, var(--panel) 97%, #ffffff); /* :lighten<3<@panel */
+	--acrylicBg: color-mix(in srgb, var(--bg) 50%, transparent);
+	--acrylicPanel: color-mix(in srgb, var(--panel) 50%, transparent);
+	--windowHeader: color-mix(in srgb, var(--panel) 85%, transparent);
+	--popup: color-mix(in srgb, var(--panel) 97%, #ffffff); /* :lighten<3<@panel */
+	--shadow: rgba(0, 0, 0, 0.1);
+	--wallpaperOverlay: rgba(255, 255, 255, 0.5);
 
-  --border: rgba(0, 0, 0, 0.1);
-  --border-strong: rgba(0, 0, 0, 0.16);
-  --divider: rgba(0, 0, 0, 0.1);
-  --input-border: rgba(0, 0, 0, 0.1);
-  --input-border-hover: rgba(0, 0, 0, 0.2);
+	--fg: #5f5f5f;
+	--fgHighlighted: color-mix(in srgb, var(--fg) 97%, #000000); /* :darken<3<@fg */
 
-  --text: #5f5f5f;
-  --text-strong: #2c2c2c;
-  --text-weak: color-mix(in srgb, var(--text) 75%, transparent);
-  --text-faint: color-mix(in srgb, var(--text) 50%, transparent);
-  --text-date: var(--text);
+	--accentDarken: color-mix(in srgb, var(--accent) 90%, #000000);
+	--accentLighten: color-mix(in srgb, var(--accent) 90%, #ffffff);
 
-  --danger: #ec4137;
-  --success: #86b300;
-  --warn: #ecb637;
-  --warn-fg: #8f6e31;
-  --warn-bg: #fff0db;
-  --info-bg: #e5f5ff;
-  --info-fg: #72818a;
+	--X2: color-mix(in srgb, var(--panel) 98%, #000000); /* :darken<2<@panel */
+	--X3: rgba(0, 0, 0, 0.05);
+	--X4: rgba(0, 0, 0, 0.1);
+	--X5: rgba(0, 0, 0, 0.05);
+	--X6: rgba(0, 0, 0, 0.25);
+	--X7: rgba(0, 0, 0, 0.05);
+	--X11: rgba(0, 0, 0, 0.1);
+	--X12: rgba(0, 0, 0, 0.1);
+	--X13: rgba(0, 0, 0, 0.15);
 
-  --link: #44a4c1;
-  --link-hover: #2f7f96;
-  --renote: #229e82;
-  --mention: var(--accent);
-  --mention-me: var(--accent);
-  --hashtag: #ff9156;
-  --cw-bg: #b1b9c1;
-  --cw-fg: #ffffff;
-  --cw-hover-bg: #bbc4ce;
+	--divider: rgba(0, 0, 0, 0.1);
+	--hairline: color-mix(in srgb, var(--divider) 50%, transparent);
 
-  --scrollbar-thumb: rgba(0, 0, 0, 0.2);
-  --scrollbar-thumb-hover: rgba(0, 0, 0, 0.4);
-  --shadow-color: rgba(0, 0, 0, 0.1);
+	--navHoverFg: color-mix(in srgb, var(--fg) 83%, #000000); /* :darken<17<@fg */
+
+	--cwBg: #b1b9c1;
+	--cwFg: #ffffff;
+	--cwHoverBg: #bbc4ce;
+
+	--infoBg: #e5f5ff;
+	--infoFg: #72818a;
+	--infoWarnBg: #fff0db;
+	--infoWarnFg: #8f6e31;
+	--switchBg: rgba(0, 0, 0, 0.15);
+	--switchOffBg: rgba(0, 0, 0, 0.1);
+	--switchOffFg: var(--panel);
+	--switchOnBg: var(--accent);
+	--switchOnFg: var(--fgOnAccent);
+
+	--buttonBg: rgba(0, 0, 0, 0.05);
+	--buttonHoverBg: rgba(0, 0, 0, 0.1);
+	--inputBorder: rgba(0, 0, 0, 0.1);
+	--inputBorderHover: rgba(0, 0, 0, 0.2);
+	--listItemHoverBg: rgba(0, 0, 0, 0.03);
+
+	--modalBg: rgba(0, 0, 0, 0.3);
+	--scrollbarHandle: rgba(0, 0, 0, 0.2);
+	--scrollbarHandleHover: rgba(0, 0, 0, 0.4);
+
+	--codeString: #b98710;
+	--codeNumber: #0fbbbb;
+	--codeBoolean: #62b70c;
+}
+
+/* OS-level auto-follow: when the user has not picked a theme explicitly
+   (html[data-theme] unset), follow the system preference. */
+@media (prefers-color-scheme: light) {
+	:root:not([data-theme]) {
+		color-scheme: light;
+
+		--bg: #ffffff;
+		--panel: color-mix(in srgb, var(--bg) 97%, #000000);
+		--panelHighlight: color-mix(in srgb, var(--panel) 97%, #000000);
+		--panelHeaderBg: color-mix(in srgb, var(--panel) 97%, #ffffff);
+		--acrylicBg: color-mix(in srgb, var(--bg) 50%, transparent);
+		--acrylicPanel: color-mix(in srgb, var(--panel) 50%, transparent);
+		--windowHeader: color-mix(in srgb, var(--panel) 85%, transparent);
+		--popup: color-mix(in srgb, var(--panel) 97%, #ffffff);
+		--shadow: rgba(0, 0, 0, 0.1);
+		--wallpaperOverlay: rgba(255, 255, 255, 0.5);
+
+		--fg: #5f5f5f;
+		--fgHighlighted: color-mix(in srgb, var(--fg) 97%, #000000);
+
+		--X2: color-mix(in srgb, var(--panel) 98%, #000000);
+		--X3: rgba(0, 0, 0, 0.05);
+		--X4: rgba(0, 0, 0, 0.1);
+		--X5: rgba(0, 0, 0, 0.05);
+		--X6: rgba(0, 0, 0, 0.25);
+		--X7: rgba(0, 0, 0, 0.05);
+		--X11: rgba(0, 0, 0, 0.1);
+		--X12: rgba(0, 0, 0, 0.1);
+		--X13: rgba(0, 0, 0, 0.15);
+
+		--divider: rgba(0, 0, 0, 0.1);
+		--hairline: color-mix(in srgb, var(--divider) 50%, transparent);
+
+		--navHoverFg: color-mix(in srgb, var(--fg) 83%, #000000);
+
+		--cwBg: #b1b9c1;
+		--cwFg: #ffffff;
+		--cwHoverBg: #bbc4ce;
+
+		--infoBg: #e5f5ff;
+		--infoFg: #72818a;
+		--infoWarnBg: #fff0db;
+		--infoWarnFg: #8f6e31;
+		--switchBg: rgba(0, 0, 0, 0.15);
+		--switchOffBg: rgba(0, 0, 0, 0.1);
+		--switchOffFg: var(--panel);
+		--switchOnBg: var(--accent);
+		--switchOnFg: var(--fgOnAccent);
+
+		--buttonBg: rgba(0, 0, 0, 0.05);
+		--buttonHoverBg: rgba(0, 0, 0, 0.1);
+		--inputBorder: rgba(0, 0, 0, 0.1);
+		--inputBorderHover: rgba(0, 0, 0, 0.2);
+		--listItemHoverBg: rgba(0, 0, 0, 0.03);
+
+		--modalBg: rgba(0, 0, 0, 0.3);
+		--scrollbarHandle: rgba(0, 0, 0, 0.2);
+		--scrollbarHandleHover: rgba(0, 0, 0, 0.4);
+
+		--codeString: #b98710;
+		--codeNumber: #0fbbbb;
+		--codeBoolean: #62b70c;
+	}
+}
+
+/* ------------------------------------------------------------------ */
+/* Base elements (style.scss)                                          */
+/* ------------------------------------------------------------------ */
+
+::selection {
+	color: #fff;
+	background-color: var(--accent);
+}
+
+html {
+	touch-action: manipulation;
+	background-attachment: fixed;
+	background-size: cover;
+	background-position: center;
+	color: var(--fg);
+	overflow: auto;
+	overflow-wrap: break-word;
+	font-family: "Atkinson Hyperlegible", Roboto, HelveticaNeue, Arial, sans-serif;
+	font-size: 14px;
+	line-height: 1.6;
+	text-size-adjust: 100%;
+	tab-size: 2;
+	scroll-padding: 60px;
+	overflow-x: clip;
+	overflow-y: auto;
+}
+
+html:dir(rtl) {
+	--gradient-to-inline-start: to right;
+	--gradient-to-inline-end: to left;
+}
+
+/* CJK-optimised font stack (html.useCJKFont in Firefish). */
+html.useCJKFont {
+	font-family: "Hiragino Maru Gothic Pro", "BIZ UDGothic", "Atkinson Hyperlegible",
+		Roboto, HelveticaNeue, Arial, sans-serif;
+}
+
+html.useSystemFont {
+	font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+		Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
+}
+
+/* Theme-change transition (html._themeChanging_ in Firefish). */
+html._themeChanging_,
+html._themeChanging_ *,
+html._themeChanging_ ::before,
+html._themeChanging_ ::after {
+	transition: background 1s ease, border 1s ease !important;
 }
 
 * {
-  box-sizing: border-box;
-  scrollbar-width: thin;
-  scrollbar-color: var(--scrollbar-thumb) transparent;
+	box-sizing: border-box;
+	scrollbar-color: var(--scrollbarHandle) transparent;
 }
 
-::selection {
-  color: var(--selection-fg);
-  background: var(--selection-bg);
+body::-webkit-scrollbar {
+	inline-size: 12px;
+	block-size: 12px;
+}
+
+body::-webkit-scrollbar-thumb {
+	border-radius: 100px;
+	background-clip: content-box;
+	border: 3px solid transparent;
 }
 
 ::-webkit-scrollbar {
-  width: var(--scrollbar-size);
-  height: var(--scrollbar-size);
+	inline-size: 6px;
+	block-size: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: transparent;
+	background: inherit;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--scrollbar-thumb);
-  border-radius: var(--radius-full);
+	background: var(--scrollbarHandle);
+	min-block-size: 80px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--scrollbar-thumb-hover);
+	background: var(--scrollbarHandleHover);
+	background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:active {
+	background: var(--accent);
+	background-clip: content-box;
+}
+
+.hide-scrollbar {
+	scrollbar-width: none;
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+	display: none;
+}
+
+html,
+body {
+	margin: 0;
+	padding: 0;
 }
 
 html,
 body,
 #app {
-  min-height: 100%;
-}
-
-body {
-  margin: 0;
-  background: var(--bg);
-  color: var(--text);
-  font-family: var(--font);
-  font-size: var(--fs-base);
-  line-height: var(--leading-base);
-  -webkit-font-smoothing: antialiased;
+	min-height: 100%;
 }
 
 a {
-  color: inherit;
-  text-decoration: none;
+	text-decoration: none;
+	cursor: pointer;
+	color: inherit;
+	-webkit-tap-highlight-color: transparent;
+	text-decoration: underline;
+	text-decoration-color: transparent;
+	transition: text-decoration-color 0.2s;
 }
 
 a:hover {
-  color: var(--accent);
+	text-decoration-color: currentColor;
 }
 
-h1,
-h2,
-h3 {
-  margin: 0;
-  line-height: var(--leading-tight);
-  color: var(--text-strong);
-  font-weight: var(--weight-bold);
-  letter-spacing: -0.01em;
+textarea,
+input {
+	-webkit-tap-highlight-color: transparent;
 }
 
-p {
-  margin: 0;
+optgroup,
+option {
+	background: var(--panel);
+	color: var(--fg);
+}
+
+hr {
+	margin-block-start: var(--margin);
+	margin-inline-end: 0;
+	margin-block-end: var(--margin);
+	margin-inline-start: 0;
+	border: none;
+	block-size: 1px;
+	background: var(--divider);
 }
 
 button,
 input,
 textarea,
 select {
-  font: inherit;
-  color: inherit;
+	font: inherit;
+	color: inherit;
+}
+
+h1,
+h2,
+h3 {
+	margin: 0;
+	line-height: 1.25;
+	color: var(--fgHighlighted);
+	font-weight: 700;
+}
+
+p {
+	margin: 0;
+}
+
+.fa-pulse {
+	animation: spin 1s infinite;
+}
+
+@keyframes spin {
+	0% {
+		transform: rotate(0deg);
+	}
+	100% {
+		transform: rotate(360deg);
+	}
+}
+
+/* ------------------------------------------------------------------ */
+/* Utility classes (style.scss)                                        */
+/* ------------------------------------------------------------------ */
+
+._noSelect {
+	user-select: none;
+	-webkit-user-select: none;
+	-webkit-touch-callout: none;
+}
+
+._ghost,
+._ghost * {
+	user-select: none;
+	-webkit-user-select: none;
+	pointer-events: none;
+}
+
+._modalBg {
+	position: fixed;
+	inset-block-start: 0;
+	inset-inline-start: 0;
+	inline-size: 100%;
+	block-size: 100%;
+	background: var(--modalBg);
+	-webkit-backdrop-filter: var(--modalBgFilter, blur(4px));
+	backdrop-filter: var(--modalBgFilter, blur(4px));
+}
+
+._shadow {
+	box-shadow: 0px 4px 32px var(--shadow) !important;
+}
+
+._button {
+	appearance: none;
+	display: inline-block;
+	padding: 0;
+	margin: 0; /* for Safari */
+	background: none;
+	border: none;
+	cursor: pointer;
+	color: inherit;
+	touch-action: manipulation;
+	-webkit-tap-highlight-color: transparent;
+	font-size: 1em;
+	font-family: inherit;
+	line-height: inherit;
+	text-decoration: none;
+}
+
+._button,
+._button * {
+	user-select: none;
+	-webkit-user-select: none;
+}
+
+._button * {
+	pointer-events: none;
+}
+
+._button:disabled {
+	opacity: 0.5;
+	cursor: default;
+}
+
+._button > i:only-child {
+	display: block;
+	margin: auto;
+}
+
+._buttonIcon {
+	appearance: none;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	inline-size: calc(var(--height, 40px) - (var(--margin) * 2));
+	block-size: calc(var(--height, 40px) - (var(--margin) * 2));
+	box-sizing: border-box;
+	position: relative;
+	border-radius: 5px;
+	outline: none;
+	cursor: pointer;
+	color: inherit;
+	background: none;
+	border: none;
+	padding: 0;
+	margin: 0;
+	touch-action: manipulation;
+	-webkit-tap-highlight-color: transparent;
+}
+
+._buttonIcon::before {
+	content: "";
+	position: absolute;
+	inline-size: 2.7em;
+	block-size: 2.7em;
+	border-radius: inherit;
+	transition: background 0.2s;
+}
+
+._buttonIcon:hover::before,
+._buttonIcon:focus::before,
+._buttonIcon.highlighted::before {
+	background: var(--buttonBg);
+}
+
+._buttonIcon:focus-visible::before {
+	outline: auto;
+}
+
+._buttonIcon.highlighted {
+	color: var(--accent);
+}
+
+._buttonPrimary {
+	appearance: none;
+	display: inline-block;
+	padding: 0;
+	margin: 0;
+	background: var(--accent);
+	border: none;
+	cursor: pointer;
+	color: var(--fgOnAccent);
+	touch-action: manipulation;
+	-webkit-tap-highlight-color: transparent;
+	font-size: 1em;
+	font-family: inherit;
+	line-height: inherit;
+	text-decoration: none;
+	user-select: none;
+}
+
+._buttonPrimary:not(:disabled):hover {
+	background: var(--X8);
+}
+
+._buttonPrimary:not(:disabled):active {
+	background: var(--X9);
+}
+
+._buttonGradate {
+	color: var(--fgOnAccent);
+	background: linear-gradient(
+		var(--gradient-to-inline-end),
+		var(--buttonGradateA),
+		var(--buttonGradateB)
+	);
+}
+
+._buttonGradate:not(:disabled):hover,
+._buttonGradate:not(:disabled):active {
+	background: linear-gradient(var(--gradient-to-inline-end), var(--X8), var(--X8));
+}
+
+._help {
+	color: var(--accent);
+	cursor: help;
+}
+
+._textButton {
+	color: var(--accent);
+	cursor: pointer;
+	background: none;
+	border: none;
+	padding: 0;
+	font: inherit;
+}
+
+._textButton:not(:disabled):hover {
+	text-decoration: underline;
+}
+
+._panel {
+	background: var(--panel);
+	border-radius: var(--radius);
+	overflow: clip;
+}
+
+._margin {
+	margin-block: var(--margin);
+	margin-inline: 0;
+}
+
+._gaps_m {
+	display: flex;
+	flex-direction: column;
+	gap: 1.5em;
+}
+
+._gaps_s {
+	display: flex;
+	flex-direction: column;
+	gap: 0.75em;
+}
+
+._gaps {
+	display: flex;
+	flex-direction: column;
+	gap: var(--margin);
+}
+
+._inputs {
+	display: flex;
+	margin-block: 32px;
+	margin-inline: 0;
+}
+
+._inputs:first-child {
+	margin-block-start: 8px;
+}
+
+._inputs:last-child {
+	margin-block-end: 8px;
+}
+
+._inputs > * {
+	flex: 1;
+	margin: 0 !important;
+}
+
+._inputs > *:not(:first-child) {
+	margin-inline-start: 8px !important;
+}
+
+._inputs > *:not(:last-child) {
+	margin-inline-end: 8px !important;
+}
+
+._block {
+	background: var(--panel);
+	border-radius: var(--radius);
+	overflow: visible;
+}
+
+._block + ._block {
+	margin-block-start: var(--margin);
+}
+
+._gap {
+	margin-block: var(--margin);
+	margin-inline: 0;
+}
+
+._gap:first-child {
+	margin-block-start: 0;
+}
+
+._card {
+	background: var(--panel);
+	border-radius: var(--radius);
+	overflow: clip;
+}
+
+._card > ._title {
+	margin: 0;
+	padding-block: 22px;
+	padding-inline: 32px;
+	font-size: 1em;
+	border-block-end: solid 1px var(--panelHeaderDivider);
+	font-weight: bold;
+	background: var(--panelHeaderBg);
+	color: var(--panelHeaderFg);
+}
+
+._card > ._content {
+	padding: 32px;
+}
+
+._card > ._content._noPad {
+	padding: 0 !important;
+}
+
+._card > ._content + ._content {
+	border-block-start: solid 0.5px var(--divider);
+}
+
+._card > ._footer {
+	border-block-start: solid 0.5px var(--divider);
+	padding-block: 24px;
+	padding-inline: 32px;
+}
+
+@media (max-width: 500px) {
+	._card > ._title,
+	._card > ._content,
+	._card > ._footer {
+		padding: 16px;
+	}
+}
+
+._borderButton {
+	appearance: none;
+	display: block;
+	inline-size: 100%;
+	padding: 10px;
+	box-sizing: border-box;
+	text-align: center;
+	background: none;
+	cursor: pointer;
+	color: inherit;
+	font: inherit;
+	border: solid 0.5px var(--divider);
+	border-radius: var(--radius);
+	user-select: none;
+}
+
+._borderButton:active {
+	border-color: var(--accent);
+}
+
+._popup {
+	background: var(--popup);
+	border-radius: var(--radius);
+	contain: content;
+}
+
+._acrylic {
+	background: var(--acrylicPanel);
+	-webkit-backdrop-filter: var(--blur, blur(15px));
+	backdrop-filter: var(--blur, blur(15px));
+}
+
+@supports not (backdrop-filter: blur(15px)) {
+	._acrylic::after {
+		content: "";
+		position: absolute;
+		inset: 0;
+		z-index: -1;
+		background: var(--bg);
+		opacity: 0.75;
+	}
+}
+
+._formBlock {
+	margin-block: 1.5em;
+	margin-inline: 0;
+}
+
+._formRoot > ._formBlock:first-child {
+	margin-block-start: 0;
+}
+
+._formRoot > ._formBlock:last-child {
+	margin-block-end: 0;
+}
+
+._formLinksGrid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+	grid-gap: 12px;
+}
+
+._formLinksGrid > button {
+	inline-size: 100% !important;
+}
+
+._flexList {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.2em;
+	inline-size: min-content;
+	min-inline-size: 100%;
+}
+
+._flexList._center {
+	justify-content: center;
+}
+
+._formLinks > *:not(:last-child) {
+	margin-block-end: 8px;
+}
+
+._beta {
+	margin-inline-start: 0.7em;
+	font-size: 65%;
+	padding-block: 2px;
+	padding-inline: 3px;
+	color: var(--accent);
+	border: solid 1px var(--accent);
+	border-radius: 4px;
+	vertical-align: top;
+}
+
+._table > ._row {
+	display: flex;
+}
+
+._table > ._row:not(:last-child) {
+	margin-block-end: 16px;
+}
+
+@media (max-width: 500px) {
+	._table > ._row:not(:last-child) {
+		margin-block-end: 8px;
+	}
+}
+
+._table > ._row > ._cell {
+	flex: 1;
+}
+
+._table > ._row > ._cell > ._label {
+	font-size: 80%;
+	opacity: 0.7;
+}
+
+._table > ._row > ._cell > ._label > ._icon {
+	margin-inline-end: 4px;
+	display: none;
+}
+
+._fullinfo {
+	padding-block: 64px;
+	padding-inline: 32px;
+	text-align: center;
+}
+
+._fullinfo > img {
+	vertical-align: bottom;
+	block-size: 128px;
+	margin-block-end: 16px;
+}
+
+._keyValue {
+	display: flex;
+}
+
+._keyValue > * {
+	flex: 1;
+}
+
+._link {
+	position: relative;
+	color: var(--link);
+	text-underline-offset: 0.2em;
+}
+
+._caption {
+	font-size: 0.8em;
+	opacity: 0.7;
+}
+
+._monospace {
+	font-family: Fira code, Fira Mono, Consolas, Menlo, Courier, monospace !important;
+}
+
+._code {
+	font-family: Fira code, Fira Mono, Consolas, Menlo, Courier, monospace !important;
+	background: #26233a;
+	color: #e0def4;
+	font-size: 14px;
+	line-height: 1.5;
+	padding: 5px;
+}
+
+/* Phosphor icon classes are dropped: Cinderfish has no icon font.
+   TODO: port icon rendering (ph-* sizing/direction classes) once an icon
+   strategy is chosen. */
+
+:not(.noGap):not(._block) > .note-container,
+:not(.noGap):not(._block) > ._panel,
+:not(.noGap):not(._block) > .noGap,
+:not(.noGap):not(._block) > .profile,
+:not(.noGap):not(._block) > .card {
+	box-shadow: 0 4px 25px rgba(0, 0, 0, 0.04);
+	border-radius: var(--radius);
+	overflow: clip;
+}
+
+:not(.noGap):not(._block) > .caution {
+	box-shadow: none;
+}
+
+.widgets ._panel {
+	box-shadow: none !important;
+}
+
+._zoom {
+	transition-duration: 0.5s, 0.5s;
+	transition-property: opacity, transform;
+	transition-timing-function: cubic-bezier(0, 0.5, 0.5, 1);
+}
+
+.zoom-enter-active,
+.zoom-leave-active {
+	transition: opacity 0.5s, transform 0.5s !important;
+}
+
+.zoom-enter-from,
+.zoom-leave-to {
+	opacity: 0;
+	transform: scale(0.9);
+}
+
+@keyframes blink {
+	0% {
+		opacity: 1;
+	}
+	70% {
+		opacity: 0;
+	}
+	100% {
+		opacity: 1;
+	}
+}
+
+@keyframes tada {
+	0% {
+		transform: scale3d(1, 1, 1);
+	}
+	10%,
+	20% {
+		transform: scale3d(0.9, 0.9, 0.9) rotate3d(0, 0, 1, -3deg);
+	}
+	30%,
+	50%,
+	70%,
+	90% {
+		transform: scale3d(1.1, 1.1, 1.1) rotate3d(0, 0, 1, 3deg);
+	}
+	40%,
+	60%,
+	80% {
+		transform: scale3d(1.1, 1.1, 1.1) rotate3d(0, 0, 1, -3deg);
+	}
+	100% {
+		transform: scale3d(1, 1, 1);
+	}
+}
+
+._anime_bounce {
+	will-change: transform;
+	animation: bounce ease 0.7s;
+	animation-iteration-count: 1;
+	transform-origin: 50% 50%;
+}
+
+._anime_bounce_ready {
+	will-change: transform;
+	transform: scaleX(0.9) scaleY(0.9);
+}
+
+._anime_bounce_standBy {
+	transition: transform 0.1s ease;
+}
+
+@keyframes bounce {
+	0% {
+		transform: scaleX(0.9) scaleY(0.9);
+	}
+	19% {
+		transform: scaleX(1.1) scaleY(1.1);
+	}
+	48% {
+		transform: scaleX(0.95) scaleY(0.95);
+	}
+	100% {
+		transform: scaleX(1) scaleY(1);
+	}
+}
+
+@keyframes spinY {
+	0% {
+		transform: perspective(128px) rotateY(0deg);
+	}
+	100% {
+		transform: perspective(128px) rotateY(360deg);
+	}
+}
+
+._blur_text {
+	filter: blur(6px);
+	transition: filter 0.3s;
+}
+
+._blur_text:hover {
+	filter: blur(0px);
+}
+
+@keyframes reset {
+	100% {
+		transform: none;
+		opacity: 1;
+	}
+}
+
+.instant {
+	animation-duration: 0s !important;
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  html.theme-switching,
-  html.theme-switching body {
-    transition: background-color var(--dur-slow) ease, color var(--dur-slow) ease;
-  }
+	@keyframes scaleIn {
+		0% {
+			transform: scale(0);
+			opacity: 0;
+		}
+	}
+	@keyframes scaleInSmall {
+		0% {
+			transform: scale(0.8);
+			opacity: 0;
+		}
+	}
 }
 
-.muted {
-  color: var(--text-weak);
+@media (prefers-reduced-motion) {
+	@keyframes tada {
+		0% {
+			transform: scale3d(1, 1, 1);
+		}
+		50% {
+			transform: scale3d(1.1, 1.1, 1.1);
+		}
+		100% {
+			transform: scale3d(1, 1, 1);
+		}
+	}
+
+	@keyframes blink {
+		0%,
+		100% {
+			opacity: 1;
+		}
+	}
 }
 
-.small {
-  font-size: var(--fs-sm);
-}
+/* ------------------------------------------------------------------ */
+/* Legacy kebab-case aliases                                           */
+/*                                                                     */
+/* Components written before the whole-port read these names; they map */
+/* onto the Firefish tokens above so unported files keep rendering     */
+/* until their port lands. New code should use the camelCase tokens.   */
+/* ------------------------------------------------------------------ */
 
-/* ---------- shared utilities ---------- */
-
-/* Panel surface: flat background, border, --radius-lg rounding. */
-.panel {
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-}
-
-/* Borderless flat note row: vertical padding only, no rounding. */
-.note-row {
-  padding: var(--space-12) 0;
-  border-radius: 0;
-}
-
-/* 1px horizontal hairline for flat flow layouts. */
-.divider-h {
-  display: block;
-  width: 100%;
-  height: 1px;
-  margin: 0;
-  border: 0;
-  background: var(--divider);
-}
-
-/* ---------- overlays ---------- */
-
-/* The generic layer container os.openLayer/popup renders into (os.ts). The
-   wrapper only carries the z-index and, for a positioned popover, the anchor
-   coordinates; the ported component places and styles itself. A click-through
-   wrapper must not swallow pointer events the page underneath still needs, so
-   only the component itself is interactive. */
-.os-layer {
-  pointer-events: none;
-}
-
-.os-layer > * {
-  pointer-events: auto;
-}
-
-/* A modal layer dims the page and closes on the backdrop. */
-.os-layer--modal {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--space-16);
-  background: var(--overlay-bg);
-  pointer-events: auto;
-}
-
-/* ---------- shell ---------- */
-
-/* The three-region geometry (Sidebar | main | WidgetPanel) and every shell
-   breakpoint live in the components that own them: AppShell.vue composes the
-   grid, Sidebar.vue owns the 250/80 collapse at 1280px, WidgetPanel.vue hides
-   at 1090px, MobileSidebar.vue owns the 500px mobile switch and the 400px
-   bottom-bar refinement. What stays here is shared chrome: the brand mark,
-   cards and controls. */
-
-.brand {
-  display: flex;
-  align-items: center;
-  gap: var(--space-10);
-  padding: var(--space-6) var(--space-8);
-}
-
-/* Flat ember badge: the accent token on its own, no gradient wash and no glow. */
-.brand-mark,
-.instance-logo {
-  display: grid;
-  place-items: center;
-  flex: none;
-  width: 38px;
-  height: 38px;
-  border-radius: var(--radius-lg);
-  color: var(--text-on-accent);
-  background: var(--accent);
-}
-
-.brand-mark .icon,
-.instance-logo .icon {
-  width: 20px;
-  height: 20px;
-}
-
-.brand-name {
-  font-size: var(--fs-lg);
-  font-weight: var(--weight-bold);
-  letter-spacing: -0.02em;
-  color: var(--text-strong);
-}
-
-.card {
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  padding: var(--space-20);
-}
-
-.card-title {
-  font-size: var(--fs-md);
-  margin-bottom: var(--space-12);
-}
-
-/* ---------- controls ---------- */
-
-.button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-8);
-  padding: var(--space-10) var(--space-20);
-  border: 0;
-  border-radius: var(--radius-md);
-  background: var(--accent);
-  color: var(--text-on-accent);
-  font-weight: var(--weight-bold);
-  cursor: pointer;
-  transition: transform var(--dur-fast) ease, background var(--dur-base) ease,
-    opacity var(--dur-base) ease;
-}
-
-.button:hover {
-  background: var(--accent-hover);
-  color: var(--text-on-accent);
-}
-
-.button:active {
-  transform: scale(0.97);
-}
-
-.button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.button.ghost {
-  background: transparent;
-  border: 1px solid var(--border);
-  color: var(--text);
-}
-
-.button.ghost:hover {
-  border-color: var(--accent);
-  color: var(--accent);
-}
-
-.button.small {
-  padding: var(--space-6) var(--space-14);
-  font-size: var(--fs-sm);
-}
-
-.button.danger {
-  background: var(--danger);
-  color: var(--text-on-status);
-}
-
-.button:focus-visible,
-.icon-button:focus-visible {
-  outline: var(--focus-outline);
-  outline-offset: 2px;
-}
-
-.icon-button {
-  display: grid;
-  place-items: center;
-  width: var(--touch-target);
-  height: var(--touch-target);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-full);
-  background: var(--panel);
-  color: var(--text-weak);
-  cursor: pointer;
-  transition: color var(--dur-base) ease, border-color var(--dur-base) ease;
-}
-
-.icon-button:hover {
-  color: var(--accent);
-  border-color: var(--accent);
-}
-
-/* Native checkboxes and radios keep the platform's light appearance in a
-   dark theme, so a lone white box sits in the middle of the panel and reads
-   as a foreign element. These rules paint the control from the theme
-   tokens instead: the box is a panel-coloured square with a themed border,
-   and the checked state fills it with the accent. */
-input[type="checkbox"],
-input[type="radio"] {
-  appearance: none;
-  flex: none;
-  width: 16px;
-  height: 16px;
-  margin: 0;
-  border: 1px solid var(--border);
-  background: var(--panel-2);
-  color: var(--accent);
-  cursor: pointer;
-  transition: background var(--dur-base) ease, border-color var(--dur-base) ease;
-}
-
-input[type="radio"] {
-  border-radius: var(--radius-full);
-}
-
-input[type="checkbox"] {
-  border-radius: var(--radius-xs, 4px);
-}
-
-input[type="checkbox"]:checked,
-input[type="radio"]:checked {
-  border-color: var(--accent);
-  background: var(--accent);
-}
-
-input[type="checkbox"]:checked {
-  /* A tick drawn with the background so it reads on the accent fill. */
-  background-image: linear-gradient(
-      to bottom,
-      transparent 45%,
-      var(--on-accent) 45%,
-      var(--on-accent) 58%,
-      transparent 58%
-    ),
-    linear-gradient(
-      to right,
-      transparent 38%,
-      var(--on-accent) 38%,
-      var(--on-accent) 52%,
-      transparent 52%
-    );
-  background-size: 62% 62%, 62% 62%;
-  background-position: center 42%, center 56%;
-  background-repeat: no-repeat;
-}
-
-input[type="radio"]:checked {
-  box-shadow: inset 0 0 0 3px var(--panel-2);
-}
-
-input[type="checkbox"]:hover,
-input[type="radio"]:hover {
-  border-color: var(--accent);
-}
-
-input[type="checkbox"]:focus-visible,
-input[type="radio"]:focus-visible {
-  outline: var(--focus-outline);
-  outline-offset: 2px;
-}
-
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-6);
-  margin-bottom: var(--space-14);
-}
-
-.field label {
-  font-size: var(--fs-sm);
-  font-weight: var(--weight-semibold);
-  color: var(--text-weak);
-}
-
-.input,
-.textarea {
-  width: 100%;
-  padding: var(--space-10) var(--space-14);
-  border: 1px solid var(--input-border);
-  border-radius: var(--radius-md);
-  background: var(--surface-inset);
-  color: var(--text);
-  outline: none;
-  transition: border-color var(--dur-base) ease,
-    box-shadow var(--dur-base) ease;
-}
-
-.input:hover,
-.textarea:hover {
-  border-color: var(--input-border-hover);
-}
-
-.input:focus,
-.textarea:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--focus-halo);
-}
-
-.textarea {
-  resize: vertical;
-  min-height: 96px;
-}
-
-.notice {
-  padding: var(--space-10) var(--space-14);
-  border-radius: var(--radius-md);
-  font-size: var(--fs-sm);
-  margin-bottom: var(--space-14);
-  border: 1px solid var(--border);
-  background: var(--panel-2);
-}
-
-.notice.error {
-  border-color: var(--danger-border);
-  background: var(--danger-soft);
-  color: var(--danger);
-}
-
-.notice.info {
-  border-color: var(--accent-border);
-  background: var(--accent-soft);
-  color: var(--text);
-}
-
-.hint {
-  font-size: var(--fs-xs);
-  color: var(--text-weak);
-}
-
-.hint.ok {
-  color: var(--success);
-}
-
-.hint.bad {
-  color: var(--danger);
-}
-
-/* ---------- page scaffolding ---------- */
-
-/* Calm empty state: a quiet glyph, a title, an optional line of help. Used by
-   every feed/column empty slot and by the 404 page. */
-.placeholder {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-10);
-  padding: var(--space-48) var(--space-20);
-  text-align: center;
-  color: var(--text-weak);
-}
-
-.placeholder .icon {
-  width: 30px;
-  height: 30px;
-  color: var(--text-weak);
-}
-
-.placeholder h2 {
-  font-size: var(--fs-lg);
-}
-
-/* ---------- auth ---------- */
-
-.auth {
-  min-height: 100vh;
-  display: grid;
-  grid-template-columns: minmax(0, 460px) minmax(0, 1fr);
-}
-
-.auth-panel {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  padding: var(--space-48) clamp(var(--space-24), 6vw, var(--space-64));
-  background: var(--surface-inset);
-  border-right: 1px solid var(--border);
-}
-
-/* Flat wash, no radial light blobs: the aside sits on the page background. */
-.auth-aside {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: var(--space-20);
-  padding: var(--space-64);
-  background: var(--bg);
-}
-
-.auth-aside h1 {
-  font-size: var(--fs-3xl);
-  max-width: 12ch;
-}
-
-/* ---------- responsive ---------- */
-
-/* Shell breakpoints belong to the components that own them: the sidebar icon
-   collapse (1280px) lives in Sidebar.vue, the widget column (1090px) in
-   WidgetPanel.vue, the mobile switch (500px) in MobileSidebar.vue, and the
-   400px bottom-bar refinement in MobileNav.vue. What stays here is
-   cross-page layout that no single component owns. */
-
-@media (max-width: 720px) {
-  .auth {
-    grid-template-columns: 1fr;
-  }
-  .auth-aside {
-    display: none;
-  }
+:root {
+	--text: var(--fg);
+	--text-strong: var(--fgHighlighted);
+	--text-weak: var(--fgTransparentWeak);
+	--text-faint: var(--fgTransparent);
+	--text-on-accent: var(--fgOnAccent);
+	--border: var(--divider);
+	--accent-hover: var(--accentLighten);
+	--accent-active: var(--accentDarken);
+	--accent-soft: var(--accentedBg);
+	--danger: var(--error);
+	--warn-fg: var(--infoWarnFg);
+	--warn-bg: var(--infoWarnBg);
+	--info-bg: var(--infoBg);
+	--info-fg: var(--infoFg);
+	--panel-2: var(--panelHighlight);
+	--surface-hover: var(--buttonHoverBg);
+	--surface-inset: var(--X2);
+	--scrollbar-thumb: var(--scrollbarHandle);
+	--scrollbar-thumb-hover: var(--scrollbarHandleHover);
+	--shadow-color: var(--shadow);
+	--overlay-bg: var(--modalBg);
+	--focus-ring: var(--accent);
+	--focus-halo: var(--focus);
+	--font-mono: Fira code, Fira Mono, Consolas, Menlo, Courier, monospace;
+	--radius-md: var(--radius);
+	--radius-lg: var(--radius);
+	--radius-full: 999px;
+	--space-8: 8px;
+	--space-10: 10px;
+	--space-12: 12px;
+	--space-16: var(--marginFull);
+	--space-20: 20px;
+	--space-24: 24px;
+	--fs-base: 14px;
+	--fs-sm: 0.85em;
+	--fs-md: 1em;
+	--fs-lg: 1.15em;
 }

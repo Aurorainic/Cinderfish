@@ -1,7 +1,8 @@
-// Firefish-shaped i18n over Cinderfish's single zh-CN dictionary.
-//
+// SPDX-License-Identifier: AGPL-3.0-only
 // Ported from firefish@02c31e0a2804de48c9d73028df525e197d8df622:packages/client/src/i18n.ts
-// (AGPL-3.0). The class is backend-agnostic; only the dictionary behind it is
+//
+// Firefish-shaped i18n over Cinderfish's single zh-CN dictionary.
+// The class is backend-agnostic; only the dictionary behind it is
 // Cinderfish's. Two access shapes are kept because ported components use both:
 //
 //   i18n.ts._postForm.replyPlaceholder   // direct property access

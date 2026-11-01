@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Ported from firefish@02c31e0a2804de48c9d73028df525e197d8df622:locales/zh-CN.yml
+//
 // Chinese dictionary for the ported screens.
 //
 // Keys and section names follow Firefish, including the underscore sections its
