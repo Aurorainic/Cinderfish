@@ -317,8 +317,9 @@ brief 只点名了 15 个成员，但 Firefish 的对话框/选择器是同一�
 | `pageWindow` / `modalPageWindow` | `(path: string)` → 在 deck 里开页面窗口 | `:259-287` | **rewrite** | 本项目已有 `components/ui/PageWindow.vue` + `components/deck/deck-page.ts`，但入口是**路由名 + 参数**而不是路径字符串；移植时把 `path` 映射成 `router.resolve(path)` 后的 location，再交给 PageWindow。`modalPageWindow` 用同一实现（`modal` 标志） |
 | `openEmojiPicker` | `(src, opts, initialTextarea)`，把 emoji 插进光标位置 | `:846-912` | **rewrite** | 本项目是 `components/ui/EmojiPicker.vue` + `os.ts:61 openReactionPicker`；emoji 目录为空（见 §3.11），选择器只提供 Unicode |
 
-`pageWindow` 是这组里唯一必须保留行为的：Deck 的「列内打开详情」完全靠它，26 个调用点分布在
-时间线与通知的各种「打开笔记/用户」入口。其余四项的 drop 都伴随页面隐藏，不会留下不可达入口。
+Task 3 owns these remaining runtime entry points. `pageWindow` is required for Deck navigation; `popup` is implemented as a focused overlay host for migrated dialogs; `openEmojiPicker` adapts the existing Unicode picker and textarea insertion. `form`, user/instance selectors and Drive selectors remain dropped with their corresponding pages.
+
+`pageWindow` 仍是后续组件迁移必须具备的行为；Task 3 负责实现并浏览器验收。除 `pageWindow` 与受支持调用点所需的 `popup` / `openEmojiPicker` 适配外，其余 drop 项必须伴随对应页面隐藏，不留下不可达入口。
 
 ## 4. drop 清单与理由
 
@@ -333,7 +334,9 @@ brief 只点名了 15 个成员，但 Firefish 的对话框/选择器是同一�
 | 消息 / 天线 / 列表 / 频道 / 剪辑 / 群组 / 画廊 / 页面 | 见能力矩阵 §5 | 端点全缺，UI 一并移除，不留空壳 |
 | 通行密钥 / TOTP | `MkSignin.vue:224,254` | 后端 `signin` 恒 `finished: true`，无二次因子 |
 
-## 5. 目标文件布局（shim 落地位置）
+### Task 2: Cinderfish 运行时适配层与主题 token
+
+**Files:**
 
 ```
 web/src/os.ts                      # 现有命令 + Firefish os.* shim；api/apiWithDialog 委托

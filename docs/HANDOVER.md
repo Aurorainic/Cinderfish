@@ -25,6 +25,8 @@ Go 单二进制的个人/极小规模联邦社交实例。后端契约是 **Miss
 | 前端 Iceshrimp 架构重写（Task 1–8） | ✅ | `d414bd9` … `9167f1e`（分支 `frontend-ui-redesign`，见 §11.10–§11.15） |
 | Firefish 前端整体移植（Task 1：参考源码/许可证/能力矩阵/shim 契约） | ✅ | 见 `git log -- docs/research/2026-11-01-*`（分支 `frontend-ui-redesign`，见 §11.16） |
 
+- Firefish 字典来源：`firefish@02c31e0a2804de48c9d73028df525e197d8df622:locales/zh-CN.yml`；当前 `web/src/i18n/zh-CN.ts` 只保留首批白名单页面词条，Cinderfish 品牌文案允许改写，其余未移植功能不复制。
+
 ## 3. 契约以源码为准
 
 `misskey-dev/misskey` 是 **AGPL-3.0-only**。实现任何端点前，先读源码的 `paramDef`（参数 JSON Schema）和 `res`（响应 schema），再查 `packages/misskey-js/src/api.types.ts` 的类型定义。官方文档是二手的，已发现多处与源码不一致。

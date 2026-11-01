@@ -105,6 +105,7 @@ export function openPostForm(opts: PostFormOptions = {}): void {
     opts.onClosed?.();
     return;
   }
+  closePostForm();
   postFormRequest.value = { ...opts, id: ++nextRequestId };
 }
 
@@ -154,6 +155,7 @@ export function post(props: PostFormProps = {}, onClosed?: () => void): Promise<
       onClosed?.();
       return;
     }
+    closePostForm();
     postFormRequest.value = {
       id: ++nextRequestId,
       reply: props.reply,
@@ -587,20 +589,24 @@ export function contextMenu(items: MenuItem[] | Ref<MenuItem[]>, ev: MouseEvent)
 // Overlay
 // ---------------------------------------------------------------------------
 
-function handleEscape(): void {
-  // DialogHost owns Escape while a dialog is open: it is modal, keeps focus
-  // inside and stops the event, so this handler must not also close the layer
-  // underneath.
+function handleEscape(event: KeyboardEvent): void {
+  // Close exactly the topmost layer. DialogHost handles its own modal keydown;
+  // this window listener owns menus, pickers and the composer in z-order.
   if (currentDialog.value) return;
   if (menuRequest.value) {
     closeMenu();
+    event.stopImmediatePropagation();
     return;
   }
   if (reactionPickerRequest.value) {
     closeReactionPicker();
+    event.stopImmediatePropagation();
     return;
   }
-  if (postFormRequest.value) closePostForm();
+  if (postFormRequest.value) {
+    closePostForm();
+    event.stopImmediatePropagation();
+  }
 }
 
 const backdropStyle: CSSProperties = {
@@ -639,7 +645,7 @@ export const OsOverlay = defineComponent({
   name: "OsOverlay",
   setup() {
     const onKeydown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") handleEscape();
+      if (event.key === "Escape") handleEscape(event);
     };
     window.addEventListener("keydown", onKeydown);
     onUnmounted(() => window.removeEventListener("keydown", onKeydown));
