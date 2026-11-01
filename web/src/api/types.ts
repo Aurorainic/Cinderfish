@@ -165,9 +165,12 @@ export interface TimelineParams {
   sinceId?: string;
   untilId?: string;
   withFiles?: boolean;
-  withRenotes?: boolean;
   withReplies?: boolean;
   includeMyRenotes?: boolean;
   includeRenotedMyNotes?: boolean;
   includeLocalRenotes?: boolean;
+  // `withRenotes` is deliberately absent: the backend parses but ignores it
+  // (internal/note/timeline.go keeps its include flags untouched), so sending
+  // `withRenotes: false` would silently do nothing. Filter renotes via the
+  // include* flags instead.
 }
