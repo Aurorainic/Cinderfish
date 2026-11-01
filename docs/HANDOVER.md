@@ -25,6 +25,8 @@ Go 单二进制的个人/极小规模联邦社交实例。后端契约是 **Miss
 | 前端 Iceshrimp 架构重写（Task 1–8） | ✅ | `d414bd9` … `9167f1e`（分支 `frontend-ui-redesign`，见 §11.10–§11.15） |
 | Firefish 前端整体移植（Task 1：参考源码/许可证/能力矩阵/shim 契约） | ✅ | 见 `git log -- docs/research/2026-11-01-*`（分支 `frontend-ui-redesign`，见 §11.16） |
 | Firefish 前端整体移植（Task 2–3：运行时 shim、壳/导航/Deck 与页面窗口） | ✅ | `feat(web): rebuild Firefish-style shell and adaptive deck`（分支 `frontend-ui-redesign`，见 §11.17） |
+| Firefish 前端整体移植（Task 4：流式更新、`useChannel`、通知别名、auth/timeline 语义收口） | ✅ | `ab897e6` … `422a9a8`（分支 `frontend-ui-redesign`） |
+| **前端重定基：Firefish 原版复原（Iceshrimp 弃用）** | 🚧 | 决策记录 `docs/research/2026-11-01-firefish-rebaseline-decision.md`；主题色板/导航/笔记密度/操作行已复原（`2c61c51`、`438cec0`、`0ca52d1`、`459d5e7`）；jclaudan 镜像评估后仅作备份（`5e763be`）；待续：PageHeader tab、composer 面板化、widgets 栏 Firefish 化 |
 
 - Firefish 字典来源：`firefish@02c31e0a2804de48c9d73028df525e197d8df622:locales/zh-CN.yml`；当前 `web/src/i18n/zh-CN.ts` 只保留首批白名单页面词条，Cinderfish 品牌文案允许改写，其余未移植功能不复制。
 
@@ -803,6 +805,30 @@ Deck 偏好 + 深链实测 `data-shell="universal"` 且可滚动；Deck 列宽 3
 1440 → 350/350；两端抽屉的滚动锁互不破坏；`os.*` 六个成员与 `popup`/Escape/窗口/emoji 插入全部通过。
 **未覆盖**：登录态下的底栏“我的”、通知列内容（本次会话未登录）；`pageWindow` 对设置/管理路由的降级只做了
 代码路径核对。完整场景表见 `.superpowers/sdd/2026-11-01-firefish-frontend-port/task-3-browser-prep.md` §4。
+
+### 11.18 Task 4 收口与前端重定基：Firefish 原版复原（2026-11-01）
+
+**Task 4 收口**（`ab897e6` … `422a9a8`）：
+
+1. **per-note 流式更新**：`noteUpdated`（reacted/unreacted/deleted）分发到 `PagedFeed`，
+   反应计数实时增减、删除实时移行；真实实例浏览器验收通过（点反应 +1/再点归零、删除行消失）。
+2. **`useChannel`/`send` 适配器**：Firefish 形状频道句柄，仅限后端注册的 5 个频道（`4e93392`）。
+3. **`defaultReaction: "⭐"`** 实例投影（`de2d547`，审计 D2-b）；**`withRenotes` 移除**（`8fd5546`，D1-b）。
+4. **登录错误 id 映射中文文案 + admin 模式注册 503 文案**（`cd760a8`）；通知页无 follow tab、
+   `markAsRead:false` 只走显式已读按钮（`41c85ba`，D2-d）；`users/notes` 回复默认值语义注释（`422a9a8`，D1-e）。
+5. **审计 §8 六项裁决全部落地**（见 `docs/research/2026-11-01-firefish-rebaseline-decision.md`）。
+
+**重定基**：Iceshrimp 参考弃用，Firefish 上游 `tmp/refcheck/firefish@02c31e0` 为唯一前端基准；
+jclaudan/firefish GitHub 镜像经核对为 v1.0.3 时期（2023-10）旧快照，落后上游约 14 个月（196 个组件
+文件差异、主题目录一致），**仅作备份不切换基准**（`5e763be`）。参考目录：`firefish`（基准）、
+`firefish-jclaudan-mirror`（备份）、`misskey`（API 契约）、`iceshrimp-deprecated`（存档）。
+
+**已复原切片**：主题色板（`2c61c51`，暗 bg `#000`/panel `#0d0d0d`/accent `#86b300`/fg `#dadada`，
+亮 bg `#fff`/fg `#5f5f5f`，全部取自 `_dark.json5`/`_light.json5`）；导航项形态（`438cec0`，
+`ui/_common_/navbar.vue` 的 accentedBg 药丸 + 2.85rem 行高）；笔记密度（`0ca52d1`，`MkNote.vue`
+article 内边距 + 1.05em）；操作行（`459d5e7`，`MkNoteFooter.vue` 0.4em 上距 + 3.5em 封顶均分）。
+浏览器走查（851×897，端口 3991）确认配色与密度已对齐；**待续**：PageHeader tab 样式、
+composer 面板化、widgets 栏 Firefish 化。
 
 ## 12. M5 联邦（ActivityPub）
 源码对照记录见 `docs/research/2026-10-28-m5-federation-source-calibration.md`（逐条对照上游文件，含刻意偏离项）。
