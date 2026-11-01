@@ -17,6 +17,20 @@
    但 token 取值改从 Firefish 默认主题变量推导（panel、panelHeader、navBg、divider、
    accent 等），保证首帧即"看起来就是 Firefish"。
 
+## 参考源码目录布局（2026-11-01 更新）
+
+| 目录 | 内容 | 状态 |
+|---|---|---|
+| `tmp/refcheck/firefish` | Firefish 上游快照 @02c31e0（2024-12-11） | **唯一前端基准** |
+| `tmp/refcheck/firefish-jclaudan-mirror` | GitHub jclaudan/firefish（main b425f61 = 2023-10-08，develop 92758a2 = 2023-10-05，v1.0.3 时期） | 备份参考，不切换基准 |
+| `tmp/refcheck/misskey` | Misskey @c05e844 | 后端 API 契约 |
+| `tmp/refcheck/iceshrimp-deprecated` | Iceshrimp 相关参考 | 已弃用，仅存档 |
+
+**jclaudan 镜像评估结论**：该镜像比现有上游参考**落后约 14 个月**（196 个组件文件有差异；
+主题目录完全一致；旧版 `ui/universal.vue` 783 行 vs 上游 878 行）。它不包含任何现有参考缺失的
+内容，因此**不切换基准**，仅留作 GitHub 侧备份（上游 git.joinfirefish.org 已消失，这是快照
+可及性冗余，不是内容增量）。
+
 ## 复原范围（对照 Firefish）
 
 | Firefish 部分 | Cinderfish 动作 |
