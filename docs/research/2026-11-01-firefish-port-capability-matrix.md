@@ -52,7 +52,7 @@ grep -n 'HandleFunc(' internal/httpapi/server.go  # Cinderfish 路由
 
 | 状态 | 含义 | 处理 |
 |------|------|------|
-| **已支持** | Go 路由存在、响应字段够用、语义一致 | 直接接 | 
+| **已支持** | Go 路由存在、响应字段够用、语义一致 | 直接接 |
 | **需适配** | 路由存在，但请求/响应形态、分页、错误或字段与本项目不同 | 改客户端适配层，不动后端 |
 | **需新增后端** | Firefish 页面依赖，但 Cinderfish 没有对应端点或数据 | 本轮**不做**，页面降级；另开后端任务 |
 | **隐藏** | 依赖 Firefish 后端专属能力或非目标功能 | 从导航和路由中移除，不留空壳 |
@@ -69,15 +69,18 @@ grep -n 'HandleFunc(' internal/httpapi/server.go  # Cinderfish 路由
 | 4 | Note 详情 | `pages/note.vue`、`components/MkNote*.vue` | `notes/show`、`users/notes`、`notes/reactions/*` | `notes/unrenote`（→`notes/delete`） | `notes/conversation`、`notes/replies`、`notes/renotes`、`notes/children` | `notes/edit`、`notes/clips`、`notes/state`、`notes/translate` |
 | 5 | 发帖 | `components/MkPostForm*.vue` | `notes/create`、`drive/files/create`、`drive/files/show`、`drive/files` | 附件上传走 XHR | `notes/polls/vote` | 投票写入、`notes/edit`、`notes/make-private`、草稿同步 |
 | 6 | 反应 | `components/MkReactionsViewer*.vue` | `notes/reactions/create`、`notes/reactions/delete` | — | `notes/reactions`（反应者列表） | 反应者浮层逐人列表 |
-| 7 | 通知 | `pages/notifications.vue`、`components/MkNotifications.vue` | `notifications/mark-all-as-read` | `i/notifications` 路径 | — | 消息类通知、`i/read-all-*` |
+| 7 | 通知 | `pages/notifications.vue`、`components/MkNotifications.vue` | `notifications/mark-all-as-read` | `i/notifications` 路径（后端 alias） | — | 消息类通知、`i/read-all-*` |
 | 8 | 媒体 | `components/MkDrive*.vue`、`pages/settings/drive.vue` | `drive/files`、`drive/files/create`、`drive/files/show`、`drive/files/delete`、`GET /media/*` | — | `drive/files/update`、`drive/folders/*` | `drive/files/upload-from-url`、`drive/stream` |
 | 9 | Profile | `pages/user/index.vue`、`components/MkInfo.vue` | `users/show`、`users/notes`、`following/create`、`following/delete` | 计数/字段空缺 | `users/followers`、`users/following`、`users/search` | `following/requests/*`、`blocking/*`、`mute/*` |
-| 10 | Settings | `pages/settings/*.vue`（39 页） | `i/update`（3 字段）、`notifications/mark-all-as-read` | 6 个 tab 的字段裁剪 | `i/registry/*` 等 | 其余 27 页 |
+| 10 | Settings | `pages/settings/*.vue`（39 页） | `i/update`（3 字段）、`notifications/mark-all-as-read` | 8 个 tab 中按字段裁剪 | `i/registry/*` 等 | 其余 27 页 |
 | 11 | 主题 | `themes/`、`theme-store.ts` | 纯客户端（`data-theme` + token） | token 语义映射 | — | 主题编辑器、自定义 CSS |
 | 12 | Deck | `ui/deck.vue`、`pages/settings/deck.vue`、`widgets/` | 纯客户端（列容器 + localStorage） | 列配置 UI | `i/registry/*`（本轮不做） | 依赖缺失端点的 widget（§3.12） |
 
 「需新增后端」的条目在 §10 汇总，全部**不在本轮实现**，页面按 §3 的降级列处理。
-两处会直接 404 的点必须先处理：`i/notifications`（路径别名）与 `notes/unrenote`（映射到 `notes/delete`）。
+两个重叠数不要混用：全量 **277** 个引用端点中，**26 个**与现有 Go 路由同名（其中 `drive/files/create` 是 XHR 直连；
+去掉它、只算 `os.api` + `endpoint = "…"` 口径时为 **25 个**）；首批白名单的 **43 个**端点中，**17 个**已有精确路由，
+其余 26 个缺失（其中 2 个只需路径/语义适配）。
+两处会直接 404 的点必须先处理：`i/notifications`（后端兼容 alias）与 `notes/unrenote`（映射到 `notes/delete`）。
 
 ## 3. 逐项矩阵
 
@@ -188,13 +191,14 @@ Unicode emoji，`reactionEmojis` 恒为 `[]`。这是字段缺失，不是「返
 
 | Firefish 调用 | 位置 | Cinderfish 路由 | 状态 |
 |---|---|---|---|
-| `i/notifications` | `components/MkNotifications.vue:80,93` | `POST /api/notifications`（**路径不同**） | 需适配 |
+| `i/notifications` | `components/MkNotifications.vue:80,93` | `POST /api/notifications`（canonical）；`POST /api/i/notifications` 为待注册的兼容 alias | 需适配（后端 alias） |
 | `notifications/mark-all-as-read` | `pages/notifications.vue`、`pages/settings/notifications.vue` | `POST /api/notifications/mark-all-as-read` | 已支持 |
 | `i/read-all-unread-notes` / `i/read-all-messaging-messages` | `pages/settings/notifications.vue` | — | 隐藏 |
 
 `i/notifications` 是上游路径（`endpoints/i/notifications.ts`，`paramDef` = `limit/sinceId/untilId/sinceDate/untilDate/markAsRead/includeTypes/excludeTypes`，
-`res` = `Notification[]`）；本实现注册在 `POST /api/notifications`，行为已实现但路径不同（HANDOVER §11.15.3）。
-策略见 HANDOVER §11.16：**本轮在客户端集中做一次路径映射，后端后续在两个路径上同时注册并把旧路径标为别名**。
+`res` = `Notification[]`）；本实现以 `POST /api/notifications` 为 canonical，行为已实现（HANDOVER §11.15.3）。
+策略见 HANDOVER §11.16：**canonical 不动；后端把 `POST /api/i/notifications` 注册为兼容 alias，两个路径进同一个 handler，
+不产生第二套实现。现有客户端继续走 canonical，移植过来的 Firefish 调用由后端 alias 直接承接，不做客户端路径映射**。
 
 **以代码为准，不以旧笔记为准**：`2026-10-30-firefish-ui-gap-analysis.md:786,880` 说 `includeTypes`「解析后丢弃」，
 已被实现推翻——`notifications.go:37-70` 解析 `includeTypes`/`excludeTypes` 并传给 `NotificationService.List`，
@@ -244,7 +248,7 @@ widgets / notifications / privacy / account / about（`web/src/router/index.ts:5
 | `deck.vue` | settings/appearance（列配置） | 需适配 | 纯客户端，列编辑器待建（§3.12） |
 | `account-info.vue` | settings/account | 需适配 | `users/stats` 不存在 → 用量块隐藏 |
 | `theme.vue`、`theme.manage.vue`、`theme.install.vue` | settings/appearance（主题选择） | 需适配 | 纯客户端，见 §3.11 |
-| `mute-block.vue`、`instance-mute.vue`、`word-mute.vue`、`reaction.vue` | settings/privacy（只读说明） | 需新增后端 | `mute/*`、`blocking/*` 路由不存在 → 显示「暂不可用」，不提供开关（避免假开关） |
+| `mute-block.vue`、`instance-mute.vue`、`word-mute.vue`、`reaction.vue` | — | 隐藏 | `mute/*`、`blocking/*` 路由不存在，且不在 §4 的保留页面名单 → 不注册页面，不提供假开关（计入 27 个隐藏设置页） |
 | `security.vue`、`apps.vue`、`api.vue`、`webhook*.vue`、`2fa*.vue`、`plugin*.vue` | — | 隐藏 | 需要 `i/regenerate-token`、`i/revoke-token`、`i/webhooks/*`、TOTP、AiScript 插件 |
 | `import-export.vue`、`migration.vue`、`delete-account.vue`、`email.vue`、`accounts.vue`、`drive.vue`、`custom-css.vue`、`custom-katex-macro.vue`、`statusbar*.vue`、`sounds.vue`、`preferences-backups.vue`、`other.vue` | — | 隐藏 | 依赖 `i/export-*`、`i/import-*`、`ap/show`、`drive/files/update`、`get-sounds`、`i/registry/*` |
 | `index.vue` | — | 重写 | 本项目 `SettingsLayout.vue` + `menu.ts` 已有菜单结构 |
@@ -322,7 +326,7 @@ JobQueue、InstanceCloud、Button、Aiscript、UserList、ServerInfo）。按「
 | 1 | `pages/timeline.vue` + `components/MkTimeline.vue`（四 tab） | `/` | 主页/本地/社交/全局 |
 | 2 | `pages/note.vue` + `MkNote*` | `/notes/:id` | 单层父帖 |
 | 3 | `pages/user/index.vue` + `user/index.timeline.vue` + `MkInfo` | `/@:handle` | 计数与置顶可用，关注/粉丝列表降级 |
-| 4 | `pages/notifications.vue` + `MkNotifications.vue` | `/notifications` | `i/notifications` 路径映射 |
+| 4 | `pages/notifications.vue` + `MkNotifications.vue` | `/notifications` | `POST /api/notifications`（canonical；`i/notifications` 为后端 alias） |
 | 5 | `pages/auth.vue` 的登录部分 + `MkSignin.vue`（去通行密钥/TOTP） | `/login` | 用户名 + 密码 |
 | 6 | `pages/signup-complete.vue` 的注册表单部分 + `MkSignup.vue`（去邮箱） | `/signup` | 受 `meta.disableRegistration` 控制 |
 | 7 | `pages/settings/index.vue` 的菜单骨架 | `/settings` | 8 个 tab |
@@ -412,7 +416,7 @@ Firefish 使用的频道与频道内事件（实测行号）对照 `internal/str
 | 3 | 发帖（文本、CW、可见性、附件）→ 出现在时间线与详情页 | `notes/create` + `drive/files/create` |
 | 4 | 回复、纯转贴、引用转贴 | `replyId` / `renoteId` / `renoteId+text` |
 | 5 | 添加与撤销反应，计数与自己的反应高亮 | `notes/reactions/*` + `myReaction` |
-| 6 | 通知列表、`main` 频道实时插入、全部已读 | `i/notifications` 映射 + `mark-all-as-read` |
+| 6 | 通知列表、`main` 频道实时插入、全部已读 | `POST /api/notifications`（`i/notifications` 为 alias）+ `mark-all-as-read` |
 | 7 | 个人页：资料、计数、置顶、关注/取消关注 | `users/show` + `i/pin` + `following/*` |
 | 8 | 设置：改资料、切主题、切导航、改 Deck 列 | 8 个 tab 中已支持项 |
 | 9 | 主题自动跟随系统；刷新后保持 | `stores/theme.ts` |
@@ -433,7 +437,7 @@ Firefish 使用的频道与频道内事件（实测行号）对照 `internal/str
 
 | 能力 | 缺失端点 | 影响页面 |
 |---|---|---|
-| 通知路径对齐 | `i/notifications`（别名注册，**最优先**） | 通知（仅路径层面） |
+| 通知路径对齐 | `POST /api/i/notifications`（canonical `/api/notifications` 的兼容 alias，**最优先**） | 通知（仅路径层面） |
 | 第三方授权 | `miauth/{session}/check`、`auth/session/show`、`auth/accept`、`auth/deny` | 登录/授权页 |
 | Note 关系 | `notes/children`、`notes/conversation`、`notes/renotes`、`notes/replies`、`notes/mentions`、`notes/reactions`（列表）、`notes/unrenote` | Note 详情、回复 tab、通知 mentions、反应者浮层 |
 | 关注关系 | `users/followers`、`users/following`、`following/requests/*` | Profile 列表、锁定账号 |
@@ -445,7 +449,8 @@ Firefish 使用的频道与频道内事件（实测行号）对照 `internal/str
 | 实例信息 | `stats`、`get-online-users-count`、`hashtags/trend`、`federation/instances`、`federation/show-instance` | widget、关于页 |
 
 `notes/unrenote` 与 `i/notifications` 是仅有的两条「不做就会在首批验收路径上 404」的项：
-前者本轮用 `notes/delete` 映射，后者本轮在客户端做路径映射；其余都伴随页面降级，不会产生死链。
+前者本轮用 `notes/delete` 映射，后者由后端注册 `/api/i/notifications` 兼容 alias（canonical 仍是 `/api/notifications`）；
+其余都伴随页面降级，不会产生死链。
 
 每一条都可以直接对回 HANDOVER §11.15 的分组表，避免两处口径分叉。
 

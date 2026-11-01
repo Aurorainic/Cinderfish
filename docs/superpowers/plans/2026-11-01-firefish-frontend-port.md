@@ -25,7 +25,7 @@
 
 ## Review Focus
 
-- Firefish 页面调用不存在的端点时，必须被能力矩阵拦截或明确降级，不能静默显示空数据；测试：端点能力表覆盖 216 个引用端点并标出 25 个现有重叠端点。
+- Firefish 页面调用不存在的端点时，必须被能力矩阵拦截或明确降级，不能静默显示空数据；测试：端点能力表覆盖 277 个引用端点（对账口径），标出 26 个与现有 Go 路由同名的端点（`os.api` + `endpoint =` 口径为 25，差额是 XHR 直连的 `drive/files/create`）；首批 43 个白名单端点中 17 个有精确路由。
 - 未登录、token 过期和 API 错误 envelope 必须回到登录或显示可理解错误；测试：`ApiError` 的 `code/id/kind/info` 保留并覆盖 401/业务错误。
 - 380/600/840/1440px 下 Deck、侧栏和 Note 不得横向溢出；测试：浏览器四个 viewport 的 `scrollWidth === clientWidth`。
 - `prefers-color-scheme` 未设置时主题首帧必须正确，手动主题必须优先；测试：浅/深系统偏好与 localStorage 覆盖组合。
@@ -59,7 +59,7 @@
 
 - [ ] **Step 4: 更新项目指引与交接文档**
 
-写明新目标取代旧的渐进式前端设计，记录 `i/notifications` 与旧通知端点兼容策略、参考源码不可直接构建的事实，以及 schema 当前版本。
+写明新目标取代旧的渐进式前端设计，记录 `/api/notifications` 为 canonical、`/api/i/notifications` 为兼容 alias 的策略、参考源码不可直接构建的事实，以及 schema 当前版本。
 
 - [ ] **Step 5: 验证并提交**
 
@@ -76,10 +76,18 @@ git commit -m "docs: define Firefish port sources and capability boundaries"
 ### Task 2: Cinderfish 运行时适配层与主题 token
 
 **Files:**
-- Create: `web/src/lib/firefish-runtime.ts`
-- Create: `web/src/lib/i18n.ts`
-- Create: `web/src/styles/firefish-tokens.css`
+- Modify: `web/src/os.ts`
 - Modify: `web/src/api/client.ts`
+- Create: `web/src/me.ts`
+- Create: `web/src/instance.ts`
+- Create: `web/src/i18n/index.ts`
+- Create: `web/src/i18n/zh-CN.ts`
+- Create: `web/src/lib/z-index.ts`
+- Create: `web/src/types/menu.ts`
+- Create: `web/src/components/ui/DialogHost.vue`
+- Create: `web/src/components/ui/PopupMenu.vue`
+- Create: `web/src/styles/firefish-tokens.css`
+- Modify: `web/src/components/AppIcon.vue`
 - Modify: `web/src/stores/session.ts`
 - Modify: `web/src/stores/instance.ts`
 - Modify: `web/src/main.ts`
@@ -87,8 +95,8 @@ git commit -m "docs: define Firefish port sources and capability boundaries"
 - Test: `web/src/lib/*.spec.ts` only if the existing test setup is extended; otherwise browser checks in Task 3.
 
 **Interfaces:**
-- Consumes: existing `apiRequest`, `ApiError`, `session`, `theme`, `instance` stores.
-- Produces: `firefishRuntime.api<T>(endpoint, params): Promise<T>`, `apiWithDialog`, `t(key, params?)`, `me`, `instance`, `showDialog`, `showMenu`, `openComposer`, `claimZIndex`.
+- Consumes: existing `api/client.ts` request primitives, `ApiError`, `session`, `theme`, `instance` stores.
+- Produces: `os.api<T>(endpoint, params): Promise<T>` (delegates to `web/src/api/client.ts` `request()`), `apiWithDialog`, `t(key, params?)`, `me`, `instance`, `showDialog`, `showMenu`, `openComposer`, `claimZIndex`. Theme aliases live in `firefish-tokens.css` + `main.css`; the eleven shim files follow runtime-adaptation-contract §5.
 
 - [ ] **Step 1: Add contract-level checks**
 
@@ -96,7 +104,7 @@ Before implementation, add the smallest available project-native checks for `t()
 
 - [ ] **Step 2: Implement the runtime shim**
 
-Map Firefish-shaped calls to the existing Cinderfish API client and stores. `apiWithDialog` must preserve `ApiError` fields, `me` must be derived from the single token, and unsupported operations must return a typed unavailable result or a visible error rather than issue Firefish-only requests.
+Map Firefish-shaped calls to the existing Cinderfish API client and stores. `web/src/os.ts` exports the Firefish-shaped `api`/`apiWithDialog` and delegates every request to `request()` in `web/src/api/client.ts`; only that file owns the token (`TOKEN_KEY = "cinderfish.token"`, `getToken`/`setToken`). `apiWithDialog` must preserve `ApiError` fields, `me` must be derived from the single session token, and unsupported operations must return a typed unavailable result or a visible error rather than issue Firefish-only requests.
 
 - [ ] **Step 3: Implement zh-CN i18n and token aliases**
 
@@ -186,7 +194,7 @@ git commit -m "feat(web): rebuild Firefish-style shell and adaptive deck"
 
 - [ ] **Step 1: Freeze endpoint tests**
 
-For every first-release endpoint, add or update contract tests from Misskey `paramDef`/`res`. Register `POST /api/i/notifications` as the canonical name while preserving `POST /api/notifications` until the old client is removed, if the existing handler semantics permit it.
+For every first-release endpoint, add or update contract tests from Misskey `paramDef`/`res`. Keep `POST /api/notifications` canonical (the existing client and tests use it); register `POST /api/i/notifications` as a compatibility alias to the same handler. Never add a second notification implementation.
 
 - [ ] **Step 2: Implement API/type mappings**
 

@@ -44,14 +44,15 @@ grep -rhoE 'ph-[a-z0-9-]+' --include=*.vue --include=*.ts $FF | sort -u | wc -l 
 ```
 
 注意 `me` 的统计必须带左边界：直接 `grep "me\."` 会把 `name.`、`theme.`、`time.` 一起算进去（得到 300+），
-这是本契约第一版写错的地方。上面这四个数合计约 203 处真实属性访问，仍然足够多，所以 `me` 仍按 shim 处理。
+这是本契约第一版写错的地方。除 `i18n` 的 1852 处外，`me.` / `me!.` / `me?.` 三项合计 **203** 处真实属性访问，
+仍然足够多，所以 `me` 仍按 shim 处理。
 这些数字决定了下面的取舍：调用点越多，越应该 shim 而不是改调用点。
 
 ## 2. 总览
 
 | Firefish 成员 | 定义位置 | Cinderfish 归属 | 决策 |
 |---|---|---|---|
-| `api` | `os.ts:25-71` | `web/src/api/client.ts` 新增通用 `request()` | **shim** |
+| `api` | `os.ts:25-71` | `web/src/os.ts` 导出 `api`，委托 `web/src/api/client.ts` 新增的通用 `request()` | **shim** |
 | `apiGet` | `os.ts:72-115` | —（Go 没有 GET API 语义） | **rewrite** → `api` |
 | `pendingApiRequestsCount` | `os.ts:19` | `web/src/api/client.ts` 的 `ref` | **shim** |
 | `apiWithDialog` | `os.ts:117-131` | `api` + 错误提示 | **shim** |
@@ -204,7 +205,7 @@ Firefish：`me.ts` 顶层 `reactive(JSON.parse(localStorage.account))`，`isSign
 
 本项目：`web/src/stores/session.ts:8` 的 `session`（`reactive`）+ `isLoggedIn`/`isAdmin`（`:15-16`）+ `refreshSession()`。
 
-决策：**shim**（347 + 52 处属性访问，绝不能靠批量改名）。
+决策：**shim**（`me.` 112 + `me!.` 39 + `me?.` 52 = 203 处属性访问，绝不能靠批量改名）。
 
 契约：
 
@@ -222,7 +223,7 @@ Firefish：`me.ts` 顶层 `reactive(JSON.parse(localStorage.account))`，`isSign
 Firefish：`i18n.ts` 是一个 40 行的 `I18n` 类（`t(key, args)` 支持点分路径与 `{arg}` 替换，缺失时
 `console.warn` 并回退 key），实例导出的 `i18n.ts` 同时被当作**词典对象**直接属性访问（`i18n.ts.signinFailed`）。
 
-数量：2400 处 `i18n.ts.<key>`、其余为 `i18n.t(...)`。
+数量：1852 处 `i18n.ts.<key>`、其余为 `i18n.t(...)`。
 
 本项目：`web/src/` 目前没有 i18n 层（文案为中文直写）。
 
@@ -335,9 +336,10 @@ brief 只点名了 15 个成员，但 Firefish 的对话框/选择器是同一�
 ## 5. 目标文件布局（shim 落地位置）
 
 ```
-web/src/os.ts                      # 现有命令 + api/apiWithDialog/alert/confirm/yesno/inputText/select/
-                                   #   popup/popupMenu/contextMenu/post/claimZIndex（pageWindow 复用 PageWindow）
-web/src/api/client.ts              # 新增通用 request()、pendingApiRequestsCount
+web/src/os.ts                      # 现有命令 + Firefish os.* shim；api/apiWithDialog 委托
+                                   #   web/src/api/client.ts 的 request()（pageWindow 复用 PageWindow）
+web/src/api/client.ts              # 新增通用 request()、pendingApiRequestsCount；唯一 token 存取
+                                   #   （TOKEN_KEY = "cinderfish.token"、getToken()/setToken()）
 web/src/me.ts                      # 基于 stores/session.ts 的 reactive 投影
 web/src/instance.ts                # 基于 stores/instance.ts 的 Firefish 形状
 web/src/i18n/index.ts              # I18n 类
@@ -350,8 +352,10 @@ web/src/components/AppIcon.vue     # 扩充 ph-* 映射所需的路径
 ```
 
 原则：shim 集中在这 11 个文件里，**移植过来的页面/组件不得直接 `fetch`、不得直接读 `localStorage` 的 token、
-不得自己拼 RPC 路径**（设计文档 §7 的边界要求）。`pageWindow` 不新增文件：它映射到既有的
-`components/ui/PageWindow.vue` 与 `components/deck/deck-page.ts`。
+不得自己拼 RPC 路径**（设计文档 §7 的边界要求）。`os.ts` 里的 `api`/`apiWithDialog` 只做 Firefish 形状的包装，
+所有 HTTP 细节（token、错误信封、viewer stamping）都在 `api/client.ts` 的 `request()` 里；token 也只有
+`api/client.ts` 读写（`TOKEN_KEY`、`getToken`/`setToken`），`stores/session.ts` 与 `stores/instance.ts` 只是调用方。
+`pageWindow` 不新增文件：它映射到既有的 `components/ui/PageWindow.vue` 与 `components/deck/deck-page.ts`。
 
 ## 6. 验收
 

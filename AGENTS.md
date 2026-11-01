@@ -42,7 +42,7 @@ These decisions are settled; do not reopen them without an explicit request.
 | Frontend runtime | Firefish's `os.*` surface is provided as shims over Cinderfish code; see the runtime adaptation contract |
 | Datastore | PostgreSQL is the only mandatory dependency; Redis is optional behind the queue abstraction and disabled by default |
 | Mastodon API | Explicitly abandoned — no endpoints, no reserved routes |
-| Notification endpoint path | The list is served at `POST /api/notifications`; upstream calls it `i/notifications`. `i/notifications` must be registered as an alias, the legacy path stays. Never add a second notification implementation |
+| Notification endpoint path | `POST /api/notifications` is the canonical path (the existing client and tests use it). Upstream Misskey calls it `i/notifications`, so register `POST /api/i/notifications` as a compatibility alias to the same handler. Never add a second notification implementation |
 | Federation vocabulary | Misskey's own `all` / `specified` / `none`, mapped from the configured `public` / `allowlist` / `none` |
 | Data migration | No migration of the private project's data; instances start empty |
 | Relay | Out of scope for the first release |
@@ -58,14 +58,21 @@ These decisions are settled; do not reopen them without an explicit request.
   # Misskey — API contract
   git clone --depth 1 --filter=blob:none --sparse https://github.com/misskey-dev/misskey.git tmp/refcheck/misskey
   cd tmp/refcheck/misskey && git sparse-checkout set packages/backend/src packages/misskey-js/src packages/frontend/src
+  cd ../..   # back to the repository root before the next clone
   # Firefish — primary frontend reference (Codeberg, no proxy needed)
   git clone --depth 1 --filter=blob:none --sparse https://codeberg.org/firefish/firefish.git tmp/refcheck/firefish
   cd tmp/refcheck/firefish && git sparse-checkout set packages/client/src packages/sw/src
+  cd ../..
   # Iceshrimp — supplemental frontend reference
   git clone --depth 1 --filter=blob:none --sparse https://codeberg.org/iceshrimp/Iceshrimp.NET.git tmp/refcheck/iceshrimp
   cd tmp/refcheck/iceshrimp && git sparse-checkout set Iceshrimp.Frontend
+  cd ../..
+  # Iceshrimp Vue fork — component mirror; the local snapshot has no .git and holds only packages/
+  mkdir -p tmp/refcheck/iceshrimp-vue
+  curl -L https://codeberg.org/banaanihillo/iceshrimp/archive/1fa829ed10f42f1511a033f5c22d01ec9efe5a41.tar.gz \
+    | tar -xz -C tmp/refcheck/iceshrimp-vue --strip-components=1 --wildcards '*/packages/*'
   ```
-  The Misskey backend source is about 11 MB; the Streaming implementation lives in `packages/backend/src/server/api/stream/`. The Vue-based Iceshrimp fork (`codeberg.org/banaanihillo/iceshrimp`) is the one whose components can be mirrored; `Iceshrimp.NET` is a Blazor rewrite, useful for layout and interaction decisions only. Codeberg intermittently returns 504 — retry, or fetch `…/archive/main.tar.gz` instead.
+  The Misskey backend source is about 11 MB; the Streaming implementation lives in `packages/backend/src/server/api/stream/`. The Vue-based Iceshrimp fork (`codeberg.org/banaanihillo/iceshrimp`) is the one whose components can be mirrored; `Iceshrimp.NET` is a Blazor rewrite, useful for layout and interaction decisions only. Codeberg intermittently returns 504 — retry, or use the pinned commit archive URL.
 - **Pinned reference versions (2026-11-01).** Firefish `02c31e0` (2024-12-11), Iceshrimp Vue fork `1fa829ed10f4` (2025-07-25), Iceshrimp.NET `2c61359` (2026-10-27), Misskey `c05e844` (2026-10-29). Details, licences and the copy boundary are in `docs/research/2026-11-01-firefish-port-source-and-license-register.md`.
 - **The reference frontends are read-only references and are not buildable in place.** The Firefish checkout is sparse (`packages/client/src`, `packages/sw/src`), so `packages/client/index.html`, the root `scripts/copy-index.mjs` and the `packages/firefish-js` workspace package are absent — `pnpm install` cannot even resolve `firefish-js: workspace:*`. Never add a reference to `package.json`, a workspace, or a build script; never build or ship reference sources.
 - Misskey and both Firefish-descended frontends are AGPL-3.0; the Iceshrimp Vue fork's client is AGPL-3.0 while its `packages/iceshrimp-sdk` is MIT. Reusing data structures, field names, enum values and behaviour is fine. If a file is copied or rewritten, keep its copyright/SPDX header and record `<repo>@<commit>:<path>` in `docs/HANDOVER.md`. If the project is ever distributed, it must be distributed under AGPL-3.0.

@@ -557,7 +557,7 @@ pnpm build    # 先 vue-tsc --noEmit，再输出 web/dist
 
 **读路径的可见性在整分支评审波次落地**（见 §11.15.8）：`notes/show` 现在按 viewer 判定可见性，不可见时以 404 `NO_SUCH_NOTE` 回答（不确认笔记是否存在），`packNoteDetail` 嵌入的父帖/被转贴笔记同样按 viewer 判定、不可见则只保留 id 不带内容。
 
-**已实现的端点不在这张表里，但有一处路径偏差要记住（Fix round 1，M3）**：上游的通知列表端点是 `i/notifications`（`endpoints/i/notifications.ts`，注册为 `POST /api/i/notifications`，`paramDef` 有 `includeTypes`/`excludeTypes`/`limit`/`sinceId`/`untilId`，`res` 是 `Notification[]`），本实现把它注册在 `POST /api/notifications`——**路径不同，行为已实现**（前端 `api/client.ts` 与全部测试都用 `/api/notifications`）。Task 5 的 `notifications/mark-all-as-read` 路径与上游一致。本轮不改路由（改路径会同时改动前端、全部通知测试与既有部署的客户端），记录为已知偏差；若将来要对齐，建议在新旧两个路径上同时注册、旧路径标记为别名。
+**已实现的端点不在这张表里，但有一处路径偏差要记住（Fix round 1，M3）**：上游的通知列表端点是 `i/notifications`（`endpoints/i/notifications.ts`，注册为 `POST /api/i/notifications`，`paramDef` 有 `includeTypes`/`excludeTypes`/`limit`/`sinceId`/`untilId`，`res` 是 `Notification[]`），本实现把它注册在 `POST /api/notifications`——**路径不同，行为已实现**（前端 `api/client.ts` 与全部测试都用 `/api/notifications`）。Task 5 的 `notifications/mark-all-as-read` 路径与上游一致。本轮不改路由（改路径会同时改动前端、全部通知测试与既有部署的客户端），记录为已知偏差；对齐方式是保留 `/api/notifications` 为 canonical，把 `/api/i/notifications` 注册为同一 handler 的兼容别名。
 
 #### 11.15.4 (b) 上游有契约，但要动 schema 或数据模型
 
@@ -714,14 +714,15 @@ $ cd web && pnpm typecheck && pnpm build
 - Firefish 上游 `develop` 停在 `02c31e0`（2024-12-11），仓库**未归档**（Codeberg API `archived: false`，2026-11-01 复核）；
   准确表述是「上游无新提交」，不是「已归档/已删除」。
 
-**`i/notifications` 与旧通知端点的兼容策略**：上游通知列表端点是 `POST /api/i/notifications`
+**通知端点的 canonical 与兼容 alias**：上游通知列表端点是 `POST /api/i/notifications`
 （`endpoints/i/notifications.ts`），本实现注册在 `POST /api/notifications`（行为已实现，§11.15.3 记录为路径偏差）。
 决定：
 
-1. 后端**两个路径都注册**，`/api/notifications` 保留为 legacy 别名，两者进同一个 handler，不产生第二套实现；
-2. 前端**只在适配层映射一次**（`web/src/api/client.ts` 的通用 `request()`），页面与组件不再出现端点路径；
-3. 在别名落地前，移植过来的 Firefish 代码调用 `i/notifications` 会 404——这是 Task 1 之后第一个必须补的后端小改动，
-   与前端移植的第一个任务配对提交，不单独留在文档里。
+1. `POST /api/notifications` 是 **canonical**，现有前端 `api/client.ts` 与全部通知测试继续使用，不改路径；
+2. 后端把 `POST /api/i/notifications` 注册为**兼容 alias**，两个路径进同一个 handler，不产生第二套实现；
+3. 移植过来的 Firefish 代码调用 `i/notifications` 由后端 alias 直接承接，不在客户端做路径映射；页面与组件仍不得直接拼 RPC 路径；
+4. 在 alias 落地前，Firefish 通知列表会 404——这是 Task 1 之后第一个必须补的后端小改动，与前端移植的第一个任务配对提交，
+   不单独留在文档里。
 
 **schema 版本**：当前为 **5**（不可变迁移 1–5，最后一次为 `user_profiles.pinned_note_ids`）。本轮不涉及 schema 变更，
 前端移植不修改数据库（设计文档 §5）。§7 里原有的「当前 schema 版本为 4」已在本次一并订正。
@@ -750,6 +751,13 @@ $ cd web && pnpm typecheck && pnpm build
 `go test ./...` 全绿；再带 `CINDERFISH_TEST_DATABASE_URL` 重跑，`internal/account`（0.77s）、
 `internal/httpapi`（9.84s）、`internal/media`（0.81s）、`internal/note`（0.73s）同样全绿。纯文档改动不影响二进制，
 但按 `AGENTS.md` 的要求仍跑一遍，避免把上一轮的红色状态当成绿。
+
+**第二轮一致性修复（同日）**：删除能力矩阵 §1 状态表的尾随空格；统一通知端点为 `/api/notifications` canonical、
+`/api/i/notifications` 兼容 alias，并同步 AGENTS、计划与能力矩阵；把运行时契约里过期的 `347`/`2400` 改为
+`112+39+52=203`/`1852`；把能力矩阵的 43 个白名单端点与 25/26 个全量同名端点分开口径，隐藏设置页固定为 27；
+Task 2 的文件布局改为运行时契约 §5 的 11 个 shim 文件（`os.ts` 委托 `client.ts` 的 `request()`，
+token 只由 `client.ts` 读写）；Iceshrimp Vue 快照范围改为完整的 `packages/`，复现命令固定到 `1fa829ed10f4` 并只解 `packages/`。
+修复后 `git show --check HEAD` 与 `git diff --check` 均无输出。
 
 **执行顺序建议**（下一步）：先按运行时契约落地 shim（`api`、`me`、`i18n`、`instance`、`z-index`、`DialogHost`、
 `PopupMenu`），再移植壳与时间线；端点缺口按能力矩阵 §10 单独立项，不与前端提交混在一起。

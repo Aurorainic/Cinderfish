@@ -21,10 +21,10 @@
 
 ## 2. 固定版本（2026-11-01 复核）
 
-| 项目 | 仓库 URL | 固定版本 | 上游提交日期 | 本地稀疏范围 | 许可证 |
+| 项目 | 仓库 URL | 固定版本 | 上游提交日期 | 本地范围（稀疏 checkout 或快照） | 许可证 |
 |------|----------|----------|--------------|--------------|--------|
 | Firefish（原版） | `https://codeberg.org/firefish/firefish.git` | `02c31e0a2804de48c9d73028df525e197d8df622` | 2024-12-11 | `packages/client/src`、`packages/sw/src` | AGPL-3.0（根 `LICENSE` 为 AGPL v3 全文） |
-| Iceshrimp Vue fork | `https://codeberg.org/banaanihillo/iceshrimp.git` | `1fa829ed10f42f1511a033f5c22d01ec9efe5a41`（`main`，2025-07-25） | 2025-07-25 | `packages/client/src`、`packages/sw/src` | AGPL-3.0（上游根 `LICENSE` 为 AGPL v3 全文，2026-11-01 复核） |
+| Iceshrimp Vue fork | `https://codeberg.org/banaanihillo/iceshrimp.git` | `1fa829ed10f42f1511a033f5c22d01ec9efe5a41`（`main`，2025-07-25） | 2025-07-25 | `packages/`（`client`、`sw`、`backend`、`iceshrimp-sdk`；本地快照无根清单） | AGPL-3.0（上游根 `LICENSE` 为 AGPL v3 全文，2026-11-01 复核） |
 | Iceshrimp.NET | `https://codeberg.org/iceshrimp/Iceshrimp.NET.git` | `2c61359de29fe3c9ea6a3b31268ceb2ce0e996a7` | 2026-10-27 | `Iceshrimp.Frontend` | EUPL-1.2（根 `LICENSE`） |
 | Misskey | `https://github.com/misskey-dev/misskey.git` | `c05e8443a9d1222a467617ed6019784a1f1a53e7` | 2026-10-29 | `packages/backend/src`、`packages/misskey-js/src`、`packages/frontend/src` | AGPL-3.0-only（`LICENSE` + 源文件 SPDX 头） |
 
@@ -150,16 +150,19 @@ export https_proxy=http://127.0.0.1:19823 http_proxy=http://127.0.0.1:19823   # 
 git clone --depth 1 --filter=blob:none --sparse https://github.com/misskey-dev/misskey.git tmp/refcheck/misskey
 cd tmp/refcheck/misskey && git sparse-checkout set packages/backend/src packages/misskey-js/src packages/frontend/src
 
-# Firefish —— 前端主参考（Codeberg 直连，偶发 504 时重试或改用 archive/main.tar.gz）
+# Firefish —— 前端主参考（Codeberg 直连，偶发 504 时重试或改用固定 commit 的归档）
 cd ../.. && git clone --depth 1 --filter=blob:none --sparse https://codeberg.org/firefish/firefish.git tmp/refcheck/firefish
 cd tmp/refcheck/firefish && git sparse-checkout set packages/client/src packages/sw/src
+cd ../..
 
 # Iceshrimp Vue fork —— 组件镜像参考。上游用 yarn 4.3.1 + PnP，本地快照没有 .git，
-# 若要「原样恢复本地形态」，用归档包而不是 git clone：
-curl -L -o /tmp/iceshrimp-vue.tar.gz https://codeberg.org/banaanihillo/iceshrimp/archive/main.tar.gz
-mkdir -p tmp/refcheck/iceshrimp-vue && tar -xzf /tmp/iceshrimp-vue.tar.gz -C tmp/refcheck/iceshrimp-vue --strip-components=1
-# 归档是完整仓库；本地快照只保留了 packages/（无根 CLI 清单），比对时只比 packages/client 与 packages/sw
-cd tmp/refcheck/iceshrimp-vue && ls packages   # backend client iceshrimp-sdk meta.json sw
+# 也不是 sparse checkout：它保留的是完整的 packages/（2012 个文件，无根清单），只解归档里的 packages/：
+curl -L -o /tmp/iceshrimp-vue.tar.gz \
+  https://codeberg.org/banaanihillo/iceshrimp/archive/1fa829ed10f42f1511a033f5c22d01ec9efe5a41.tar.gz
+mkdir -p tmp/refcheck/iceshrimp-vue
+tar -xzf /tmp/iceshrimp-vue.tar.gz -C tmp/refcheck/iceshrimp-vue --strip-components=1 --wildcards '*/packages/*'
+# 本地快照只有 packages/，没有根 package.json/yarn.lock/LICENSE；比对时只比 packages/client 与 packages/sw
+cd tmp/refcheck/iceshrimp-vue && ls packages   # README.md backend client iceshrimp-sdk meta.json sw
 
 # Iceshrimp.NET —— 仅布局/交互证据
 cd ../.. && git clone --depth 1 --filter=blob:none --sparse https://codeberg.org/iceshrimp/Iceshrimp.NET.git tmp/refcheck/iceshrimp
@@ -169,6 +172,7 @@ cd tmp/refcheck/iceshrimp && git sparse-checkout set Iceshrimp.Frontend
 版本核对（本轮实际执行过的）：
 
 ```bash
+cd ../..   # 回到仓库根目录（上一段结束时在 tmp/refcheck/iceshrimp）
 git -C tmp/refcheck/firefish  log -1 --format='%H %cI'   # 02c31e0a… 2024-12-11
 git -C tmp/refcheck/misskey   log -1 --format='%H %cI'   # c05e8443… 2026-10-29（上游 develop 已到 3a43e05f）
 git -C tmp/refcheck/iceshrimp log -1 --format='%H %cI'   # 2c61359d… 2026-10-27
