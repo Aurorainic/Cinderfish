@@ -131,6 +131,16 @@ class StreamingClient {
     }
   }
 
+  // send writes a raw client frame ({type, body}) to the socket: Firefish
+  // call sites use it for subNote/unsubNote/readNotification. No-op when the
+  // socket is down; reconnection re-asserts channel subscriptions but not
+  // per-note ones (components re-subscribe on the __reconnected signal).
+  send(type: string, body: unknown): void {
+    if (this.ws?.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify({ type, body }));
+    }
+  }
+
   private open(): void {
     if (!this.wanted) return;
     if (typeof window === "undefined") return;
@@ -216,3 +226,56 @@ class StreamingClient {
 }
 
 export const streaming = new StreamingClient();
+
+// Firefish-shaped channel adapter. `useChannel("homeTimeline")` etc. returns a
+// handle whose on(type, cb) receives that channel's events, mirroring the
+// Misskey client's useChannel. Channels not registered server-side (userList,
+// channel, antenna, drive, recommendedTimeline) are rejected loudly instead of
+// silently receiving nothing. Params objects are not supported by the backend.
+export type StreamChannelName =
+  | "main"
+  | "homeTimeline"
+  | "localTimeline"
+  | "hybridTimeline"
+  | "globalTimeline";
+
+export interface StreamChannel {
+  on(type: string, handler: (body: unknown) => void): void;
+  off(type: string, handler: (body: unknown) => void): void;
+  send(type: string, body: unknown): void;
+  dispose(): void;
+}
+
+export function useChannel(channel: StreamChannelName): StreamChannel {
+  const token = streaming.subscribe(channel);
+  const typeHandlers = new Map<string, Set<(body: unknown) => void>>();
+  const forward: StreamHandler = (wireChannel, type, body) => {
+    if (wireChannel !== channel) return;
+    typeHandlers.get(type)?.forEach((h) => {
+      try {
+        h(body);
+      } catch {
+        // A broken listener must not stop the others.
+      }
+    });
+  };
+  const offStream = streaming.on(forward);
+  return {
+    on(type, handler) {
+      if (!typeHandlers.has(type)) typeHandlers.set(type, new Set());
+      typeHandlers.get(type)!.add(handler);
+    },
+    off(type, handler) {
+      typeHandlers.get(type)?.delete(handler);
+    },
+    send(type, body) {
+      streaming.send(type, body);
+    },
+    dispose() {
+      offStream();
+      for (const set of typeHandlers.values()) set.clear();
+      typeHandlers.clear();
+      streaming.unsubscribe(token);
+    },
+  };
+}
