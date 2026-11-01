@@ -1,6 +1,6 @@
 # Cinderfish 交接说明
 
-- 最后更新：2026-10-31（Iceshrimp 架构重写 Task 8：API 缺口审计与收尾）
+- 最后更新：2026-11-01（Firefish 前端整体移植 Task 1：参考源码、许可证与能力矩阵）
 - 项目名 **Cinderfish**（2026-10-28 定名，Go module `github.com/Aurorainic/cinderfish`）
 - 仓库：当前目录 `/home/lainsaka/文档/MilnFish`，分支 `main`；远程 `origin` 为
   `https://github.com/Aurorainic/Cinderfish.git`（GitHub 仓库已更名，本地目录改名待办）
@@ -23,6 +23,7 @@ Go 单二进制的个人/极小规模联邦社交实例。后端契约是 **Miss
 | M6.1 前端界面重构（Firefish/Misskey 风格、自适应 deck） | ✅ | `23ac6d7` … 见 git log |
 | M7 打磨 | ✅ | 见 git log（迁移工具、账号管理、性能基线、部署文档） |
 | 前端 Iceshrimp 架构重写（Task 1–8） | ✅ | `d414bd9` … `9167f1e`（分支 `frontend-ui-redesign`，见 §11.10–§11.15） |
+| Firefish 前端整体移植（Task 1：参考源码/许可证/能力矩阵/shim 契约） | ✅ | 见 `git log -- docs/research/2026-11-01-*`（分支 `frontend-ui-redesign`，见 §11.16） |
 
 ## 3. 契约以源码为准
 
@@ -101,7 +102,7 @@ go run ./cmd/cinderfish-admin --config config.toml create --username root --pass
 
 只跑 API 时可以不构建前端：`web_dist` 目录不存在，服务器自动退回纯 API 模式。
 
-数据库迁移在启动时自动执行（不可变的版本化脚本）。当前 schema 版本为 **4**。
+数据库迁移在启动时自动执行（不可变的版本化脚本）。当前 schema 版本为 **5**（`internal/db/db.go` 的 `migrations` 1–5）。
 
 数据库测试包（`internal/account`、`internal/httpapi`）都会 TRUNCATE 同一批表，因此每个包用 `internal/testdb` 在 `TestMain` 里持有 PostgreSQL advisory lock，直到该包的测试二进制退出——这样 `go test ./...` 并行跑包时不会互相清表（不加锁时会随机出现"找不到用户"之类的假失败）。
 
@@ -684,6 +685,75 @@ $ cd web && pnpm typecheck && pnpm build
 **已知遗留（本波次不做）**：`notes/reactions/create` 的读可见性仍未接线（表里保留该行）；`notes/delete` 仍借用
 `notes/show` 的错误 id；提及被回复/引用吸收时不再发主通道 `mention` 事件（客户端会多收一条事件，不影响通知内容）。
 
+### 11.16 Firefish 前端整体移植 Task 1：参考源码、许可证与能力矩阵（2026-11-01）
+
+**方向变更**：前端不再做「在现有页面上渐进改造」，改为以 Firefish 客户端的页面结构、壳、Deck、信息密度与
+交互模型为基线整体移植，API 一律接本项目的 Misskey 兼容端点。2026-11-01 的设计文档
+（`docs/superpowers/specs/2026-11-01-firefish-frontend-port-design.md`）取代旧的渐进式设计；
+旧计划 Task 2–8 的**后端与 API 侧**成果保留（§11.10–§11.15），前端组件不再按旧结构演进。
+
+本任务的产物是三份 research 文档，本轮**没有改产品代码**（`web/`、`internal/`、`cmd/` 零改动）：
+
+| 文档 | 内容 |
+|------|------|
+| `docs/research/2026-11-01-firefish-port-source-and-license-register.md` | 四个参考的固定 commit、来源 URL、许可证、稀疏范围、可构建性判定、复制边界 |
+| `docs/research/2026-11-01-firefish-port-capability-matrix.md` | 首批 12 项能力 → Firefish 页面 → 端点 → 当前状态（已支持/需适配/需新增后端/隐藏）与降级 |
+| `docs/research/2026-11-01-runtime-adaptation-contract.md` | `api`/`apiWithDialog`/`alert`/`confirm`/`popup`/`popupMenu`/`contextMenu`/`inputText`/`post`/`claimZIndex`/`me`/`i18n`/`instance`/路由/`AppIcon` 的 `shim`·`rewrite`·`drop` 归属 |
+
+**固定的参考版本**：Firefish `02c31e0`（2024-12-11）、Iceshrimp Vue fork `1fa829ed10f4`（2025-07-25，
+经 Codeberg API 复核）、Iceshrimp.NET `2c61359`（2026-10-27）、Misskey `c05e844`（2026-10-29）。
+
+**参考源码不可直接构建**（登记为只读参考，不作为本地依赖）：
+
+- Firefish 的稀疏范围只有 `packages/client/src` 与 `packages/sw/src`，`packages/client/index.html`、
+  根 `scripts/copy-index.mjs`、`packages/firefish-js` 都不在磁盘上；`packages/client/package.json` 依赖
+  `firefish-js: workspace:*`，`pnpm install` 会以 `ERR_PNPM_WORKSPACE_PKG_NOT_FOUND` 中止。
+- Iceshrimp Vue fork 的本地快照只有 `packages/`（`client`/`sw`/`backend`/`iceshrimp-sdk`），没有根清单，
+  上游用 yarn 4.3.1 + PnP，不是 pnpm 工作区；即使补齐也不引入——它意味着同时引入 Firefish 后端契约、
+  Service Worker 与插件运行时，与「Misskey API 是唯一后端兼容边界」冲突，因此只作组件镜像参考。
+- Firefish 上游 `develop` 停在 `02c31e0`（2024-12-11），仓库**未归档**（Codeberg API `archived: false`，2026-11-01 复核）；
+  准确表述是「上游无新提交」，不是「已归档/已删除」。
+
+**`i/notifications` 与旧通知端点的兼容策略**：上游通知列表端点是 `POST /api/i/notifications`
+（`endpoints/i/notifications.ts`），本实现注册在 `POST /api/notifications`（行为已实现，§11.15.3 记录为路径偏差）。
+决定：
+
+1. 后端**两个路径都注册**，`/api/notifications` 保留为 legacy 别名，两者进同一个 handler，不产生第二套实现；
+2. 前端**只在适配层映射一次**（`web/src/api/client.ts` 的通用 `request()`），页面与组件不再出现端点路径；
+3. 在别名落地前，移植过来的 Firefish 代码调用 `i/notifications` 会 404——这是 Task 1 之后第一个必须补的后端小改动，
+   与前端移植的第一个任务配对提交，不单独留在文档里。
+
+**schema 版本**：当前为 **5**（不可变迁移 1–5，最后一次为 `user_profiles.pinned_note_ids`）。本轮不涉及 schema 变更，
+前端移植不修改数据库（设计文档 §5）。§7 里原有的「当前 schema 版本为 4」已在本次一并订正。
+
+**只读审计后的订正**（同一天的 Task 1 审计，本地记录 `.superpowers/sdd/2026-11-01-firefish-frontend-port/task-1-audit.md`，
+该目录被 `.gitignore` 覆盖、不入库）：三份文档初稿的 12 类问题已修正，值得记住的六条：
+
+1. 端点口径从「只匹配 `os.api(`」扩到 `api(`/`endpoint = "…"`/`fetch(apiUrl + …)`，去重后 **277** 个（初稿的 157 是窄口径）。
+2. `POST /api/meta` **没有 `emojis` 字段**（初稿误写「返回空数组」）；emoji picker 退化为 Unicode 的结论不变。
+3. `i/update` 只接受 `name`/`description`/`avatarId`（`i_update.go:66-70`），其余字段静默忽略 → 设置页只渲染三个输入框。
+4. `readAllNotifications` **已发布**（`notifications.go:19`），`readNotification` **已处理**但语义是「该用户全部标读」
+   （`connection.go:143-149`），初稿标成「缺」是错的。
+5. 补登 5 个真实端点：`notes/unrenote`（取消转贴 → 映射 `notes/delete`）、`notes/edit`（Firefish 专属，隐藏）、
+   `notes/replies`、`notes/mentions`、`drive/files/attached-notes`。
+6. 运行时契约补 6 个首批页面会调用的成员：`pageWindow`（rewrite）、`select`/`yesno`（shim）、
+   `form`/`selectUser`/`selectLocalUser`/`selectInstance`/`selectDriveFile`/`selectDriveFolder`（drop）、
+   `openEmojiPicker`（rewrite）。
+
+另有三处**既有研究**已被代码推翻，本次不改旧笔记原文（保审计链），以新文档为准：
+`2026-10-30-firefish-ui-gap-analysis.md:786,880` 说通知 `includeTypes`「解析后丢弃」（实际已实现）、
+`2026-10-31-iceshrimp-architecture-translation.md:16` 把 2012 个文件挂在 `client/src`（实际是 `packages/` 全量）、
+`2026-10-29-frontend-redesign-reference-analysis.md:44` 的「Firefish 开发已中止」（更准确：`develop` 自 2024-12 无新提交，
+仓库未 archive）。
+
+**本轮门禁（2026-11-01 实测）**：`git diff --check` 无输出；`gofmt -l internal/ cmd/` 无输出；`go vet ./...` 通过；
+`go test ./...` 全绿；再带 `CINDERFISH_TEST_DATABASE_URL` 重跑，`internal/account`（0.77s）、
+`internal/httpapi`（9.84s）、`internal/media`（0.81s）、`internal/note`（0.73s）同样全绿。纯文档改动不影响二进制，
+但按 `AGENTS.md` 的要求仍跑一遍，避免把上一轮的红色状态当成绿。
+
+**执行顺序建议**（下一步）：先按运行时契约落地 shim（`api`、`me`、`i18n`、`instance`、`z-index`、`DialogHost`、
+`PopupMenu`），再移植壳与时间线；端点缺口按能力矩阵 §10 单独立项，不与前端提交混在一起。
+
 ## 12. M5 联邦（ActivityPub）
 
 源码对照记录见 `docs/research/2026-10-28-m5-federation-source-calibration.md`（逐条对照上游文件，含刻意偏离项）。
@@ -738,6 +808,10 @@ POST /inbox                            POST /users/{id}/inbox
 |------|------|
 | `AGENTS.md` | 项目规约（**改代码前必读**） |
 | `docs/superpowers/specs/2026-10-26-cinderfish-architecture-v0.md` | 架构设计 v0 |
+| `docs/superpowers/specs/2026-11-01-firefish-frontend-port-design.md` | **Firefish 前端整体移植设计（取代渐进式设计）** |
+| `docs/research/2026-11-01-firefish-port-source-and-license-register.md` | **移植参考源码版本、许可证与复制边界** |
+| `docs/research/2026-11-01-firefish-port-capability-matrix.md` | **页面 → 端点能力矩阵与降级行为** |
+| `docs/research/2026-11-01-runtime-adaptation-contract.md` | **运行时 shim 契约（shim/rewrite/drop）** |
 | `docs/research/2026-10-26-misskey-fediverse-firefish.md` | 首轮调研 |
 | `docs/research/2026-10-26-go-ecosystem-and-dependency-decisions.md` | Go 生态与依赖取舍 |
 | `docs/research/2026-10-26-tech-stack-comparison.md` | 技术栈横向对比 |
