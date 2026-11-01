@@ -4,6 +4,7 @@ import type {
   InstanceMeta,
   MeDetailed,
   Note,
+  NoteVisibility,
   Notification,
   SigninResponse,
   TimelineParams,
@@ -13,15 +14,19 @@ import type {
 
 const TOKEN_KEY = "cinderfish.token";
 
-// Misskey-compatible notes/create wraps the created note in an object. Keep
-// the envelope conversion here so every caller, including optimistic renotes,
-// receives the Note value its types declare.
 // Content warnings are either absent or non-empty in the Misskey create schema.
 export function normalizeContentWarning(enabled: boolean, value: string): string | null {
   const normalized = value.trim();
   return enabled && normalized ? normalized : null;
 }
 
+export function isContentWarningValid(value: string): boolean {
+  return value.length <= 100;
+}
+
+// Misskey-compatible notes/create wraps the created note in an object. Keep
+// the envelope conversion here so every caller, including optimistic renotes,
+// receives the Note value its types declare.
 // Misskey-compatible notes/create wraps the created note in an object. Keep
 // the envelope conversion here so every caller, including optimistic renotes,
 // receives the Note value its types declare.
@@ -278,7 +283,7 @@ export const api = {
   createNote: (params: {
     text?: string;
     cw?: string | null;
-    visibility?: string;
+    visibility?: NoteVisibility;
     localOnly?: boolean;
     fileIds?: string[];
     replyId?: string;

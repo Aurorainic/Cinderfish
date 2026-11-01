@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { api, normalizeContentWarning } from "../../api/client";
+import { api, isContentWarningValid, normalizeContentWarning } from "../../api/client";
 import type { DriveFile, Note, NoteVisibility } from "../../api/types";
 import { relativeTime } from "../../lib/time";
 import { instance, loadInstance } from "../../stores/instance";
@@ -52,6 +52,7 @@ let draftTimer: ReturnType<typeof setTimeout> | undefined;
 
 const maxLength = computed(() => instance.meta?.maxNoteTextLength ?? 3000);
 const remaining = computed(() => maxLength.value - text.value.length);
+const contentWarningRemaining = computed(() => 100 - cw.value.length);
 
 // Only the standalone composer owns the draft: reply and quote targets would
 // otherwise be lost when the dialog closes.
@@ -61,6 +62,7 @@ const recipientList = computed(() => parseHandles(recipientsInput.value));
 
 const canPost = computed(() => {
   if (posting.value || uploading.value || remaining.value < 0) return false;
+  if (showCw.value && !isContentWarningValid(cw.value)) return false;
   if (visibility.value === "specified" && recipientList.value.length === 0) return false;
   return text.value.trim().length > 0 || files.value.length > 0 || !!props.renoteTo;
 });
@@ -335,7 +337,15 @@ onBeforeUnmount(() => {
     </div>
 
     <div v-if="showCw" class="field cw-field">
-      <input v-model="cw" class="input" type="text" placeholder="内容警告（可选）" />
+      <input
+        v-model="cw"
+        class="input"
+        type="text"
+        maxlength="100"
+        placeholder="内容警告（可选）"
+        :aria-invalid="contentWarningRemaining < 0"
+      />
+      <span class="muted small" aria-live="polite">剩余 {{ contentWarningRemaining }} 个字符</span>
     </div>
 
     <textarea
