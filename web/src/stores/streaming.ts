@@ -1,5 +1,9 @@
 import { ref } from "vue";
 import { getToken } from "../api/client";
+import { dispatchStreamingFrame, type StreamHandler, type StreamingFrame } from "./streaming-frames";
+
+export { dispatchStreamingFrame } from "./streaming-frames";
+export type { StreamingFrame, StreamHandler } from "./streaming-frames";
 
 // A thin client for the backend's Misskey-compatible Streaming API.
 // Frames are {type, body}; channel events arrive as
@@ -12,8 +16,7 @@ import { getToken } from "../api/client";
 // itself because the server delivers per-user events only once per
 // connection; dropping a caller's reference never kills the store's own.
 
-export type StreamHandler = (channel: string, type: string, body: unknown) => void;
-
+export type NoteUpdatedHandler = (event: { id: string; type: string; body: unknown }) => void;
 type ChannelSub = { id: string; channel: string; refs: number };
 
 const RECONNECT_BASE_MS = 1000;
@@ -133,21 +136,19 @@ class StreamingClient {
     };
 
     ws.onmessage = (event) => {
-      let frame: { type?: string; body?: unknown };
+      let frame: StreamingFrame;
       try {
-        frame = JSON.parse(String(event.data)) as { type?: string; body?: unknown };
+        frame = JSON.parse(String(event.data)) as StreamingFrame;
       } catch {
         return;
       }
-      if (frame.type !== "channel" || !frame.body) return;
-      const body = frame.body as { id?: string; type?: string; body?: unknown };
-      if (!body.id || !body.type) return;
-      const channel = this.subsByWire.get(body.id)?.channel ?? "";
-      if (channel === "main" && body.type === "notification") {
-        unreadNotifications.value += 1;
-      }
-      this.emit(channel, body.type, body.body);
-    };
+      dispatchStreamingFrame(this.handlers, frame, (id) => this.subsByWire.get(id)?.channel);
+      if (frame.type === "channel" && frame.body && typeof frame.body === "object") {
+        const body = frame.body as { id?: string; type?: string; body?: unknown };
+        if (body.type === "notification" && this.subsByWire.get(body.id ?? "")?.channel === "main") {
+          unreadNotifications.value += 1;
+        }
+      }    };
 
     ws.onclose = () => {
       if (this.ws !== ws) return;
