@@ -19,31 +19,11 @@ func (s *Server) packNoteFor(n *note.Note, viewerID string) map[string]any {
 	return s.packNoteDetailFor(n, pc)
 }
 
-// packNoteDetailFor renders a note in the Note schema without touching
-// the database again beyond the nested entities a detail view needs.
+// packNoteDetailFor renders a note in the Note schema for the packer
+// interface, using the same detail packer the HTTP endpoints use so the
+// two paths cannot drift apart.
 func (s *Server) packNoteDetailFor(n *note.Note, pc notePackContext) map[string]any {
-	ctx := context.Background()
-	packed := packNote(n, pc)
-	packed["clippedCount"] = n.ClippedCount
-
-	if n.ReplyID != nil {
-		if parent, err := s.notes.Get(ctx, *n.ReplyID); err == nil {
-			reply := packNote(parent, s.notePackContext(ctx, parent, pc.ViewerID))
-			reply["replyId"] = nil
-			reply["renoteId"] = nil
-			packed["reply"] = reply
-		} else {
-			packed["reply"] = nil
-		}
-	}
-	if n.RenoteID != nil {
-		if target, err := s.notes.Get(ctx, *n.RenoteID); err == nil {
-			packed["renote"] = packNote(target, s.notePackContext(ctx, target, pc.ViewerID))
-		} else {
-			packed["renote"] = nil
-		}
-	}
-	return packed
+	return packNoteDetail(context.Background(), s, n, pc)
 }
 
 // streamingPacker renders stored entities for streaming payloads.
@@ -85,7 +65,6 @@ func (s *Server) packNotification(n *note.Notification, viewerID string) map[str
 		"userId":    n.NotifierID,
 		"noteId":    n.NoteID,
 		"reaction":  n.Reaction,
-		"body":      "",
 	}
 	if n.NotifierID != nil {
 		if author, err := s.accounts.GetByID(ctx, *n.NotifierID); err == nil {

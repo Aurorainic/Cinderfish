@@ -149,7 +149,9 @@ func TestNotesCreateVisibilityLevels(t *testing.T) {
 			"text":       "note " + visibility,
 			"visibility": visibility,
 		})
-		resp, body := post(t, ts, "/api/notes/show", map[string]any{"noteId": id})
+		// A followers note is hidden from strangers now, so show it as
+		// its author.
+		resp, body := post(t, ts, "/api/notes/show", map[string]any{"i": token, "noteId": id})
 		if resp.StatusCode != http.StatusOK {
 			t.Fatalf("show %s: status %d", visibility, resp.StatusCode)
 		}
@@ -596,7 +598,9 @@ func TestSpecifiedVisibility(t *testing.T) {
 		"visibleUserIds": []string{idB},
 	})
 
-	resp, body := post(t, ts, "/api/notes/show", map[string]any{"noteId": id})
+	// A specified note is hidden from strangers now, so show it as its
+	// author.
+	resp, body := post(t, ts, "/api/notes/show", map[string]any{"i": tokenA, "noteId": id})
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("show: status %d", resp.StatusCode)
 	}
@@ -743,14 +747,19 @@ func TestRenoteInheritsTargetVisibility(t *testing.T) {
 	_, tokenA := createUser(t, ts, uniqueName(t)+"a")
 	_, tokenB := createUser(t, ts, uniqueName(t)+"b")
 
-	showVisibility := func(id string) (any, any) {
+	showVisibilityAs := func(id, token string) (any, any) {
 		t.Helper()
-		resp, body := post(t, ts, "/api/notes/show", map[string]any{"noteId": id})
+		payload := map[string]any{"noteId": id}
+		if token != "" {
+			payload["i"] = token
+		}
+		resp, body := post(t, ts, "/api/notes/show", payload)
 		if resp.StatusCode != http.StatusOK {
 			t.Fatalf("show %s: status %d, body %v", id, resp.StatusCode, body)
 		}
 		return body["visibility"], body["localOnly"]
 	}
+	showVisibility := func(id string) (any, any) { return showVisibilityAs(id, "") }
 
 	home := createNote(t, ts, tokenA, map[string]any{"text": "home note", "visibility": "home"})
 	homeRenote := createNote(t, ts, tokenB, map[string]any{"renoteId": home})
@@ -762,7 +771,8 @@ func TestRenoteInheritsTargetVisibility(t *testing.T) {
 	// followers-only.
 	followers := createNote(t, ts, tokenA, map[string]any{"text": "followers only", "visibility": "followers"})
 	ownRenote := createNote(t, ts, tokenA, map[string]any{"renoteId": followers})
-	if vis, _ := showVisibility(ownRenote); vis != "followers" {
+	// The followers renote is hidden from strangers; show it as its author.
+	if vis, _ := showVisibilityAs(ownRenote, tokenA); vis != "followers" {
 		t.Errorf("renote of an own followers note visibility = %v, want followers", vis)
 	}
 
@@ -795,7 +805,9 @@ func TestReplyInheritsTargetVisibility(t *testing.T) {
 
 	show := func(id string) (any, any) {
 		t.Helper()
-		resp, body := post(t, ts, "/api/notes/show", map[string]any{"noteId": id})
+		// The followers replies below are only visible to B, so show
+		// everything as B; public and home notes stay visible either way.
+		resp, body := post(t, ts, "/api/notes/show", map[string]any{"i": tokenB, "noteId": id})
 		if resp.StatusCode != http.StatusOK {
 			t.Fatalf("show %s: status %d, body %v", id, resp.StatusCode, body)
 		}
@@ -933,4 +945,210 @@ func uploadFile(t *testing.T, baseURL, token, name string, content *bytes.Buffer
 		t.Fatalf("decode response: %v", err)
 	}
 	return resp, decoded
+}
+
+// notes/show must not confirm a restricted note exists: a followers or
+// specified note is answered with the same 404 NO_SUCH_NOTE as a missing
+// id for anyone outside its audience, while the author, the addressed
+// users and the followers read it normally.
+func TestNotesShowVisibility(t *testing.T) {
+	// The follower case needs following/create, which only runs with the
+	// federation store attached.
+	ts := newFederationServer(t, "public").ts
+	idA, tokenA := createUser(t, ts, uniqueName(t)+"a")
+	idB, tokenB := createUser(t, ts, uniqueName(t)+"b")
+	_, tokenC := createUser(t, ts, uniqueName(t)+"c")
+
+	followers := createNote(t, ts, tokenA, map[string]any{
+		"text": "followers only", "visibility": "followers",
+	})
+	specified := createNote(t, ts, tokenA, map[string]any{
+		"text": "just for b", "visibility": "specified",
+		"visibleUserIds": []string{idB},
+	})
+
+	// Anonymous viewers get NO_SUCH_NOTE, not the content.
+	for _, id := range []string{followers, specified} {
+		resp, body := post(t, ts, "/api/notes/show", map[string]any{"noteId": id})
+		if resp.StatusCode != http.StatusNotFound {
+			t.Fatalf("anonymous show %s: status %d, body %v", id, resp.StatusCode, body)
+		}
+		if errObj, _ := body["error"].(map[string]any); errObj["code"] != "NO_SUCH_NOTE" {
+			t.Errorf("anonymous code = %v, want NO_SUCH_NOTE", errObj["code"])
+		}
+	}
+
+	// An authenticated stranger gets the same 404 for both.
+	for _, id := range []string{followers, specified} {
+		resp, body := post(t, ts, "/api/notes/show", map[string]any{"i": tokenC, "noteId": id})
+		if resp.StatusCode != http.StatusNotFound {
+			t.Fatalf("stranger show %s: status %d, body %v", id, resp.StatusCode, body)
+		}
+		if errObj, _ := body["error"].(map[string]any); errObj["code"] != "NO_SUCH_NOTE" {
+			t.Errorf("stranger code = %v, want NO_SUCH_NOTE", errObj["code"])
+		}
+	}
+
+	// The author sees both.
+	for _, id := range []string{followers, specified} {
+		resp, body := post(t, ts, "/api/notes/show", map[string]any{"i": tokenA, "noteId": id})
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("author show %s: status %d, body %v", id, resp.StatusCode, body)
+		}
+	}
+
+	// The addressed user sees the specified note.
+	resp, body := post(t, ts, "/api/notes/show", map[string]any{"i": tokenB, "noteId": specified})
+	if resp.StatusCode != http.StatusOK || body["text"] != "just for b" {
+		t.Errorf("addressee show specified: status %d, body %v", resp.StatusCode, body)
+	}
+	// But not the followers note.
+	resp, _ = post(t, ts, "/api/notes/show", map[string]any{"i": tokenB, "noteId": followers})
+	if resp.StatusCode != http.StatusNotFound {
+		t.Errorf("non-follower show followers: status %d, want 404", resp.StatusCode)
+	}
+
+	// After following the author the followers note becomes visible.
+	if resp, out := post(t, ts, "/api/following/create", map[string]any{
+		"i": tokenC, "userId": idA,
+	}); resp.StatusCode != http.StatusOK {
+		t.Fatalf("follow: status %d, body %v", resp.StatusCode, out)
+	}
+	resp, body = post(t, ts, "/api/notes/show", map[string]any{"i": tokenC, "noteId": followers})
+	if resp.StatusCode != http.StatusOK || body["text"] != "followers only" {
+		t.Errorf("follower show followers: status %d, body %v", resp.StatusCode, body)
+	}
+	// The followers note stays hidden anonymously.
+	resp, _ = post(t, ts, "/api/notes/show", map[string]any{"noteId": followers})
+	if resp.StatusCode != http.StatusNotFound {
+		t.Errorf("anonymous show followers: status %d, want 404", resp.StatusCode)
+	}
+
+	// A public note stays visible to everyone.
+	public := createNote(t, ts, tokenA, map[string]any{"text": "open"})
+	for _, payload := range []map[string]any{
+		{"noteId": public}, {"i": tokenC, "noteId": public},
+	} {
+		resp, body := post(t, ts, "/api/notes/show", payload)
+		if resp.StatusCode != http.StatusOK || body["text"] != "open" {
+			t.Errorf("public show: status %d, body %v", resp.StatusCode, body)
+		}
+	}
+}
+
+// The embedded parent of a reply or quote is packed only when the viewer
+// may read the parent; otherwise the id stays but the embedded object is
+// null, like a deleted or unreachable parent upstream.
+// The embedded parent of a reply or quote is packed only when the viewer
+// may read the parent; otherwise the id stays but the embedded object is
+// null, like a deleted or unreachable parent upstream
+// (core/entities/NotificationEntityService.ts).
+func TestEmbeddedParentVisibility(t *testing.T) {
+	ts := newFederationServer(t, "public").ts
+	idA, tokenA := createUser(t, ts, uniqueName(t)+"a")
+	idB, tokenB := createUser(t, ts, uniqueName(t)+"b")
+	_, tokenC := createUser(t, ts, uniqueName(t)+"d")
+
+	parent := createNote(t, ts, tokenA, map[string]any{
+		"text": "secret parent", "visibility": "followers",
+	})
+	// B follows A, so B sees the parent.
+	if resp, out := post(t, ts, "/api/following/create", map[string]any{
+		"i": tokenB, "userId": idA,
+	}); resp.StatusCode != http.StatusOK {
+		t.Fatalf("follow: status %d, body %v", resp.StatusCode, out)
+	}
+
+	// A reply is narrowed to the parent's followers visibility by
+	// notes/create, so a stranger cannot read the reply itself.
+	reply := createNote(t, ts, tokenB, map[string]any{"replyId": parent, "text": "narrowed reply"})
+	for _, payload := range []map[string]any{
+		{"noteId": reply}, {"i": tokenC, "noteId": reply},
+	} {
+		resp, body := post(t, ts, "/api/notes/show", payload)
+		if resp.StatusCode != http.StatusNotFound {
+			t.Fatalf("show reply as stranger: status %d, body %v", resp.StatusCode, body)
+		}
+	}
+	// A follower sees the reply with its embedded parent.
+	resp, body := post(t, ts, "/api/notes/show", map[string]any{"i": tokenB, "noteId": reply})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("show reply as follower: status %d, body %v", resp.StatusCode, body)
+	}
+	if parentObj, ok := body["reply"].(map[string]any); !ok || parentObj["text"] != "secret parent" {
+		t.Errorf("embedded reply for follower = %v, want the parent", body["reply"])
+	}
+	// The parent's author sees the embedded parent too.
+	resp, body = post(t, ts, "/api/notes/show", map[string]any{"i": tokenA, "noteId": reply})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("show reply as author: status %d, body %v", resp.StatusCode, body)
+	}
+	if parentObj, ok := body["reply"].(map[string]any); !ok || parentObj["id"] != parent {
+		t.Errorf("embedded reply for author = %v, want the parent", body["reply"])
+	}
+
+	// The author may renote their own followers-only note, and the renote
+	// keeps the followers visibility (TestRenoteInheritsTargetVisibility
+	// covers the narrowing). That renote's embedded target is then the
+	// leak surface: the author must see it, a stranger must not.
+	ownQuote := createNote(t, ts, tokenA, map[string]any{
+		"renoteId": parent, "text": "quoting my own",
+	})
+	for _, payload := range []map[string]any{
+		{"noteId": ownQuote}, {"i": tokenC, "noteId": ownQuote},
+	} {
+		resp, body = post(t, ts, "/api/notes/show", payload)
+		if resp.StatusCode != http.StatusNotFound {
+			t.Errorf("show own quote as stranger: status %d, want 404", resp.StatusCode)
+		}
+	}
+	// The follower reads the renote with its embedded target.
+	resp, body = post(t, ts, "/api/notes/show", map[string]any{"i": tokenB, "noteId": ownQuote})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("show own quote as follower: status %d, body %v", resp.StatusCode, body)
+	}
+	if renoteObj, ok := body["renote"].(map[string]any); !ok || renoteObj["text"] != "secret parent" {
+		t.Errorf("embedded renote for follower = %v, want the parent", body["renote"])
+	}
+
+	// The reply keeps the parent's specified visibility and audience, so
+	// the parent author A reads the reply while the parent's audience
+	// member B does not — and B gets NO_SUCH_NOTE rather than the reply
+	// with an unembedded parent, since the reply itself is restricted.
+	// The unembedded-parent case is exercised below via the open reply:
+	// its embedded parent is public, so every viewer sees it.
+	specified := createNote(t, ts, tokenA, map[string]any{
+		"text": "secret specified", "visibility": "specified",
+		"visibleUserIds": []string{idB},
+	})
+	inner := createNote(t, ts, tokenB, map[string]any{
+		"replyId": specified, "text": "answering in kind",
+		"visibility": "specified", "visibleUserIds": []string{idA},
+	})
+	resp, body = post(t, ts, "/api/notes/show", map[string]any{"i": tokenC, "noteId": inner})
+	if resp.StatusCode != http.StatusNotFound {
+		t.Errorf("show inner reply as outsider: status %d, want 404", resp.StatusCode)
+	}
+	resp, body = post(t, ts, "/api/notes/show", map[string]any{"i": tokenA, "noteId": inner})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("show inner reply as addressee: status %d, body %v", resp.StatusCode, body)
+	}
+	if body["replyId"] != specified {
+		t.Errorf("replyId = %v, want %s", body["replyId"], specified)
+	}
+	if parentObj, ok := body["reply"].(map[string]any); !ok || parentObj["text"] != "secret specified" {
+		t.Errorf("embedded reply for parent author = %v, want the parent", body["reply"])
+	}
+
+	// The packer path itself: a public reply to a public parent embeds
+	// the parent for everyone.
+	open := createNote(t, ts, tokenA, map[string]any{"text": "open parent"})
+	openReply := createNote(t, ts, tokenB, map[string]any{"replyId": open, "text": "open reply"})
+	resp, body = post(t, ts, "/api/notes/show", map[string]any{"noteId": openReply})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("show open reply: status %d, body %v", resp.StatusCode, body)
+	}
+	if parentObj, ok := body["reply"].(map[string]any); !ok || parentObj["text"] != "open parent" {
+		t.Errorf("embedded reply = %v, want the public parent", body["reply"])
+	}
 }

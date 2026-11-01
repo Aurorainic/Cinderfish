@@ -93,28 +93,9 @@ func (s *Server) handleNotifications(w http.ResponseWriter, r *http.Request) {
 
 	out := make([]any, 0, len(notifications))
 	for _, n := range notifications {
-		item := map[string]any{
-			"id":        n.ID,
-			"createdAt": n.CreatedAt.UTC().Format("2006-01-02T15:04:05.000Z"),
-			"type":      n.Type,
-			"isRead":    n.IsRead,
-			"userId":    n.NotifierID,
-			"noteId":    n.NoteID,
-			"reaction":  n.Reaction,
-			"body":      "",
-		}
-		if n.NotifierID != nil {
-			if author, err := s.accounts.GetByID(r.Context(), *n.NotifierID); err == nil {
-				item["user"] = packUserLite(author, "", nil)
-			}
-		}
-		if n.NoteID != nil {
-			if n, err := s.notes.Get(r.Context(), *n.NoteID); err == nil {
-				pc := s.notePackContext(r.Context(), n, info.User.ID)
-				item["note"] = packNoteDetail(r.Context(), s, n, pc)
-			}
-		}
-		out = append(out, item)
+		// The same packer the streaming main channel uses, so the HTTP
+		// list and the pushed event cannot drift apart.
+		out = append(out, s.packNotification(n, info.User.ID))
 	}
 
 	writeJSON(w, http.StatusOK, out)

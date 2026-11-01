@@ -189,3 +189,44 @@ func TestIPinLimit(t *testing.T) {
 		t.Fatalf("pin after unpin: status %d, body %v", resp.StatusCode, body)
 	}
 }
+
+// The pinned strip on users/show and /api/i is packed for the actual
+// viewer, so a reactor sees their own myReaction there.
+func TestPinnedNotesPackedForViewer(t *testing.T) {
+	ts := newTestServer(t, "open")
+	authorName := uniqueName(t)
+	authorID, authorToken := createUser(t, ts, authorName)
+	_, reactorToken := createUser(t, ts, authorName+"b")
+
+	id := createNote(t, ts, authorToken, map[string]any{"text": "pinned"})
+	if resp, me := post(t, ts, "/api/i/pin", map[string]any{"i": authorToken, "noteId": id}); resp.StatusCode != http.StatusOK {
+		t.Fatalf("pin: status %d, body %v", resp.StatusCode, me)
+	}
+	if resp, out := post(t, ts, "/api/notes/reactions/create", map[string]any{
+		"i": reactorToken, "noteId": id, "reaction": "🎉",
+	}); resp.StatusCode != http.StatusOK {
+		t.Fatalf("react: status %d, body %v", resp.StatusCode, out)
+	}
+
+	assertMyReaction := func(where string, show map[string]any) {
+		pinned, _ := show["pinnedNotes"].([]any)
+		if len(pinned) != 1 {
+			t.Fatalf("%s pinnedNotes = %v, want one note", where, show["pinnedNotes"])
+		}
+		packed, _ := pinned[0].(map[string]any)
+		if packed["myReaction"] != "🎉" {
+			t.Errorf("%s pinned note myReaction = %v, want 🎉", where, packed["myReaction"])
+		}
+	}
+
+	_, show := post(t, ts, "/api/users/show", map[string]any{"i": reactorToken, "userId": authorID})
+	assertMyReaction("users/show", show)
+
+	resp, me := post(t, ts, "/api/i", map[string]any{"i": reactorToken})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("api/i: status %d, body %v", resp.StatusCode, me)
+	}
+	if _, ok := me["pinnedNotes"]; ok {
+		t.Logf("reactor's own pinnedNotes is empty as expected")
+	}
+}

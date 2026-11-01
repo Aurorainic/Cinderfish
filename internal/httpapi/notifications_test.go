@@ -461,3 +461,19 @@ func TestNotificationsMarkAsReadOnlyTouchesReturnedTypes(t *testing.T) {
 		t.Errorf("mention notification was marked read by a reaction-only fetch")
 	}
 }
+
+// The HTTP notification list must not carry a spurious body field: the
+// upstream Notification type only has body on app-type notifications,
+// which this server never stores.
+func TestNotificationHasNoBodyField(t *testing.T) {
+	ts, tokenA := seedTwoNotificationTypes(t)
+	list := fetchNotifications(t, ts, tokenA, map[string]any{})
+	if len(list) == 0 {
+		t.Fatal("no notifications")
+	}
+	for _, n := range list {
+		if _, present := n["body"]; present {
+			t.Errorf("notification carries body field: %v", n)
+		}
+	}
+}

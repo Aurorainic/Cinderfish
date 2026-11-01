@@ -83,6 +83,6 @@ func (s *Server) pinNote(w http.ResponseWriter, r *http.Request, pin bool) {
 	// carry the fresh list: the web session replaces itself with the
 	// response, and an empty pinnedNoteIds would blank the footer's
 	// pinned/unpinned label until the next /api/i.
-	s.applyPinnedNotes(r.Context(), info.User.ID, packed)
+	s.applyPinnedNotes(r.Context(), info.User.ID, info.User.ID, packed)
 	writeJSON(w, http.StatusOK, packed)
 }

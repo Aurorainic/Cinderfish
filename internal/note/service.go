@@ -472,6 +472,30 @@ SELECT visible_user_id FROM note_visibilities WHERE note_id = $1
 	return out
 }
 
+// VisibleTo reports whether viewerID may read the note. An empty
+// viewerID is the anonymous viewer, who only sees public and home notes.
+func (s *Service) VisibleTo(ctx context.Context, n *Note, viewerID string) (bool, error) {
+	if n.Visibility == VisibilityPublic || n.Visibility == VisibilityHome {
+		return true, nil
+	}
+	if viewerID == "" {
+		return false, nil
+	}
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return false, fmt.Errorf("note: begin visibility check: %w", err)
+	}
+	defer tx.Rollback(ctx)
+	visible, err := noteVisibleToTx(ctx, tx, n, viewerID)
+	if err != nil {
+		return false, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return false, fmt.Errorf("note: commit visibility check: %w", err)
+	}
+	return visible, nil
+}
+
 // Delete soft deletes a note owned by the given user.
 func (s *Service) Delete(ctx context.Context, id, userID string) error {
 	ct, err := s.pool.Exec(ctx, `

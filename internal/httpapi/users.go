@@ -81,8 +81,8 @@ func (s *Server) handleUsersNotes(w http.ResponseWriter, r *http.Request) {
 }
 
 // applyPinnedNotes fills pinnedNoteIds and pinnedNotes with the user's
-// pin list in stored order, at most five notes packed.
-func (s *Server) applyPinnedNotes(ctx context.Context, userID string, packed map[string]any) {
+// pin list in stored order, at most five notes packed for viewerID.
+func (s *Server) applyPinnedNotes(ctx context.Context, userID, viewerID string, packed map[string]any) {
 	if s.accounts == nil || s.notes == nil {
 		return
 	}
@@ -105,7 +105,7 @@ func (s *Server) applyPinnedNotes(ctx context.Context, userID string, packed map
 		if err != nil {
 			continue
 		}
-		notes = append(notes, packNoteDetail(ctx, s, n, s.notePackContext(ctx, n, "")))
+		notes = append(notes, packNoteDetail(ctx, s, n, s.notePackContext(ctx, n, viewerID)))
 	}
 	packed["pinnedNotes"] = notes
 }

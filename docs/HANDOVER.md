@@ -549,10 +549,12 @@ pnpm build    # 先 vue-tsc --noEmit，再输出 web/dist
 | `users/update` 的 `followersVisibility`/`followingVisibility` | `endpoints/users/update.ts` | `user_profiles.followers_visibility`/`following_visibility` | `views/settings/PrivacySettings.vue:55-70`（只读展示） | 要与 `users/following` 的可见性校验一起落地 |
 | `admin/drive/files` | `endpoints/admin/drive/files.ts` | `drive_files` | `views/admin/AdminFiles.vue:71` 占位 | 管理端列表 + 审核语义 |
 | `i/signin-history` | `endpoints/i/signin-history.ts` | `signins` | 账户设置（可选展示） | 无消费端 |
-| `notes/show`、`notes/reactions/create` 的**读可见性** | `endpoints/notes/show.ts`、`core/ReactionService.ts` L115-116（`isVisibleForMe`） | `noteVisibleToTx` 已存在（§11.15.2 第 2 项） | 所有笔记详情/反应入口 | 时间线已按可见性过滤，但详情仍按 id 直接可见；统一语义要一次读路径整改（show/reactions/notifications 打包），本波次只落地回复入径 |
+| `notes/reactions/create` 的**读可见性** | `core/ReactionService.ts` L121（`isVisibleForMe`） | `noteVisibleToTx` 已存在（§11.15.2 第 2 项） | 所有笔记详情/反应入口 | 时间线已按可见性过滤；反应入口的可见性校验尚未接线（回复入径与 `notes/show` 已在最终评审波次落地，见下） |
 | `notes/search`、`users/search`、`notes/search-by-tag` | `endpoints/notes/search.ts` 等 | `notes.text`、`notes.tags`（无全文索引） | **无搜索 UI** | 需要索引 + 查询设计；前端也没有入口 |
 
 **回复的受众收敛已在 Fix round 1 落地**（§11.15.2 第 2 项），因此不在上表：首轮只做了「回复目标可见性」的拒绝，漏掉了「回复本身按目标收敛可见性/localOnly」，reviewer 以 Important 指出后补齐（`core/NoteCreateService.ts` L544-573）。
+
+**读路径的可见性在整分支评审波次落地**（见 §11.15.8）：`notes/show` 现在按 viewer 判定可见性，不可见时以 404 `NO_SUCH_NOTE` 回答（不确认笔记是否存在），`packNoteDetail` 嵌入的父帖/被转贴笔记同样按 viewer 判定、不可见则只保留 id 不带内容。
 
 **已实现的端点不在这张表里，但有一处路径偏差要记住（Fix round 1，M3）**：上游的通知列表端点是 `i/notifications`（`endpoints/i/notifications.ts`，注册为 `POST /api/i/notifications`，`paramDef` 有 `includeTypes`/`excludeTypes`/`limit`/`sinceId`/`untilId`，`res` 是 `Notification[]`），本实现把它注册在 `POST /api/notifications`——**路径不同，行为已实现**（前端 `api/client.ts` 与全部测试都用 `/api/notifications`）。Task 5 的 `notifications/mark-all-as-read` 路径与上游一致。本轮不改路由（改路径会同时改动前端、全部通知测试与既有部署的客户端），记录为已知偏差；若将来要对齐，建议在新旧两个路径上同时注册、旧路径标记为别名。
 
@@ -664,6 +666,23 @@ $ cd web && pnpm typecheck && pnpm build
 工具契约要求当轮停止，因此 1440/1280/1100/840/720/600/380 的截图与溢出实测**没有做**。
 本波次的 UI 改动只有「徽标初值来自会话」这一处逻辑（无 CSS、无 DOM 结构变化，徽标渲染路径在 Task 3 已实测），
 但**按证据规则仍记为未验证**，见 §14。
+
+#### 11.15.8 整分支评审修复波：读路径可见性、打包去重与置顶 viewer（2026-10-31）
+
+整分支评审（76 提交，181 文件）给出「合并前需修」的结论，本波次处理其中的三处：
+
+| 问题 | 处理 |
+|---|---|
+| `notes/show` 不判可见性，followers/specified 笔记按 id 直读即得；`packNoteDetail` 嵌入的父帖同样不过滤，公开回复会带出父帖正文 | `handleNotesShow` 取可选 viewer，按 `noteVisibleToTx`（与上游 `isVisibleForMe` 逐条一致）判定，不可见时以 404 `NO_SUCH_NOTE` 回答（不确认存在性）；`packNoteDetail` 嵌入父帖/被转贴笔记前同样判定，不可见则只留 id 不带内容。`note.Service.VisibleTo` 是新暴露的读路径入口 |
+| HTTP 通知列表与流式通知各有一套打包，字段已开始漂移（HTTP 多一个 `body`） | 两条路径统一走 `s.packNotification`，并删掉上游 Notification 类型没有的 `body` 字段 |
+| `applyPinnedNotes` 用匿名 viewer 打包置顶笔记，登录用户看不到自己的 `myReaction` | `applyPinnedNotes` 增加 viewerID 参数，`users/show`、`/api/i`、`i/pin`、`i/unpin` 都传入真实 viewer |
+
+测试：`TestNotesShowVisibility`（匿名/陌生人是 404，作者、被指名的用户、关注者正常）、`TestPinnedNotesPackedForViewer`、
+`TestNotificationHasNoBodyField`。上游比对：`NoteEntityService.isVisibleForMe`（L308-359）与
+`core/entities/NotificationEntityService.ts` 的「不可达则返回 null」语义。
+
+**已知遗留（本波次不做）**：`notes/reactions/create` 的读可见性仍未接线（表里保留该行）；`notes/delete` 仍借用
+`notes/show` 的错误 id；提及被回复/引用吸收时不再发主通道 `mention` 事件（客户端会多收一条事件，不影响通知内容）。
 
 ## 12. M5 联邦（ActivityPub）
 

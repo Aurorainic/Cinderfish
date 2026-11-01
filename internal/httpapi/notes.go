@@ -282,6 +282,27 @@ func (s *Server) handleNotesShow(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// A note the viewer may not read is answered like a missing one, so
+	// the response does not confirm the note exists. Upstream notes/show
+	// has no visibility check, but its ecosystem keeps restricted ids out
+	// of an outsider's reach; our packers embed parents by id, so the
+	// check has to live here.
+	visible, err := s.notes.VisibleTo(r.Context(), n, viewerID)
+	if err != nil {
+		writeAPIError(w, &APIError{
+			Message: "Could not load the note.", Code: "INTERNAL_ERROR",
+			ID: errIDInternal, Kind: "server", Status: http.StatusInternalServerError,
+		})
+		return
+	}
+	if !visible {
+		writeAPIError(w, &APIError{
+			Message: "No such note.", Code: "NO_SUCH_NOTE",
+			ID: errIDNoSuchNote, Kind: "client", Status: http.StatusNotFound,
+		})
+		return
+	}
+
 	pc := s.notePackContext(r.Context(), n, viewerID)
 	writeJSON(w, http.StatusOK, packNoteDetail(r.Context(), s, n, pc))
 }

@@ -212,7 +212,7 @@ func (s *Server) handleI(w http.ResponseWriter, r *http.Request) {
 	packed := packMeDetailed(info.User, info.User.CreatedAt, includeSecrets, loadProfile(r.Context(), s, info.User.ID))
 	s.applyUserCounts(r.Context(), info.User.ID, packed)
 	s.applyUnreadNotifications(r.Context(), info.User.ID, packed)
-	s.applyPinnedNotes(r.Context(), info.User.ID, packed)
+	s.applyPinnedNotes(r.Context(), info.User.ID, info.User.ID, packed)
 	writeJSON(w, http.StatusOK, packed)
 }
 
@@ -270,8 +270,10 @@ func (s *Server) handleUsersShow(w http.ResponseWriter, r *http.Request) {
 	// users/show does not require credentials, but an authenticated viewer
 	// gets their relationship with the target filled in. A missing or bad
 	// token simply means anonymous, never a 401.
-	if s.federationStore != nil {
-		if info, err := s.authenticate(r.Context(), r, bodyAsMap(r)); err == nil && info != nil && info.User.ID != user.ID {
+	viewerID := ""
+	if info, authErr := s.authenticate(r.Context(), r, bodyAsMap(r)); authErr == nil && info != nil {
+		viewerID = info.User.ID
+		if s.federationStore != nil && info.User.ID != user.ID {
 			packed["isFollowing"] = s.federationStore.HasFollowing(r.Context(), info.User.ID, user.ID)
 			packed["isFollowed"] = s.federationStore.HasFollowing(r.Context(), user.ID, info.User.ID)
 			packed["hasPendingFollowRequestFromYou"] = s.federationStore.HasPendingFollowRequest(r.Context(), info.User.ID, user.ID)
@@ -279,7 +281,7 @@ func (s *Server) handleUsersShow(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	s.applyUserCounts(r.Context(), user.ID, packed)
-	s.applyPinnedNotes(r.Context(), user.ID, packed)
+	s.applyPinnedNotes(r.Context(), user.ID, viewerID, packed)
 	writeJSON(w, http.StatusOK, packed)
 }
 

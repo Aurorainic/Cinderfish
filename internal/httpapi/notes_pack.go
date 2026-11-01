@@ -81,18 +81,30 @@ func packNoteDetail(ctx context.Context, s *Server, n *note.Note, pc notePackCon
 
 	if n.ReplyID != nil {
 		if parent, err := s.notes.Get(ctx, *n.ReplyID); err == nil {
-			reply := packNote(parent, s.notePackContext(ctx, parent, pc.ViewerID))
-			// The embedded reply is a shallow copy.
-			reply["replyId"] = nil
-			reply["renoteId"] = nil
-			packed["reply"] = reply
+			if visible, verr := s.notes.VisibleTo(ctx, parent, pc.ViewerID); verr == nil && visible {
+				reply := packNote(parent, s.notePackContext(ctx, parent, pc.ViewerID))
+				// The embedded reply is a shallow copy.
+				reply["replyId"] = nil
+				reply["renoteId"] = nil
+				packed["reply"] = reply
+			} else {
+				// A parent the viewer may not read is omitted, like a
+				// deleted or unreachable one upstream
+				// (core/entities/NotificationEntityService.ts): replyId
+				// stays, the embedded object is null.
+				packed["reply"] = nil
+			}
 		} else {
 			packed["reply"] = nil
 		}
 	}
 	if n.RenoteID != nil {
 		if target, err := s.notes.Get(ctx, *n.RenoteID); err == nil {
-			packed["renote"] = packNote(target, s.notePackContext(ctx, target, pc.ViewerID))
+			if visible, verr := s.notes.VisibleTo(ctx, target, pc.ViewerID); verr == nil && visible {
+				packed["renote"] = packNote(target, s.notePackContext(ctx, target, pc.ViewerID))
+			} else {
+				packed["renote"] = nil
+			}
 		} else {
 			packed["renote"] = nil
 		}
