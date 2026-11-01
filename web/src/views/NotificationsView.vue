@@ -14,7 +14,9 @@ import { usePageTitle } from "../composables/use-page-title";
 
 // Type tabs are pushed down to the endpoint as includeTypes, so every page
 // the feed receives is already of the selected type and an empty result means
-// the type really has no notifications.
+// the type really has no notifications. "follow" is not offered: the backend
+// never writes follow notification rows (following/create only emits a stream
+// event), so the tab would always be empty.
 type Filter = "all" | "reaction" | "mention" | "renote";
 
 type TabIcon = "bell" | "heart" | "reply" | "renote";
@@ -98,6 +100,9 @@ async function fetcher(p: PagedFeedParams): Promise<Notification[]> {
     limit: PAGE_SIZE,
     untilId: p.untilId || undefined,
     includeTypes: includeTypesFor(filter.value),
+    // The backend marks only the returned page read, and marking a filtered
+    // page would leave the other types unread while the badge already shows
+    // zero; the explicit "mark all as read" button is the only read path.
     markAsRead: false,
   });
 }
