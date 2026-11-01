@@ -3,6 +3,7 @@ import { ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import AuthLayout from "../layouts/AuthLayout.vue";
 import { usePageTitle } from "../composables/use-page-title";
+import { ApiError } from "../api/client";
 import { signin } from "../stores/session";
 
 const router = useRouter();
@@ -14,6 +15,24 @@ const error = ref("");
 const busy = ref(false);
 
 usePageTitle("登录");
+
+// Firefish MkSignin.vue's loginFailed(): map the server's error ids to
+// concrete copy. The backend sends id-only errors, so err.message would just
+// be the HTTP status text.
+const LOGIN_ERROR_COPY: Record<string, string> = {
+  "6cc579cc-885d-43d8-95c2-b8c7fc963280": "用户不存在。",
+  "932c904e-9460-45b7-9ce6-7ed33be7eb2c": "密码不正确。",
+  "e03a5f46-d309-4865-9b69-56282d94e1eb": "该账号已被停用。",
+  "22d05606-fbcf-421a-a2db-b32610dcfd1b": "尝试次数过多，请稍后再试。",
+};
+
+function loginErrorText(err: unknown): string {
+  if (err instanceof ApiError) {
+    const mapped = LOGIN_ERROR_COPY[err.id];
+    if (mapped) return mapped;
+  }
+  return "登录失败，请稍后再试。";
+}
 
 async function submit() {
   if (busy.value) return;
@@ -28,7 +47,7 @@ async function submit() {
     const redirect = typeof route.query.redirect === "string" ? route.query.redirect : "/";
     await router.push(redirect);
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "登录失败。";
+    error.value = loginErrorText(err);
   } finally {
     busy.value = false;
   }

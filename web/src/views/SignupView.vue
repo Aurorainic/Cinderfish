@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
-import { api } from "../api/client";
+import { api, ApiError } from "../api/client";
 import AuthLayout from "../layouts/AuthLayout.vue";
 import { usePageTitle } from "../composables/use-page-title";
 import { instance, loadInstance } from "../stores/instance";
@@ -57,7 +57,13 @@ async function submit() {
     await signup(name, password.value, invitationCode.value.trim());
     await router.push("/");
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "注册失败。";
+    // The backend has no email field and no captcha; a 503 here means the
+    // admin registration mode (Firefish shows its "closed" copy for this).
+    if (err instanceof ApiError && err.status === 503) {
+      error.value = "本实例仅限管理员创建账号。";
+    } else {
+      error.value = "注册失败，请检查输入后重试。";
+    }
   } finally {
     busy.value = false;
   }
