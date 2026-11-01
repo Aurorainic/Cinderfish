@@ -67,3 +67,19 @@ export function signout(): void {
   session.token = "";
   session.me = null;
 }
+
+export interface AccountPatch {
+  name?: string | null;
+  description?: string | null;
+  avatarId?: string | null;
+}
+
+// The single write path for the signed-in user's own fields. It replaces the
+// stored copy in place so everything projecting from `session.me` (the
+// Firefish `me` shim, note headers restamped by the client) sees the new
+// values without a reload. Callers: the profile settings view and `me.ts`.
+export async function updateAccount(patch: AccountPatch): Promise<void> {
+  const updated = await api.iUpdate(patch);
+  if (session.me) Object.assign(session.me, updated);
+  else session.me = updated;
+}

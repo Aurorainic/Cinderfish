@@ -2,6 +2,9 @@
    Firefish. Colours, scale, motion and layers are tokens so the light theme in
    [data-theme="light"] and the dark theme below stay in sync. */
 
+/* Firefish's camelCase token names, aliased onto the tokens below. */
+@import "./firefish-tokens.css";
+
 :root {
   color-scheme: dark;
   accent-color: var(--accent);

@@ -3,7 +3,8 @@ import { api } from "../api/client";
 import type { InstanceMeta } from "../api/types";
 
 // Instance metadata is fetched once and shared; it drives the registration
-// hints and the federation badge.
+// hints and the federation badge. `web/src/instance.ts` projects this store
+// into the Firefish `getInstanceInfo()` shape, so both read the same copy.
 export const instance = reactive({
   meta: null as InstanceMeta | null,
   error: "",
@@ -17,6 +18,10 @@ export async function loadInstance(): Promise<void> {
   inflight = (async () => {
     try {
       instance.meta = await api.meta();
+      // A retry that succeeds must clear the failure of the earlier attempt,
+      // otherwise the sidebar keeps reporting an error the instance no longer
+      // has.
+      instance.error = "";
     } catch (err) {
       instance.error = err instanceof Error ? err.message : String(err);
     } finally {

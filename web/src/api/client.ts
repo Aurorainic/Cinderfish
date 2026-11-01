@@ -1,3 +1,4 @@
+import { ref } from "vue";
 import type {
   DriveFile,
   InstanceMeta,
@@ -11,6 +12,11 @@ import type {
 } from "./types";
 
 const TOKEN_KEY = "cinderfish.token";
+
+// Counts the requests in flight so a global loading indicator can show them
+// without every caller tracking its own state (Firefish's os exposes the same
+// ref for the same reason).
+export const pendingApiRequestsCount = ref(0);
 
 export class ApiError extends Error {
   status: number;
@@ -127,9 +133,42 @@ function stampViewer(value: unknown, depth = 0): void {
 // fields. Pass false only where a token would be meaningless or harmful:
 // signin, signup, availability checks and instance meta.
 async function post<T>(path: string, body: Record<string, unknown> = {}, sendToken = true): Promise<T> {
-  const payload: Record<string, unknown> = { ...body };
-  const token = getToken();
-  if (!token) viewer = null;
+  return request<T>(path, body, { useToken: sendToken });
+}
+
+// The one HTTP path the app uses. `endpoint` is Firefish-shaped: a bare RPC
+// name ("i", "notes/show") resolves under /api/, a path that already carries
+// the prefix is used as is, and an absolute URL is sent unchanged for the few
+// cross-instance reads the ported client performs.
+export interface RequestOptions {
+  /** Token to send instead of the stored one. */
+  token?: string | null;
+  /** false sends neither the `i` field nor the Authorization header. */
+  useToken?: boolean;
+}
+
+const ABSOLUTE_URL = /^[a-z][a-z0-9+.-]*:/i;
+
+function resolvePath(endpoint: string): string {
+  if (ABSOLUTE_URL.test(endpoint) || endpoint.startsWith("//")) return endpoint;
+  if (endpoint.startsWith("/api/")) return endpoint;
+  return `/api/${endpoint.replace(/^\/+/, "")}`;
+}
+
+export async function request<T>(
+  endpoint: string,
+  data: Record<string, unknown> = {},
+  options: RequestOptions = {},
+): Promise<T> {
+  const absolute = ABSOLUTE_URL.test(endpoint) || endpoint.startsWith("//");
+  const path = resolvePath(endpoint);
+  const payload: Record<string, unknown> = { ...data };
+  const token = options.token ?? getToken();
+  // A remote instance must never receive Cinderfish's own session token; it is
+  // only attached to an absolute URL when the caller passes one explicitly.
+  const sendToken = options.useToken !== false && (!absolute || options.token != null);
+
+  if (!token && !absolute) viewer = null;
   if (sendToken && token) payload.i = token;
 
   const headers: Record<string, string> = {
@@ -139,16 +178,27 @@ async function post<T>(path: string, body: Record<string, unknown> = {}, sendTok
   // The admin handlers authenticate from the header only, so send both:
   // `i` for Misskey compatibility and Bearer for every backend route.
   if (sendToken && token) headers.Authorization = `Bearer ${token}`;
-  const res = await fetch(path, {
-    method: "POST",
-    headers,
-    body: JSON.stringify(payload),
-  });
-  if (!res.ok) throw await parseError(res);
-  const data = (await res.json()) as T;
-  if (VIEWER_PATHS.has(path)) rememberViewer(data);
-  else stampViewer(data);
-  return data;
+
+  pendingApiRequestsCount.value++;
+  try {
+    const res = await fetch(path, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw await parseError(res);
+    // A 204 has no body; Firefish resolves it to undefined, and callers such
+    // as notes/delete rely on that instead of an empty object.
+    if (res.status === 204) return undefined as T;
+    const body = (await res.json()) as T;
+    // A foreign instance's payload carries no Cinderfish viewer fields.
+    if (absolute) return body;
+    if (VIEWER_PATHS.has(path)) rememberViewer(body);
+    else stampViewer(body);
+    return body;
+  } finally {
+    pendingApiRequestsCount.value--;
+  }
 }
 
 async function upload(file: File): Promise<DriveFile> {
