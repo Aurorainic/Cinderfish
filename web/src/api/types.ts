@@ -135,7 +135,7 @@ export interface Notification {
   userId: string | null;
   noteId: string | null;
   reaction: string | null;
-  body: string;
+  body?: string;
   user?: UserLite;
   note?: Note;
 }
