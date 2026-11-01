@@ -13,6 +13,13 @@ import type {
 
 const TOKEN_KEY = "cinderfish.token";
 
+// Misskey-compatible notes/create wraps the created note in an object. Keep
+// the envelope conversion here so every caller, including optimistic renotes,
+// receives the Note value its types declare.
+export function unwrapCreatedNote(response: { createdNote: Note }): Note {
+  return response.createdNote;
+}
+
 // Counts the requests in flight so a global loading indicator can show them
 // without every caller tracking its own state (Firefish's os exposes the same
 // ref for the same reason).
@@ -268,7 +275,8 @@ export const api = {
     replyId?: string;
     renoteId?: string;
     visibleUserIds?: string[];
-  }) => post<Note>("/api/notes/create", params),
+  }) =>
+    post<{ createdNote: Note }>("/api/notes/create", params).then(unwrapCreatedNote),
 
   showNote: (noteId: string) => post<Note>("/api/notes/show", { noteId }),
 
