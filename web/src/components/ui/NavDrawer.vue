@@ -6,20 +6,20 @@ import UserAvatar from "../UserAvatar.vue";
 import { DRAWER_FOOTER_KEYS, NAV_ITEM_KEYS, navItemsFor } from "../../nav";
 import { openPostForm } from "../../os";
 import type { MeDetailed } from "../../api/types";
-import type { ShellMode } from "../../stores/shell";
+import { lockBodyScroll } from "../../lib/scroll-lock";
 
-// The full-height navigation drawer behind the mobile bar's first key and the
-// rail's collapsed state. AppShell owns the open flag, the account, the shell
-// mode and the theme; this component renders and emits, and traps focus while
-// open. Mount it once with `v-model:open` (or `:open` + `@update:open`).
+// The full-height navigation drawer behind the mobile bar's first key. The
+// shell owns the open flag, the account, the layout preference and the theme;
+// this component renders and emits, and traps focus while open. Mount it once
+// with `v-model:open` (or `:open` + `@update:open`).
 const props = withDefaults(
   defineProps<{
     open: boolean;
     me?: MeDetailed | null;
-    mode?: ShellMode;
+    deckPreferred?: boolean;
     theme?: string;
   }>(),
-  { mode: "universal", theme: "dark" },
+  { deckPreferred: false, theme: "dark" },
 );
 
 const emit = defineEmits<{
@@ -87,21 +87,23 @@ function onKeydown(event: KeyboardEvent): void {
 }
 
 let restoreFocus: HTMLElement | null = null;
-let previousOverflow = "";
+let releaseScroll: (() => void) | null = null;
 
 function teardown(): void {
   document.removeEventListener("keydown", onKeydown, true);
-  document.body.style.overflow = previousOverflow;
+  releaseScroll?.();
+  releaseScroll = null;
 }
 
 watch(
   () => props.open,
   async (open) => {
     if (open) {
-      previousOverflow = document.body.style.overflow;
+      // Shared with the widgets drawer: one owner, ref-counted, so the two
+      // panels cannot unlock each other's page (lib/scroll-lock.ts).
+      releaseScroll ??= lockBodyScroll();
       restoreFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
       document.addEventListener("keydown", onKeydown, true);
-      document.body.style.overflow = "hidden";
       await nextTick();
       panel.value?.focus();
       return;
@@ -196,9 +198,9 @@ onBeforeUnmount(teardown);
             </button>
             <button class="drawer-item" type="button" @click="emit('toggle-mode')">
               <span class="drawer-label drawer-label--single">
-                {{ mode === "deck" ? "切换到通用视图" : "切换到 Deck 视图" }}
+                {{ deckPreferred ? "切换到通用视图" : "切换到 Deck 视图" }}
               </span>
-              <span class="drawer-pill">{{ mode === "deck" ? "Deck" : "通用" }}</span>
+              <span class="drawer-pill">{{ deckPreferred ? "Deck" : "通用" }}</span>
             </button>
             <button
               v-if="me"

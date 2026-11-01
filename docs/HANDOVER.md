@@ -1,6 +1,6 @@
 # Cinderfish 交接说明
 
-- 最后更新：2026-11-01（Firefish 前端整体移植 Task 1：参考源码、许可证与能力矩阵）
+- 最后更新：2026-11-01（Firefish 前端整体移植 Task 3：壳、导航与 Deck）
 - 项目名 **Cinderfish**（2026-10-28 定名，Go module `github.com/Aurorainic/cinderfish`）
 - 仓库：当前目录 `/home/lainsaka/文档/MilnFish`，分支 `main`；远程 `origin` 为
   `https://github.com/Aurorainic/Cinderfish.git`（GitHub 仓库已更名，本地目录改名待办）
@@ -24,6 +24,7 @@ Go 单二进制的个人/极小规模联邦社交实例。后端契约是 **Miss
 | M7 打磨 | ✅ | 见 git log（迁移工具、账号管理、性能基线、部署文档） |
 | 前端 Iceshrimp 架构重写（Task 1–8） | ✅ | `d414bd9` … `9167f1e`（分支 `frontend-ui-redesign`，见 §11.10–§11.15） |
 | Firefish 前端整体移植（Task 1：参考源码/许可证/能力矩阵/shim 契约） | ✅ | 见 `git log -- docs/research/2026-11-01-*`（分支 `frontend-ui-redesign`，见 §11.16） |
+| Firefish 前端整体移植（Task 2–3：运行时 shim、壳/导航/Deck 与页面窗口） | ✅ | `feat(web): rebuild Firefish-style shell and adaptive deck`（分支 `frontend-ui-redesign`，见 §11.17） |
 
 - Firefish 字典来源：`firefish@02c31e0a2804de48c9d73028df525e197d8df622:locales/zh-CN.yml`；当前 `web/src/i18n/zh-CN.ts` 只保留首批白名单页面词条，Cinderfish 品牌文案允许改写，其余未移植功能不复制。
 
@@ -763,9 +764,47 @@ token 只由 `client.ts` 读写）；Iceshrimp Vue 快照范围改为完整的 `
 
 **执行顺序建议**（下一步）：先按运行时契约落地 shim（`api`、`me`、`i18n`、`instance`、`z-index`、`DialogHost`、
 `PopupMenu`），再移植壳与时间线；端点缺口按能力矩阵 §10 单独立项，不与前端提交混在一起。
+（Task 2–3 已完成这条顺序的前半段，见 §11.17。）
+
+### 11.17 Firefish 前端整体移植 Task 2–3：运行时 shim、壳与 Deck（2026-11-01）
+
+**交付**：`web/src` 的 Firefish 风格壳、导航与 Deck，以及首批页面在运行期需要的剩余 `os.*` 成员。
+代码清单、越界文件与理由、逐项证据见 `docs/superpowers/reports/task-3-report.md`。
+
+1. **Deck 偏好 ≠ 布局**（修真实缺陷）：三个可成列的路由在 `router/index.ts` 标 `meta.deck`，
+   `stores/shell.ts` 的 `shellLayout(preferred, routeOwnsDeck)` 决定实际布局。此前 Deck 偏好下打开
+   `/notes/:id`、`/@handle`、`/settings/*` 会被 `height:100dvh; overflow:hidden` 裁掉且无法滚动。
+2. **Escape 所有权收敛**：新增 `lib/layer-stack.ts`（无 Vue 依赖、可单测），`OsOverlay` 在
+   document capture 注册唯一监听，命中即 `stopImmediatePropagation` 并只关栈顶。对话框、菜单、
+   发帖框、表情选择器、通用 `popup`、Deck 页面窗口全部入栈；NavDrawer 的 capture 监听与
+   WidgetsDrawer/NoteFooter 的 bubble 监听不再能同一次按键关掉第二层。
+3. **运行时契约 §3.5/§3.15 补完**：`openLayer` / `closeLayer` / `popup`（`markRaw`、`MaybeRef` props、
+   `events`、`disposeEvent`、延后 `dispose`）、`pageWindow` / `modalPageWindow`、`openEmojiPicker`
+   （Unicode 目录；在给定 textarea 的光标处插入，不移植 Firefish 的全局 focus 监听）。
+4. **降级写清楚**：`pageWindow` 对 `note`/`profile` 走已有的 `DeckPageWindow`（URL 不变），其余已知
+   路由导航主表面（这些页面用 `useRoute()`，窗口内渲染需要第二个路由实例，而“不引入第二路由”是硬约束）；
+   未知名路径（`not-found`）显式拒绝；`modalPageWindow` 与 `pageWindow` 同实现——本项目的 `PageWindow`
+   固定是模态，Firefish“可拖动 vs 模态”的差别不提供。
+5. **壳与密度**：三列齐边 + 1px 分隔线，外壳 cap 1280 → 1360，侧栏/小组件列全高吸附；`PageHeader` 的
+   `-24px` bleed 与主列 24px 内边距（≤500px 时 12px）成对，改一处必须改另一处。导航项补齐
+   `:focus-visible`。全局等待条消费 `pendingApiRequestsCount`（承接 Task 2 审计 m-1）。
+6. **共享滚动锁**：`lib/scroll-lock.ts` 引用计数，NavDrawer 与 WidgetsDrawer 不再互相解锁/互相锁死。
+7. **Deck 自适应**：列菜单与“添加列”迁到 `os.popupMenu`（删掉两套本地 Escape/pointerdown 与列内
+   overflow 裁切）；单列断点 1099 → 839，840/600/380 分别落在“多列/单列/单列 + 底栏”。移动底栏在登录后
+   多一个“我的”键（registry 的 `to` 是静态串，账户地址取不到，故按会话生成）。
+
+**门禁（本机实测）**：`cd web && pnpm typecheck` 退出 0；`pnpm build` 退出 0；`git diff --check` 无输出；
+`tmp/task3-check.mjs`（`tmp/` 不入库）跑层栈 LIFO、`shellLayout`、`deckPageFor` 共 5 项全过。
+未安装前端测试框架。
+
+**浏览器验收（真实实例 + 临时 harness，2026-11-01）**：380×720、600×800、840×900、1280×720、1440×900
+五个视口 × 6 条路由 × 通用/Deck 两种布局，`document.documentElement.scrollWidth - clientWidth` 全部为 0；
+Deck 偏好 + 深链实测 `data-shell="universal"` 且可滚动；Deck 列宽 380 → 364/364（一列）、840 → 350/350、
+1440 → 350/350；两端抽屉的滚动锁互不破坏；`os.*` 六个成员与 `popup`/Escape/窗口/emoji 插入全部通过。
+**未覆盖**：登录态下的底栏“我的”、通知列内容（本次会话未登录）；`pageWindow` 对设置/管理路由的降级只做了
+代码路径核对。完整场景表见 `.superpowers/sdd/2026-11-01-firefish-frontend-port/task-3-browser-prep.md` §4。
 
 ## 12. M5 联邦（ActivityPub）
-
 源码对照记录见 `docs/research/2026-10-28-m5-federation-source-calibration.md`（逐条对照上游文件，含刻意偏离项）。
 
 ### 12.1 已实现的路由

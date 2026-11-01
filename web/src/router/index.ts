@@ -9,7 +9,16 @@ import { refreshSession, session } from "../stores/session";
 export const router = createRouter({
   history: createWebHistory(),
   routes: [
-    { path: "/", name: "home", component: () => import("../views/TimelineView.vue") },
+    // `meta.deck` marks the surfaces the deck can render as columns. A route
+    // without it stays in the universal layout even when the deck preference is
+    // on, which is what keeps deep links to notes, profiles and settings
+    // scrollable.
+    {
+      path: "/",
+      name: "home",
+      component: () => import("../views/TimelineView.vue"),
+      meta: { deck: true },
+    },
     {
       path: "/login",
       name: "login",
@@ -36,11 +45,13 @@ export const router = createRouter({
       path: "/notifications",
       name: "notifications",
       component: () => import("../views/NotificationsView.vue"),
+      meta: { deck: true },
     },
     {
       path: "/explore",
       name: "explore",
       component: () => import("../views/ExploreView.vue"),
+      meta: { deck: true },
     },
     // Settings is a two-column shell with one child page per tab; the child
     // routes are named `settings-<tab>`, which is how the layout finds the

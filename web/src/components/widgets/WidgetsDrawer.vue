@@ -2,6 +2,7 @@
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import AppIcon from "../AppIcon.vue";
+import { lockBodyScroll } from "../../lib/scroll-lock";
 import WidgetEditToggle from "./WidgetEditToggle.vue";
 import WidgetStack from "./WidgetStack.vue";
 
@@ -44,8 +45,18 @@ watch(
   () => close(false),
 );
 
+// The lock is shared with the nav drawer through lib/scroll-lock, so the two
+// panels cannot unlock each other's page. Escape is handled here only while no
+// global layer is above the drawer; os.ts owns that ordering.
+let releaseScroll: (() => void) | null = null;
+
 watch(open, (value) => {
-  document.body.style.overflow = value ? "hidden" : "";
+  if (value) {
+    releaseScroll ??= lockBodyScroll();
+    return;
+  }
+  releaseScroll?.();
+  releaseScroll = null;
 });
 
 onMounted(() => {
@@ -58,7 +69,8 @@ onBeforeUnmount(() => {
   document.removeEventListener("keydown", onKeydown);
   desktop?.removeEventListener("change", onViewportChange);
   desktop = null;
-  document.body.style.overflow = "";
+  releaseScroll?.();
+  releaseScroll = null;
 });
 </script>
 

@@ -7,7 +7,6 @@ import { openPostForm } from "../../os";
 import { instance } from "../../stores/instance";
 import { navPrefs } from "../../stores/nav";
 import { session } from "../../stores/session";
-import type { ShellMode } from "../../stores/shell";
 import { theme } from "../../stores/theme";
 
 // The desktop navigation column, translated from fork/ui/_common_/navbar.vue:
@@ -18,7 +17,11 @@ import { theme } from "../../stores/theme";
 // actions; the store's show()/badge() are read inside the computed so an
 // admin entry or an unread count shows up without this file knowing which
 // item carries one.
-defineProps<{ mode: ShellMode }>();
+//
+// `deckPreferred` is the stored layout preference, not the layout in use: the
+// switch below changes the preference, and AppShell decides whether the current
+// route can honour it.
+defineProps<{ deckPreferred: boolean }>();
 
 const emit = defineEmits<{
   "toggle-theme": [];
@@ -69,11 +72,11 @@ const nav = computed(() => navItemsFor(navPrefs.value.desktop));
       <button
         class="icon-button mode-toggle"
         type="button"
-        :aria-pressed="mode === 'deck'"
-        :title="mode === 'deck' ? '切换到通用视图' : '切换到 Deck 视图'"
+        :aria-pressed="deckPreferred"
+        :title="deckPreferred ? '切换到通用视图' : '切换到 Deck 视图'"
         @click="emit('toggle-mode')"
       >
-        <AppIcon :name="mode === 'deck' ? 'display' : 'columns'" />
+        <AppIcon :name="deckPreferred ? 'display' : 'columns'" />
       </button>
       <button class="icon-button" type="button" :title="theme === 'dark' ? '切换浅色' : '切换深色'" @click="emit('toggle-theme')">
         <AppIcon :name="theme === 'dark' ? 'sun' : 'moon'" />
@@ -86,32 +89,60 @@ const nav = computed(() => navItemsFor(navPrefs.value.desktop));
 </template>
 
 <style scoped>
-/* The sidebar scrolls on its own when the account block and the nav no longer
-   fit the viewport, instead of pushing the document taller. */
+/* The sidebar is the shell's first column: full viewport height, its own
+   scroll, and a divider instead of a gap. It scrolls on its own when the
+   account block and the nav no longer fit, instead of pushing the document
+   taller. */
 .sidebar {
   position: sticky;
-  top: var(--space-24);
+  top: 0;
   align-self: start;
   display: flex;
   flex-direction: column;
-  gap: var(--space-20);
-  height: calc(100vh - var(--space-48));
+  gap: var(--space-16);
+  height: 100dvh;
+  padding: var(--space-12) var(--space-12) var(--space-16);
+  border-right: 1px solid var(--divider);
   overflow-y: auto;
   overscroll-behavior: contain;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-10);
+  min-width: 0;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  color: var(--text-strong);
+}
+
+.brand:hover {
+  color: var(--text-strong);
+  background: var(--surface-hover);
+}
+
+/* The mark keeps main.css's flat accent square; the name is what the narrow
+   rail hides, so only its overflow lives here. */
+.brand-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .nav {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: 2px;
 }
 
 .nav-link {
   display: flex;
   align-items: center;
   gap: var(--space-14);
-  padding: var(--space-10) var(--space-14);
-  border-radius: var(--radius-md);
+  padding: var(--space-8) var(--space-12);
+  border-radius: var(--radius-sm);
   color: var(--nav-fg);
   font-weight: var(--weight-semibold);
   transition: background var(--dur-base) ease, color var(--dur-base) ease;
@@ -130,6 +161,13 @@ const nav = computed(() => navItemsFor(navPrefs.value.desktop));
 .nav-link.router-link-active {
   color: var(--nav-active);
   background: var(--surface-selected);
+}
+
+.brand:focus-visible,
+.nav-link:focus-visible,
+.account-chip:focus-visible {
+  outline: var(--focus-outline);
+  outline-offset: -2px;
 }
 
 .sidebar-foot {

@@ -49,3 +49,12 @@ watch(shellMode, (mode) => {
 export function setShellMode(mode: ShellMode): void {
   shellMode.value = mode;
 }
+
+// The preference and the layout are separate values. Deck columns can only
+// render the three surfaces they own (timeline, notifications, explore); every
+// other route keeps the scrolling universal layout even while the preference is
+// "deck". Folding the two together is what clipped /notes/:id, /@handle and
+// /settings/* behind `height: 100dvh; overflow: hidden` before.
+export function shellLayout(preferredDeck: boolean, routeOwnsDeck: boolean): ShellMode {
+  return preferredDeck && routeOwnsDeck ? "deck" : "universal";
+}

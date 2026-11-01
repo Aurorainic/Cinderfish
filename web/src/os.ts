@@ -2,6 +2,11 @@
 // confirmDialog are called from anywhere, and the singleton overlay container
 // (OsOverlay, mounted once in App.vue) renders the resulting layers.
 //
+// Escape is owned by one stack (lib/layer-stack.ts) and one document-capture
+// listener: whatever opened last closes first, and the event stops there, so
+// components with their own Escape listeners (nav drawer, widgets drawer, page
+// window, note menus) can no longer close a second layer in the same key press.
+//
 // It also carries the Firefish-shaped runtime shim. Two rules keep the port
 // honest (see docs/research/2026-11-01-runtime-adaptation-contract.md):
 //
@@ -14,19 +19,28 @@ import {
   computed,
   defineComponent,
   h,
+  isRef,
+  markRaw,
   onUnmounted,
   shallowRef,
+  toValue,
+  watch,
   type CSSProperties,
+  type Component,
+  type MaybeRefOrGetter,
   type Ref,
 } from "vue";
 import { ApiError, request } from "./api/client";
 import type { DriveFile, Note } from "./api/types";
 import PostForm from "./components/composer/PostForm.vue";
+import { closeDeckPage, deckPage, deckPageFor, openDeckPage } from "./components/deck/deck-page";
 import DialogHost from "./components/ui/DialogHost.vue";
 import EmojiPicker from "./components/ui/EmojiPicker.vue";
 import PageWindow from "./components/ui/PageWindow.vue";
 import PopupMenu from "./components/ui/PopupMenu.vue";
 import { i18n, t } from "./i18n";
+import { claimZIndex } from "./lib/z-index";
+import { createLayerStack, type LayerEntry } from "./lib/layer-stack";
 import { router } from "./router";
 import { session } from "./stores/session";
 import type { MenuItem } from "./types/menu";
@@ -36,6 +50,160 @@ export { claimZIndex } from "./lib/z-index";
 export type { ZIndexPriority } from "./lib/z-index";
 
 let nextRequestId = 0;
+
+// ---------------------------------------------------------------------------
+// Layer stack
+// ---------------------------------------------------------------------------
+
+// Everything Escape can close is registered here, in opening order:
+// dialogs, menus, the composer, the picker, generic popups and the deck page
+// window. OsOverlay installs one document-capture listener that closes exactly
+// the top entry and stops the event, so a component's own Escape handler
+// (nav drawer, widgets drawer, page window, note menus) can no longer close a
+// second layer at the same time. That ownership is the point: registration
+// order between independent components was not a contract.
+const layerStack = createLayerStack();
+
+export interface LayerOptions {
+  /** Z band, as in Firefish's claimZIndex. Ported overlays are "middle". */
+  priority?: "low" | "middle" | "high";
+  /** Dim the page behind the layer and close it on a backdrop click. */
+  modal?: boolean;
+  /** Fixed position of the layer (popovers). Defaults to a full-viewport,
+   * click-through container so the component can place itself. */
+  position?: { left: number; top: number } | null;
+  /** Emit handlers, keyed by the event name Firefish would use. */
+  events?: Record<string, (...args: never[]) => void>;
+  /** Runs once, however the layer closed. */
+  onClose?: () => void;
+}
+
+export interface LayerHandle {
+  id: number;
+  zIndex: number;
+  /** Closes the layer. Idempotent and safe to call twice. */
+  dispose: () => void;
+}
+
+interface GenericLayer extends LayerHandle {
+  component: Component;
+  props: MaybeRefOrGetter<Record<string, unknown>>;
+  eventProps: Record<string, (...args: never[]) => void>;
+  entry: LayerEntry;
+  modal: boolean;
+  position: { left: number; top: number } | null;
+  onClose?: () => void;
+  closing: boolean;
+}
+
+const genericLayers = shallowRef<GenericLayer[]>([]);
+
+/**
+ * Mount a component as a global layer. This is the primitive behind `popup`
+ * and the emoji picker: the component is rendered by OsOverlay at a claimed
+ * z-index, and Escape closes the topmost layer through the same stack as the
+ * dialogs.
+ */
+export function openLayer<P extends Record<string, unknown>>(
+  component: Component,
+  props: MaybeRefOrGetter<P>,
+  options: LayerOptions = {},
+): LayerHandle {
+  const id = ++nextRequestId;
+  const zIndex = claimZIndex(options.priority ?? "middle");
+  const eventProps = eventPropsFor(options.events ?? {});
+  let layer!: GenericLayer;
+  const entry = layerStack.push(() => closeLayer(id));
+  layer = {
+    id,
+    zIndex,
+    component: markRaw(component),
+    props,
+    eventProps,
+    entry,
+    modal: options.modal === true,
+    position: options.position ?? null,
+    onClose: options.onClose,
+    closing: false,
+    dispose: () => closeLayer(id),
+  };
+  genericLayers.value = [...genericLayers.value, layer];
+  return layer;
+}
+
+/** Close one layer, or the topmost one when no target is given. */
+export function closeLayer(target?: LayerHandle | number | null): boolean {
+  if (target === undefined || target === null) return layerStack.closeTop();
+  const id = typeof target === "number" ? target : target.id;
+  const layer = genericLayers.value.find((candidate) => candidate.id === id);
+  if (!layer || layer.closing) return false;
+  layer.closing = true;
+  layerStack.remove(layer.entry);
+  // Firefish defers the removal by a tick because unmounting inside the emit
+  // that asked for the close breaks Vue's event/autocomplete cleanup.
+  window.setTimeout(() => {
+    genericLayers.value = genericLayers.value.filter((candidate) => candidate.id !== id);
+    layer.onClose?.();
+  }, 0);
+  return true;
+}
+
+function eventPropsFor(events: Record<string, (...args: never[]) => void>): Record<string, (...args: never[]) => void> {
+  const props: Record<string, (...args: never[]) => void> = {};
+  for (const [name, handler] of Object.entries(events)) {
+    props[`on${name.charAt(0).toUpperCase()}${name.slice(1)}`] = handler;
+  }
+  return props;
+}
+
+// Top-level refs in `props` are read inside the render function below, which
+// keeps them live (the Firefish `CanUseRef` shape) without handing the mounted
+// component a Ref it would have to unwrap itself.
+function resolveLayerProps(layer: GenericLayer): Record<string, unknown> {
+  const raw = toValue(layer.props) ?? {};
+  const resolved: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(raw)) {
+    resolved[key] = isRef(value) ? value.value : value;
+  }
+  return resolved;
+}
+
+/**
+ * Firefish's `os.popup(component, props, events?, disposeEvent?)`: mount a
+ * component as a layer and resolve once it can be disposed. The returned
+ * `dispose` is idempotent; `disposeEvent` names the component event that
+ * closes the layer (Firefish's `"closed"` convention).
+ */
+export function popup<P extends Record<string, unknown>>(
+  component: Component,
+  props: MaybeRefOrGetter<P>,
+  events: Record<string, (...args: never[]) => void> = {},
+  disposeEvent?: string,
+): Promise<{ dispose: () => void }> {
+  const handlers = { ...events };
+  let handle!: LayerHandle;
+  if (disposeEvent) {
+    handlers[disposeEvent] = () => handle.dispose();
+  }
+  handle = openLayer(component, props, { events: handlers });
+  return Promise.resolve({ dispose: handle.dispose });
+}
+
+// The deck page window can be raised by a deck column click as well as by
+// pageWindow, so the stack follows the state instead of the command: whichever
+// path opened it, Escape closes it like any other layer.
+let deckPageLayer: LayerEntry | null = null;
+
+watch(deckPage, (page) => {
+  if (page && !deckPageLayer) {
+    deckPageLayer = layerStack.push(() => closeDeckPage());
+    return;
+  }
+  if (!page && deckPageLayer) {
+    layerStack.remove(deckPageLayer);
+    deckPageLayer = null;
+  }
+});
 
 // ---------------------------------------------------------------------------
 // Firefish-shaped API
@@ -93,6 +261,7 @@ interface PostFormRequest extends PostFormOptions {
 }
 
 const postFormRequest = shallowRef<PostFormRequest | null>(null);
+let postFormLayer: LayerEntry | null = null;
 
 /** Open the global post form. A `renote` target is rendered as a quote preview
  * and submitted as renoteId plus text (the backend accepts both on one note).
@@ -107,6 +276,7 @@ export function openPostForm(opts: PostFormOptions = {}): void {
   }
   closePostForm();
   postFormRequest.value = { ...opts, id: ++nextRequestId };
+  postFormLayer = layerStack.push(closePostForm);
 }
 
 /** The shell's compose entry. Same command as openPostForm, named the way the
@@ -118,6 +288,10 @@ export function openComposer(opts: PostFormOptions = {}): void {
 function closePostForm(): void {
   const active = postFormRequest.value;
   postFormRequest.value = null;
+  if (postFormLayer) {
+    layerStack.remove(postFormLayer);
+    postFormLayer = null;
+  }
   active?.resolve?.();
   active?.onClosed?.();
 }
@@ -163,21 +337,13 @@ export function post(props: PostFormProps = {}, onClosed?: () => void): Promise<
       resolve,
       onClosed,
     };
+    postFormLayer = layerStack.push(closePostForm);
   });
 }
 
 // ---------------------------------------------------------------------------
-// Reaction picker (existing command, unchanged)
+// Emoji picker and reaction picker
 // ---------------------------------------------------------------------------
-
-type ReactionPickerRequest = {
-  id: number;
-  left: number;
-  top: number;
-  onSelect: (emoji: string) => void;
-};
-
-const reactionPickerRequest = shallowRef<ReactionPickerRequest | null>(null);
 
 // Mirrors the sizes EmojiPicker's stylesheet caps itself at, so the popover can
 // be positioned without mounting it first.
@@ -185,10 +351,10 @@ const PICKER_WIDTH = 336;
 const PICKER_HEIGHT = 420;
 const PICKER_GAP = 8;
 
-/** Open the single reaction picker. The chosen emoji goes to `onSelect`;
- * `anchor` places the popover above (or below) the button that opened it.
- * Opening it again replaces the previous request. */
-export function openReactionPicker(onSelect: (emoji: string) => void, anchor?: Element | null): void {
+/** Where the picker sits: above the anchor when there is room, below it
+ * otherwise, always inside the viewport. Shared by the reaction and annotation
+ * entries so both popovers land the same way. */
+function pickerPosition(anchor?: Element | null): { left: number; top: number } {
   const viewportWidth = window.innerWidth;
   const viewportHeight = window.innerHeight;
   let left = (viewportWidth - PICKER_WIDTH) / 2;
@@ -203,12 +369,105 @@ export function openReactionPicker(onSelect: (emoji: string) => void, anchor?: E
 
   left = Math.max(PICKER_GAP, Math.min(left, viewportWidth - PICKER_WIDTH - PICKER_GAP));
   top = Math.max(PICKER_GAP, Math.min(top, viewportHeight - PICKER_HEIGHT - PICKER_GAP));
-
-  reactionPickerRequest.value = { id: ++nextRequestId, left, top, onSelect };
+  return { left, top };
 }
 
-function closeReactionPicker(): void {
-  reactionPickerRequest.value = null;
+export interface EmojiPickerOptions {
+  /** Reaction mode: the picker is titled and called the same way, but the
+   * caller consumes the emoji instead of having it inserted into a field. */
+  asReaction?: boolean;
+}
+
+/** Insert `text` at the caret of an input or textarea, keeping the field the
+ * focused element and firing `input` so a v-model updates. */
+function insertTextAtCursor(field: HTMLTextAreaElement | HTMLInputElement, text: string): void {
+  field.focus();
+  const start = field.selectionStart ?? field.value.length;
+  const end = field.selectionEnd ?? start;
+  if (typeof field.setRangeText === "function") {
+    field.setRangeText(text, start, end, "end");
+    // A textarea's value is plain state; re-dispatch `input` so the component
+    // that owns it sees the change exactly like a keystroke.
+    field.dispatchEvent(new Event("input", { bubbles: true }));
+    return;
+  }
+  // setRangeText is missing on a few input types; fall back to the append form.
+  field.value = `${field.value.slice(0, start)}${text}${field.value.slice(end)}`;
+  field.dispatchEvent(new Event("input", { bubbles: true }));
+}
+
+let pickerLayer: LayerHandle | null = null;
+
+function closePicker(): void {
+  if (!pickerLayer) return;
+  const handle = pickerLayer;
+  pickerLayer = null;
+  handle.dispose();
+}
+
+function openPickerLayer(
+  anchor: Element | null | undefined,
+  onSelect: (emoji: string) => void,
+): void {
+  closePicker();
+  let handle!: LayerHandle;
+  handle = openLayer(
+    EmojiPicker,
+    {},
+    {
+      priority: "middle",
+      position: pickerPosition(anchor),
+      events: {
+        select: (emoji: string) => {
+          handle.dispose();
+          onSelect(emoji);
+        },
+        close: () => handle.dispose(),
+      },
+      onClose: () => {
+        if (pickerLayer === handle) pickerLayer = null;
+      },
+    },
+  );
+  pickerLayer = handle;
+}
+
+/** Open the single reaction picker. The chosen emoji goes to `onSelect`;
+ * `anchor` places the popover above (or below) the button that opened it.
+ * Opening it again replaces the previous request. */
+export function openReactionPicker(onSelect: (emoji: string) => void, anchor?: Element | null): void {
+  openPickerLayer(anchor, onSelect);
+}
+
+/**
+ * Firefish's `os.openEmojiPicker(src, opts, initialTextarea)`: a Unicode emoji
+ * picker anchored to `src` that inserts the chosen emoji at the caret of
+ * `initialTextarea`.
+ *
+ * Cinderfish has no custom emoji catalogue (`POST /api/meta` carries no
+ * `emojis` field), so the picker is the Unicode set the reaction picker
+ * already uses. Firefish's global "remember the last focused textarea" focus
+ * listener and MutationObserver are deliberately not ported: the call site owns
+ * its field, and a hidden document-wide listener is a leak, not a feature.
+ */
+export function openEmojiPicker(
+  src?: HTMLElement | null,
+  opts: EmojiPickerOptions = {},
+  initialTextarea?: HTMLTextAreaElement | HTMLInputElement | null,
+): Promise<void> {
+  const target = initialTextarea ?? null;
+  if (!target) {
+    console.warn("os.openEmojiPicker: no target field was given, the picked emoji is discarded");
+  }
+  openPickerLayer(src ?? null, (emoji) => {
+    if (!target) return;
+    insertTextAtCursor(target, emoji);
+  });
+  // `asReaction` is accepted for signature compatibility with the ported call
+  // sites; the picker is the same Unicode set either way, so the only thing it
+  // can change is how the caller reads the result.
+  void opts;
+  return Promise.resolve();
 }
 
 // ---------------------------------------------------------------------------
@@ -359,14 +618,34 @@ export function showDialog(spec: DialogSpec): Promise<DialogOutcome> {
         break;
     }
     dialogQueue.value = [...dialogQueue.value, request];
+    // Only the head is on screen; the rest queue behind it. Registering the
+    // head here and again when the queue advances keeps Escape's target and the
+    // visible dialog the same layer.
+    if (dialogQueue.value.length === 1) registerDialogLayer(request.id);
   });
+}
+
+const dialogLayers = new Map<number, LayerEntry>();
+
+function registerDialogLayer(id: number): void {
+  if (dialogLayers.has(id)) return;
+  dialogLayers.set(
+    id,
+    layerStack.push(() => resolveDialog(id, { canceled: true })),
+  );
 }
 
 function resolveDialog(id: number, outcome: DialogOutcome): void {
   const [head, ...rest] = dialogQueue.value;
   if (!head || head.id !== id) return;
   dialogQueue.value = rest;
+  const entry = dialogLayers.get(id);
+  if (entry) {
+    dialogLayers.delete(id);
+    layerStack.remove(entry);
+  }
   head.resolve(outcome);
+  if (rest[0]) registerDialogLayer(rest[0].id);
 }
 
 export interface AlertProps {
@@ -508,6 +787,7 @@ export interface MenuRequest {
 }
 
 const menuRequest = shallowRef<MenuRequest | null>(null);
+let menuLayer: LayerEntry | null = null;
 
 function enqueueMenu(
   items: MenuItem[] | Ref<MenuItem[]>,
@@ -518,11 +798,16 @@ function enqueueMenu(
     // One popover at a time: opening a second menu resolves the first.
     closeMenu();
     menuRequest.value = { id: ++nextRequestId, items, placement, src, resolve };
+    menuLayer = layerStack.push(closeMenu);
   });
 }
 
 function closeMenu(): void {
   const active = menuRequest.value;
+  if (menuLayer) {
+    layerStack.remove(menuLayer);
+    menuLayer = null;
+  }
   if (!active) return;
   menuRequest.value = null;
   active.resolve();
@@ -586,27 +871,59 @@ export function contextMenu(items: MenuItem[] | Ref<MenuItem[]>, ev: MouseEvent)
 }
 
 // ---------------------------------------------------------------------------
+// Page windows
+// ---------------------------------------------------------------------------
+
+/** Open `path` in a deck page window. Returns false when there is no window
+ * for it: the main router's catch-all resolves every string as `not-found`, so
+ * an unknown path must be refused explicitly instead of raising a 404 window. */
+function openPageWindow(path: string): boolean {
+  const resolved = router.resolve(path);
+  const name = typeof resolved.name === "string" ? resolved.name : null;
+  if (!name || name === "not-found") {
+    console.warn(`os.pageWindow: ${path} is not a Cinderfish route`);
+    return false;
+  }
+  const page = deckPageFor(name, resolved.params);
+  if (page) {
+    openDeckPage(page);
+    return true;
+  }
+  // Settings, admin and the timelines have no standalone window view: their
+  // components read `useRoute()`, and a second router is out of scope (the
+  // contract keeps one router tree). Navigating the main surface is the
+  // documented degradation; the deck preference keeps the URL, so returning to
+  // a deck route restores the columns.
+  void router.push(resolved.fullPath);
+  return true;
+}
+
+/** Firefish's `os.pageWindow(path)`: a note or a profile opens in the deck's
+ * page window; any other route is navigated. */
+export function pageWindow(path: string): void {
+  openPageWindow(path);
+}
+
+/** Firefish's `os.modalPageWindow(path)`. Cinderfish's PageWindow is always
+ * modal (backdrop + aria-modal), so this is the same command; the difference
+ * Firefish draws between a draggable window and a modal one is not offered. */
+export function modalPageWindow(path: string): void {
+  openPageWindow(path);
+}
+
+// ---------------------------------------------------------------------------
 // Overlay
 // ---------------------------------------------------------------------------
 
+// One document-capture listener owns Escape for every layer. Capture runs
+// before component handlers, and stopImmediatePropagation keeps the listeners
+// other components registered on document (nav drawer, widgets drawer, note
+// menus) from closing a second layer in the same key press.
 function handleEscape(event: KeyboardEvent): void {
-  // Close exactly the topmost layer. DialogHost handles its own modal keydown;
-  // this window listener owns menus, pickers and the composer in z-order.
-  if (currentDialog.value) return;
-  if (menuRequest.value) {
-    closeMenu();
-    event.stopImmediatePropagation();
-    return;
-  }
-  if (reactionPickerRequest.value) {
-    closeReactionPicker();
-    event.stopImmediatePropagation();
-    return;
-  }
-  if (postFormRequest.value) {
-    closePostForm();
-    event.stopImmediatePropagation();
-  }
+  if (event.key !== "Escape") return;
+  if (!layerStack.closeTop()) return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
 }
 
 const backdropStyle: CSSProperties = {
@@ -616,51 +933,57 @@ const backdropStyle: CSSProperties = {
   background: "rgba(0, 0, 0, 0.5)",
 };
 
-// The picker is a popover: it dims nothing, the backdrop only catches clicks.
-const pickerBackdropStyle: CSSProperties = {
-  position: "fixed",
-  inset: 0,
-  zIndex: 1100,
-  background: "transparent",
-};
-
-const pickerLayerStyle = (request: ReactionPickerRequest): CSSProperties => ({
-  position: "fixed",
-  left: `${request.left}px`,
-  top: `${request.top}px`,
-  zIndex: 1101,
-});
-
 function postFormTitle(opts: PostFormOptions): string {
   if (opts.reply) return t("reply");
   if (opts.renote) return t("quote");
   return t("toPost");
 }
 
+function renderGenericLayer(layer: GenericLayer) {
+  const props = { ...resolveLayerProps(layer), ...layer.eventProps };
+  const style: CSSProperties = layer.position
+    ? {
+        position: "fixed",
+        left: `${layer.position.left}px`,
+        top: `${layer.position.top}px`,
+        zIndex: layer.zIndex,
+      }
+    : { position: "fixed", inset: 0, zIndex: layer.zIndex, pointerEvents: "none" };
+  return h(
+    "div",
+    {
+      key: `layer-${layer.id}`,
+      class: layer.modal ? "os-layer os-layer--modal" : "os-layer",
+      style,
+      // Only a click on the backdrop itself closes: clicks inside the component
+      // bubble to this wrapper, and closing on those would make every modal
+      // layer unusable.
+      onClick: layer.modal
+        ? (event: MouseEvent) => {
+            if (event.target === event.currentTarget) layer.dispose();
+          }
+        : undefined,
+    },
+    [h(layer.component, props)],
+  );
+}
+
 /** The singleton overlay container. Mount it once in App.vue; it renders
-  * nothing until a command opens a layer. Dialogs and menus own their own
-  * backdrop and z-index (claimZIndex), so only the picker and the post form
-  * use the backdrop below. */
+ * nothing until a command opens a layer. Dialogs and menus own their own
+ * backdrop and z-index (claimZIndex), the generic layers get theirs from
+ * openLayer, and the composer keeps the backdrop below. */
 export const OsOverlay = defineComponent({
   name: "OsOverlay",
   setup() {
-    const onKeydown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") handleEscape(event);
-    };
-    window.addEventListener("keydown", onKeydown);
-    onUnmounted(() => window.removeEventListener("keydown", onKeydown));
-
-    function pickEmoji(request: ReactionPickerRequest, emoji: string): void {
-      closeReactionPicker();
-      request.onSelect(emoji);
-    }
+    document.addEventListener("keydown", handleEscape, true);
+    onUnmounted(() => document.removeEventListener("keydown", handleEscape, true));
 
     return () => {
       const dialog = currentDialog.value;
       const menu = menuRequest.value;
       const form = postFormRequest.value;
-      const picker = reactionPickerRequest.value;
-      if (!dialog && !menu && !form && !picker) return null;
+      const layers = genericLayers.value;
+      if (!dialog && !menu && !form && !layers.length) return null;
       return [
         dialog
           ? h(DialogHost, {
@@ -676,20 +999,13 @@ export const OsOverlay = defineComponent({
               onClose: () => closeMenuById(menu.id),
             })
           : null,
-        form || picker
+        ...layers.map(renderGenericLayer),
+        form
           ? h("div", {
               key: "backdrop",
-              style: form ? backdropStyle : pickerBackdropStyle,
-              onClick: () => (form ? closePostForm() : closeReactionPicker()),
+              style: backdropStyle,
+              onClick: () => closePostForm(),
             })
-          : null,
-        picker
-          ? h("div", { key: `picker-${picker.id}`, style: pickerLayerStyle(picker) }, [
-              h(EmojiPicker, {
-                onSelect: (emoji: string) => pickEmoji(picker, emoji),
-                onClose: () => closeReactionPicker(),
-              }),
-            ])
           : null,
         form
           ? h(

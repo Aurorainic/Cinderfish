@@ -32,16 +32,21 @@ import WidgetStack from "../widgets/WidgetStack.vue";
 
 <style scoped>
 /* The column scrolls independently of the page so a tall stack never
-   stretches the shell. */
+   stretches the shell. It is the shell's last column: full height, a divider
+   instead of a gap, and the same 24px bleed PageHeader expects from the main
+   column is not needed here because no sticky header sits inside it. */
 .widget-panel {
   position: sticky;
-  top: var(--space-24);
+  top: 0;
   align-self: start;
   display: flex;
   flex-direction: column;
   gap: var(--space-12);
   min-width: 0;
-  max-height: calc(100dvh - var(--space-48));
+  height: 100dvh;
+  max-height: 100dvh;
+  padding: var(--space-12) var(--space-14) var(--space-16);
+  border-left: 1px solid var(--divider);
   overflow-y: auto;
   overscroll-behavior: contain;
 }

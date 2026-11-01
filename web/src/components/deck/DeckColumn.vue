@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, ref } from "vue";
 import { api } from "../../api/client";
 import type { Notification } from "../../api/types";
 import {
@@ -14,6 +14,8 @@ import {
   type ColumnType,
 } from "../../stores/deck";
 import { isLoggedIn } from "../../stores/session";
+import { popupMenu } from "../../os";
+import type { MenuItem } from "../../types/menu";
 import AppIcon from "../AppIcon.vue";
 import NotificationItem from "../NotificationItem.vue";
 import TimelineFeed from "../TimelineFeed.vue";
@@ -31,11 +33,6 @@ const NOTIFICATION_PAGE_SIZE = 20;
 const meta = computed(() => COLUMN_META[props.column.type]);
 const isTimeline = computed(() => TIMELINE_TYPES.includes(props.column.type));
 const timelineSource = computed(() => props.column.type as TimelineSource);
-const widthAction = computed(() =>
-  props.column.width === COLUMN_WIDTHS[1]
-    ? `收窄列 · ${COLUMN_WIDTHS[0]}px`
-    : `加宽列 · ${COLUMN_WIDTHS[1]}px`,
-);
 
 // The explore column is a timeline column whose source the reader picks.
 const exploreScope = ref<"local" | "global">("local");
@@ -44,104 +41,76 @@ function notificationFetcher(p: { untilId?: string }): Promise<Notification[]> {
   return api.notifications({ limit: NOTIFICATION_PAGE_SIZE, untilId: p.untilId, markAsRead: false });
 }
 
-const menuOpen = ref(false);
-const root = ref<HTMLElement | null>(null);
+const menuButton = ref<HTMLElement | null>(null);
 const body = ref<HTMLElement | null>(null);
 
-function toggleMenu(): void {
-  menuOpen.value = !menuOpen.value;
-}
-
-function chooseType(type: ColumnType): void {
-  setColumnType(props.column.id, type);
-  menuOpen.value = false;
-}
-
-function shift(delta: number): void {
-  moveColumn(props.column.id, props.index + delta);
-  menuOpen.value = false;
-}
-
-function toggleWidth(): void {
-  toggleColumnWidth(props.column.id);
-  menuOpen.value = false;
-}
-
 function goTop(): void {
-  menuOpen.value = false;
   body.value?.scrollTo({
     top: 0,
     behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
   });
 }
 
-function closeColumn(): void {
-  removeColumn(props.column.id);
+// The column menu is the shared popup menu, not a popover drawn inside the
+// column: `.deck-column` clips its overflow, so a 190px popover opened near the
+// right edge of a narrow column was cut off, and its own Escape handler closed
+// the menu and the global layer above it in the same key press.
+function openMenu(): void {
+  const items: MenuItem[] = [
+    { type: "button", text: "回到顶部", action: () => goTop() },
+    null,
+    { type: "label", text: "数据源" },
+    ...COLUMN_TYPES.map<MenuItem>((type) => ({
+      type: "button",
+      text: COLUMN_META[type].label,
+      icon: COLUMN_META[type].icon,
+      active: props.column.type === type,
+      action: () => setColumnType(props.column.id, type),
+    })),
+    null,
+    {
+      type: "button",
+      text: "上移",
+      hidden: props.index === 0,
+      action: () => moveColumn(props.column.id, props.index - 1),
+    },
+    {
+      type: "button",
+      text: "下移",
+      hidden: props.index >= props.count - 1,
+      action: () => moveColumn(props.column.id, props.index + 1),
+    },
+    {
+      type: "button",
+      text: props.column.width === COLUMN_WIDTHS[1] ? `收窄列 · ${COLUMN_WIDTHS[0]}px` : `加宽列 · ${COLUMN_WIDTHS[1]}px`,
+      action: () => toggleColumnWidth(props.column.id),
+    },
+    null,
+    { type: "button", text: "关闭列", danger: true, action: () => removeColumn(props.column.id) },
+  ];
+  void popupMenu(items, menuButton.value, { anchor: { x: "right", y: "top" } });
 }
-
-// A popover that is open should not survive a click anywhere else.
-function onDocumentPointerDown(event: PointerEvent): void {
-  if (!menuOpen.value) return;
-  const el = root.value;
-  if (el && !el.contains(event.target as Node)) menuOpen.value = false;
-}
-
-onMounted(() => document.addEventListener("pointerdown", onDocumentPointerDown));
-onBeforeUnmount(() => document.removeEventListener("pointerdown", onDocumentPointerDown));
 </script>
 
 <template>
   <section
-    ref="root"
     class="deck-column"
     :style="{ '--column-width': `${column.width}px` }"
     :aria-label="`${meta.label}列`"
-    @keydown.escape="menuOpen = false"
   >
     <header class="col-head">
       <span class="col-icon" :title="meta.description"><AppIcon :name="meta.icon" /></span>
       <h2 class="col-title">{{ meta.label }}</h2>
       <button
+        ref="menuButton"
         class="col-menu-button"
         type="button"
         title="列菜单"
         aria-haspopup="menu"
-        :aria-expanded="menuOpen"
-        @click="toggleMenu"
+        @click="openMenu"
       >
         <AppIcon name="more" />
       </button>
-
-      <div v-if="menuOpen" class="col-menu" role="menu">
-        <button type="button" role="menuitem" class="menu-item" @click="goTop">回到顶部</button>
-        <div class="menu-sep" role="separator"></div>
-        <p class="menu-label">数据源</p>
-        <button
-          v-for="type in COLUMN_TYPES"
-          :key="type"
-          type="button"
-          role="menuitemradio"
-          class="menu-item"
-          :class="{ active: column.type === type }"
-          :aria-checked="column.type === type"
-          @click="chooseType(type)"
-        >
-          <AppIcon :name="COLUMN_META[type].icon" />
-          <span>{{ COLUMN_META[type].label }}</span>
-          <AppIcon v-if="column.type === type" name="check" class="menu-check" />
-        </button>
-        <div class="menu-sep" role="separator"></div>
-        <button type="button" role="menuitem" class="menu-item" :disabled="index === 0" @click="shift(-1)">
-          上移
-        </button>
-        <button type="button" role="menuitem" class="menu-item" :disabled="index >= count - 1" @click="shift(1)">
-          下移
-        </button>
-        <button type="button" role="menuitem" class="menu-item" @click="toggleWidth">
-          {{ widthAction }}
-        </button>
-        <button type="button" role="menuitem" class="menu-item danger" @click="closeColumn">关闭列</button>
-      </div>
     </header>
 
     <div
@@ -264,82 +233,8 @@ onBeforeUnmount(() => document.removeEventListener("pointerdown", onDocumentPoin
 }
 
 .col-menu-button:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: var(--focus-outline);
   outline-offset: 2px;
-}
-
-.col-menu {
-  position: absolute;
-  top: 46px;
-  right: 8px;
-  z-index: 20;
-  width: 190px;
-  padding: 6px;
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-sm);
-}
-
-.menu-label {
-  margin: 4px 8px 6px;
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-
-.menu-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding: 7px 8px;
-  border: 0;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--text);
-  font: inherit;
-  font-size: 0.88rem;
-  text-align: left;
-  cursor: pointer;
-}
-
-.menu-item:hover:not(:disabled),
-.menu-item:focus-visible {
-  background: var(--panel-2);
-}
-
-.menu-item:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: -2px;
-}
-
-.menu-item:disabled {
-  opacity: 0.4;
-  cursor: default;
-}
-
-.menu-item.active {
-  color: var(--accent);
-  font-weight: 600;
-}
-
-.menu-item.danger {
-  color: var(--danger);
-}
-
-.menu-check {
-  margin-left: auto;
-  width: 1em;
-  height: 1em;
-}
-
-.menu-sep {
-  height: 1px;
-  margin: 6px 8px;
-  background: var(--border);
 }
 
 /* The feed scrolls inside the column, so the column keeps its header in view
@@ -391,9 +286,11 @@ onBeforeUnmount(() => document.removeEventListener("pointerdown", onDocumentPoin
   outline-offset: 2px;
 }
 
-/* Below 1100px one column owns the strip: the reader flips between columns
-   with a horizontal swipe instead of reading two cramped ones. */
-@media (max-width: 1099px) {
+/* Below 840px one column owns the strip: the reader flips between columns with
+   a horizontal swipe (scroll-snap) instead of reading columns too narrow to be
+   legible. 840 is the shell's own boundary — above it the collapsed rail leaves
+   room for at least two narrow columns at the acceptance widths. */
+@media (max-width: 839px) {
   .deck-column {
     flex-basis: 100%;
   }

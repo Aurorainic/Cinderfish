@@ -1,25 +1,31 @@
 <script setup lang="ts">
+// The narrow-viewport navigation. Items come from the shared registry and the
+// user's mobile selection; the menu key (first) opens NavDrawer, the post key is
+// fixed in the middle, and the account key appears while signed in. The drawer's
+// open state lives in MobileSidebar, so this component only announces requests.
 import { computed } from "vue";
 import AppIcon from "../AppIcon.vue";
 import { NAV_ITEM_KEYS, navItemsFor, type NavIcon } from "../../nav";
 import { openPostForm } from "../../os";
 import { navPrefs } from "../../stores/nav";
+import { session } from "../../stores/session";
 
-// The narrow-viewport navigation. Items come from the shared registry and the
-// user's mobile selection; the menu key (first) opens NavDrawer and the post
-// key is fixed in the middle. The drawer's open state lives in AppShell, so
-// this component only announces the request.
 const emit = defineEmits<{ menu: [] }>();
 
 interface BarSlot {
   key: string;
-  kind: "menu" | "post" | "link";
+  kind: "menu" | "post" | "profile" | "link";
   label: string;
   icon: NavIcon;
   to?: string;
   badge?: number;
   dot?: boolean;
 }
+
+// The account needs one reachable key of its own: a profile is otherwise only
+// behind the drawer, and the registry cannot carry it because its target
+// depends on who is signed in.
+const profileTo = computed(() => (session.me ? `/@${session.me.username}` : ""));
 
 // Badges for items the bar does not show would otherwise be invisible, so the
 // menu key carries a dot when the drawer holds anything unread.
@@ -43,6 +49,9 @@ const slots = computed<BarSlot[]>(() => {
     ...links.slice(0, split),
     { key: "post", kind: "post", label: "发帖", icon: "plus" },
     ...links.slice(split),
+    ...(profileTo.value
+      ? [{ key: "profile", kind: "profile" as const, label: "我的", icon: "user" as const, to: profileTo.value }]
+      : []),
   ];
 });
 </script>

@@ -155,11 +155,13 @@
 
   /* ---------- layout ---------- */
   /* Sidebar widths follow the Iceshrimp fork: 250px full, 80px icon-only
-     (fork/ui/_common_/navbar.vue: $nav-width / $nav-icon-only-width). */
+     (fork/ui/_common_/navbar.vue: $nav-width / $nav-icon-only-width). The shell
+     cap is the third column's budget plus the main column at its widest, so a
+     wide monitor centres the app instead of stretching the reading column. */
   --rail-width: 250px;
   --rail-width-collapsed: 80px;
   --side-width: 300px;
-  --shell-max-width: 1280px;
+  --shell-max-width: 1360px;
   --bottom-bar-height: 66px;
   --touch-target: 40px;
 
@@ -333,6 +335,31 @@ select {
   margin: 0;
   border: 0;
   background: var(--divider);
+}
+
+/* ---------- overlays ---------- */
+
+/* The generic layer container os.openLayer/popup renders into (os.ts). The
+   wrapper only carries the z-index and, for a positioned popover, the anchor
+   coordinates; the ported component places and styles itself. A click-through
+   wrapper must not swallow pointer events the page underneath still needs, so
+   only the component itself is interactive. */
+.os-layer {
+  pointer-events: none;
+}
+
+.os-layer > * {
+  pointer-events: auto;
+}
+
+/* A modal layer dims the page and closes on the backdrop. */
+.os-layer--modal {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-16);
+  background: var(--overlay-bg);
+  pointer-events: auto;
 }
 
 /* ---------- shell ---------- */

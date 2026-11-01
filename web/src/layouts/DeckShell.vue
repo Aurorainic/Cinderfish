@@ -1,40 +1,29 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from "vue";
+import { ref } from "vue";
 import AppIcon from "../components/AppIcon.vue";
 import DeckColumn from "../components/deck/DeckColumn.vue";
 import DeckPageWindow from "../components/deck/DeckPageWindow.vue";
-import { addColumn, COLUMN_META, COLUMN_TYPES, deckColumns, type ColumnType } from "../stores/deck";
+import { popupMenu } from "../os";
+import { addColumn, COLUMN_META, COLUMN_TYPES, deckColumns } from "../stores/deck";
+import type { MenuItem } from "../types/menu";
 
 // Deck mode replaces the routed main area with a horizontal strip of
-// independently scrolling columns. Adding a column is the one control that
-// lives outside the columns themselves.
-const adding = ref(false);
-const addRoot = ref<HTMLElement | null>(null);
+// independently scrolling columns. Adding a column opens the shared popup menu
+// (os.popupMenu) instead of a locally drawn one: the local variant carried its
+// own Escape and pointerdown listeners, which meant two menu lifecycles and two
+// answers to the same key press.
+const addButton = ref<HTMLElement | null>(null);
 
-function choose(type: ColumnType): void {
-  addColumn(type);
-  adding.value = false;
+const ADD_ITEMS: MenuItem[] = COLUMN_TYPES.map((type) => ({
+  type: "button" as const,
+  text: `${COLUMN_META[type].label} — ${COLUMN_META[type].description}`,
+  icon: COLUMN_META[type].icon,
+  action: () => addColumn(type),
+}));
+
+function openAddMenu(): void {
+  void popupMenu(ADD_ITEMS, addButton.value, { anchor: { x: "left", y: "top" } });
 }
-
-function onDocumentPointerDown(event: PointerEvent): void {
-  if (!adding.value) return;
-  const el = addRoot.value;
-  if (el && !el.contains(event.target as Node)) adding.value = false;
-}
-
-function onKeydown(event: KeyboardEvent): void {
-  if (event.key === "Escape") adding.value = false;
-}
-
-onMounted(() => {
-  document.addEventListener("pointerdown", onDocumentPointerDown);
-  window.addEventListener("keydown", onKeydown);
-});
-
-onBeforeUnmount(() => {
-  document.removeEventListener("pointerdown", onDocumentPointerDown);
-  window.removeEventListener("keydown", onKeydown);
-});
 </script>
 
 <template>
@@ -50,37 +39,18 @@ onBeforeUnmount(() => {
         :count="deckColumns.length"
       />
 
-      <div ref="addRoot" class="deck-add">
+      <div class="deck-add">
         <button
+          ref="addButton"
           class="add-button"
           type="button"
           title="添加列"
           aria-haspopup="menu"
-          :aria-expanded="adding"
-          @click="adding = !adding"
+          @click="openAddMenu"
         >
           <AppIcon name="plus" />
           <span>添加列</span>
         </button>
-
-        <!-- Inside the click-outside root: a pointerdown on an item would
-             otherwise close the picker before the click reached it. -->
-        <div v-if="adding" class="add-menu" role="menu" aria-label="列类型">
-          <button
-            v-for="type in COLUMN_TYPES"
-            :key="type"
-            type="button"
-            role="menuitem"
-            class="add-item"
-            @click="choose(type)"
-          >
-            <span class="add-item-icon"><AppIcon :name="COLUMN_META[type].icon" /></span>
-            <span class="add-item-text">
-              <span class="add-item-label">{{ COLUMN_META[type].label }}</span>
-              <span class="add-item-desc">{{ COLUMN_META[type].description }}</span>
-            </span>
-          </button>
-        </div>
       </div>
     </div>
 
@@ -100,11 +70,14 @@ onBeforeUnmount(() => {
   min-width: 0;
   min-height: 0;
   height: 100%;
+  padding: var(--space-12);
 }
 
 /* The strip is the only horizontal scroller: columns never widen the page, so
    the shell keeps its own width and the viewport never gets a second
-   horizontal scrollbar. */
+   horizontal scrollbar. Below 840px one column owns the strip (DeckColumn sets
+   its basis to 100%) and the snap points turn the strip into one page per
+   column. */
 .deck-strip {
   display: flex;
   align-items: stretch;
@@ -143,7 +116,7 @@ onBeforeUnmount(() => {
   justify-content: center;
   gap: 8px;
   border: 1px dashed var(--border);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--muted);
   font: inherit;
@@ -154,88 +127,25 @@ onBeforeUnmount(() => {
 }
 
 .add-button:hover,
-.add-button[aria-expanded="true"] {
+.add-button:focus-visible {
   color: var(--accent);
   border-color: var(--accent);
 }
 
 .add-button:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: var(--focus-outline);
   outline-offset: 2px;
-}
-
-/* Fixed so the picker is never clipped by the strip's own scroller. */
-.add-menu {
-  position: fixed;
-  right: 24px;
-  bottom: 24px;
-  z-index: 60;
-  width: 260px;
-  max-width: calc(100vw - 32px);
-  padding: 6px;
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-sm);
-}
-
-.add-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  padding: 8px;
-  border: 0;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--text);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.add-item:hover,
-.add-item:focus-visible {
-  background: var(--panel-2);
-}
-
-.add-item:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: -2px;
-}
-
-.add-item-icon {
-  display: inline-flex;
-  color: var(--accent);
-}
-
-.add-item-text {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  min-width: 0;
-}
-
-.add-item-label {
-  font-size: 0.9rem;
-  font-weight: 600;
-}
-
-.add-item-desc {
-  font-size: 0.76rem;
-  color: var(--muted);
 }
 
 /* On phones the shell stacks and reserves room for the bottom navigation, so
    the strip only loses its width; the height still comes from the shell. */
 @media (max-width: 500px) {
-  .deck-add {
-    width: 96px;
+  .deck {
+    padding: var(--space-8);
   }
 
-  .add-menu {
-    right: var(--space-12);
-    bottom: calc(var(--bottom-bar-height) + var(--space-20) + env(safe-area-inset-bottom));
+  .deck-add {
+    width: 96px;
   }
 }
 </style>
