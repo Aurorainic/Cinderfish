@@ -1,6 +1,10 @@
-/* Cinderfish frontend: a warm ember accent on a quiet, flat shell inspired by
-   Firefish. Colours, scale, motion and layers are tokens so the light theme in
-   [data-theme="light"] and the dark theme below stay in sync. */
+/* Cinderfish frontend: Firefish original restoration. Colour tokens derive
+   from Firefish's default dark theme (themes/_dark.json5 @02c31e0): black
+   page background, panels lifted 3%, the #86b300 accent, #dadada foreground
+   and its content semantics (link/renote/hashtag/CW). The light theme mirrors
+   themes/_light.json5 the same way. Scale, motion and layer tokens stay
+   structural; the light theme in [data-theme="light"] and the dark theme
+   below stay in sync. */
 
 /* Firefish's camelCase token names, aliased onto the tokens below. */
 @import "./firefish-tokens.css";
@@ -9,87 +13,87 @@
   color-scheme: dark;
   accent-color: var(--accent);
 
-  /* ---------- surfaces ---------- */
-  --bg: #0e0d12;
-  --theme-color: #0e0d12;
-  --panel: #1c1a23;
-  --panel-2: #24212c;
-  --surface-inset: #17151d;
+  /* ---------- surfaces (Firefish _dark.json5: bg #000, panel = lighten 3) ---------- */
+  --bg: #000000;
+  --theme-color: #000000;
+  --panel: #0d0d0d;
+  --panel-2: #171717;
+  --surface-inset: #070707;
   --surface-hover: rgba(255, 255, 255, 0.06);
   --surface-selected: color-mix(in srgb, var(--accent) 18%, transparent);
-  --popup-bg: #262330;
-  --window-header-bg: #221f2b;
+  --popup-bg: #171717;
+  --window-header-bg: rgba(255, 255, 255, 0.05);
   --overlay-bg: rgba(0, 0, 0, 0.5);
   --overlay-blur: 12px;
 
-  /* ---------- accent ---------- */
-  --accent: #ff6b35;
-  --accent-hover: #ff8a5c;
-  --accent-active: #e85a26;
-  --accent-soft: color-mix(in srgb, var(--accent) 14%, transparent);
+  /* ---------- accent (Firefish default #86b300) ---------- */
+  --accent: #86b300;
+  --accent-hover: #9bcc1a;
+  --accent-active: #6f9300;
+  --accent-soft: color-mix(in srgb, var(--accent) 15%, transparent);
   --accent-border: color-mix(in srgb, var(--accent) 42%, var(--border));
-  --text-on-accent: #1a0f08;
+  --text-on-accent: #ffffff;
 
-  /* ---------- lines ---------- */
-  --border: #2e2a38;
-  --border-strong: #3d3849;
-  --divider: rgba(255, 255, 255, 0.08);
+  /* ---------- lines (Firefish divider rgba(255,255,255,.1)) ---------- */
+  --border: rgba(255, 255, 255, 0.1);
+  --border-strong: rgba(255, 255, 255, 0.16);
+  --divider: rgba(255, 255, 255, 0.1);
   --input-border: rgba(255, 255, 255, 0.1);
   --input-border-hover: rgba(255, 255, 255, 0.2);
   --input-border-invalid: var(--danger);
 
-  /* ---------- foreground ---------- */
-  --text: #ece9f3;
+  /* ---------- foreground (Firefish fg #dadada) ---------- */
+  --text: #dadada;
   --text-strong: #ffffff;
-  --text-weak: #9893a7;
-  --text-faint: #6b6579;
-  --text-date: #8b8599;
+  --text-weak: color-mix(in srgb, var(--text) 75%, transparent);
+  --text-faint: color-mix(in srgb, var(--text) 50%, transparent);
+  --text-date: var(--text);
   --text-on-status: #ffffff;
 
-  /* ---------- status ---------- */
-  --danger: #f25f5c;
+  /* ---------- status (Firefish success/error/warn) ---------- */
+  --danger: #ec4137;
   --danger-soft: color-mix(in srgb, var(--danger) 14%, transparent);
   --danger-border: color-mix(in srgb, var(--danger) 45%, var(--border));
-  --success: #4cc38a;
+  --success: #86b300;
   --success-soft: color-mix(in srgb, var(--success) 14%, transparent);
-  --warn: #e8b13f;
-  --warn-bg: color-mix(in srgb, var(--warn) 14%, transparent);
-  --warn-fg: #f0c463;
-  --info-bg: rgba(127, 180, 255, 0.12);
-  --info-fg: #a9c4e6;
+  --warn: #ecb637;
+  --warn-bg: #42321c;
+  --warn-fg: #ffbd3e;
+  --info-bg: #253142;
+  --info-fg: #ffffff;
 
-  /* ---------- content semantics ---------- */
-  --link: #ff9868;
-  --link-hover: #ffb494;
-  --renote: #4fd1c5;
-  --mention: #7fb4ff;
-  --mention-me: #ffc2a1;
-  --hashtag: #ffb35c;
-  --cw-bg: #2a2634;
-  --cw-fg: #ece9f3;
-  --cw-hover-bg: #332e40;
+  /* ---------- content semantics (Firefish link/hashtag/renote) ---------- */
+  --link: #44a4c1;
+  --link-hover: #6fc0d8;
+  --renote: #229e82;
+  --mention: var(--accent);
+  --mention-me: var(--accent);
+  --hashtag: #ff9156;
+  --cw-bg: #687390;
+  --cw-fg: #393f4f;
+  --cw-hover-bg: #707b97;
 
-  /* ---------- navigation ---------- */
+  /* ---------- navigation (Firefish navBg = panel, navActive = accent) ---------- */
   --nav-bg: var(--panel);
-  --nav-fg: var(--text-weak);
-  --nav-fg-hover: var(--text);
+  --nav-fg: var(--text);
+  --nav-fg-hover: color-mix(in srgb, var(--text) 82%, #ffffff);
   --nav-active: var(--accent);
   --nav-indicator: var(--accent);
-  --badge-bg: var(--accent);
-  --badge-fg: var(--text-on-accent);
+  --badge-bg: #31b1ce;
+  --badge-fg: #ffffff;
 
   /* ---------- focus, scrollbar, selection ---------- */
   --focus-ring: var(--accent);
   --focus-outline: 2px solid var(--focus-ring);
   --focus-halo: color-mix(in srgb, var(--accent) 24%, transparent);
-  --scrollbar-thumb: rgba(255, 255, 255, 0.18);
-  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.32);
+  --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.4);
   --scrollbar-size: 8px;
   --selection-bg: color-mix(in srgb, var(--accent) 32%, transparent);
   --selection-fg: var(--text-strong);
 
-  /* ---------- shadow ---------- */
-  --shadow-color: rgba(0, 0, 0, 0.45);
+  /* ---------- shadow (Firefish shadow rgba(0,0,0,.3)) ---------- */
+  --shadow-color: rgba(0, 0, 0, 0.3);
   --shadow-popover: 0 2px 10px var(--shadow-color);
   --shadow-modal: 0 8px 32px var(--shadow-color);
 
@@ -177,48 +181,50 @@
 :root[data-theme="light"] {
   color-scheme: light;
 
-  --bg: #f7f5f1;
-  --theme-color: #f7f5f1;
-  --panel: #ffffff;
-  --panel-2: #f1eee8;
-  --surface-inset: #f3efe7;
-  --surface-hover: rgba(36, 31, 26, 0.06);
-  --popup-bg: #ffffff;
-  --window-header-bg: #f4f1ea;
-  --overlay-bg: rgba(30, 24, 20, 0.4);
+  /* Firefish _light.json5: bg #fff, panel = lighten 3, fg #5f5f5f. */
+  --bg: #ffffff;
+  --theme-color: #ffffff;
+  --panel: #f7f7f7;
+  --panel-2: #ececec;
+  --surface-inset: #f0f0f0;
+  --surface-hover: rgba(0, 0, 0, 0.06);
+  --popup-bg: #f7f7f7;
+  --window-header-bg: rgba(0, 0, 0, 0.03);
+  --overlay-bg: rgba(0, 0, 0, 0.3);
 
-  --border: #e4dfd6;
-  --border-strong: #d2cbbf;
-  --divider: rgba(0, 0, 0, 0.08);
-  --input-border: rgba(36, 31, 26, 0.14);
-  --input-border-hover: rgba(36, 31, 26, 0.24);
+  --border: rgba(0, 0, 0, 0.1);
+  --border-strong: rgba(0, 0, 0, 0.16);
+  --divider: rgba(0, 0, 0, 0.1);
+  --input-border: rgba(0, 0, 0, 0.1);
+  --input-border-hover: rgba(0, 0, 0, 0.2);
 
-  --text: #241f1a;
-  --text-strong: #100d0a;
-  --text-weak: #786f64;
-  --text-faint: #a2988b;
-  --text-date: #847b70;
+  --text: #5f5f5f;
+  --text-strong: #2c2c2c;
+  --text-weak: color-mix(in srgb, var(--text) 75%, transparent);
+  --text-faint: color-mix(in srgb, var(--text) 50%, transparent);
+  --text-date: var(--text);
 
-  --danger: #c8403d;
-  --success: #1f8f5f;
-  --warn: #9a6a00;
-  --warn-fg: #7a5200;
-  --info-bg: rgba(22, 104, 184, 0.1);
-  --info-fg: #1b5a94;
+  --danger: #ec4137;
+  --success: #86b300;
+  --warn: #ecb637;
+  --warn-fg: #8f6e31;
+  --warn-bg: #fff0db;
+  --info-bg: #e5f5ff;
+  --info-fg: #72818a;
 
-  --link: #c2440f;
-  --link-hover: #96330a;
-  --renote: #0e8a7b;
-  --mention: #1668b8;
-  --mention-me: #b03a10;
-  --hashtag: #a35a00;
-  --cw-bg: #f0ebe1;
-  --cw-fg: #241f1a;
-  --cw-hover-bg: #e7e0d4;
+  --link: #44a4c1;
+  --link-hover: #2f7f96;
+  --renote: #229e82;
+  --mention: var(--accent);
+  --mention-me: var(--accent);
+  --hashtag: #ff9156;
+  --cw-bg: #b1b9c1;
+  --cw-fg: #ffffff;
+  --cw-hover-bg: #bbc4ce;
 
-  --scrollbar-thumb: rgba(36, 31, 26, 0.22);
-  --scrollbar-thumb-hover: rgba(36, 31, 26, 0.36);
-  --shadow-color: rgba(60, 40, 20, 0.18);
+  --scrollbar-thumb: rgba(0, 0, 0, 0.2);
+  --scrollbar-thumb-hover: rgba(0, 0, 0, 0.4);
+  --shadow-color: rgba(0, 0, 0, 0.1);
 }
 
 * {
