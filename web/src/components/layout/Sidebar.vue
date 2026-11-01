@@ -9,14 +9,14 @@ import { navPrefs } from "../../stores/nav";
 import { session } from "../../stores/session";
 import { theme } from "../../stores/theme";
 
-// The desktop navigation column, translated from fork/ui/_common_/navbar.vue:
-// brand on top, the post button, the registry-driven nav list, and the account
-// block at the bottom. Widths come from the layout tokens (250px full, 80px
-// icon-only below 1280px, matching the fork's $nav-width pair). Navigation
-// itself is delegated to RouterLink, so the only emitted events are shell
-// actions; the store's show()/badge() are read inside the computed so an
-// admin entry or an unread count shows up without this file knowing which
-// item carries one.
+// The desktop navigation column, restored from Firefish ui/_common_/navbar.vue
+// (not the Iceshrimp fork): brand/banner on top, the round post button, the
+// registry-driven nav list, and the account block at the bottom. Widths match
+// the upstream pair ($nav-width: 250px, icon-only 80px below 1280px). The nav
+// item shape follows upstream: no pill background at rest — hover/focus/active
+// paint a full-width rounded accentedBg backdrop behind the row, text turns
+// accent, line-height 2.85rem, left padding 30px, 32px icon. Navigation itself
+// is delegated to RouterLink; emitted events are shell actions only.
 //
 // `deckPreferred` is the stored layout preference, not the layout in use: the
 // switch below changes the preference, and AppShell decides whether the current
@@ -138,29 +138,51 @@ const nav = computed(() => navItemsFor(navPrefs.value.desktop));
 }
 
 .nav-link {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: var(--space-14);
-  padding: var(--space-8) var(--space-12);
-  border-radius: var(--radius-sm);
+  gap: var(--space-8);
+  /* Firefish .item: line-height 2.85rem, padding-inline-start 30px, 0.9em
+     label, no background at rest. */
+  padding: 0 var(--space-12) 0 30px;
+  line-height: 2.85rem;
+  border-radius: var(--radius-full);
   color: var(--nav-fg);
-  font-weight: var(--weight-semibold);
-  transition: background var(--dur-base) ease, color var(--dur-base) ease;
+  font-size: 0.9em;
+  white-space: nowrap;
+  transition: color 0.4s ease;
 }
 
 .nav-link .icon {
-  width: 22px;
-  height: 22px;
+  position: relative;
+  width: 32px;
+  height: 32px;
+}
+
+/* Firefish paints the backdrop with :before sized to calc(100% - 34px) so the
+   rounded pill does not touch the column edges. */
+.nav-link::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: calc(100% - 24px);
+  margin: auto;
+  border-radius: 999px;
+  background: transparent;
+  transition: background 0.4s ease;
 }
 
 .nav-link:hover {
-  background: var(--surface-hover);
-  color: var(--nav-fg-hover);
+  color: var(--nav-hover-fg, var(--accent));
+}
+
+.nav-link:hover::before,
+.nav-link.router-link-active::before {
+  background: var(--accentedBg);
 }
 
 .nav-link.router-link-active {
   color: var(--nav-active);
-  background: var(--surface-selected);
 }
 
 .brand:focus-visible,
@@ -287,7 +309,7 @@ const nav = computed(() => navItemsFor(navPrefs.value.desktop));
 @media (max-width: 1279px) {
   .brand {
     justify-content: center;
-    padding: 6px 0;
+    padding: 2rem 0 0.5rem;
   }
 
   .brand-name,
@@ -297,7 +319,12 @@ const nav = computed(() => navItemsFor(navPrefs.value.desktop));
 
   .nav-link {
     justify-content: center;
-    padding: 13px 0;
+    padding: 0;
+    line-height: 3.6rem;
+  }
+
+  .nav-link::before {
+    width: 60%;
   }
 
   .sidebar-foot {
