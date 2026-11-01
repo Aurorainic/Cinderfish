@@ -92,7 +92,6 @@ git commit -m "docs: define Firefish port sources and capability boundaries"
 - Modify: `web/src/stores/instance.ts`
 - Modify: `web/src/main.ts`
 - Modify: `web/src/styles/main.css`
-- Modify: `web/src/os.ts` (settle the previous post request before replacing it; stop Escape after closing only the topmost overlay)
 - Test: `web/src/lib/*.spec.ts` only if the existing test setup is extended; otherwise browser checks in Task 3.
 
 **Interfaces:**
@@ -136,7 +135,7 @@ git commit -m "feat(web): add Firefish runtime and theme compatibility layers"
 - Modify: `web/src/stores/deck.ts`
 - Modify: `web/src/router/index.ts`
 - Modify: `web/src/nav.ts`
-- Modify: `web/src/os.ts` (implement `openLayer`/`closeLayer`, `popup`, `pageWindow`, `modalPageWindow`, and `openEmojiPicker` from the runtime contract)
+- Modify: `web/src/os.ts` (implement runtime contract §3.5/§3.15 `openLayer`/`closeLayer`, `popup`, `pageWindow`, `modalPageWindow` and `openEmojiPicker`; verify overlay stacking, window navigation and emoji insertion)
 
 **Interfaces:**
 - Consumes: Task 2 runtime and theme contracts; existing `deck` store and vue-router.

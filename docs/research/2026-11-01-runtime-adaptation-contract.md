@@ -70,7 +70,7 @@ grep -rhoE 'ph-[a-z0-9-]+' --include=*.vue --include=*.ts $FF | sort -u | wc -l 
 | `pageWindow` / `modalPageWindow` | `os.ts:259-287` | `components/ui/PageWindow.vue` + `components/deck/deck-page.ts` | **rewrite**（见 §3.15） |
 | `popupMenu` | `os.ts:914-956` | 新建 `components/ui/PopupMenu.vue` | **shim** |
 | `contextMenu` | `os.ts:957-985` | popupMenu + 光标定位 | **shim** |
-| `post` | `os.ts:986-1030` | `web/src/os.ts:46 openPostForm` | **shim**（补 onClosed） |
+| `post` | `os.ts:986-1030` | `web/src/os.ts:46 openPostForm` | **shim**（补 onClosed；单例发帖框被新请求替换时先 resolve 旧 Promise 并调用旧 `onClosed`） |
 | `toast` | `os.ts:289-298` | — | **drop**（0 调用点） |
 | `claimZIndex` | `os.ts:196-204` | 新建 `web/src/lib/z-index.ts` | **shim** |
 | `me` / `isSignedIn` / `isAdmin` | `me.ts`、`account.ts` | `web/src/stores/session.ts` | **shim**（reactive 代理） |
@@ -334,9 +334,7 @@ Task 3 owns these remaining runtime entry points. `pageWindow` is required for D
 | 消息 / 天线 / 列表 / 频道 / 剪辑 / 群组 / 画廊 / 页面 | 见能力矩阵 §5 | 端点全缺，UI 一并移除，不留空壳 |
 | 通行密钥 / TOTP | `MkSignin.vue:224,254` | 后端 `signin` 恒 `finished: true`，无二次因子 |
 
-### Task 2: Cinderfish 运行时适配层与主题 token
-
-**Files:**
+## 5. 目标文件布局（shim 落地位置）
 
 ```
 web/src/os.ts                      # 现有命令 + Firefish os.* shim；api/apiWithDialog 委托
