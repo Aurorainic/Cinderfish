@@ -192,7 +192,10 @@ onBeforeUnmount(() => root.value?.removeEventListener("keydown", hotkeys));
 
 .note-inner {
   --avatar-size: 48px;
-  padding: 12px 14px 8px;
+  /* Firefish MkNote.vue .article: padding 20px top, 32px sides, 10px
+     bottom, root font-size 1.05em. */
+  padding: 14px 22px 10px;
+  font-size: 1.05em;
 }
 
 .note.detail {
@@ -270,7 +273,8 @@ onBeforeUnmount(() => root.value?.removeEventListener("keydown", hotkeys));
   .note-inner {
     --avatar-size: 46px;
     font-size: 0.975em;
-    padding: 11px 12px 7px;
+    /* Firefish .max-width_500px .article: 18px top, 16px sides, 8px bottom. */
+    padding: 13px 16px 8px;
   }
 
   .quote {
