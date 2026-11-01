@@ -3,6 +3,12 @@ export interface StreamingFrame {
   body: unknown;
 }
 
+export interface NoteUpdatedEvent {
+  id: string;
+  type: "reacted" | "unreacted" | "deleted";
+  body: unknown;
+}
+
 export type StreamHandler = (channel: string, type: string, body: unknown) => void;
 
 export function dispatchStreamingFrame(

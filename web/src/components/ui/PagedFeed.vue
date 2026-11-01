@@ -1,6 +1,23 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { streaming } from "../../stores/streaming";
+import type { Note } from "../../api/types";
+import { applyNoteUpdate } from "../../stores/note-updates";
+import { session } from "../../stores/session";
+
+const notesById = new Map<string, Note>();
+
+function indexNotes(list: unknown[]): void {
+  const visit = (value: unknown, depth: number): void => {
+    if (depth > 4 || !value || typeof value !== "object") return;
+    const note = value as Note;
+    if (typeof note.id !== "string" || !note.id) return;
+    notesById.set(note.id, note);
+    visit(note.reply, depth + 1);
+    visit(note.renote, depth + 1);
+  };
+  for (const item of list) visit(item, 0);
+}
 
 export interface PagedFeedParams {
   untilId?: string;
@@ -102,6 +119,7 @@ async function load() {
     seen.clear();
     cursor.value = "";
     items.value = takeFresh(result.items);
+    indexNotes(result.items);
     advanceCursor();
     hasMore.value = result.hasMoreHint ?? result.items.length >= props.pageSize;
     pending.value = [];
@@ -126,6 +144,7 @@ async function loadMore() {
     const result = splitResult(raw);
     const fresh = takeFresh(result.items);
     if (fresh.length) {
+      indexNotes(fresh);
       items.value = [...items.value, ...fresh];
       advanceCursor();
     }
@@ -149,6 +168,7 @@ function refresh() {
 
 function remove(id: string) {
   const next = items.value.filter((item) => idOf(item) !== id);
+  notesById.delete(id);
   if (next.length === items.value.length) return;
   seen.delete(id);
   items.value = next;
@@ -255,6 +275,7 @@ function handleStream(channel: string, type: string, body: unknown) {
 
 let subscription = "";
 let offStream: (() => void) | null = null;
+let offNoteUpdates: (() => void) | null = null;
 
 function syncSubscription() {
   if (subscription) {
@@ -298,6 +319,19 @@ watch(hasMore, async (more) => {
 
 onMounted(() => {
   offStream = streaming.on(handleStream);
+  offNoteUpdates = streaming.onNoteUpdated((event) => {
+    if (!applyNoteUpdate(notesById, event, session.me?.id)) return;
+    if (event.type === "deleted") {
+      const nextItems = items.value.filter((item) => idOf(item) !== event.id);
+      const nextPending = pending.value.filter((item) => idOf(item) !== event.id);
+      if (nextItems.length !== items.value.length) {
+        items.value = nextItems;
+        seen.delete(event.id);
+        publish();
+      }
+      if (nextPending.length !== pending.value.length) pending.value = nextPending;
+    }
+  });
   syncSubscription();
   if (typeof IntersectionObserver !== "undefined") {
     observer = new IntersectionObserver(
@@ -315,6 +349,8 @@ onMounted(() => {
 onBeforeUnmount(() => {
   observer?.disconnect();
   observer = null;
+  offNoteUpdates?.();
+  offNoteUpdates = null;
   if (subscription) streaming.unsubscribe(subscription);
   subscription = "";
   offStream?.();

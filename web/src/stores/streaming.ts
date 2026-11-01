@@ -1,9 +1,9 @@
 import { ref } from "vue";
 import { getToken } from "../api/client";
-import { dispatchStreamingFrame, type StreamHandler, type StreamingFrame } from "./streaming-frames";
+import { dispatchStreamingFrame, type NoteUpdatedEvent, type StreamHandler, type StreamingFrame } from "./streaming-frames";
 
 export { dispatchStreamingFrame } from "./streaming-frames";
-export type { StreamingFrame, StreamHandler } from "./streaming-frames";
+export type { NoteUpdatedEvent, StreamingFrame, StreamHandler } from "./streaming-frames";
 
 // A thin client for the backend's Misskey-compatible Streaming API.
 // Frames are {type, body}; channel events arrive as
@@ -16,7 +16,8 @@ export type { StreamingFrame, StreamHandler } from "./streaming-frames";
 // itself because the server delivers per-user events only once per
 // connection; dropping a caller's reference never kills the store's own.
 
-export type NoteUpdatedHandler = (event: { id: string; type: string; body: unknown }) => void;
+export type NoteUpdatedHandler = (event: NoteUpdatedEvent) => void;
+
 type ChannelSub = { id: string; channel: string; refs: number };
 
 const RECONNECT_BASE_MS = 1000;
@@ -41,6 +42,7 @@ class StreamingClient {
   private subsByWire = new Map<string, ChannelSub>();
   private tokens = new Map<string, ChannelSub>();
   private handlers = new Set<StreamHandler>();
+  private noteUpdateHandlers = new Set<(event: NoteUpdatedEvent) => void>();
   private mainToken = "";
 
   start(): void {
@@ -73,12 +75,29 @@ class StreamingClient {
     this.channelSubs.clear();
     this.subsByWire.clear();
     this.tokens.clear();
+    this.handlers.clear();
+    this.noteUpdateHandlers.clear();
     this.mainToken = "";
   }
 
   on(handler: StreamHandler): () => void {
     this.handlers.add(handler);
     return () => this.handlers.delete(handler);
+  }
+
+  onNoteUpdated(handler: (event: NoteUpdatedEvent) => void): () => void {
+    this.noteUpdateHandlers.add(handler);
+    return () => this.noteUpdateHandlers.delete(handler);
+  }
+
+  private dispatchNoteUpdated(event: NoteUpdatedEvent): void {
+    for (const handler of this.noteUpdateHandlers) {
+      try {
+        handler(event);
+      } catch {
+        // A broken listener must not stop the others.
+      }
+    }
   }
 
   // subscribe returns a caller token; the wire-level channel subscription
@@ -143,12 +162,16 @@ class StreamingClient {
         return;
       }
       dispatchStreamingFrame(this.handlers, frame, (id) => this.subsByWire.get(id)?.channel);
+      if (frame.type === "noteUpdated" && frame.body && typeof frame.body === "object") {
+        this.dispatchNoteUpdated(frame.body as NoteUpdatedEvent);
+      }
       if (frame.type === "channel" && frame.body && typeof frame.body === "object") {
         const body = frame.body as { id?: string; type?: string; body?: unknown };
         if (body.type === "notification" && this.subsByWire.get(body.id ?? "")?.channel === "main") {
           unreadNotifications.value += 1;
         }
-      }    };
+      }
+    };
 
     ws.onclose = () => {
       if (this.ws !== ws) return;
