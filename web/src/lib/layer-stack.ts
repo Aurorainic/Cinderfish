@@ -11,6 +11,7 @@
 
 export interface LayerEntry {
   id: number;
+  zIndex: number;
   close: () => void;
 }
 
@@ -18,9 +19,9 @@ export interface LayerStack {
   entries(): readonly LayerEntry[];
   top(): LayerEntry | null;
   size(): number;
-  push(close: () => void): LayerEntry;
+  push(close: () => void, zIndex: number): LayerEntry;
   remove(target: LayerEntry | number | null | undefined): boolean;
-  /** Closes the topmost layer; returns false when the stack is empty. */
+  /** Closes the highest visible layer; ties close last-opened first. */
   closeTop(): boolean;
   close(id: number): boolean;
 }
@@ -38,15 +39,20 @@ export function createLayerStack(): LayerStack {
     return true;
   }
 
-  function push(close: () => void): LayerEntry {
-    const entry: LayerEntry = { id: ++seq, close };
+  function push(close: () => void, zIndex: number): LayerEntry {
+    const entry: LayerEntry = { id: ++seq, zIndex, close };
     stack.push(entry);
     return entry;
   }
 
   return {
     entries: () => stack,
-    top: () => stack[stack.length - 1] ?? null,
+    top: () => stack.reduce<LayerEntry | null>((top, entry) => {
+      if (!top || entry.zIndex > top.zIndex || (entry.zIndex === top.zIndex && entry.id > top.id)) {
+        return entry;
+      }
+      return top;
+    }, null),
     size: () => stack.length,
     push,
     remove,
@@ -58,7 +64,7 @@ export function createLayerStack(): LayerStack {
       return true;
     },
     closeTop(): boolean {
-      const entry = stack[stack.length - 1];
+      const entry = this.top();
       if (!entry) return false;
       // Remove before running the closer: a closer that re-enters the stack
       // (a layer that closes another one on the way out) must not see itself.

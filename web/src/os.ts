@@ -64,6 +64,10 @@ let nextRequestId = 0;
 // order between independent components was not a contract.
 const layerStack = createLayerStack();
 
+function pushLayer(close: () => void, zIndex: number): LayerEntry {
+  return layerStack.push(close, zIndex);
+}
+
 export interface LayerOptions {
   /** Z band, as in Firefish's claimZIndex. Ported overlays are "middle". */
   priority?: "low" | "middle" | "high";
@@ -110,13 +114,13 @@ export function openLayer<P extends Record<string, unknown>>(
   options: LayerOptions = {},
 ): LayerHandle {
   const id = ++nextRequestId;
-  const zIndex = claimZIndex(options.priority ?? "middle");
+  const renderZIndex = claimZIndex("high");
   const eventProps = eventPropsFor(options.events ?? {});
   let layer!: GenericLayer;
-  const entry = layerStack.push(() => closeLayer(id));
+  const entry = pushLayer(() => closeLayer(id), renderZIndex);
   layer = {
     id,
-    zIndex,
+    zIndex: renderZIndex,
     component: markRaw(component),
     props,
     eventProps,
@@ -196,7 +200,7 @@ let deckPageLayer: LayerEntry | null = null;
 
 watch(deckPage, (page) => {
   if (page && !deckPageLayer) {
-    deckPageLayer = layerStack.push(() => closeDeckPage());
+    deckPageLayer = pushLayer(() => closeDeckPage(), claimZIndex("middle"));
     return;
   }
   if (!page && deckPageLayer) {
@@ -276,7 +280,7 @@ export function openPostForm(opts: PostFormOptions = {}): void {
   }
   closePostForm();
   postFormRequest.value = { ...opts, id: ++nextRequestId };
-  postFormLayer = layerStack.push(closePostForm);
+  postFormLayer = pushLayer(closePostForm, claimZIndex("high"));
 }
 
 /** The shell's compose entry. Same command as openPostForm, named the way the
@@ -337,7 +341,7 @@ export function post(props: PostFormProps = {}, onClosed?: () => void): Promise<
       resolve,
       onClosed,
     };
-    postFormLayer = layerStack.push(closePostForm);
+    postFormLayer = pushLayer(closePostForm, claimZIndex("high"));
   });
 }
 
@@ -629,9 +633,12 @@ const dialogLayers = new Map<number, LayerEntry>();
 
 function registerDialogLayer(id: number): void {
   if (dialogLayers.has(id)) return;
-  dialogLayers.set(
+    dialogLayers.set(
     id,
-    layerStack.push(() => resolveDialog(id, { canceled: true })),
+    pushLayer(
+      () => resolveDialog(id, { canceled: true }),
+      claimZIndex("high"),
+    ),
   );
 }
 
@@ -795,10 +802,18 @@ function enqueueMenu(
   placement: MenuPlacement,
 ): Promise<void> {
   return new Promise((resolve) => {
-    // One popover at a time: opening a second menu resolves the first.
+    // One popover at a time: opening a second menu closes and resolves the first.
     closeMenu();
+    const zIndex = claimZIndex("high");
+    const entry = pushLayer(() => {
+      const active = menuRequest.value;
+      if (!active) return;
+      menuRequest.value = null;
+      menuLayer = null;
+      active.resolve();
+    }, zIndex);
     menuRequest.value = { id: ++nextRequestId, items, placement, src, resolve };
-    menuLayer = layerStack.push(closeMenu);
+    menuLayer = entry;
   });
 }
 
