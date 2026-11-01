@@ -16,6 +16,15 @@ const TOKEN_KEY = "cinderfish.token";
 // Misskey-compatible notes/create wraps the created note in an object. Keep
 // the envelope conversion here so every caller, including optimistic renotes,
 // receives the Note value its types declare.
+// Content warnings are either absent or non-empty in the Misskey create schema.
+export function normalizeContentWarning(enabled: boolean, value: string): string | null {
+  const normalized = value.trim();
+  return enabled && normalized ? normalized : null;
+}
+
+// Misskey-compatible notes/create wraps the created note in an object. Keep
+// the envelope conversion here so every caller, including optimistic renotes,
+// receives the Note value its types declare.
 export function unwrapCreatedNote(response: { createdNote: Note }): Note {
   return response.createdNote;
 }
@@ -276,7 +285,10 @@ export const api = {
     renoteId?: string;
     visibleUserIds?: string[];
   }) =>
-    post<{ createdNote: Note }>("/api/notes/create", params).then(unwrapCreatedNote),
+    post<{ createdNote: Note }>("/api/notes/create", {
+      ...params,
+      cw: normalizeContentWarning(params.cw !== null && params.cw !== undefined, params.cw ?? ""),
+    }).then(unwrapCreatedNote),
 
   showNote: (noteId: string) => post<Note>("/api/notes/show", { noteId }),
 

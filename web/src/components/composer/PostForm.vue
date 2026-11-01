@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { api } from "../../api/client";
+import { api, normalizeContentWarning } from "../../api/client";
 import type { DriveFile, Note, NoteVisibility } from "../../api/types";
 import { relativeTime } from "../../lib/time";
 import { instance, loadInstance } from "../../stores/instance";
@@ -264,7 +264,7 @@ async function submit() {
 
     const created = await api.createNote({
       text: text.value.trim() || undefined,
-      cw: showCw.value && cw.value ? cw.value : null,
+      cw: normalizeContentWarning(showCw.value, cw.value),
       visibility: visibility.value,
       localOnly: localOnly.value,
       fileIds: files.value.map((f) => f.id),
