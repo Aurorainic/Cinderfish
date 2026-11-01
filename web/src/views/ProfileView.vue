@@ -195,12 +195,21 @@ async function fetcher(p: PagedFeedParams): Promise<PagedFeedResult> {
   if (filtering) {
     if (p.untilId === undefined) rawCursor = "";
     if (rawCursor) params.untilId = rawCursor;
+    // Keep withReplies on (the backend default) so the replies filter has
+    // rows to select from; the unfiltered notes tab excludes them instead.
   } else if (p.untilId) {
     params.untilId = p.untilId;
   }
 
-  if (activeTab.value === "notes") params.withReplies = false;
-  else if (activeTab.value === "media") params.withFiles = true;
+  if (activeTab.value === "notes") {
+    // The replies tab filters client-side instead of passing
+    // withReplies: false here, so this branch only shapes the notes tab;
+    // users/notes defaults to including replies (backend divergence from
+    // Misskey's false default, kept deliberate).
+    params.withReplies = false;
+  } else if (activeTab.value === "media") {
+    params.withFiles = true;
+  }
 
   const page = await api.usersNotes(params);
   if (page.length) rawCursor = page[page.length - 1].id;
