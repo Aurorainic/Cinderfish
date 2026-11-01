@@ -52,6 +52,10 @@ export interface InstanceInfo {
   backgroundImageUrl: string | null;
   mascotImageUrl: string;
   emojis: EmojiSimple[];
+  /** Firefish reads `meta.defaultReaction` when a note is starred. The backend
+   * does not provide it, so this carries Firefish's own default; it must stay
+   * inside Firefish's accepted reaction whitelist. */
+  defaultReaction: string;
   features: InstanceFeatures;
 }
 
@@ -84,6 +88,7 @@ const FALLBACK: InstanceInfo = {
   backgroundImageUrl: null,
   mascotImageUrl: "",
   emojis: [],
+  defaultReaction: "⭐",
   features: DEFAULT_FEATURES,
 };
 
@@ -152,6 +157,7 @@ export function getInstanceInfo(): InstanceInfo {
     backgroundImageUrl: readNullableString(meta, "backgroundImageUrl"),
     mascotImageUrl: readString(meta, "mascotImageUrl", ""),
     emojis: [],
+    defaultReaction: "⭐",
     features: projectFeatures(meta),
   };
 }
