@@ -397,9 +397,11 @@ onBeforeUnmount(() => {
         class="tool-button"
         :class="{ active: showCw }"
         title="内容警告"
+        aria-label="内容警告"
+        :aria-pressed="showCw"
         @click="showCw = !showCw"
       >
-        <span>CW</span>
+        <AppIcon name="eyeSlash" />
       </button>
 
       <div class="vis-segmented" role="radiogroup" aria-label="可见性">

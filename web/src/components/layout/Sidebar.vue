@@ -67,13 +67,13 @@ const nav = computed(() => navItemsFor(navPrefs.value.desktop));
         <span class="account-name">{{ session.me.username }}</span>
       </RouterLink>
       <button
-        class="mode-toggle"
+        class="icon-button mode-toggle"
         type="button"
         :aria-pressed="mode === 'deck'"
         :title="mode === 'deck' ? '切换到通用视图' : '切换到 Deck 视图'"
         @click="emit('toggle-mode')"
       >
-        {{ mode === "deck" ? "通用" : "Deck" }}
+        <AppIcon :name="mode === 'deck' ? 'display' : 'columns'" />
       </button>
       <button class="icon-button" type="button" :title="theme === 'dark' ? '切换浅色' : '切换深色'" @click="emit('toggle-theme')">
         <AppIcon :name="theme === 'dark' ? 'sun' : 'moon'" />
@@ -203,25 +203,13 @@ const nav = computed(() => navItemsFor(navPrefs.value.desktop));
   white-space: nowrap;
 }
 
-/* Deck/universal switch. Labelled rather than icon-only so the two layouts
-   stay distinguishable once the sidebar collapses; the label is short enough
-   for the icon-only state. */
-.mode-toggle {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: none;
-  white-space: nowrap;
-  padding: 6px 12px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--panel);
-  color: var(--muted);
-  font: inherit;
-  font-size: 0.78rem;
-  font-weight: 700;
-  cursor: pointer;
-  transition: color 0.15s ease, border-color 0.15s ease;
+/* The deck/universal switch is an icon button like the ones next to it, so
+   the sidebar footer keeps one shape. The pressed state carries the accent,
+   which is what told the labelled button apart before. */
+.mode-toggle[aria-pressed="true"] {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-soft);
 }
 
 .mode-toggle:hover,
@@ -293,8 +281,8 @@ const nav = computed(() => navItemsFor(navPrefs.value.desktop));
 
   .mode-toggle {
     width: 40px;
-    padding: 6px 0;
-    font-size: 0.7rem;
+    height: 40px;
+    padding: 0;
   }
 
   .compose {
