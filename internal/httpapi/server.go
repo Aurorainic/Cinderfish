@@ -140,6 +140,7 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("POST /api/notes/timeline", s.handleHomeTimeline)
 
 	s.mux.HandleFunc("POST /api/notifications", s.handleNotifications)
+	s.mux.HandleFunc("POST /api/i/notifications", s.handleNotifications)
 	s.mux.HandleFunc("POST /api/notifications/mark-all-as-read", s.handleNotificationsMarkAllAsRead)
 
 	s.mux.HandleFunc("POST /api/drive/files/create", s.handleDriveFilesCreate)

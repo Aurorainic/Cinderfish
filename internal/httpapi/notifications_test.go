@@ -35,6 +35,24 @@ func fetchNotifications(t *testing.T, ts *httptest.Server, token string, params 
 	return out
 }
 
+func TestINotificationsAliasMatchesCanonical(t *testing.T) {
+	ts, tokenA := seedTwoNotificationTypes(t)
+	payload := map[string]any{"i": tokenA, "markAsRead": false}
+
+	canonicalResponse, canonical := postRaw(t, ts, "/api/notifications", payload)
+	if canonicalResponse.StatusCode != http.StatusOK {
+		t.Fatalf("canonical notifications status = %d, body %v", canonicalResponse.StatusCode, canonical)
+	}
+
+	aliasResponse, alias := postRaw(t, ts, "/api/i/notifications", payload)
+	if aliasResponse.StatusCode != http.StatusOK {
+		t.Fatalf("notifications alias status = %d, body %v", aliasResponse.StatusCode, alias)
+	}
+	if !reflect.DeepEqual(alias, canonical) {
+		t.Errorf("notifications alias response = %v, want canonical response %v", alias, canonical)
+	}
+}
+
 func notificationTypesOf(list []map[string]any) []string {
 	out := make([]string, 0, len(list))
 	for _, n := range list {
