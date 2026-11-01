@@ -1,8 +1,8 @@
-import { reactive, shallowReactive, toRef } from "vue";
+import { reactive, shallowReactive, toRefs, type Ref } from "vue";
 
 const STORAGE_KEY = "cinderfish.firefish.store";
 const defaults = {
-  animation: true,
+  detectPostLanguage: true,
   defaultNoteLocalOnly: false,
   defaultNoteVisibility: "public",
   enablePullToRefresh: true,
@@ -30,10 +30,11 @@ const defaults = {
 };
 
 export type FirefishStoreState = typeof defaults;
+export type FirefishStoreReactiveState = { [K in keyof FirefishStoreState]: Ref<FirefishStoreState[K]> };
 
 export interface FirefishStore {
   readonly state: FirefishStoreState;
-  readonly reactiveState: { foldNotification: ReturnType<typeof toRef<FirefishStoreState["foldNotification"]>> };
+  readonly reactiveState: FirefishStoreReactiveState;
   set<K extends keyof FirefishStoreState>(key: K, value: FirefishStoreState[K]): void;
 }
 
@@ -61,7 +62,7 @@ export function createFirefishStore(
   }
 
   const state = reactive({ ...defaults, ...saved }) as FirefishStoreState;
-  const reactiveState = shallowReactive({ foldNotification: toRef(state, "foldNotification") });
+  const reactiveState = shallowReactive(toRefs(state)) as FirefishStoreReactiveState;
 
   return {
     state,
@@ -78,3 +79,9 @@ export function createFirefishStore(
 }
 
 export const defaultStore = createFirefishStore();
+
+export const postFormActions: { title: string; handler: (...args: unknown[]) => unknown }[] = [];
+export const userActions: { title: string; handler: (...args: unknown[]) => unknown }[] = [];
+export const noteActions: { title: string; handler: (...args: unknown[]) => unknown }[] = [];
+export const noteViewInterruptors: { handler: (...args: unknown[]) => Promise<unknown> }[] = [];
+export const notePostInterruptors: { handler: (...args: unknown[]) => Promise<unknown> }[] = [];
