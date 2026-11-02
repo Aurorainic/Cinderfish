@@ -140,6 +140,10 @@ watch(
   min-width: 0;
   box-sizing: border-box;
   overflow-x: clip;
+  /* Firefish paints the reading column on --panel and leaves rows transparent;
+     note footers use the same colour for their hit area, so the column colour
+     is what keeps those rows from looking like floating pills. */
+  background: var(--panel);
   border-inline: 1px solid var(--divider);
   /* Matches --page-header-bleed in PageHeader.vue: the sticky header bleeds
      back over this padding, so the two numbers must stay equal or the header

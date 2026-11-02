@@ -13,7 +13,7 @@
 			<MkA class="name" :to="userPage" @click.stop>
 				<MkUserName :user="note.user" />
 			</MkA>
-			{{ i18n.ts.renotedBy }}
+			<span class="verb">{{ t("renotedVerb") }}</span>
 		</span>
 		<div class="info">
 			<span class="time">
@@ -33,7 +33,7 @@ import MkAvatar from "../ui/MkAvatar.vue";
 import MkTime from "../ui/MkTime.vue";
 import MkUserName from "../ui/MkUserName.vue";
 import Visibility from "./Visibility.vue";
-import { i18n } from "../../i18n";
+import { t } from "../../i18n";
 
 const props = defineProps<{
 	note: Note;
@@ -50,6 +50,7 @@ const userPage = computed(
 .renote {
 	display: flex;
 	align-items: center;
+	gap: 0.4em;
 	white-space: pre;
 	color: var(--renote);
 	cursor: pointer;
@@ -70,6 +71,9 @@ const userPage = computed(
 }
 
 .text {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.3em;
 	overflow: hidden;
 	flex-shrink: 1;
 	text-overflow: ellipsis;

@@ -71,6 +71,7 @@ const zhCN = {
   noNotes: "没有帖子",
   noNotifications: "没有通知",
   renotedBy: "{user} 转发了",
+  renotedVerb: "转发了",
   reply: "回复",
   replies: "回复",
   toReply: "回复",

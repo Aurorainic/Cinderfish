@@ -122,23 +122,31 @@ function getDateText(time: string): string {
 	text-align: center;
 }
 
+/* Firefish draws the date label as flat 12px text, not a panel chip. */
 .cinderfish-date-separated-list > .separator > .date {
 	display: inline-block;
+	position: relative;
 	margin: 0;
-	padding: 0.5em 1em;
-	font-size: 0.85em;
-	font-weight: bold;
-	background: var(--panel, transparent);
-	border-radius: var(--radius, 8px);
+	padding-block: 0;
+	padding-inline: 16px;
+	line-height: 32px;
+	text-align: center;
+	font-size: 12px;
+	color: var(--dateLabelFg, var(--fg));
 }
 
 .cinderfish-date-separated-list > .separator > .date > span:first-child {
 	margin-inline-end: 8px;
 }
 
+.cinderfish-date-separated-list > .separator > .date > span:last-child {
+	margin-inline-start: 8px;
+}
+
 .cinderfish-date-separated-list > .separator > .date > span > .caret {
-	font-size: 0.7em;
-	margin-inline: 4px;
-	opacity: 0.7;
+	font-style: normal;
+	font-size: 0.9em;
+	margin-inline: 8px;
+	opacity: 0.6;
 }
 </style>

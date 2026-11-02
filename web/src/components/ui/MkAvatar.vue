@@ -18,7 +18,8 @@
 		:title="title"
 		@click="emit('click', $event)"
 	>
-		<img class="inner" :src="url ?? ''" decoding="async" />
+		<img v-if="url" class="inner" :src="url" decoding="async" />
+		<span v-else class="inner placeholder" aria-hidden="true">{{ initial }}</span>
 	</span>
 	<MkA
 		v-else
@@ -29,7 +30,8 @@
 		:title="title"
 		@click.stop
 	>
-		<img class="inner" :src="url ?? ''" decoding="async" />
+		<img v-if="url" class="inner" :src="url" decoding="async" />
+		<span v-else class="inner placeholder" aria-hidden="true">{{ initial }}</span>
 	</MkA>
 </template>
 
@@ -65,6 +67,11 @@ const emit = defineEmits<{
 const squareAvatars = false;
 
 const url = computed(() => props.user.avatarUrl);
+
+// Accounts without an uploaded avatar get Firefish's blank-avatar treatment:
+// a panel-coloured disc with the first character of the name, instead of a
+// broken <img>.
+const initial = computed(() => (props.user.name || props.user.username || "?").slice(0, 1).toUpperCase());
 
 const to = computed(() => `/@${props.user.username}${props.user.host ? `@${props.user.host}` : ""}`);
 const title = computed(
@@ -106,12 +113,21 @@ function extractAvgColorFromBlurhash(hash: string | null): string | undefined {
 .cinderfish-avatar {
 	position: relative;
 	display: inline-block;
-	inline-size: var(--avatar-size, 48px);
-	block-size: var(--avatar-size, 48px);
 	vertical-align: bottom;
 	border-radius: 100%;
 	overflow: clip;
 	flex-shrink: 0;
+	/* The box doubles as the placeholder's size container, so the initial
+	   scales with whatever the caller sizes the avatar to. */
+	container-type: size;
+}
+
+/* Zero specificity: Firefish sizes avatars from the call site (1.2em in a
+   renote bar, 48px in a note header), so a parent class must win over our
+   default. */
+:where(.cinderfish-avatar) {
+	inline-size: var(--avatar-size, 48px);
+	block-size: var(--avatar-size, 48px);
 }
 
 .cinderfish-avatar.square {
@@ -124,6 +140,15 @@ function extractAvgColorFromBlurhash(hash: string | null): string | undefined {
 	object-fit: cover;
 	-webkit-user-drag: none;
 	user-select: none;
+}
+
+.cinderfish-avatar > .placeholder {
+	display: grid;
+	place-items: center;
+	background: var(--panelHighlight, var(--panel));
+	color: var(--fgTransparentWeak, var(--fg));
+	font-size: 45cqw;
+	font-weight: bold;
 }
 
 /* Firefish draws "cat ears" on cat accounts; the simplified Cinderfish port

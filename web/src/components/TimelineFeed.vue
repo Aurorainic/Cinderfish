@@ -26,7 +26,7 @@
 		     one post dialog. Deck columns pass `:composer="false"`: a 350px
 		     column is not the place for it, and the rail carries the global
 		     post entry there. -->
-		<PostForm v-if="isLoggedIn && composer" fixed />
+		<PostForm v-if="isLoggedIn && composer && showFixedPostForm" fixed />
 
 		<!-- Firefish's "new notes" button (MkTimeline's `.new`): streamed notes
 		     queue up inside MkPagination while the list is scrolled away from
@@ -66,6 +66,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { api } from "../api/client";
 import type { Note, TimelineParams } from "../api/types";
 import { isLoggedIn } from "../stores/session";
+import { defaultStore } from "../store/firefish-store";
 import { useChannel } from "../stores/streaming";
 import AppIcon from "./AppIcon.vue";
 import PostForm from "./composer/PostForm.vue";
@@ -79,6 +80,12 @@ const props = withDefaults(
 );
 
 const needsAuth = computed(() => props.source === "hybrid" || props.source === "home");
+
+// Firefish's timeline only pins the post form when the user turns that on
+// (deviceStore.showFixedPostForm, default false); the navbar's post button is
+// the normal entry point. The registry is reactive, so flipping the setting in
+// the widget/settings UI shows or hides the form without a reload.
+const showFixedPostForm = computed(() => defaultStore.reactiveState.showFixedPostForm.value);
 
 const PAGE_SIZE = 20;
 
