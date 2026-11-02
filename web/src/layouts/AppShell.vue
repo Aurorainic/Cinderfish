@@ -2,8 +2,8 @@
 import { computed, onMounted, watch } from "vue";
 import { useRouter } from "vue-router";
 import MobileSidebar from "../components/layout/MobileSidebar.vue";
-import Sidebar from "../components/layout/Sidebar.vue";
-import WidgetPanel from "../components/layout/WidgetPanel.vue";
+import Navbar from "../components/layout/Navbar.vue";
+import WidgetHost from "../components/widgets/WidgetHost.vue";
 import WidgetsDrawer from "../components/widgets/WidgetsDrawer.vue";
 import { pendingApiRequestsCount } from "../api/client";
 import { loadInstance } from "../stores/instance";
@@ -68,10 +68,10 @@ watch(
 </script>
 
 <template>
-  <!-- The Iceshrimp universal composition (fork/ui/universal.vue): sidebar,
-       main region, widget column. Deck mode keeps the sidebar and hands the
-       widget column's width to the horizontal strip, so WidgetPanel only
-       mounts in universal mode. -->
+  <!-- The Firefish universal composition (ui/universal.vue): navbar, the
+       sticky contents column, the widget column. Deck mode keeps the navbar
+       and hands the widget column's width to the horizontal strip, so
+       WidgetHost only mounts in universal mode. -->
   <div class="shell" :data-shell="props.mode">
     <div
       v-if="busy"
@@ -81,28 +81,30 @@ watch(
       aria-valuetext="正在加载"
     ></div>
 
-    <Sidebar
+    <Navbar
       :deck-preferred="props.deckPreferred"
       @toggle-theme="toggleTheme"
       @toggle-mode="toggleShellMode"
       @signout="handleSignout"
     />
 
-    <main class="main">
+    <main class="contents">
       <!-- Every route except the three deck surfaces renders through the deck
            page window instead, so the slot is the routed view. -->
       <slot />
     </main>
 
-    <WidgetPanel v-if="props.mode === 'universal'" />
+    <div v-if="props.mode === 'universal'" class="widgets-container">
+      <WidgetHost />
+    </div>
 
-    <!-- Below 1090px the panel is hidden and the same stack moves into this
-         drawer behind its floating fab; the fab hides itself above 1090px, so
-         widget access survives every width. -->
+    <!-- Below 1090px the widget column is hidden and the same stack moves into
+         this drawer behind its floating fab; the fab hides itself above 1090px,
+         so widget access survives every width. -->
     <WidgetsDrawer />
 
-    <!-- Below 500px the sidebar is gone and the same registry renders through
-         the drawer + bottom bar. -->
+    <!-- Below 500px the navbar is gone and the drawer + bottom bar take over;
+         Navbar hides itself at that breakpoint, so no second copy is needed. -->
     <MobileSidebar
       :deck-preferred="props.deckPreferred"
       @toggle-theme="toggleTheme"
@@ -113,82 +115,93 @@ watch(
 </template>
 
 <style scoped>
-/* Firefish's shell is three flush columns divided by borders, not three cards
-   floating on a gap: sidebar (250px, 80px below 1280px) | main | widgets
-   (300px, hidden below 1090px by the panel itself). The tracks are centred and
-   capped so a wide monitor does not stretch the reading column. */
+/* Firefish's universal.vue (dkgtipfy) is three flush columns divided by
+   borders, not three cards floating on a gap: navbar (250px, 80px below
+   1280px) | contents | widgets (300px, hidden below 1090px). Layout scalars
+   are defined here rather than in main.css because only the shells use them. */
 .shell {
+  --nav-width: 250px;
+  --nav-icon-only-width: 80px;
+  --widgets-hide-threshold: 1090px;
+  --widgets-width: 300px;
+
   position: relative;
-  display: grid;
-  grid-template-columns: var(--rail-width) minmax(0, 1fr) var(--side-width);
-  gap: 0;
-  max-width: var(--shell-max-width);
+  display: flex;
+  box-sizing: border-box;
+  min-height: 100dvh;
   margin: 0 auto;
-  min-height: 100vh;
-  border-inline: 1px solid var(--divider);
 }
 
-.main {
+/* Firefish's contents column (MkStickyContainer + main): the reading column
+   owns a divider against the widgets side, keeps the header bleed padding, and
+   is capped so a wide monitor does not stretch the text. */
+.contents {
+  flex: 1 1 auto;
   min-width: 0;
+  box-sizing: border-box;
+  overflow-x: clip;
+  border-inline: 1px solid var(--divider);
   /* Matches --page-header-bleed in PageHeader.vue: the sticky header bleeds
      back over this padding, so the two numbers must stay equal or the header
      leaks across the column divider. */
-  padding: 0 var(--space-24) var(--space-64);
+  padding: 0 var(--space-24) var(--space-24);
 }
 
-@media (max-width: 1279px) {
-  .shell {
-    grid-template-columns: var(--rail-width-collapsed) minmax(0, 1fr) var(--side-width);
+@media (min-width: 1280px) {
+  .contents {
+    max-width: 750px;
   }
+}
+
+/* Firefish's widgets-container: sticky, its own scroll, 300px plus margin
+   padding, hidden below 1090px. */
+.widgets-container {
+  position: sticky;
+  top: 0;
+  max-height: 100dvh;
+  overflow-y: auto;
+  overflow-x: clip;
+  box-sizing: content-box;
+  inline-size: var(--widgets-width);
+  min-inline-size: max-content;
+  padding-inline: var(--margin);
 }
 
 @media (max-width: 1090px) {
-  .shell {
-    grid-template-columns: var(--rail-width-collapsed) minmax(0, 1fr);
+  .widgets-container {
+    display: none;
   }
 }
 
-/* The fork's mobile threshold: from here down the sidebar disappears and the
-   bottom bar plus drawer take over; the reserved padding keeps the page above
-   the fixed bar, including the device safe area. */
+/* Firefish's mobile threshold: from here down the navbar is gone (both
+   Navbar.vue and the mobile rules hide it) and the bottom bar plus drawer take
+   over; the reserved padding keeps the page above the fixed bar, including the
+   device safe area. */
 @media (max-width: 500px) {
-  .shell {
-    display: block;
+  .contents {
     border-inline: 0;
-  }
-
-  .main {
-    padding: 0 var(--space-12) calc(var(--bottom-bar-height) + env(safe-area-inset-bottom));
+    padding: 0 var(--space-12) calc(var(--margin) + 4rem + env(safe-area-inset-bottom));
   }
 }
 
 /* Deck mode gives the widget column's width back to the horizontal column
-   strip; the sidebar keeps its own width so the icon state below 1280px still
+   strip; the navbar keeps its own width so the icon state below 1280px still
    applies. Kept last so its higher specificity wins over the breakpoints. */
-.shell[data-shell="deck"] {
-  grid-template-columns: var(--rail-width) minmax(0, 1fr);
-  height: 100dvh;
-  min-height: 0;
-  overflow: hidden;
-}
-
-/* The deck strip owns the scrolling, so the main area stops being a scrolling
-   document: it becomes a flex column whose child grows into the remaining
-   height. This is the whole height chain — nothing below divides the viewport
-   by hand. */
-.shell[data-shell="deck"] .main {
+.shell[data-shell="deck"] .contents {
+  max-width: none;
   display: flex;
   flex-direction: column;
-  flex: 1 1 auto;
+  border-inline-end: 0;
+  height: 100dvh;
   min-height: 0;
   padding: 0;
   overflow: hidden;
 }
 
-@media (max-width: 1279px) {
-  .shell[data-shell="deck"] {
-    grid-template-columns: var(--rail-width-collapsed) minmax(0, 1fr);
-  }
+.shell[data-shell="deck"] {
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
 }
 
 /* On phones the shell stacks into a column for the deck strip; the bottom bar
@@ -197,9 +210,8 @@ watch(
   .shell[data-shell="deck"] {
     display: flex;
     flex-direction: column;
-    grid-template-columns: none;
     height: 100dvh;
-    padding: 0 0 calc(var(--bottom-bar-height) + env(safe-area-inset-bottom));
+    padding: 0 0 calc(var(--margin) + 4rem + env(safe-area-inset-bottom));
   }
 }
 
@@ -208,7 +220,7 @@ watch(
 .api-progress {
   position: fixed;
   inset: 0 0 auto 0;
-  z-index: var(--z-overlay);
+  z-index: 1000;
   height: 2px;
   overflow: hidden;
   background: transparent;
@@ -220,7 +232,7 @@ watch(
   inset: 0;
   width: 40%;
   background: var(--accent);
-  animation: api-progress-slide 1.1s var(--ease-standard) infinite;
+  animation: api-progress-slide 1.1s ease infinite;
 }
 
 @keyframes api-progress-slide {

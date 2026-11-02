@@ -4,6 +4,7 @@ import { useRoute } from "vue-router";
 import AppShell from "./layouts/AppShell.vue";
 import DeckShell from "./layouts/DeckShell.vue";
 import { OsOverlay } from "./os";
+import ToastHost from "./components/DialogHost.vue";
 import { shellLayout, shellMode } from "./stores/shell";
 
 // The deck preference is not the layout. Only the three surfaces the deck
@@ -27,4 +28,6 @@ const showsDeck = computed(() => shellLayout(deckPreferred.value, deckRoute.valu
     </AppShell>
   </RouterView>
   <OsOverlay />
+  <!-- lib/os.ts toasts; dialogs, menus and the composer render in OsOverlay. -->
+  <ToastHost />
 </template>

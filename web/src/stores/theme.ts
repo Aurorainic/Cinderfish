@@ -1,4 +1,5 @@
-import { ref } from "vue";
+import { ref, watch } from "vue";
+import { defaultStore, type ThemeMode } from "../store/firefish-store";
 
 export type Theme = "dark" | "light";
 export type ThemePreference = Theme | "auto";
@@ -62,12 +63,38 @@ function markSwitch(): void {
 }
 
 function persist(preference: ThemePreference): void {
+  // Single source of truth: defaultStore.themeMode (device slice). The legacy
+  // cinderfish.theme key is still written so a tab running older code stays in
+  // step, but reads come from the store.
   try {
     localStorage.setItem(THEME_STORAGE_KEY, preference);
   } catch {
     // Storage may be unavailable; the choice simply does not persist.
   }
+  if (defaultStore.state.themeMode !== preference) {
+    defaultStore.set("themeMode", preference as ThemeMode);
+  }
 }
+
+// Seed from the store at startup: defaultStore may already carry a mode the
+// legacy key does not (the store wins on conflict).
+{
+  const mode = defaultStore.state.themeMode;
+  if (isThemePreference(mode) && mode !== themePreference.value) {
+    themePreference.value = mode;
+    paint(resolveTheme(mode));
+  }
+}
+
+// A mode written elsewhere (another tab, the settings page) re-paints here.
+watch(
+  () => defaultStore.reactiveState.themeMode.value,
+  (mode) => {
+    if (!isThemePreference(mode) || mode === themePreference.value) return;
+    themePreference.value = mode;
+    paint(resolveTheme(mode));
+  },
+);
 
 function paint(next: Theme): void {
   const changed = document.documentElement.dataset.theme !== next;

@@ -1,318 +1,300 @@
-<script setup lang="ts">
-import { computed } from "vue";
-import type { Notification } from "../api/types";
-import { emojiChar, emojiName } from "../lib/emoji-catalog";
-import { absoluteTime, relativeTime } from "../lib/time";
-import AppIcon from "./AppIcon.vue";
-import UserAvatar from "./UserAvatar.vue";
+// SPDX-License-Identifier: AGPL-3.0-only
+// Ported from firefish@02c31e0:packages/client/src/components/MkNotification.vue
+//
+// Adaptations:
+// - firefish-js entities.Notification is replaced by the local api/types
+//   Notification (same Misskey field names; groupInvited/app/pollVote types
+//   are not emitted by the Cinderfish backend and are dropped).
+// - Mfm renders as plain text via note/get-note-summary; MkReactionIcon
+//   becomes the curated emoji catalog (lib/emoji-catalog); reaction emoji
+//   resolution and the default-reaction fallback keep the original's shape.
+// - The follow request accept/reject buttons, MkFollowButton and the read
+//   IntersectionObserver (marking rows read on sight) are dropped:
+//   TODO no following/requests/accept endpoint and no read-marking endpoint
+//   in Cinderfish; unread state is store-driven.
+// - useTooltip for the reaction preview is dropped; the reaction keeps a
+//   native title attribute instead.
+<template>
+	<div class="notification" :class="[notification.type, { unread: !notification.isRead }]">
+		<div class="head">
+			<MkAvatar
+				v-if="notification.note && notification.type === 'pollEnded'"
+				class="icon"
+				:user="notification.note.user"
+			/>
+			<MkAvatar v-else-if="notification.user" class="icon" :user="notification.user" />
+			<span v-else class="icon icon-fallback" aria-hidden="true">
+				<AppIcon name="bell" />
+			</span>
+			<span class="sub-icon" :class="notification.type">
+				<AppIcon v-if="!(notification.type === 'reaction' && reaction)" :name="subIcon" />
+				<span v-else-if="notification.type === 'reaction' && reaction" class="reaction-emoji" :title="reactionTitle">
+					{{ reaction }}
+				</span>
+			</span>
+		</div>
+		<div class="tail">
+			<header>
+				<template v-if="notification.type === 'pollEnded'">
+					<span class="name">投票已结束</span>
+				</template>
+				<MkA v-else-if="notification.user" class="name" :to="userPage(notification.user)">
+					<MkUserName :user="notification.user" />
+				</MkA>
+				<span v-else class="name">通知</span>
+				<MkTime :time="notification.createdAt" class="time" />
+			</header>
+			<MkA
+				v-if="notification.note && noteTypes.has(notification.type)"
+				class="text"
+				:to="notePage(notification.note)"
+				:title="getNoteSummary(notification.type === 'renote' && notification.note.renote ? notification.note.renote : notification.note)"
+			>
+				<span class="text-body">{{ noteSummary }}</span>
+			</MkA>
+			<span v-else-if="notification.type === 'follow'" class="text muted">
+				{{ i18n.ts._notification.youWereFollowed }}
+			</span>
+			<span v-else-if="notification.type === 'followRequestAccepted'" class="text muted">
+				{{ i18n.ts._notification.yourFollowRequestAccepted }}
+			</span>
+			<span v-else-if="notification.type === 'receiveFollowRequest'" class="text muted">
+				{{ i18n.ts._notification.youReceivedFollowRequest }}
+			</span>
+			<span v-else-if="notification.type === 'app' && notification.body" class="text muted">
+				{{ notification.body }}
+			</span>
+		</div>
+	</div>
+</template>
 
-type IconName = "bell" | "heart" | "reply" | "renote" | "user" | "check" | "feather";
+<script lang="ts" setup>
+import { computed } from "vue";
+import type { Note, Notification, UserLite } from "../api/types";
+import { emojiChar, emojiName } from "../lib/emoji-catalog";
+import { i18n } from "../i18n";
+import { getNoteSummary } from "./note/get-note-summary";
+import AppIcon from "./AppIcon.vue";
+import MkA from "./ui/MkA.vue";
+import MkAvatar from "./ui/MkAvatar.vue";
+import MkTime from "./ui/MkTime.vue";
+import MkUserName from "./ui/MkUserName.vue";
+
+// Types whose text line links to the related note, mirroring the original's
+// per-type MkA blocks (reaction/renote/reply/mention/quote/pollVote/pollEnded).
+const noteTypes = new Set([
+	"reaction",
+	"renote",
+	"reply",
+	"mention",
+	"quote",
+	"pollVote",
+	"pollEnded",
+]);
 
 const props = defineProps<{ notification: Notification }>();
 
-// Chinese wording per Misskey notification type, plus the tone that colours
-// the type badge. Unknown types fall back to a neutral line so a new
-// server-side type still renders something sensible.
-const copy: Record<string, { icon: IconName; text: string; tone: string }> = {
-  reaction: { icon: "heart", text: "反应了你的笔记", tone: "reaction" },
-  reply: { icon: "reply", text: "回复了你", tone: "reply" },
-  mention: { icon: "bell", text: "提到了你", tone: "mention" },
-  follow: { icon: "user", text: "关注了你", tone: "follow" },
-  followRequestAccepted: { icon: "user", text: "接受了你的关注请求", tone: "follow" },
-  receiveFollowRequest: { icon: "user", text: "请求关注你", tone: "follow" },
-  renote: { icon: "renote", text: "转贴了你的笔记", tone: "renote" },
-  quote: { icon: "renote", text: "引用了你的笔记", tone: "renote" },
-  pollEnded: { icon: "check", text: "你的投票已结束", tone: "poll" },
-  note: { icon: "feather", text: "发布了新笔记", tone: "note" },
-};
-
-const meta = computed(
-  () => copy[props.notification.type] ?? { icon: "bell" as IconName, text: "有一条新通知", tone: "note" },
-);
-
-const actorName = computed(
-  () => props.notification.user?.name || props.notification.user?.username || "某位用户",
-);
-
-const to = computed(() => {
-  const n = props.notification;
-  if (n.noteId) return `/notes/${n.noteId}`;
-  if (n.user?.username) return `/@${n.user.username}`;
-  return "/notifications";
+// The sub-icon maps one-to-one onto the original's ph-* icon chain.
+// The sub-icon maps one-to-one onto the original's ph-* icon chain. For a
+// reaction notification the badge shows the reaction emoji itself instead of
+// an icon, like the original's XReactionIcon slot.
+const subIcon = computed(() => {
+	switch (props.notification.type) {
+		case "follow":
+			return "user";
+		case "receiveFollowRequest":
+			return "clock";
+		case "followRequestAccepted":
+			return "check";
+		case "renote":
+			return "renote";
+		case "reply":
+			return "reply";
+		case "mention":
+			return "bell";
+		case "quote":
+			return "quote";
+		case "pollVote":
+		case "pollEnded":
+			return "question";
+		default:
+			return "smiley";
+	}
 });
 
-// The reaction picker renders from the same curated catalog. Reactions come
-// from the API as a unicode character or as a custom `:shortcode:`; the
-// shortcode is resolved to its catalog character and otherwise shown as-is,
-// so an instance emoji that is not in the catalog still reads as a name.
+// Firefish resolves :shortcode@.: against the note's customEmojis; the
+// curated catalog is Cinderfish's equivalent. A raw unicode reaction shows
+// as-is; the default-reaction fallback of the original is kept ("⭐").
 const reaction = computed(() => {
-  const raw = props.notification.reaction?.trim();
-  if (!raw) return "";
-  const shortcode = /^:([A-Za-z0-9_+-]+):$/.exec(raw);
-  if (!shortcode) return raw;
-  return emojiChar(shortcode[1]) ?? raw;
+	const raw = props.notification.reaction?.trim();
+	if (!raw) return "";
+	const shortcode = /^:([\w+-]+)(?:@[\w.]*)?:$/.exec(raw);
+	if (shortcode) return emojiChar(shortcode[1]) ?? raw;
+	return raw;
 });
 
 const reactionTitle = computed(() => emojiName(reaction.value));
 
-// The related note, flattened to plain text: a boost shows the boosted body,
-// and media-only notes get a short hint instead of an empty line.
-const excerpt = computed(() => {
-  const note = props.notification.note;
-  if (!note) return "";
-  let text = (note.text ?? "").trim();
-  if (!text && note.renote) text = (note.renote.text ?? "").trim();
-  if (!text) {
-    if (note.renote) return "转贴了一条笔记";
-    if (note.files.length) return "[附件]";
-    return "";
-  }
-  text = text.replace(/\s+/g, " ").trim();
-  return text.length > 140 ? `${text.slice(0, 140)}…` : text;
+const noteSummary = computed(() => {
+	const note = props.notification.note;
+	if (!note) return "";
+	// A renote notification shows the boosted note, as the original does with
+	// getNoteSummary(notification.note.renote).
+	const target =
+		props.notification.type === "renote" && note.renote ? note.renote : note;
+	return getNoteSummary(target);
 });
 
-const time = computed(() => relativeTime(props.notification.createdAt));
-const timeTitle = computed(() => absoluteTime(props.notification.createdAt));
+// Cinderfish's router serves /notes/:id and /@username (filters/note and
+// filters/user of the original collapse to these two builders).
+function notePage(note: Note): string {
+	return `/notes/${note.id}`;
+}
+
+function userPage(user: UserLite): string {
+	return `/@${user.username}`;
+}
 </script>
 
-<template>
-  <RouterLink
-    :to="to"
-    class="item"
-    :class="[`tone-${meta.tone}`, { unread: !notification.isRead, read: notification.isRead }]"
-  >
-    <span class="badge">
-      <AppIcon :name="meta.icon" />
-    </span>
-
-    <span class="avatar-slot">
-      <UserAvatar v-if="notification.user" :user="notification.user" :size="36" />
-      <span v-else class="avatar-empty" aria-hidden="true">?</span>
-    </span>
-
-    <span class="content">
-      <span class="line">
-        <strong class="actor">{{ actorName }}</strong>
-        <span class="action">{{ meta.text }}</span>
-        <span
-          v-if="reaction"
-          class="reaction"
-          :title="`反应 ${reactionTitle}`"
-          :aria-label="`反应 ${reactionTitle}`"
-          >{{ reaction }}</span
-        >
-      </span>
-      <span v-if="excerpt" class="excerpt">{{ excerpt }}</span>
-    </span>
-
-    <span class="tail">
-      <time class="time" :title="timeTitle">{{ time }}</time>
-      <span v-if="!notification.isRead" class="dot" title="未读" aria-label="未读"></span>
-    </span>
-  </RouterLink>
-</template>
-
 <style scoped>
-/* Borderless notification row: the hairline belongs to the row, so rows butt
-   against each other inside PagedFeed. The row is its own size container so
-   it holds up in a ~350px deck column and a ~680px main column alike. */
-.item {
-  --tone: var(--muted);
-  --tone-bg: var(--panel-2);
-  container-name: notification;
-  container-type: inline-size;
-  display: grid;
-  grid-template-columns: auto auto minmax(0, 1fr) auto;
-  align-items: start;
-  gap: 10px;
-  padding: 12px 14px;
-  border-bottom: 1px solid var(--divider);
-  color: var(--text);
-  transition: background 0.15s ease;
+.notification {
+	display: flex;
+	gap: 12px;
+	padding: 14px 16px;
+	border-bottom: 1px solid var(--divider);
+	background: var(--panel);
+	transition: background 0.15s ease;
 }
 
-.item:hover {
-  background: var(--panel-2);
-  color: var(--text);
+.notification:hover {
+	background: var(--panelHighlight);
 }
 
-.item.unread {
-  background: color-mix(in srgb, var(--accent) 6%, transparent);
-  box-shadow: inset 2px 0 0 var(--accent);
+.notification.unread {
+	background: color-mix(in srgb, var(--accent) 8%, var(--panel));
 }
 
-.item.unread:hover {
-  background: color-mix(in srgb, var(--accent) 11%, transparent);
+/* The type badge overlaps the avatar's corner like the original's .sub-icon. */
+.head {
+	position: relative;
+	flex: none;
+	width: 42px;
 }
 
-/* Iceshrimp.NET dims read rows with .notification.read { opacity: 0.7 }
-   (NotificationComponent.razor.css L12-14); unread keeps full emphasis. */
-.item.read {
-  opacity: 0.7;
+.icon {
+	width: 42px;
+	height: 42px;
+	border-radius: 50%;
 }
 
-.badge {
-  flex: none;
-  display: grid;
-  place-items: center;
-  width: 24px;
-  height: 24px;
-  margin-top: 6px;
-  border-radius: 50%;
-  background: var(--tone-bg);
-  color: var(--tone);
+.icon-fallback {
+	display: grid;
+	place-items: center;
+	background: var(--panel-2);
+	color: var(--muted);
 }
 
-.badge .icon {
-  width: 14px;
-  height: 14px;
+.icon-fallback .icon {
+	width: 18px;
+	height: 18px;
 }
 
-.tone-reaction {
-  --tone: #ff5c8a;
-  --tone-bg: color-mix(in srgb, #ff5c8a 16%, transparent);
+.sub-icon {
+	position: absolute;
+	right: -3px;
+	bottom: -3px;
+	display: grid;
+	place-items: center;
+	width: 20px;
+	height: 20px;
+	border-radius: 50%;
+	background: var(--panel);
+	color: var(--muted);
+	font-size: 12px;
+	line-height: 1;
 }
 
-.tone-reply,
-.tone-mention {
-  --tone: var(--mention);
-  --tone-bg: color-mix(in srgb, var(--mention) 16%, transparent);
+.sub-icon .icon {
+	width: 12px;
+	height: 12px;
 }
 
-.tone-renote {
-  --tone: var(--renote);
-  --tone-bg: color-mix(in srgb, var(--renote) 16%, transparent);
+.sub-icon.reaction {
+	background: var(--panel);
 }
 
-.tone-follow {
-  --tone: var(--success);
-  --tone-bg: color-mix(in srgb, var(--success) 16%, transparent);
-}
-
-.tone-poll {
-  --tone: var(--hashtag);
-  --tone-bg: color-mix(in srgb, var(--hashtag) 16%, transparent);
-}
-
-.tone-note {
-  --tone: var(--accent);
-  --tone-bg: var(--accent-soft);
-}
-
-.avatar-slot {
-  flex: none;
-  display: block;
-  line-height: 0;
-  margin-top: 1px;
-}
-
-.avatar-empty {
-  display: grid;
-  place-items: center;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background: var(--panel-2);
-  border: 1px solid var(--border);
-  color: var(--muted);
-  font-weight: 700;
-}
-
-.content {
-  display: block;
-  min-width: 0;
-}
-
-.line {
-  display: flex;
-  align-items: baseline;
-  flex-wrap: wrap;
-  gap: 5px;
-  font-size: 0.92rem;
-  line-height: 1.45;
-}
-
-.actor {
-  color: var(--text-strong);
-  font-weight: 700;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 14em;
-}
-
-.action {
-  color: var(--muted);
-}
-
-.reaction {
-  align-self: center;
-  padding: 0 8px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--panel);
-  font-size: 0.95rem;
-  line-height: 1.6;
-  color: var(--text);
-}
-
-.excerpt {
-  display: -webkit-box;
-  margin-top: 3px;
-  color: var(--muted);
-  font-size: 0.84rem;
-  line-height: 1.45;
-  overflow: hidden;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
-  -webkit-box-orient: vertical;
-  word-break: break-word;
+.reaction-emoji {
+	max-width: 20px;
+	overflow: hidden;
 }
 
 .tail {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding-top: 2px;
+	flex: 1;
+	min-width: 0;
+}
+
+header {
+	display: flex;
+	align-items: baseline;
+	gap: 8px;
+}
+
+.name {
+	font-weight: 700;
+	color: var(--text-strong);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
 .time {
-  color: var(--muted);
-  font-size: 0.78rem;
-  white-space: nowrap;
+	margin-left: auto;
+	color: var(--muted);
+	font-size: 0.8rem;
+	white-space: nowrap;
 }
 
-.dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--accent);
+.text {
+	display: block;
+	margin-top: 2px;
+	color: var(--text);
+	font-size: 0.92rem;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
-/* Narrow deck columns: pull the row in and let the time drop under the text
-   instead of squeezing the actor line. */
-@container notification (max-width: 430px) {
-  .item {
-    grid-template-columns: auto auto minmax(0, 1fr);
-    gap: 8px;
-    padding: 11px 10px;
-  }
+.text-body {
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
 
-  .badge {
-    width: 22px;
-    height: 22px;
-    margin-top: 5px;
-  }
+.muted {
+	opacity: 0.7;
+}
 
-  .tail {
-    grid-column: 3;
-    grid-row: 2;
-    justify-content: flex-start;
-    padding-top: 2px;
-  }
+/* Narrow viewport: the original's v-size max:[500,450] collapses the layout
+   to a tighter row. */
+@container (max-width: 500px) {
+	.notification {
+		gap: 10px;
+		padding: 12px;
+	}
 
-  .time {
-    font-size: 0.75rem;
-  }
+	.head {
+		width: 34px;
+	}
+
+	.icon {
+		width: 34px;
+		height: 34px;
+	}
+
+	.sub-icon {
+		right: -4px;
+		bottom: -4px;
+		width: 18px;
+		height: 18px;
+	}
 }
 </style>

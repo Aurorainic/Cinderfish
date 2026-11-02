@@ -1,8 +1,20 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Ported from firefish@02c31e0:packages/client/src/pages/settings/account-info.vue
+// and pages/settings/security.vue
+//
+// Adaptations: the users/stats endpoint does not exist, so the statistics
+// section of account-info is dropped (the capability matrix marks the usage
+// block as hidden). Password change, 2FA and signin-history have no backend
+// endpoints and are rendered as explicit unavailable rows, matching the
+// project's "no fake buttons" rule.
 <script setup lang="ts">
 import { computed } from "vue";
 import { useRouter } from "vue-router";
 import AppIcon from "../../components/AppIcon.vue";
+import MkKeyValue from "../../components/ui/MkKeyValue.vue";
+import MkTime from "../../components/ui/MkTime.vue";
 import UserAvatar from "../../components/UserAvatar.vue";
+import { i18n } from "../../i18n";
 import { isAdmin, session, signout } from "../../stores/session";
 import SettingsPage from "./SettingsPage.vue";
 
@@ -12,6 +24,11 @@ const me = computed(() => session.me);
 const email = computed(() => {
   const value = session.me?.email;
   return typeof value === "string" && value ? value : "";
+});
+
+const registeredDate = computed(() => {
+  const date = session.me ? new Date(session.me.createdAt) : null;
+  return date && !Number.isNaN(date.getTime()) ? date.toISOString() : null;
 });
 
 function handleSignout() {
@@ -43,17 +60,38 @@ function handleSignout() {
               <span v-if="isAdmin" class="badge admin">管理员</span>
             </div>
             <div class="muted small">@{{ me.username }}</div>
-            <div class="muted small mono">ID: {{ me.id }}</div>
-            <div v-if="email" class="muted small mono">{{ email }}</div>
           </div>
+        </div>
+
+        <div class="key-values">
+          <MkKeyValue :copy="me.id" oneline>
+            <template #key>ID</template>
+            <template #value><span class="mono">{{ me.id }}</span></template>
+          </MkKeyValue>
+          <MkKeyValue v-if="registeredDate" oneline>
+            <template #key>注册时间</template>
+            <template #value>
+              <MkTime :time="registeredDate" mode="detail" />
+            </template>
+          </MkKeyValue>
+          <MkKeyValue v-if="email" oneline>
+            <template #key>{{ i18n.ts.email ?? "邮箱" }}</template>
+            <template #value><span class="mono">{{ email }}</span></template>
+          </MkKeyValue>
+          <MkKeyValue oneline>
+            <template #key>帖子数量</template>
+            <template #value>{{ me.notesCount.toLocaleString("zh-CN") }}</template>
+          </MkKeyValue>
         </div>
 
         <div class="row-actions">
           <RouterLink :to="`/@${me.username}`" class="button ghost small">
             <AppIcon name="user" />
-            查看个人资料
+            {{ i18n.ts.profile }}
           </RouterLink>
-          <RouterLink to="/settings/profile" class="button ghost small">编辑个人资料</RouterLink>
+          <RouterLink to="/settings/profile" class="button ghost small">
+            {{ i18n.ts.editProfile }}
+          </RouterLink>
         </div>
       </section>
 
@@ -72,6 +110,14 @@ function handleSignout() {
           <div class="setting-text">
             <div class="setting-label">两步验证</div>
             <p class="muted small">服务器尚未提供两步验证接口。</p>
+          </div>
+          <span class="status">未开放</span>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-text">
+            <div class="setting-label">登录历史</div>
+            <p class="muted small">服务器尚未提供 i/signin-history 接口。</p>
           </div>
           <span class="status">未开放</span>
         </div>
@@ -140,6 +186,13 @@ function handleSignout() {
   font-size: var(--fs-2xs);
   font-weight: var(--weight-bold);
   letter-spacing: 0.02em;
+}
+
+.key-values {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-10);
+  margin-top: var(--space-14);
 }
 
 .row-actions {
