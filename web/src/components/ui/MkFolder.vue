@@ -130,7 +130,9 @@ defineExpose({
 	z-index: 10;
 	position: sticky;
 	inset-block-start: var(--stickyTop, 0px);
-	padding: var(--x-padding);
+	/* Firefish gets --x-padding from the call site; default to the folder's
+	   own inline gutter so the header is never unpadded. */
+	padding: var(--x-padding, 8px);
 	-webkit-backdrop-filter: var(--blur, blur(8px));
 	backdrop-filter: var(--blur, blur(20px));
 	margin-inline: -12px;

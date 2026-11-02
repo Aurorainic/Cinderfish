@@ -3,6 +3,8 @@ import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import type { Component } from "vue";
 import { useRoute } from "vue-router";
 import AppIcon from "../components/AppIcon.vue";
+import MkButton from "../components/ui/MkButton.vue";
+import MkLoading from "../components/ui/MkLoading.vue";
 import SectionMenu from "../components/ui/SectionMenu.vue";
 import PageHeader from "../components/ui/PageHeader.vue";
 import type { SectionMenuGroup } from "../components/ui/section-menu";
@@ -82,24 +84,24 @@ onBeforeUnmount(() => {
     <PageHeader title="管理" icon="shield" :subtitle="instance.meta?.name ?? '实例控制台'" />
 
     <div class="admin-body">
-      <section v-if="!session.ready" class="card">
-        <p class="muted small">正在确认登录状态…</p>
+      <section v-if="!session.ready" class="_panel">
+        <MkLoading />
       </section>
 
-      <section v-else-if="!isAdmin" class="card gate">
-        <span class="gate-icon"><AppIcon name="shield" /></span>
+      <section v-else-if="!isAdmin" class="_panel gate">
+        <span class="gate-glyph"><AppIcon name="shield" /></span>
         <h2>需要管理员权限</h2>
         <!-- The gate explains the state; it is not the access control. Every
              admin endpoint answers FORBIDDEN on the server for this account. -->
-        <p class="muted gate-text">
+        <p class="gate-text">
           <template v-if="isLoggedIn">
             当前账号{{ session.me ? ` @${session.me.username}` : "" }}不是实例管理员，服务端也会拒绝管理接口的请求。
           </template>
           <template v-else>这个页面只对实例管理员开放。请使用管理员账号登录后再访问。</template>
         </p>
         <div class="gate-actions">
-          <RouterLink v-if="!isLoggedIn" to="/login" class="button">登录</RouterLink>
-          <RouterLink v-else to="/" class="button ghost">回到时间线</RouterLink>
+          <MkButton v-if="!isLoggedIn" link to="/login" primary>登录</MkButton>
+          <MkButton v-else link to="/">回到时间线</MkButton>
         </div>
       </section>
 
@@ -119,13 +121,13 @@ onBeforeUnmount(() => {
 }
 
 .admin-body {
-  padding-top: var(--space-20);
+  padding-block-start: var(--margin);
 }
 
 .admin-grid {
   display: grid;
   grid-template-columns: 164px minmax(0, 1fr);
-  gap: var(--space-20);
+  gap: var(--margin);
   align-items: start;
 }
 
@@ -136,57 +138,61 @@ onBeforeUnmount(() => {
      form that would size each row to its max-content width and let the
      scrolling menu strip widen the page. Same fix as SettingsLayout. */
   align-items: stretch;
-  gap: var(--space-14);
+  gap: 14px;
 }
 
 .admin-content {
   display: flex;
   flex-direction: column;
-  gap: var(--space-16);
+  gap: var(--margin);
   min-width: 0;
 }
 
+/* Firefish's full-page state (MkError / _fullinfo): a centred glyph, a short
+   explanation and the action that gets the reader out of the dead end. */
 .gate {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--space-12);
-  padding: var(--space-48) var(--space-24);
+  gap: 12px;
+  padding-block: 48px;
+  padding-inline: 24px;
   text-align: center;
 }
 
-.gate-icon {
+.gate-glyph {
   display: grid;
   place-items: center;
-  width: 52px;
-  height: 52px;
+  inline-size: 52px;
+  block-size: 52px;
   border-radius: 50%;
-  background: var(--accent-soft);
+  background: var(--accentedBg);
   color: var(--accent);
 }
 
-.gate-icon .icon {
-  width: 24px;
-  height: 24px;
+.gate-glyph .icon {
+  inline-size: 24px;
+  block-size: 24px;
 }
 
 .gate h2 {
-  font-size: var(--fs-lg);
+  font-size: 1.15em;
 }
 
 .gate-text {
-  max-width: 44ch;
+  max-inline-size: 44ch;
+  color: var(--fgTransparentWeak);
 }
 
 .gate-actions {
   display: flex;
-  gap: var(--space-8);
+  gap: 8px;
 }
 
 @media (max-width: 720px) {
   .admin-grid {
     grid-template-columns: minmax(0, 1fr);
-    gap: var(--space-14);
+    gap: 14px;
   }
 }
 </style>

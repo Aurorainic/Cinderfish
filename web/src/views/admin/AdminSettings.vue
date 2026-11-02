@@ -2,6 +2,10 @@
 import { computed, onMounted, ref, watch } from "vue";
 import { api } from "../../api/client";
 import AppIcon from "../../components/AppIcon.vue";
+import MkButton from "../../components/ui/MkButton.vue";
+import MkInfo from "../../components/ui/MkInfo.vue";
+import MkInput from "../../components/ui/MkInput.vue";
+import MkLoading from "../../components/ui/MkLoading.vue";
 import { instance, loadInstance } from "../../stores/instance";
 import AdminCallout from "./AdminCallout.vue";
 import {
@@ -146,157 +150,161 @@ onMounted(() => {
 </script>
 
 <template>
-  <section class="card">
-    <div class="section-head">
+  <section class="_card">
+    <div class="_title section-head">
       <h2>联邦模式</h2>
-      <span v-if="modeSaving" class="hint">正在保存…</span>
+      <MkLoading v-if="modeSaving" em :size-em="0.8" />
     </div>
-    <p class="muted small section-desc">
-      决定本实例与其他实例互通的程度。切换后立即生效，无需重启。
-    </p>
+    <div class="_content">
+      <p class="_caption section-desc">
+        决定本实例与其他实例互通的程度。切换后立即生效，无需重启。
+      </p>
 
-    <div class="modes" role="group" aria-label="联邦模式">
-      <button
-        v-for="item in FEDERATION_MODES"
-        :key="item.id"
-        type="button"
-        class="mode"
-        :class="{ active: mode === item.id }"
-        :aria-pressed="mode === item.id"
-        :disabled="!mode"
-        @click="selectMode(item.id)"
-      >
-        <span class="mode-name">
-          {{ item.label }}
-          <span v-if="mode === item.id" class="mode-tag">
-            <AppIcon name="check" />
-            当前
+      <div class="modes" role="group" aria-label="联邦模式">
+        <button
+          v-for="item in FEDERATION_MODES"
+          :key="item.id"
+          type="button"
+          class="mode"
+          :class="{ active: mode === item.id }"
+          :aria-pressed="mode === item.id"
+          :disabled="!mode"
+          @click="selectMode(item.id)"
+        >
+          <span class="mode-name">
+            {{ item.label }}
+            <span v-if="mode === item.id" class="mode-tag">
+              <AppIcon name="check" />
+              当前
+            </span>
           </span>
-        </span>
-        <span class="mode-desc">{{ item.desc }}</span>
-      </button>
+          <span class="mode-desc">{{ item.desc }}</span>
+        </button>
+      </div>
+
+      <MkInfo
+        v-if="modeNotice"
+        class="notice-row"
+        :warn="modeNotice.kind === 'bad'"
+        role="status"
+        aria-live="polite"
+      >
+        {{ modeNotice.text }}
+      </MkInfo>
+      <MkInfo v-else-if="!mode" class="notice-row">
+        <span>正在读取当前联邦模式…</span>
+        <MkButton @click="reloadMeta">重新加载</MkButton>
+      </MkInfo>
+
+      <AdminCallout v-if="mode === 'none'" class="callout-row" title="联邦已关闭" tone="warn">
+        <p>来自其他实例的笔记与活动将不再接收，本实例的笔记也不会投递出去。</p>
+      </AdminCallout>
     </div>
-
-    <p
-      v-if="modeNotice"
-      class="notice"
-      :class="modeNotice.kind === 'ok' ? 'info' : 'error'"
-      role="status"
-      aria-live="polite"
-    >
-      {{ modeNotice.text }}
-    </p>
-    <p v-else-if="!mode" class="notice info">
-      <span>正在读取当前联邦模式…</span>
-      <button class="button ghost small" type="button" @click="reloadMeta">重新加载</button>
-    </p>
-
-    <AdminCallout v-if="mode === 'none'" title="联邦已关闭" tone="warn">
-      <p>来自其他实例的笔记与活动将不再接收，本实例的笔记也不会投递出去。</p>
-    </AdminCallout>
   </section>
 
-  <section class="card">
-    <div class="section-head">
+  <section class="_card">
+    <div class="_title section-head">
       <h2>联邦白名单</h2>
       <span v-if="hosts.length" class="count">{{ hosts.length }}</span>
     </div>
-    <p class="muted small section-desc">
-      按域名后缀匹配：加入 <code>example.com</code> 后，<code>example.com</code> 与子域
-      <code>sub.example.com</code> 都会被允许，而 <code>notexample.com</code> 不会被允许。
-    </p>
+    <div class="_content">
+      <p class="_caption section-desc">
+        按域名后缀匹配：加入 <code>example.com</code> 后，<code>example.com</code> 与子域
+        <code>sub.example.com</code> 都会被允许，而 <code>notexample.com</code> 不会被允许。
+      </p>
 
-    <AdminCallout
-      v-if="mode && !allowlistActive"
-      class="settings-alert"
-      title="白名单当前不生效"
-      tone="danger"
-    >
-      <p>当前联邦模式不是「仅白名单」，白名单中的域名不会被使用。切换到「仅白名单」后才会生效。</p>
-    </AdminCallout>
+      <AdminCallout
+        v-if="mode && !allowlistActive"
+        class="callout-row"
+        title="白名单当前不生效"
+        tone="danger"
+      >
+        <p>当前联邦模式不是「仅白名单」，白名单中的域名不会被使用。切换到「仅白名单」后才会生效。</p>
+      </AdminCallout>
 
-    <form class="row-form" :class="{ dimmed: !allowlistActive }" @submit.prevent="addHost">
-      <label class="sr-only" for="allowlist-host">要添加的实例域名</label>
-      <input
-        id="allowlist-host"
-        v-model="newHost"
-        class="input"
-        type="text"
-        placeholder="example.com"
-        autocomplete="off"
-        spellcheck="false"
-        :disabled="!allowlistActive || hostPending"
-      />
-      <button class="button" type="submit" :disabled="!allowlistActive || hostPending">
-        {{ hostPending ? "添加中…" : "添加" }}
-      </button>
-    </form>
-
-    <p
-      v-if="hostNotice"
-      class="notice"
-      :class="hostNotice.kind === 'ok' ? 'info' : 'error'"
-      role="status"
-      aria-live="polite"
-    >
-      {{ hostNotice.text }}
-    </p>
-
-    <div v-if="hostsError" class="notice error" role="alert">
-      <span>{{ hostsError }}</span>
-      <button class="button ghost small" type="button" @click="loadHosts">重试</button>
-    </div>
-
-    <p v-if="hostsLoading" class="hint">正在加载白名单…</p>
-    <ul v-else-if="hosts.length" class="hosts" :class="{ dimmed: !allowlistActive }">
-      <li v-for="host in hosts" :key="host" class="host">
-        <span class="host-name">{{ host }}</span>
-        <button
-          type="button"
-          class="button ghost small remove"
-          :disabled="!allowlistActive || removing !== null"
-          :aria-label="`从白名单移除 ${host}`"
-          @click="removeHost(host)"
+      <form class="row-form" :class="{ dimmed: !allowlistActive }" @submit.prevent="addHost">
+        <MkInput
+          v-model="newHost"
+          class="row-input"
+          type="text"
+          placeholder="example.com"
+          autocomplete="off"
+          :spellcheck="false"
+          :disabled="!allowlistActive || hostPending"
         >
-          {{ removing === host ? "移除中…" : "移除" }}
-        </button>
-      </li>
-    </ul>
-    <p v-else-if="!hostsError" class="hint">
-      {{
-        allowlistActive
-          ? "白名单为空：仅白名单模式下，本实例不会与任何其他实例互通。"
-          : "白名单为空。"
-      }}
-    </p>
+          <template #label>实例域名</template>
+        </MkInput>
+        <MkButton type="submit" :disabled="!allowlistActive || hostPending">
+          {{ hostPending ? "添加中…" : "添加" }}
+        </MkButton>
+      </form>
 
-    <p class="hint format-hint">只填域名，不需要写协议或路径。</p>
+      <MkInfo
+        v-if="hostNotice"
+        class="notice-row"
+        :warn="hostNotice.kind === 'bad'"
+        role="status"
+        aria-live="polite"
+      >
+        {{ hostNotice.text }}
+      </MkInfo>
+
+      <MkInfo v-if="hostsError" class="notice-row" warn role="alert">
+        <span>{{ hostsError }}</span>
+        <MkButton @click="loadHosts">重试</MkButton>
+      </MkInfo>
+
+      <MkLoading v-if="hostsLoading" />
+      <ul v-else-if="hosts.length" class="hosts" :class="{ dimmed: !allowlistActive }">
+        <li v-for="host in hosts" :key="host" class="host">
+          <span class="host-name">{{ host }}</span>
+          <MkButton
+            mini
+            danger
+            :disabled="!allowlistActive || removing !== null"
+            :aria-label="`从白名单移除 ${host}`"
+            @click="removeHost(host)"
+          >
+            {{ removing === host ? "移除中…" : "移除" }}
+          </MkButton>
+        </li>
+      </ul>
+      <p v-else-if="!hostsError" class="_caption">
+        {{
+          allowlistActive
+            ? "白名单为空：仅白名单模式下，本实例不会与任何其他实例互通。"
+            : "白名单为空。"
+        }}
+      </p>
+
+      <p class="_caption format-hint">只填域名，不需要写协议或路径。</p>
+    </div>
   </section>
 
-  <section class="card">
-    <div class="section-head">
+  <section class="_card">
+    <div class="_title section-head">
       <h2>注册</h2>
       <span class="pill" :class="{ open: registrationOpen }">
         {{ instance.meta ? (registrationOpen ? "自助注册开启" : "自助注册关闭") : "读取中…" }}
       </span>
     </div>
-    <p class="muted small section-desc">
-      当前识别到的模式：<strong>{{ registration }}</strong>。注册模式由服务端
-      <code>registration_mode</code> 配置决定，修改后需要重启服务生效；当前版本没有提供在线切换接口。
-    </p>
+    <div class="_content">
+      <p class="_caption section-desc">
+        当前识别到的模式：<strong>{{ registration }}</strong>。注册模式由服务端
+        <code>registration_mode</code> 配置决定，修改后需要重启服务生效；当前版本没有提供在线切换接口。
+      </p>
 
-    <AdminCallout
-      v-if="instance.meta && !registrationOpen"
-      title="自助注册已关闭"
-      tone="warn"
-    >
-      <p>新账号只能由管理员在「用户」页创建；如果实例启用了邀请模式，也可以凭邀请码注册。</p>
-      <div class="callout-actions">
-        <RouterLink :to="{ path: '/admin', query: { tab: 'users' } }" class="button ghost small">
-          去创建账号
-        </RouterLink>
-      </div>
-    </AdminCallout>
+      <AdminCallout
+        v-if="instance.meta && !registrationOpen"
+        title="自助注册已关闭"
+        tone="warn"
+      >
+        <p>新账号只能由管理员在「用户」页创建；如果实例启用了邀请模式，也可以凭邀请码注册。</p>
+        <div class="callout-actions">
+          <MkButton link to="/admin?tab=users">去创建账号</MkButton>
+        </div>
+      </AdminCallout>
+    </div>
   </section>
 </template>
 
@@ -304,67 +312,68 @@ onMounted(() => {
 .section-head {
   display: flex;
   align-items: center;
-  gap: var(--space-10);
-  margin-bottom: var(--space-6);
+  gap: 10px;
 }
 
 .section-head h2 {
-  font-size: var(--fs-md);
+  font-size: 1em;
 }
 
 .section-desc {
-  margin-bottom: var(--space-14);
+  margin-block-end: var(--margin);
 }
 
 .count {
   display: inline-grid;
   place-items: center;
-  min-width: 22px;
-  height: 22px;
-  padding: 0 var(--space-6);
-  border-radius: var(--radius-full);
-  background: var(--accent-soft);
+  min-inline-size: 22px;
+  block-size: 22px;
+  padding-inline: 6px;
+  border-radius: 999px;
+  background: var(--accentedBg);
   color: var(--accent);
-  font-size: var(--fs-xs);
-  font-weight: var(--weight-bold);
+  font-size: 0.78em;
+  font-weight: bold;
 }
 
 .pill {
-  padding: 2px var(--space-10);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-full);
-  color: var(--text-weak);
-  font-size: var(--fs-2xs);
-  font-weight: var(--weight-bold);
+  padding-block: 2px;
+  padding-inline: 10px;
+  border: solid 0.5px var(--divider);
+  border-radius: 999px;
+  color: var(--fgTransparentWeak);
+  font-size: 0.78em;
+  font-weight: bold;
 }
 
 .pill.open {
   border-color: var(--success);
-  background: var(--success-soft);
+  background: color-mix(in srgb, var(--success) 15%, transparent);
   color: var(--success);
 }
 
 .modes {
   display: flex;
   flex-direction: column;
-  gap: var(--space-6);
-  margin-bottom: var(--space-14);
+  gap: 6px;
+  margin-block-end: var(--margin);
 }
 
 .mode {
   display: flex;
   flex-direction: row;
   align-items: flex-start;
-  gap: var(--space-12);
-  padding: var(--space-12) var(--space-14);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--surface-inset);
-  color: var(--text);
-  text-align: left;
+  gap: 12px;
+  padding-block: 12px;
+  padding-inline: 14px;
+  border: solid 1px var(--divider);
+  border-radius: var(--radius);
+  background: var(--buttonBg);
+  color: var(--fg);
+  font: inherit;
+  text-align: start;
   cursor: pointer;
-  transition: border-color var(--dur-base) ease, background var(--dur-base) ease,
-    opacity var(--dur-base) ease;
+  transition: border-color 0.1s ease, background 0.1s ease, opacity 0.1s ease;
 }
 
 .mode:hover:not(:disabled) {
@@ -372,14 +381,13 @@ onMounted(() => {
 }
 
 .mode:focus-visible {
-  outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--focus-halo);
+  outline: solid 2px var(--accent);
+  outline-offset: 1px;
 }
 
 .mode.active {
   border-color: var(--accent);
-  background: var(--accent-soft);
+  background: var(--accentedBg);
 }
 
 .mode:disabled {
@@ -391,50 +399,53 @@ onMounted(() => {
   display: flex;
   align-items: center;
   flex: none;
-  gap: var(--space-8);
-  min-width: 92px;
-  font-weight: var(--weight-bold);
-  color: var(--text-strong);
+  gap: 8px;
+  min-inline-size: 92px;
+  font-weight: bold;
+  color: var(--fgHighlighted);
 }
 
 .mode-tag {
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  padding: 1px var(--space-8) 1px var(--space-6);
-  border-radius: var(--radius-full);
+  padding-block: 1px;
+  padding-inline: 6px 8px;
+  border-radius: 999px;
   background: var(--accent);
-  color: var(--text-on-accent);
-  font-size: var(--fs-2xs);
-  font-weight: var(--weight-bold);
+  color: var(--fgOnAccent);
+  font-size: 0.78em;
+  font-weight: bold;
 }
 
 .mode-tag .icon {
-  width: 0.9em;
-  height: 0.9em;
+  inline-size: 0.9em;
+  block-size: 0.9em;
 }
 
 .mode-desc {
   flex: 1;
-  min-width: 0;
-  font-size: var(--fs-sm);
-  color: var(--text-weak);
-  line-height: var(--leading-tight);
+  min-inline-size: 0;
+  font-size: 0.9em;
+  color: var(--fgTransparentWeak);
+  line-height: 1.4;
 }
 
-.settings-alert {
-  margin-bottom: var(--space-14);
+.notice-row,
+.callout-row {
+  margin-block-end: var(--margin);
 }
 
 .row-form {
   display: flex;
-  gap: var(--space-8);
-  margin-bottom: var(--space-14);
+  align-items: flex-end;
+  gap: 8px;
+  margin-block-end: var(--margin);
 }
 
-.row-form .input {
+.row-input {
   flex: 1;
-  min-width: 0;
+  min-inline-size: 0;
 }
 
 .dimmed {
@@ -443,69 +454,49 @@ onMounted(() => {
 
 .hosts {
   list-style: none;
-  margin: 0 0 var(--space-4);
+  margin: 0;
   padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-6);
 }
 
 .host {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-12);
-  padding: var(--space-8) var(--space-8) var(--space-8) var(--space-14);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--surface-inset);
+  gap: 12px;
+  padding-block: 8px;
+  border-block-start: solid 0.5px var(--hairline);
+}
+
+.host:first-child {
+  border-block-start: none;
 }
 
 .host-name {
-  font-weight: var(--weight-semibold);
+  font-weight: 600;
   overflow-wrap: anywhere;
 }
 
-.remove {
-  color: var(--danger);
-}
-
-.remove:hover:not(:disabled) {
-  border-color: var(--danger);
-  color: var(--danger);
-}
-
 .format-hint {
-  margin-top: var(--space-10);
+  margin-block-start: 10px;
 }
 
 code {
-  padding: 1px var(--space-4);
-  border-radius: var(--radius-xs);
-  background: var(--panel-2);
+  padding-block: 1px;
+  padding-inline: 4px;
+  border-radius: 4px;
+  background: var(--panelHighlight);
   font-size: 0.88em;
-}
-
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
 }
 
 @media (max-width: 620px) {
   .mode {
     flex-direction: column;
-    gap: var(--space-6);
+    gap: 6px;
   }
 
   .row-form {
     flex-direction: column;
+    align-items: stretch;
   }
 }
 </style>

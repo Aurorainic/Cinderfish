@@ -75,31 +75,36 @@ function onDeleted(_id: string): void {
 </template>
 
 <style scoped>
+/* Firefish's MkTab default variant: one equal-width button per option,
+   radius --radius, the selected one accent text on --accentedBg. */
 .tab {
 	display: flex;
-	gap: 4px;
-	margin-block: 8px 12px;
-	padding: 4px;
-	border-radius: var(--radius-md);
-	background: var(--surface-inset);
+	padding-block: 10px;
+	padding-inline: 8px;
+	font-size: 90%;
 }
 
 .tab-item {
 	flex: 1;
-	padding: 6px 12px;
+	margin-inline: 8px;
+	padding-block: 10px;
+	padding-inline: 8px;
 	border: 0;
-	border-radius: var(--radius-sm);
+	border-radius: var(--radius);
 	background: transparent;
-	color: var(--text-weak);
+	color: var(--fg);
 	font: inherit;
-	font-size: var(--fs-xs);
-	font-weight: var(--weight-semibold);
 	cursor: pointer;
+	transition: color 0.1s ease, background 0.1s ease;
+}
+
+.tab-item:hover {
+	color: var(--fgHighlighted);
+	background: var(--panelHighlight);
 }
 
 .tab-item.active {
-	background: var(--panel);
 	color: var(--accent);
-	box-shadow: var(--shadow-popover);
+	background: var(--accentedBg);
 }
 </style>

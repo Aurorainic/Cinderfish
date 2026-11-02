@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import AppIcon from "../../components/AppIcon.vue";
+import MkButton from "../../components/ui/MkButton.vue";
 import {
   MAX_MOBILE_NAV,
   NAV_ITEM_DEFS,
@@ -17,6 +18,7 @@ import {
   toggleMobileItem,
 } from "../../stores/nav";
 import SettingsPage from "./SettingsPage.vue";
+import SettingsSection from "./SettingsSection.vue";
 
 // Two lists share one editor: the rail on wide screens and the bottom bar on
 // narrow ones. Order is explicit up/down rather than drag, the same choice the
@@ -83,160 +85,142 @@ function toggle(target: Target, key: NavKey): void {
 
 <template>
   <SettingsPage>
-    <section class="card">
-      <h2 class="card-title">导航</h2>
-      <p class="muted small">
-        选择侧栏与底部栏里出现哪些入口、以什么顺序出现。设置只保存在这台设备上。
-      </p>
+    <p class="settings-hint">
+      选择侧栏与底部栏里出现哪些入口、以什么顺序出现。设置只保存在这台设备上。
+    </p>
 
-      <div class="section">
-        <h3 class="section-title">桌面侧栏</h3>
-        <ul class="rows">
-          <li v-for="(key, index) in desktopVisible" :key="key" class="row">
-            <span class="row-icon"><AppIcon :name="NAV_ITEM_DEFS[key].icon" /></span>
-            <span class="row-text">
-              <span class="row-label">{{ NAV_ITEM_DEFS[key].label }}</span>
-              <span class="row-desc">{{ descriptions[key] }}</span>
-            </span>
-            <span class="row-actions">
-              <button
-                type="button"
-                class="row-button"
-                title="上移"
-                aria-label="上移"
-                :disabled="index === 0"
-                @click="move('desktop', key, -1)"
-              >
-                <span class="arrow up"><AppIcon name="arrowLeft" /></span>
-              </button>
-              <button
-                type="button"
-                class="row-button"
-                title="下移"
-                aria-label="下移"
-                :disabled="index >= desktopVisible.length - 1"
-                @click="move('desktop', key, 1)"
-              >
-                <span class="arrow down"><AppIcon name="arrowLeft" /></span>
-              </button>
-              <button
-                type="button"
-                class="row-button danger"
-                title="隐藏"
-                aria-label="隐藏"
-                :disabled="desktopLocked"
-                @click="toggle('desktop', key)"
-              >
-                <AppIcon name="close" />
-              </button>
-            </span>
-          </li>
-        </ul>
+    <SettingsSection title="桌面侧栏" persist-key="settings-navigation-desktop">
+      <ul class="rows">
+        <li v-for="(key, index) in desktopVisible" :key="key" class="row">
+          <span class="row-icon"><AppIcon :name="NAV_ITEM_DEFS[key].icon" /></span>
+          <span class="row-text">
+            <span class="row-label">{{ NAV_ITEM_DEFS[key].label }}</span>
+            <span class="row-desc">{{ descriptions[key] }}</span>
+          </span>
+          <span class="row-actions">
+            <button
+              type="button"
+              class="row-button"
+              title="上移"
+              aria-label="上移"
+              :disabled="index === 0"
+              @click="move('desktop', key, -1)"
+            >
+              <span class="arrow up"><AppIcon name="arrowLeft" /></span>
+            </button>
+            <button
+              type="button"
+              class="row-button"
+              title="下移"
+              aria-label="下移"
+              :disabled="index >= desktopVisible.length - 1"
+              @click="move('desktop', key, 1)"
+            >
+              <span class="arrow down"><AppIcon name="arrowLeft" /></span>
+            </button>
+            <button
+              type="button"
+              class="row-button danger"
+              title="隐藏"
+              aria-label="隐藏"
+              :disabled="desktopLocked"
+              @click="toggle('desktop', key)"
+            >
+              <AppIcon name="close" />
+            </button>
+          </span>
+        </li>
+      </ul>
 
-        <div v-if="desktopHidden.length" class="hidden-row">
-          <span class="hidden-label">已隐藏</span>
-          <button
-            v-for="key in desktopHidden"
-            :key="key"
-            type="button"
-            class="chip"
-            :title="`显示${NAV_ITEM_DEFS[key].label}`"
-            @click="toggle('desktop', key)"
-          >
-            <AppIcon name="plus" />
-            {{ NAV_ITEM_DEFS[key].label }}
-          </button>
-        </div>
+      <div v-if="desktopHidden.length" class="hidden-row">
+        <span class="hidden-label">已隐藏</span>
+        <button
+          v-for="key in desktopHidden"
+          :key="key"
+          type="button"
+          class="chip"
+          :title="`显示${NAV_ITEM_DEFS[key].label}`"
+          @click="toggle('desktop', key)"
+        >
+          <AppIcon name="plus" />
+          {{ NAV_ITEM_DEFS[key].label }}
+        </button>
       </div>
+    </SettingsSection>
 
-      <div class="section">
-        <h3 class="section-title">移动底部栏</h3>
-        <p class="muted small">
-          窄屏下只显示这些入口，最多 {{ MAX_MOBILE_NAV }} 项。
-        </p>
-        <ul class="rows">
-          <li v-for="(key, index) in mobileVisible" :key="key" class="row">
-            <span class="row-icon"><AppIcon :name="NAV_ITEM_DEFS[key].icon" /></span>
-            <span class="row-text">
-              <span class="row-label">{{ NAV_ITEM_DEFS[key].label }}</span>
-              <span class="row-desc">{{ descriptions[key] }}</span>
-            </span>
-            <span class="row-actions">
-              <button
-                type="button"
-                class="row-button"
-                title="上移"
-                aria-label="上移"
-                :disabled="index === 0"
-                @click="move('mobile', key, -1)"
-              >
-                <span class="arrow up"><AppIcon name="arrowLeft" /></span>
-              </button>
-              <button
-                type="button"
-                class="row-button"
-                title="下移"
-                aria-label="下移"
-                :disabled="index >= mobileVisible.length - 1"
-                @click="move('mobile', key, 1)"
-              >
-                <span class="arrow down"><AppIcon name="arrowLeft" /></span>
-              </button>
-              <button
-                type="button"
-                class="row-button danger"
-                title="隐藏"
-                aria-label="隐藏"
-                :disabled="mobileLocked"
-                @click="toggle('mobile', key)"
-              >
-                <AppIcon name="close" />
-              </button>
-            </span>
-          </li>
-        </ul>
+    <SettingsSection title="移动底部栏" persist-key="settings-navigation-mobile">
+      <p class="settings-hint">窄屏下只显示这些入口，最多 {{ MAX_MOBILE_NAV }} 项。</p>
+      <ul class="rows">
+        <li v-for="(key, index) in mobileVisible" :key="key" class="row">
+          <span class="row-icon"><AppIcon :name="NAV_ITEM_DEFS[key].icon" /></span>
+          <span class="row-text">
+            <span class="row-label">{{ NAV_ITEM_DEFS[key].label }}</span>
+            <span class="row-desc">{{ descriptions[key] }}</span>
+          </span>
+          <span class="row-actions">
+            <button
+              type="button"
+              class="row-button"
+              title="上移"
+              aria-label="上移"
+              :disabled="index === 0"
+              @click="move('mobile', key, -1)"
+            >
+              <span class="arrow up"><AppIcon name="arrowLeft" /></span>
+            </button>
+            <button
+              type="button"
+              class="row-button"
+              title="下移"
+              aria-label="下移"
+              :disabled="index >= mobileVisible.length - 1"
+              @click="move('mobile', key, 1)"
+            >
+              <span class="arrow down"><AppIcon name="arrowLeft" /></span>
+            </button>
+            <button
+              type="button"
+              class="row-button danger"
+              title="隐藏"
+              aria-label="隐藏"
+              :disabled="mobileLocked"
+              @click="toggle('mobile', key)"
+            >
+              <AppIcon name="close" />
+            </button>
+          </span>
+        </li>
+      </ul>
 
-        <div v-if="mobileHidden.length" class="hidden-row">
-          <span class="hidden-label">已隐藏</span>
-          <button
-            v-for="key in mobileHidden"
-            :key="key"
-            type="button"
-            class="chip"
-            :disabled="mobileFull"
-            :title="mobileFull ? `最多 ${MAX_MOBILE_NAV} 项` : `显示${NAV_ITEM_DEFS[key].label}`"
-            @click="toggle('mobile', key)"
-          >
-            <AppIcon name="plus" />
-            {{ NAV_ITEM_DEFS[key].label }}
-          </button>
-        </div>
+      <div v-if="mobileHidden.length" class="hidden-row">
+        <span class="hidden-label">已隐藏</span>
+        <button
+          v-for="key in mobileHidden"
+          :key="key"
+          type="button"
+          class="chip"
+          :disabled="mobileFull"
+          :title="mobileFull ? `最多 ${MAX_MOBILE_NAV} 项` : `显示${NAV_ITEM_DEFS[key].label}`"
+          @click="toggle('mobile', key)"
+        >
+          <AppIcon name="plus" />
+          {{ NAV_ITEM_DEFS[key].label }}
+        </button>
       </div>
+    </SettingsSection>
 
-      <button type="button" class="button ghost small reset" @click="resetNav">恢复默认</button>
-    </section>
+    <div class="settings-actions">
+      <MkButton inline @click="resetNav">恢复默认</MkButton>
+    </div>
   </SettingsPage>
 </template>
 
 <style scoped>
-.section {
-  margin-top: var(--space-16);
-  padding-top: var(--space-14);
-  border-top: 1px solid var(--divider);
-}
-
-.section-title {
-  margin-bottom: var(--space-8);
-  color: var(--text-strong);
-  font-size: var(--fs-sm);
-  font-weight: var(--weight-bold);
-}
-
 .rows {
   display: flex;
   flex-direction: column;
-  gap: var(--space-6);
-  margin: var(--space-10) 0 0;
+  gap: 6px;
+  margin: 0;
   padding: 0;
   list-style: none;
 }
@@ -247,8 +231,8 @@ function toggle(target: Target, key: NavKey): void {
   gap: var(--space-10);
   padding: var(--space-8) var(--space-10);
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--panel-2);
+  border-radius: var(--radius);
+  background: var(--panelHighlight);
 }
 
 .row-icon {
@@ -271,16 +255,16 @@ function toggle(target: Target, key: NavKey): void {
 }
 
 .row-label {
-  color: var(--text-strong);
-  font-size: var(--fs-sm);
-  font-weight: var(--weight-semibold);
+  color: var(--fgHighlighted);
+  font-size: 0.9em;
+  font-weight: 600;
   line-height: 1.35;
 }
 
 .row-desc {
   overflow: hidden;
-  color: var(--text-weak);
-  font-size: var(--fs-2xs);
+  color: var(--fgTransparentWeak);
+  font-size: 0.78em;
   line-height: 1.35;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -289,7 +273,7 @@ function toggle(target: Target, key: NavKey): void {
 .row-actions {
   display: flex;
   flex: none;
-  gap: var(--space-2);
+  gap: 2px;
 }
 
 .row-button {
@@ -299,25 +283,24 @@ function toggle(target: Target, key: NavKey): void {
   height: 26px;
   padding: 0;
   border: 1px solid transparent;
-  border-radius: var(--radius-sm);
+  border-radius: 6px;
   background: transparent;
-  color: var(--text-weak);
+  color: var(--fgTransparentWeak);
   cursor: pointer;
-  transition: color var(--dur-base) ease, border-color var(--dur-base) ease,
-    opacity var(--dur-base) ease;
+  transition: color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
 }
 
 .row-button:hover:not(:disabled) {
-  border-color: var(--border);
+  border-color: var(--divider);
   color: var(--accent);
 }
 
 .row-button.danger:hover:not(:disabled) {
-  color: var(--danger);
+  color: var(--error);
 }
 
 .row-button:focus-visible {
-  outline: var(--focus-outline);
+  outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
 
@@ -347,30 +330,29 @@ function toggle(target: Target, key: NavKey): void {
 .hidden-row {
   display: flex;
   align-items: center;
-  gap: var(--space-6);
+  gap: 6px;
   flex-wrap: wrap;
-  margin-top: var(--space-10);
 }
 
 .hidden-label {
-  color: var(--text-faint);
-  font-size: var(--fs-2xs);
-  font-weight: var(--weight-semibold);
+  color: var(--fgTransparentWeak);
+  font-size: 0.78em;
+  font-weight: 600;
 }
 
 .chip {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-4);
-  padding: var(--space-4) var(--space-10);
-  border: 1px dashed var(--border);
+  gap: 4px;
+  padding: 4px var(--space-10);
+  border: 1px dashed var(--divider);
   border-radius: var(--radius-full);
   background: transparent;
-  color: var(--text-weak);
-  font-size: var(--fs-xs);
-  font-weight: var(--weight-semibold);
+  color: var(--fgTransparentWeak);
+  font-size: 0.8em;
+  font-weight: 600;
   cursor: pointer;
-  transition: color var(--dur-base) ease, border-color var(--dur-base) ease;
+  transition: color 0.15s ease, border-color 0.15s ease;
 }
 
 .chip:hover:not(:disabled) {
@@ -386,9 +368,5 @@ function toggle(target: Target, key: NavKey): void {
 .chip .icon {
   width: 12px;
   height: 12px;
-}
-
-.reset {
-  margin-top: var(--space-16);
 }
 </style>

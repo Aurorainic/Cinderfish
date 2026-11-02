@@ -4,6 +4,9 @@ import { streaming } from "../../stores/streaming";
 import type { Note } from "../../api/types";
 import { applyNoteUpdate } from "../../stores/note-updates";
 import { session } from "../../stores/session";
+import MkError from "./MkError.vue";
+import MkInfo from "./MkInfo.vue";
+import MkLoading from "./MkLoading.vue";
 
 const notesById = new Map<string, Note>();
 
@@ -362,7 +365,8 @@ defineExpose({ refresh, remove });
 
 <template>
   <div ref="root" class="paged-feed">
-    <p v-if="error" class="notice error">{{ error }}</p>
+    <MkError v-if="error && !items.length" @retry="load" />
+    <MkInfo v-else-if="error" warn>{{ error }}</MkInfo>
 
     <div v-if="pendingCount" class="pill-row">
       <button type="button" class="new-pill" @click="flushPending">
@@ -370,9 +374,7 @@ defineExpose({ refresh, remove });
       </button>
     </div>
 
-    <div v-if="loading && !items.length" class="skeleton-list">
-      <div v-for="i in 3" :key="i" class="skeleton"></div>
-    </div>
+    <MkLoading v-if="loading && !items.length" />
 
     <template v-else>
       <template v-for="row in rows" :key="row.key">
@@ -380,13 +382,17 @@ defineExpose({ refresh, remove });
         <slot v-else name="item" :item="row.item" />
       </template>
 
-      <div v-if="!rows.length && !error" class="placeholder">
-        <slot name="empty">这里还没有内容。</slot>
+      <div v-if="!rows.length && !error" class="empty">
+        <slot name="empty">
+          <div class="_fullinfo empty-placeholder">
+            <p>这里还没有内容。</p>
+          </div>
+        </slot>
       </div>
     </template>
 
     <div v-if="hasMore" ref="sentinel" class="sentinel">
-      <span v-if="loadingMore" class="muted small">加载中…</span>
+      <MkLoading v-if="loadingMore" mini />
     </div>
   </div>
 </template>
@@ -403,68 +409,56 @@ defineExpose({ refresh, remove });
   justify-content: center;
 }
 
+/* Firefish's "new notes" pill (MkTimeline .new > button): accented background,
+   accent text, fully rounded. */
 .new-pill {
-  padding: 6px 18px;
-  border: 1px solid var(--accent);
-  border-radius: var(--radius);
-  background: var(--accent-soft);
+  padding-block: 0.5em;
+  padding-inline: 1.2em;
+  border: 0;
+  border-radius: 2em;
+  background: var(--accentedBg);
   color: var(--accent);
-  font-weight: 700;
+  font: inherit;
+  font-weight: bold;
   cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease;
+  pointer-events: all;
 }
 
 .new-pill:hover,
 .new-pill:focus-visible {
   background: var(--accent);
-  color: var(--on-accent);
+  color: var(--fgOnAccent);
 }
 
+/* Same label as MkDateSeparatedList: flat 12px text, no divider lines. */
 .date-sep {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin: 4px 0;
-  color: var(--muted);
-  font-size: 0.78rem;
+  margin: 0;
+  padding-inline: 16px;
+  font-size: 12px;
+  line-height: 32px;
+  text-align: center;
+  color: var(--dateLabelFg, var(--fg));
   white-space: nowrap;
 }
 
-.date-sep::before,
-.date-sep::after {
-  content: "";
-  flex: 1;
-  height: 1px;
-  background: var(--border);
+.empty-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  color: var(--fgTransparentWeak);
+}
+
+.empty-placeholder > p {
+  margin: 0;
+  font-size: 0.95em;
+  line-height: 1.5;
 }
 
 .sentinel {
   display: flex;
   justify-content: center;
-  padding: 8px 0;
-  min-height: 16px;
-}
-
-.skeleton-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.skeleton {
-  height: 120px;
-  border-radius: var(--radius-lg);
-  background: linear-gradient(90deg, var(--panel) 25%, var(--panel-2) 50%, var(--panel) 75%);
-  background-size: 200% 100%;
-  animation: shimmer 1.4s infinite linear;
-}
-
-@keyframes shimmer {
-  from {
-    background-position: 200% 0;
-  }
-  to {
-    background-position: -200% 0;
-  }
+  padding-block: 8px;
+  min-block-size: 16px;
 }
 </style>

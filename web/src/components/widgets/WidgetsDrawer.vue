@@ -127,16 +127,17 @@ onBeforeUnmount(() => {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 9px 14px;
-  border: 1px solid var(--border);
+  padding-block: 9px;
+  padding-inline: 14px;
+  border: solid 0.5px var(--divider);
   border-radius: 999px;
-  background: var(--bg-raised);
-  box-shadow: var(--shadow-sm);
-  color: var(--text);
-  font-size: 0.82rem;
+  background: var(--panel);
+  box-shadow: 0 4px 16px var(--shadow);
+  color: var(--fg);
+  font-size: 0.85em;
   font-weight: 600;
   cursor: pointer;
-  transition: color 0.15s ease, border-color 0.15s ease;
+  transition: color 0.1s ease, border-color 0.1s ease;
 }
 
 .widget-fab:hover {
@@ -145,8 +146,8 @@ onBeforeUnmount(() => {
 }
 
 .widget-fab .icon {
-  width: 16px;
-  height: 16px;
+  inline-size: 16px;
+  block-size: 16px;
 }
 
 .widget-drawer {
@@ -160,7 +161,7 @@ onBeforeUnmount(() => {
 .backdrop {
   position: absolute;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: var(--modalBg);
 }
 
 .panel {
@@ -169,8 +170,8 @@ onBeforeUnmount(() => {
   flex-direction: column;
   width: min(320px, 100vw - 48px);
   height: 100dvh;
-  background: var(--bg-raised);
-  border-left: 1px solid var(--border);
+  background: var(--panel);
+  border-inline-start: solid 0.5px var(--divider);
   outline: none;
 }
 
@@ -178,33 +179,34 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 12px 14px;
-  border-bottom: 1px solid var(--divider);
+  padding-block: 12px;
+  padding-inline: 14px;
+  border-block-end: solid 0.5px var(--divider);
 }
 
 .panel-head h2 {
-  font-size: 1rem;
+  font-size: 1em;
 }
 
 .panel-actions {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-left: auto;
+  margin-inline-start: auto;
 }
 
 .panel-close {
   display: grid;
   place-items: center;
-  width: 30px;
-  height: 30px;
+  inline-size: 30px;
+  block-size: 30px;
   padding: 0;
-  border: 1px solid var(--border);
+  border: solid 0.5px var(--divider);
   border-radius: 50%;
-  background: transparent;
-  color: var(--muted);
+  background: none;
+  color: var(--fgTransparentWeak);
   cursor: pointer;
-  transition: color 0.15s ease, border-color 0.15s ease;
+  transition: color 0.1s ease, border-color 0.1s ease;
 }
 
 .panel-close:hover {
@@ -212,9 +214,14 @@ onBeforeUnmount(() => {
   border-color: var(--accent);
 }
 
+.panel-close:focus-visible {
+  outline: solid 2px var(--accent);
+  outline-offset: 2px;
+}
+
 .panel-close .icon {
-  width: 15px;
-  height: 15px;
+  inline-size: 15px;
+  block-size: 15px;
 }
 
 .panel-body {

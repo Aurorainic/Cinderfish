@@ -10,12 +10,12 @@
 import { computed, ref, watch } from "vue";
 import { api, ApiError } from "../../api/client";
 import MkButton from "../../components/ui/MkButton.vue";
-import MkFolder from "../../components/ui/MkFolder.vue";
 import MkInfo from "../../components/ui/MkInfo.vue";
 import UserAvatar from "../../components/UserAvatar.vue";
 import { i18n } from "../../i18n";
 import { session, updateAccount } from "../../stores/session";
 import SettingsPage from "./SettingsPage.vue";
+import SettingsSection from "./SettingsSection.vue";
 
 const me = computed(() => session.me);
 
@@ -146,27 +146,26 @@ watch(
 
 <template>
 	<SettingsPage>
-		<div v-if="!me" class="card signin-gate">
-			<h2 class="card-title">需要登录</h2>
-			<p class="muted small">登录之后才会显示账户相关的设置。</p>
-			<div class="gate-actions">
-				<RouterLink to="/login" class="button small">登录</RouterLink>
-				<RouterLink to="/signup" class="button ghost small">注册</RouterLink>
+		<div v-if="!me" class="_panel gate-panel">
+			<h2 class="gate-title">需要登录</h2>
+			<p class="settings-hint">登录之后才会显示账户相关的设置。</p>
+			<div class="settings-actions">
+				<MkButton link to="/login" primary inline>登录</MkButton>
+				<MkButton link to="/signup" inline>注册</MkButton>
 			</div>
 		</div>
 
 		<template v-else>
-			<MkInfo v-if="profileSaved" class="saved">{{ i18n.ts.saved }}</MkInfo>
+			<MkInfo v-if="profileSaved">{{ i18n.ts.saved }}</MkInfo>
 
-			<section class="card">
-				<h2 class="card-title">头像</h2>
-				<p class="muted small">
+			<SettingsSection title="头像" persist-key="settings-profile-avatar">
+				<p class="settings-hint">
 					头像会显示在个人页与每条笔记的头部。横幅图片暂不可编辑：服务器还没有开放对应字段。
 				</p>
 				<div class="avatar-row">
 					<UserAvatar :user="me" :size="72" />
 					<div class="avatar-actions">
-						<label class="button ghost small upload-button">
+						<label class="upload-button">
 							<input type="file" accept="image/*" class="file-input" @change="onAvatarPicked" />
 							{{ avatarBusy ? i18n.ts.uploading : me.avatarUrl ? "更换头像" : i18n.ts._profile.changeAvatar }}
 						</label>
@@ -175,12 +174,11 @@ watch(
 						</MkButton>
 					</div>
 				</div>
-			</section>
+			</SettingsSection>
 
-			<section class="card">
-				<h2 class="card-title">{{ i18n.ts._profile.name }}</h2>
+			<SettingsSection title="昵称" persist-key="settings-profile-name">
 				<div class="field">
-					<label for="profile-name">
+					<label for="profile-name" class="field-head">
 						<span class="sr-only">{{ i18n.ts._profile.name }}</span>
 						<span class="counter" :class="{ over: nameLength > MAX_NAME }">
 							{{ nameLength }}/{{ MAX_NAME }}
@@ -189,20 +187,19 @@ watch(
 					<input
 						id="profile-name"
 						v-model="profileName"
-						class="input"
+						class="text-input"
 						type="text"
 						:maxlength="MAX_NAME"
 						autocomplete="nickname"
 						:placeholder="i18n.ts._profile.name"
 					/>
 				</div>
-			</section>
+			</SettingsSection>
 
-			<section class="card">
-				<h2 class="card-title">{{ i18n.ts._profile.description }}</h2>
-				<p class="muted small">{{ i18n.ts._profile.youCanIncludeHashtags }}</p>
+			<SettingsSection title="简介" persist-key="settings-profile-description">
+				<p class="settings-hint">{{ i18n.ts._profile.youCanIncludeHashtags }}</p>
 				<div class="field">
-					<label for="profile-description">
+					<label for="profile-description" class="field-head">
 						<span class="sr-only">{{ i18n.ts._profile.description }}</span>
 						<span class="counter" :class="{ over: descriptionLength > MAX_DESCRIPTION }">
 							{{ descriptionLength }}/{{ MAX_DESCRIPTION }}
@@ -211,68 +208,66 @@ watch(
 					<textarea
 						id="profile-description"
 						v-model="profileDescription"
-						class="textarea"
+						class="text-input"
 						rows="5"
 						:maxlength="MAX_DESCRIPTION"
 						:placeholder="i18n.ts._profile.description"
 					></textarea>
 				</div>
 
-				<p v-if="profileError" class="notice error">{{ profileError }}</p>
+				<MkInfo v-if="profileError" warn>{{ profileError }}</MkInfo>
 
-				<div class="row-actions">
+				<div class="settings-actions">
 					<MkButton primary inline :disabled="!canSaveProfile" @click="saveProfile">
 						{{ profileSaving ? i18n.ts.processing : i18n.ts.save }}
 					</MkButton>
 					<MkButton inline :disabled="!profileDirty || profileSaving" @click="resetProfile">
 						还原
 					</MkButton>
-					<RouterLink :to="`/@${me.username}`" class="button ghost small view-link">
+					<MkButton link inline :to="`/@${me.username}`" class="view-link">
 						{{ i18n.ts.profile }}
-					</RouterLink>
+					</MkButton>
 				</div>
-			</section>
+			</SettingsSection>
 
-			<section class="card">
-				<h2 class="card-title">不可编辑</h2>
-				<MkFolder :expanded="false" persist-key="settings-profile-readonly">
-					<template #header>位置、生日、附加信息与账户类型</template>
-					<p class="muted small readonly-body">
-						服务器侧的个人资料写接口只接受昵称、简介和头像（i/update
-						字段白名单），位置、生日、附加信息与 isBot / isCat
-						标记暂时没有写路径，这里不做前端模拟。
-					</p>
-				</MkFolder>
-			</section>
+			<SettingsSection
+				title="不可编辑"
+				persist-key="settings-profile-readonly"
+				:expanded="false"
+			>
+				<p class="settings-hint">
+					服务器侧的个人资料写接口只接受昵称、简介和头像（i/update
+					字段白名单），位置、生日、附加信息与 isBot / isCat
+					标记暂时没有写路径，这里不做前端模拟。
+				</p>
+			</SettingsSection>
 		</template>
 	</SettingsPage>
 </template>
 
 <style scoped>
-.signin-gate h2 {
-	margin-block-end: var(--space-6);
-}
-
-.gate-actions {
+.gate-panel {
 	display: flex;
+	flex-direction: column;
 	gap: var(--space-8);
-	margin-top: var(--space-16);
+	padding: var(--margin);
 }
 
-.saved {
-	margin-block-end: var(--space-4);
+.gate-title {
+	margin: 0;
+	font-size: 1.1em;
 }
 
 .avatar-row {
 	display: flex;
 	align-items: center;
 	gap: var(--space-16);
-	margin-top: var(--space-14);
 	flex-wrap: wrap;
 }
 
 .avatar-actions {
 	display: flex;
+	align-items: center;
 	gap: var(--space-8);
 	flex-wrap: wrap;
 }
@@ -281,8 +276,24 @@ watch(
    through the label, so keyboard users still reach it. */
 .upload-button {
 	position: relative;
+	display: inline-flex;
+	align-items: center;
 	overflow: hidden;
+	padding: 6px 14px;
+	border: 1px solid var(--divider);
+	border-radius: var(--radius);
+	background: transparent;
+	color: inherit;
+	font-size: 0.9em;
+	font-weight: 600;
 	cursor: pointer;
+	transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.upload-button:hover,
+.upload-button:focus-within {
+	border-color: var(--accent);
+	color: var(--accent);
 }
 
 .file-input {
@@ -292,12 +303,13 @@ watch(
 	cursor: pointer;
 }
 
-.upload-button:focus-within {
-	border-color: var(--accent);
-	color: var(--accent);
+.field {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
 }
 
-.field label {
+.field-head {
 	display: flex;
 	align-items: baseline;
 	justify-content: space-between;
@@ -315,27 +327,33 @@ watch(
 
 .counter {
 	color: var(--text-weak);
-	font-size: var(--fs-xs);
+	font-size: 0.8em;
 	font-variant-numeric: tabular-nums;
 }
 
 .counter.over {
-	color: var(--danger);
+	color: var(--error);
 }
 
-.row-actions {
-	display: flex;
-	align-items: center;
-	gap: var(--space-8);
-	flex-wrap: wrap;
-	margin-top: var(--space-14);
+.text-input {
+	box-sizing: border-box;
+	inline-size: 100%;
+	padding: 8px 10px;
+	border: 1px solid var(--divider);
+	border-radius: var(--radius);
+	background: var(--panelHighlight);
+	color: var(--fg);
+	font: inherit;
+	line-height: 1.5;
+	resize: vertical;
+}
+
+.text-input:focus-visible {
+	outline: 2px solid var(--focus);
+	outline-offset: 1px;
 }
 
 .view-link {
 	margin-inline-start: auto;
-}
-
-.readonly-body {
-	margin: 0 0 var(--space-10);
 }
 </style>

@@ -80,7 +80,7 @@ watch(
 
 <template>
   <aside class="side">
-    <section class="side-card">
+    <section class="_panel side-card">
       <header class="side-head">
         <AppIcon name="image" />
         <h2>文件</h2>
@@ -104,10 +104,10 @@ watch(
           <img :src="photoUrl(photo.file)" :alt="photo.file.name" loading="lazy" />
         </RouterLink>
       </div>
-      <p v-else class="side-empty">还没有图片。</p>
+      <p v-else class="_caption side-empty">还没有图片。</p>
     </section>
 
-    <section class="side-card">
+    <section class="_panel side-card">
       <header class="side-head">
         <AppIcon name="feather" />
         <h2>动态</h2>
@@ -119,7 +119,7 @@ watch(
           <span class="activity-time">{{ relativeTime(note.createdAt) }}</span>
         </li>
       </ul>
-      <p v-else-if="!loading" class="side-empty">还没有动态。</p>
+      <p v-else-if="!loading" class="_caption side-empty">还没有动态。</p>
     </section>
   </aside>
 </template>
@@ -128,33 +128,30 @@ watch(
 .side {
   display: flex;
   flex-direction: column;
-  gap: var(--space-16);
+  gap: var(--margin);
   min-width: 0;
 }
 
 .side-card {
-  padding: var(--space-14);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  background: var(--panel);
+  padding: 14px;
   min-width: 0;
 }
 
 .side-head {
   display: flex;
   align-items: center;
-  gap: var(--space-6);
-  margin-bottom: var(--space-10);
-  color: var(--text-weak);
+  gap: 6px;
+  margin-block-end: 10px;
+  color: var(--fgTransparentWeak);
 }
 
 .side-head .icon {
-  width: 15px;
-  height: 15px;
+  inline-size: 15px;
+  block-size: 15px;
 }
 
 .side-head h2 {
-  font-size: var(--fs-xs);
+  font-size: 0.85em;
   font-weight: 700;
   letter-spacing: 0.04em;
 }
@@ -162,15 +159,15 @@ watch(
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
-  gap: var(--space-4);
+  gap: 4px;
 }
 
 .tile {
   display: block;
   aspect-ratio: 1;
   overflow: hidden;
-  border-radius: var(--radius-sm);
-  background: var(--surface-inset);
+  border-radius: 4px;
+  background: var(--panelHighlight);
 }
 
 .tile img {
@@ -182,12 +179,12 @@ watch(
 
 .tile:hover,
 .tile:focus-visible {
-  outline: var(--focus-outline);
+  outline: solid 2px var(--accent);
   outline-offset: -2px;
 }
 
 .skeleton {
-  background: linear-gradient(90deg, var(--panel-2) 25%, var(--surface-inset) 50%, var(--panel-2) 75%);
+  background: linear-gradient(90deg, var(--panelHighlight) 25%, var(--panel) 50%, var(--panelHighlight) 75%);
   background-size: 200% 100%;
   animation: shimmer 1.4s infinite linear;
 }
@@ -202,15 +199,15 @@ watch(
 }
 
 .side-empty {
-  color: var(--text-weak);
-  font-size: var(--fs-sm);
+  color: var(--fgTransparentWeak);
+  font-size: 0.9em;
 }
 
 .retry {
-  margin-inline-start: var(--space-8);
+  margin-inline-start: 8px;
   padding: 0;
   border: 0;
-  background: transparent;
+  background: none;
   color: var(--accent);
   font: inherit;
   font-weight: 600;
@@ -218,14 +215,14 @@ watch(
 }
 
 .retry:focus-visible {
-  outline: var(--focus-outline);
+  outline: solid 2px var(--accent);
   outline-offset: 2px;
 }
 
 .activity {
   display: flex;
   flex-direction: column;
-  gap: var(--space-8);
+  gap: 8px;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -234,13 +231,13 @@ watch(
 .activity-row {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: 2px;
   min-width: 0;
 }
 
 .activity-text {
-  color: var(--text);
-  font-size: var(--fs-sm);
+  color: var(--fg);
+  font-size: 0.9em;
   line-height: 1.4;
   overflow-wrap: anywhere;
 }
@@ -250,7 +247,7 @@ watch(
 }
 
 .activity-time {
-  color: var(--text-faint);
-  font-size: var(--fs-2xs);
+  color: var(--fgTransparent);
+  font-size: 0.8em;
 }
 </style>

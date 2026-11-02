@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import AppIcon from "../../components/AppIcon.vue";
+import MkButton from "../../components/ui/MkButton.vue";
 import { WIDGET_NAMES, WIDGETS, type WidgetName } from "../../widgets/registry";
 import { addWidget, moveWidget, removeWidget, resetWidgets, widgetStack } from "../../stores/widgets";
 import SettingsPage from "./SettingsPage.vue";
+import SettingsSection from "./SettingsSection.vue";
 
 // The widget column is an ordered list of one instance per widget: reorder here
 // with explicit buttons, add a missing one from the picker below the list.
@@ -24,9 +26,8 @@ function add(name: WidgetName): void {
 
 <template>
   <SettingsPage>
-    <section class="card">
-      <h2 class="card-title">小组件</h2>
-      <p class="muted small">
+    <SettingsSection title="小组件顺序" persist-key="settings-widgets-order">
+      <p class="settings-hint">
         小工具列按这里的顺序从上往下排列，只保存在这台设备上。窄屏时它们收进右侧的小组件抽屉。
       </p>
 
@@ -87,10 +88,12 @@ function add(name: WidgetName): void {
           {{ WIDGETS[name].label }}
         </button>
       </div>
-      <p v-else class="muted small adder-note">所有小组件都已添加。</p>
+      <p v-else class="settings-hint">所有小组件都已添加。</p>
+    </SettingsSection>
 
-      <button type="button" class="button ghost small reset" @click="resetWidgets">恢复默认</button>
-    </section>
+    <div class="settings-actions">
+      <MkButton inline @click="resetWidgets">恢复默认</MkButton>
+    </div>
   </SettingsPage>
 </template>
 
@@ -98,8 +101,8 @@ function add(name: WidgetName): void {
 .rows {
   display: flex;
   flex-direction: column;
-  gap: var(--space-6);
-  margin: var(--space-12) 0 0;
+  gap: 6px;
+  margin: 0;
   padding: 0;
   list-style: none;
 }
@@ -110,8 +113,8 @@ function add(name: WidgetName): void {
   gap: var(--space-10);
   padding: var(--space-8) var(--space-10);
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--panel-2);
+  border-radius: var(--radius);
+  background: var(--panelHighlight);
 }
 
 .row-icon {
@@ -134,16 +137,16 @@ function add(name: WidgetName): void {
 }
 
 .row-label {
-  color: var(--text-strong);
-  font-size: var(--fs-sm);
-  font-weight: var(--weight-semibold);
+  color: var(--fgHighlighted);
+  font-size: 0.9em;
+  font-weight: 600;
   line-height: 1.35;
 }
 
 .row-desc {
   overflow: hidden;
-  color: var(--text-weak);
-  font-size: var(--fs-2xs);
+  color: var(--fgTransparentWeak);
+  font-size: 0.78em;
   line-height: 1.35;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -152,7 +155,7 @@ function add(name: WidgetName): void {
 .row-actions {
   display: flex;
   flex: none;
-  gap: var(--space-2);
+  gap: 2px;
 }
 
 .row-button {
@@ -162,25 +165,24 @@ function add(name: WidgetName): void {
   height: 26px;
   padding: 0;
   border: 1px solid transparent;
-  border-radius: var(--radius-sm);
+  border-radius: 6px;
   background: transparent;
-  color: var(--text-weak);
+  color: var(--fgTransparentWeak);
   cursor: pointer;
-  transition: color var(--dur-base) ease, border-color var(--dur-base) ease,
-    opacity var(--dur-base) ease;
+  transition: color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
 }
 
 .row-button:hover:not(:disabled) {
-  border-color: var(--border);
+  border-color: var(--divider);
   color: var(--accent);
 }
 
 .row-button.danger:hover:not(:disabled) {
-  color: var(--danger);
+  color: var(--error);
 }
 
 .row-button:focus-visible {
-  outline: var(--focus-outline);
+  outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
 
@@ -208,48 +210,41 @@ function add(name: WidgetName): void {
 }
 
 .empty {
-  margin-top: var(--space-12);
+  margin: 0;
   padding: var(--space-16) var(--space-12);
-  border: 1px dashed var(--border);
-  border-radius: var(--radius-md);
-  color: var(--text-weak);
-  font-size: var(--fs-sm);
+  border: 1px dashed var(--divider);
+  border-radius: var(--radius);
+  color: var(--fgTransparentWeak);
+  font-size: 0.9em;
   text-align: center;
 }
 
 .adder {
   display: flex;
   align-items: center;
-  gap: var(--space-6);
+  gap: 6px;
   flex-wrap: wrap;
-  margin-top: var(--space-12);
-  padding-top: var(--space-12);
-  border-top: 1px solid var(--divider);
 }
 
 .adder-label {
-  color: var(--text-faint);
-  font-size: var(--fs-2xs);
-  font-weight: var(--weight-semibold);
-}
-
-.adder-note {
-  margin-top: var(--space-12);
+  color: var(--fgTransparentWeak);
+  font-size: 0.78em;
+  font-weight: 600;
 }
 
 .chip {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-4);
-  padding: var(--space-4) var(--space-10);
-  border: 1px dashed var(--border);
+  gap: 4px;
+  padding: 4px var(--space-10);
+  border: 1px dashed var(--divider);
   border-radius: var(--radius-full);
   background: transparent;
-  color: var(--text-weak);
-  font-size: var(--fs-xs);
-  font-weight: var(--weight-semibold);
+  color: var(--fgTransparentWeak);
+  font-size: 0.8em;
+  font-weight: 600;
   cursor: pointer;
-  transition: color var(--dur-base) ease, border-color var(--dur-base) ease;
+  transition: color 0.15s ease, border-color 0.15s ease;
 }
 
 .chip:hover {
@@ -258,16 +253,12 @@ function add(name: WidgetName): void {
 }
 
 .chip:focus-visible {
-  outline: var(--focus-outline);
+  outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
 
 .chip .icon {
   width: 12px;
   height: 12px;
-}
-
-.reset {
-  margin-top: var(--space-16);
 }
 </style>

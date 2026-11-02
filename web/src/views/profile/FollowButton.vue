@@ -97,7 +97,7 @@ async function onClick() {
 .follow-button {
 	display: inline-flex;
 	align-items: center;
-	font-weight: var(--weight-bold);
+	font-weight: bold;
 }
 
 .follow-button.full {

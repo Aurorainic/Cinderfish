@@ -3,6 +3,7 @@ import { computed } from "vue";
 import { useRoute } from "vue-router";
 import type { UserDetailed } from "../api/types";
 import UserAvatar from "./UserAvatar.vue";
+import MkButton from "./ui/MkButton.vue";
 import { NAV_ITEM_DEFS } from "../nav";
 
 const props = defineProps<{
@@ -26,7 +27,7 @@ const joinDate = computed(() => {
   if (Number.isNaN(d.getTime())) return "";
   return `${d.getFullYear()} 年 ${d.getMonth() + 1} 月加入`;
 });
-const loginTarget = computed(() => ({ path: "/login", query: { redirect: route.fullPath } }));
+const loginTarget = computed(() => `/login?redirect=${encodeURIComponent(route.fullPath)}`);
 
 function formatCount(n: number): string {
   return n.toLocaleString("zh-CN");
@@ -40,7 +41,7 @@ function toggleFollow() {
 </script>
 
 <template>
-  <section class="card profile">
+  <section class="_panel profile">
     <div class="banner">
       <img v-if="user.bannerUrl" :src="user.bannerUrl" alt="" />
     </div>
@@ -50,12 +51,10 @@ function toggleFollow() {
         <UserAvatar class="avatar" :user="user" :size="96" />
 
         <div class="actions">
-          <RouterLink v-if="isSelf" :to="NAV_ITEM_DEFS.settings.to" class="button ghost small">编辑资料</RouterLink>
-          <button
+          <MkButton v-if="isSelf" link :to="NAV_ITEM_DEFS.settings.to">编辑资料</MkButton>
+          <MkButton
             v-else-if="loggedIn"
-            type="button"
-            class="button small"
-            :class="{ ghost: following || pending }"
+            :primary="!following && !pending"
             :disabled="followBusy || pending"
             @click="toggleFollow"
           >
@@ -63,8 +62,8 @@ function toggleFollow() {
             <template v-else-if="pending">请求已发送</template>
             <template v-else-if="following">取消关注</template>
             <template v-else>关注</template>
-          </button>
-          <RouterLink v-else :to="loginTarget" class="button small">登录后关注</RouterLink>
+          </MkButton>
+          <MkButton v-else link :to="loginTarget">登录后关注</MkButton>
         </div>
       </div>
 
@@ -74,9 +73,9 @@ function toggleFollow() {
       </div>
 
       <p v-if="user.description" class="bio">{{ user.description }}</p>
-      <p v-else class="bio muted">还没有简介</p>
+      <p v-else class="bio empty">还没有简介</p>
 
-      <p v-if="joinDate" class="joined small muted">{{ joinDate }}</p>
+      <p v-if="joinDate" class="joined _caption">{{ joinDate }}</p>
 
       <div class="counters">
         <div class="counter">
@@ -106,8 +105,8 @@ function toggleFollow() {
 
 .banner {
   height: 108px;
-  background: var(--panel-2);
-  border-bottom: 1px solid var(--divider);
+  background: var(--panelHighlight);
+  border-block-end: solid 0.5px var(--divider);
 }
 
 .banner img {
@@ -118,7 +117,8 @@ function toggleFollow() {
 }
 
 .body {
-  padding: 0 20px 20px;
+  padding-block: 0 20px;
+  padding-inline: 20px;
 }
 
 .head {
@@ -127,21 +127,21 @@ function toggleFollow() {
   justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
-  margin-top: -40px;
-  margin-bottom: 12px;
+  margin-block-start: -40px;
+  margin-block-end: 12px;
 }
 
 .avatar {
   border: 3px solid var(--panel);
-  background: var(--panel-2);
+  background: var(--panelHighlight);
   border-radius: 50%;
 }
 
 .actions {
   display: flex;
   gap: 8px;
-  margin-left: auto;
-  padding-bottom: 4px;
+  margin-inline-start: auto;
+  padding-block-end: 4px;
 }
 
 .names {
@@ -152,33 +152,37 @@ function toggleFollow() {
 }
 
 .name {
-  font-size: 1.45rem;
+  font-size: 1.45em;
   overflow-wrap: anywhere;
 }
 
 .handle {
-  color: var(--muted);
-  font-size: 0.9rem;
+  color: var(--fgTransparentWeak);
+  font-size: 0.9em;
   overflow-wrap: anywhere;
 }
 
 .bio {
-  margin-top: 12px;
+  margin-block-start: 12px;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
 
+.bio.empty {
+  color: var(--fgTransparentWeak);
+}
+
 .joined {
-  margin-top: 8px;
+  margin-block-start: 8px;
 }
 
 .counters {
   display: flex;
   flex-wrap: wrap;
   gap: 22px;
-  margin-top: 16px;
-  padding-top: 14px;
-  border-top: 1px solid var(--border);
+  margin-block-start: 16px;
+  padding-block-start: 14px;
+  border-block-start: solid 0.5px var(--divider);
 }
 
 .counter {
@@ -189,30 +193,31 @@ function toggleFollow() {
 
 .counter .value {
   font-weight: 700;
-  color: var(--text-strong);
+  color: var(--fgHighlighted);
 }
 
 .counter .label {
-  font-size: 0.85rem;
-  color: var(--muted);
+  font-size: 0.9em;
+  color: var(--fgTransparentWeak);
 }
 
 .lists-note {
-  margin-top: 8px;
-  color: var(--text-faint);
-  font-size: 0.72rem;
+  margin-block-start: 8px;
+  color: var(--fgTransparent);
+  font-size: 0.8em;
   line-height: 1.5;
 }
 
 @media (max-width: 480px) {
   .body {
-    padding: 0 14px 16px;
+    padding-block: 0 16px;
+    padding-inline: 14px;
   }
   .banner {
     height: 88px;
   }
   .name {
-    font-size: 1.25rem;
+    font-size: 1.25em;
   }
   .counters {
     gap: 16px;

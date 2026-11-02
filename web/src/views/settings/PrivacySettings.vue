@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { computed, onMounted } from "vue";
+import MkInfo from "../../components/ui/MkInfo.vue";
 import { instance, loadInstance } from "../../stores/instance";
 import { session } from "../../stores/session";
 import SettingsPage from "./SettingsPage.vue";
+import SettingsSection from "./SettingsSection.vue";
 
 // Misskey spells the federation modes all / specified / none. The public and
 // allowlist spellings are accepted as aliases so a config change does not
@@ -42,21 +44,19 @@ onMounted(() => {
 
 <template>
   <SettingsPage>
-    <section class="card">
-      <h2 class="card-title">联邦</h2>
-      <p class="muted small">
+    <SettingsSection title="联邦" persist-key="settings-privacy-federation">
+      <p class="settings-hint">
         联邦模式由实例管理员在服务端配置，会同时影响你能看到的远端内容和远端实例能否投递到这里。
       </p>
       <div class="row">
         <span class="row-label">当前模式</span>
         <span class="value">{{ federation }}</span>
       </div>
-      <p v-if="instance.error" class="notice error">读取实例信息失败：{{ instance.error }}</p>
-    </section>
+      <MkInfo v-if="instance.error" warn>读取实例信息失败：{{ instance.error }}</MkInfo>
+    </SettingsSection>
 
-    <section v-if="me" class="card">
-      <h2 class="card-title">可见性</h2>
-      <p class="muted small">
+    <SettingsSection v-if="me" title="可见性" persist-key="settings-privacy-visibility">
+      <p class="settings-hint">
         当前取值来自服务器，网页端尚不能修改：关注者与关注中的列表权限需要在服务端或后续版本的设置接口里调整。
       </p>
       <div class="row">
@@ -67,11 +67,10 @@ onMounted(() => {
         <span class="row-label">关注中列表</span>
         <span class="value">{{ visibility(me.followingVisibility) }}</span>
       </div>
-    </section>
+    </SettingsSection>
 
-    <section class="card">
-      <h2 class="card-title">尚不可用</h2>
-      <p class="muted small">
+    <SettingsSection title="尚不可用" persist-key="settings-privacy-unavailable" :expanded="false">
+      <p class="settings-hint">
         以下能力服务器还没有提供接口，这里不做任何前端模拟，等接口落地后再开放：
       </p>
       <ul class="todo">
@@ -80,7 +79,7 @@ onMounted(() => {
         <li>保存默认笔记可见性（目前每条笔记在编辑框里单独选择）</li>
         <li>私信与仅指定用户可见的偏好</li>
       </ul>
-    </section>
+    </SettingsSection>
   </SettingsPage>
 </template>
 
@@ -89,35 +88,35 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: var(--space-12);
-  margin-top: var(--space-10);
   padding-top: var(--space-10);
   border-top: 1px solid var(--divider);
 }
 
 .row-label {
-  color: var(--text);
-  font-size: var(--fs-sm);
+  color: var(--fg);
+  font-size: 0.9em;
 }
 
 .value {
   margin-left: auto;
   padding: 1px var(--space-10);
-  border: 1px solid var(--border);
+  border: 1px solid var(--divider);
   border-radius: var(--radius-full);
-  background: var(--surface-inset);
-  color: var(--text-weak);
-  font-size: var(--fs-2xs);
-  font-weight: var(--weight-semibold);
+  background: var(--panelHighlight);
+  color: var(--fgTransparentWeak);
+  font-size: 0.72em;
+  font-weight: 600;
   white-space: nowrap;
 }
 
 .todo {
   display: flex;
   flex-direction: column;
-  gap: var(--space-6);
-  margin: var(--space-10) 0 0;
+  gap: 6px;
+  margin: 0;
   padding-left: var(--space-20);
-  color: var(--text-weak);
-  font-size: var(--fs-sm);
+  color: var(--fgTransparentWeak);
+  font-size: 0.9em;
+  line-height: 1.5;
 }
 </style>

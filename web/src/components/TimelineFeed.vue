@@ -13,11 +13,11 @@
 // - Streamed notes are prepended as-is; Firefish's withReplies/withRenotes
 //   client-side replay checks have no backend counterpart.
 <template>
-	<div v-if="needsAuth && !isLoggedIn" class="card placeholder">
-		<AppIcon name="globe" />
+	<div v-if="needsAuth && !isLoggedIn" class="_panel _fullinfo auth-gate">
+		<AppIcon class="ghost" name="globe" />
 		<h2>需要登录</h2>
-		<p class="small">这个频道只对已登录用户开放。</p>
-		<RouterLink to="/login" class="button small">登录</RouterLink>
+		<p>这个频道只对已登录用户开放。</p>
+		<MkButton link to="/login" primary>登录</MkButton>
 	</div>
 
 	<div v-else class="timeline-feed">
@@ -52,9 +52,9 @@
 				</MkDateSeparatedList>
 			</template>
 			<template #empty>
-				<div class="placeholder">
-					<AppIcon name="feather" />
-					<span>这里还没有笔记。</span>
+				<div class="_fullinfo empty-placeholder">
+					<AppIcon class="ghost" name="feather" />
+					<p>这里还没有笔记。</p>
 				</div>
 			</template>
 		</MkPagination>
@@ -69,6 +69,7 @@ import { isLoggedIn } from "../stores/session";
 import { defaultStore } from "../store/firefish-store";
 import { useChannel } from "../stores/streaming";
 import AppIcon from "./AppIcon.vue";
+import MkButton from "./ui/MkButton.vue";
 import PostForm from "./composer/PostForm.vue";
 import MkDateSeparatedList from "./ui/MkDateSeparatedList.vue";
 import MkPagination from "./ui/MkPagination.vue";
@@ -211,5 +212,55 @@ function scrollTop() {
 /* Borderless rows carry their own hairline, so they must not be spaced. */
 .timeline-feed :deep(.cinderfish-date-separated-list.noGap) {
 	gap: 0;
+}
+
+/* Firefish's empty state (MkPagination's _fullinfo slot): the muted badge and
+   its label sit centred in the column instead of hugging the top-left. */
+.empty-placeholder {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 12px;
+	color: var(--fgTransparentWeak);
+}
+
+.empty-placeholder > .ghost {
+	inline-size: 64px;
+	block-size: 64px;
+	opacity: 0.45;
+}
+
+.empty-placeholder > p {
+	margin: 0;
+	font-size: 0.95em;
+	line-height: 1.5;
+}
+
+/* Firefish's unauthenticated state uses the same centred badge and label as
+   its empty state; the panel only appears when the feed has nothing else. */
+.auth-gate {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 12px;
+	color: var(--fgTransparentWeak);
+}
+
+.auth-gate > .ghost {
+	inline-size: 64px;
+	block-size: 64px;
+	opacity: 0.45;
+}
+
+.auth-gate > h2 {
+	margin: 0;
+	font-size: 1.05em;
+	color: var(--fg);
+}
+
+.auth-gate > p {
+	margin: 0;
+	font-size: 0.95em;
+	line-height: 1.5;
 }
 </style>

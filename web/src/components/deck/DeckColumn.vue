@@ -19,6 +19,7 @@ import type { MenuItem } from "../../types/menu";
 import AppIcon from "../AppIcon.vue";
 import NotificationItem from "../NotificationItem.vue";
 import TimelineFeed from "../TimelineFeed.vue";
+import MkButton from "../ui/MkButton.vue";
 import PagedFeed from "../ui/PagedFeed.vue";
 import WidgetStack from "../widgets/WidgetStack.vue";
 import { interceptDeckClick } from "./deck-links";
@@ -132,12 +133,17 @@ function openMenu(): void {
           <template #item="{ item }">
             <NotificationItem :notification="(item as Notification)" class="row" />
           </template>
-          <template #empty>还没有通知。</template>
+          <template #empty>
+            <div class="_fullinfo empty-placeholder">
+              <p>还没有通知。</p>
+            </div>
+          </template>
         </PagedFeed>
-        <div v-else class="placeholder">
-          <AppIcon name="bell" />
-          <span>登录后可以查看通知。</span>
-          <RouterLink to="/login" class="button small">登录</RouterLink>
+        <div v-else class="_fullinfo auth-gate">
+          <AppIcon class="ghost" name="bell" />
+          <h2>需要登录</h2>
+          <p>登录后可以查看通知。</p>
+          <MkButton link to="/login" primary>登录</MkButton>
         </div>
       </template>
 
@@ -145,22 +151,12 @@ function openMenu(): void {
 
       <template v-else>
         <nav class="scope" aria-label="探索范围">
-          <button
-            type="button"
-            class="scope-button"
-            :class="{ active: exploreScope === 'local' }"
-            @click="exploreScope = 'local'"
-          >
+          <MkButton chip :primary="exploreScope === 'local'" @click="exploreScope = 'local'">
             本地
-          </button>
-          <button
-            type="button"
-            class="scope-button"
-            :class="{ active: exploreScope === 'global' }"
-            @click="exploreScope = 'global'"
-          >
+          </MkButton>
+          <MkButton chip :primary="exploreScope === 'global'" @click="exploreScope = 'global'">
             全球
-          </button>
+          </MkButton>
         </nav>
         <TimelineFeed :key="exploreScope" :source="exploreScope" :composer="false" />
       </template>
@@ -179,20 +175,25 @@ function openMenu(): void {
   flex: 0 0 var(--column-width, 350px);
   min-width: 0;
   height: 100%;
-  background: var(--bg-raised);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
+  background: var(--panel);
+  border: solid 0.5px var(--divider);
+  border-radius: var(--radius);
   overflow: hidden;
   scroll-snap-align: start;
 }
 
+/* Firefish's deck header: one 42px row on panelHeaderBg, title at .9em, the
+   menu button reaching the column edge. */
 .col-head {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 10px 10px 14px;
-  border-bottom: 1px solid var(--border);
-  background: var(--panel-2);
+  padding-inline: 16px;
+  block-size: 42px;
+  font-size: 0.9em;
+  color: var(--panelHeaderFg);
+  background: var(--panelHeaderBg);
+  border-block-end: solid 0.5px var(--panelHeaderDivider);
   flex: none;
 }
 
@@ -204,9 +205,9 @@ function openMenu(): void {
 .col-title {
   flex: 1;
   min-width: 0;
-  font-size: 0.95rem;
+  font-size: 1em;
   font-weight: 700;
-  color: var(--text-strong);
+  color: var(--fgHighlighted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -216,25 +217,24 @@ function openMenu(): void {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  height: 30px;
+  inline-size: 42px;
+  block-size: 42px;
+  margin-inline-end: -16px;
   padding: 0;
   border: 0;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--muted);
+  background: none;
+  color: var(--fgTransparentWeak);
   cursor: pointer;
 }
 
 .col-menu-button:hover,
 .col-menu-button[aria-expanded="true"] {
-  background: var(--panel-2);
-  color: var(--text);
+  color: var(--fgHighlighted);
 }
 
 .col-menu-button:focus-visible {
-  outline: var(--focus-outline);
-  outline-offset: 2px;
+  outline: solid 2px var(--accent);
+  outline-offset: -2px;
 }
 
 /* The feed scrolls inside the column, so the column keeps its header in view
@@ -249,41 +249,61 @@ function openMenu(): void {
 
 /* Feeds own their own row padding; the widget stack does not. */
 .col-body--widgets {
-  padding: var(--space-12);
+  padding: var(--margin);
 }
 
 .scope {
   display: flex;
   gap: 4px;
-  padding: 8px 10px;
-  border-bottom: 1px solid var(--divider);
+  padding-block: 8px;
+  padding-inline: 10px;
+  border-block-end: solid 0.5px var(--divider);
   position: sticky;
   top: 0;
   z-index: 1;
-  background: var(--bg-raised);
+  background: var(--panel);
 }
 
-.scope-button {
-  padding: 5px 14px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--muted);
-  font: inherit;
-  font-size: 0.82rem;
-  font-weight: 600;
-  cursor: pointer;
+/* Firefish's unauthenticated deck column: the same centred badge and label as
+   the page-level gate, inside the column's own scroll body. */
+.auth-gate {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  color: var(--fgTransparentWeak);
 }
 
-.scope-button.active {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--on-accent);
+.auth-gate > .ghost {
+  inline-size: 48px;
+  block-size: 48px;
+  opacity: 0.45;
 }
 
-.scope-button:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
+.auth-gate > h2 {
+  margin: 0;
+  font-size: 1.05em;
+  color: var(--fg);
+}
+
+.auth-gate > p {
+  margin: 0;
+  font-size: 0.95em;
+  line-height: 1.5;
+}
+
+.empty-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  color: var(--fgTransparentWeak);
+}
+
+.empty-placeholder > p {
+  margin: 0;
+  font-size: 0.95em;
+  line-height: 1.5;
 }
 
 /* Below 840px one column owns the strip: the reader flips between columns with

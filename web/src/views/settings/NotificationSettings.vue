@@ -2,9 +2,12 @@
 import { computed, ref } from "vue";
 import { api, ApiError } from "../../api/client";
 import AppIcon from "../../components/AppIcon.vue";
+import MkButton from "../../components/ui/MkButton.vue";
+import MkInfo from "../../components/ui/MkInfo.vue";
 import { session } from "../../stores/session";
 import { setUnreadNotifications, streamState, unreadNotifications } from "../../stores/streaming";
 import SettingsPage from "./SettingsPage.vue";
+import SettingsSection from "./SettingsSection.vue";
 
 const me = computed(() => session.me);
 const marking = ref(false);
@@ -50,24 +53,23 @@ async function markAllRead() {
 
 <template>
   <SettingsPage>
-    <div v-if="!me" class="card">
-      <h2 class="card-title">需要登录</h2>
-      <p class="muted small">登录之后才会显示通知相关的设置。</p>
-      <div class="gate-actions">
-        <RouterLink to="/login" class="button small">登录</RouterLink>
-        <RouterLink to="/signup" class="button ghost small">注册</RouterLink>
+    <div v-if="!me" class="_panel gate-panel">
+      <h2 class="gate-title">需要登录</h2>
+      <p class="settings-hint">登录之后才会显示通知相关的设置。</p>
+      <div class="settings-actions">
+        <MkButton link to="/login" primary inline>登录</MkButton>
+        <MkButton link to="/signup" inline>注册</MkButton>
       </div>
     </div>
 
     <template v-else>
-      <section class="card">
-        <h2 class="card-title">通知</h2>
-        <p class="muted small">
+      <SettingsSection title="已读状态" persist-key="settings-notifications-read">
+        <p class="settings-hint">
           通知的类型筛选在通知页顶部；服务器暂未提供保存通知偏好的接口，因此这里只保留已读状态的操作。
         </p>
 
-        <p v-if="error" class="notice error">{{ error }}</p>
-        <p v-if="done" class="notice info">已全部标为已读</p>
+        <MkInfo v-if="error" warn>{{ error }}</MkInfo>
+        <MkInfo v-if="done">已全部标为已读</MkInfo>
 
         <div class="row">
           <div class="row-text">
@@ -76,21 +78,20 @@ async function markAllRead() {
               {{ unreadNotifications ? `${unreadNotifications} 条未读` : "没有未读通知" }}
             </span>
           </div>
-          <button
-            type="button"
-            class="button ghost small"
+          <MkButton
+            class="action"
+            inline
             :disabled="marking || unreadNotifications === 0"
             @click="markAllRead"
           >
             <AppIcon name="check" />
             {{ marking ? "处理中…" : "全部标为已读" }}
-          </button>
+          </MkButton>
         </div>
-      </section>
+      </SettingsSection>
 
-      <section class="card">
-        <h2 class="card-title">实时连接</h2>
-        <p class="muted small">
+      <SettingsSection title="实时连接" persist-key="settings-notifications-stream">
+        <p class="settings-hint">
           新通知通过服务器推送到达，不轮询。连接状态由外壳自动维护，无需手动设置。
         </p>
         <div class="row">
@@ -100,24 +101,29 @@ async function markAllRead() {
           </div>
           <span class="status" :class="{ live: streamState === 'open' }">{{ connectionLabel }}</span>
         </div>
-      </section>
+      </SettingsSection>
     </template>
   </SettingsPage>
 </template>
 
 <style scoped>
-.gate-actions {
+.gate-panel {
   display: flex;
+  flex-direction: column;
   gap: var(--space-8);
-  margin-top: var(--space-16);
+  padding: var(--margin);
+}
+
+.gate-title {
+  margin: 0;
+  font-size: 1.1em;
 }
 
 .row {
   display: flex;
   align-items: center;
   gap: var(--space-12);
-  margin-top: var(--space-12);
-  padding-top: var(--space-12);
+  padding-top: var(--space-10);
   border-top: 1px solid var(--divider);
 }
 
@@ -128,41 +134,42 @@ async function markAllRead() {
 }
 
 .row-label {
-  color: var(--text-strong);
-  font-size: var(--fs-sm);
-  font-weight: var(--weight-semibold);
+  color: var(--fgHighlighted);
+  font-size: 0.9em;
+  font-weight: 600;
 }
 
 .row-desc {
-  color: var(--text-weak);
-  font-size: var(--fs-xs);
+  color: var(--fgTransparentWeak);
+  font-size: 0.8em;
 }
 
-.row .button {
-  margin-left: auto;
+.action {
   flex: none;
+  margin-inline-start: auto;
 }
 
-.row .button .icon {
+.action .icon {
   width: 14px;
   height: 14px;
+  margin-inline-end: 4px;
 }
 
 .status {
   flex: none;
   margin-left: auto;
   padding: 1px var(--space-8);
-  border: 1px solid var(--border);
+  border: 1px solid var(--divider);
   border-radius: var(--radius-full);
-  color: var(--text-weak);
-  font-size: var(--fs-2xs);
-  font-weight: var(--weight-semibold);
+  color: var(--fgTransparentWeak);
+  font-size: 0.72em;
+  font-weight: 600;
   white-space: nowrap;
 }
 
 .status.live {
-  border-color: color-mix(in srgb, var(--success) 40%, var(--border));
-  background: var(--success-soft);
+  border-color: color-mix(in srgb, var(--success) 40%, var(--divider));
+  background: color-mix(in srgb, var(--success) 15%, transparent);
   color: var(--success);
 }
 </style>

@@ -50,7 +50,13 @@ function number(value: number): string {
 
 <template>
 	<article class="user-card">
-		<div class="banner" :class="{ detailed }"></div>
+		<div
+			class="banner"
+			:class="{ detailed }"
+			:style="
+				user.bannerUrl ? { backgroundImage: `url('${user.bannerUrl}')` } : undefined
+			"
+		></div>
 		<span
 			v-if="isSignedIn(me) && me.id !== user.id && user.isFollowed"
 			class="followed"
@@ -110,23 +116,26 @@ function number(value: number): string {
 
 .banner {
 	block-size: 84px;
-	background: var(--surface-inset);
+	background-color: rgb(0 0 0 / 0.1);
+	background-position: center;
+	background-size: cover;
 }
 
 .banner.detailed {
 	block-size: 120px;
 }
 
+/* MkUserInfo's "follows you" chip sits over the banner in the accent colour. */
 .followed {
 	position: absolute;
 	inset-block-start: 8px;
-	inset-inline-end: 8px;
-	padding: 2px 10px;
-	border-radius: var(--radius-full);
-	background: var(--accent-soft);
-	color: var(--accent);
-	font-size: var(--fs-2xs);
-	font-weight: var(--weight-bold);
+	inset-inline-start: 8px;
+	padding: 2px 8px;
+	border-radius: 6px;
+	background: var(--accent);
+	color: var(--fgOnAccent);
+	font-size: 0.75em;
+	font-weight: bold;
 }
 
 .title {
@@ -143,23 +152,23 @@ function number(value: number): string {
 }
 
 .name {
-	color: var(--text-strong);
-	font-size: var(--fs-md);
-	font-weight: var(--weight-bold);
+	color: var(--fgHighlighted);
+	font-size: 1em;
+	font-weight: bold;
 }
 
 .username {
 	margin: 0;
 	color: var(--text-weak);
-	font-size: var(--fs-xs);
+	font-size: 0.8em;
 	overflow-wrap: anywhere;
 }
 
 .description {
 	padding: 0 16px;
 	color: var(--text);
-	font-size: var(--fs-sm);
-	line-height: var(--leading-relaxed);
+	font-size: 0.8em;
+	line-height: 1.5;
 }
 
 .description :deep(.mfm) {
@@ -182,11 +191,11 @@ function number(value: number): string {
 	margin: 4px 16px 0;
 	padding: 4px 8px;
 	border: 0;
-	border-radius: var(--radius-sm);
+	border-radius: 6px;
 	background: transparent;
 	color: var(--accent);
 	font: inherit;
-	font-size: var(--fs-xs);
+	font-size: 0.85em;
 	text-align: start;
 	cursor: pointer;
 }
@@ -200,7 +209,7 @@ function number(value: number): string {
 	gap: 16px;
 	padding: 0 16px;
 	color: var(--text-weak);
-	font-size: var(--fs-xs);
+	font-size: 0.8em;
 }
 
 .status p {
@@ -210,8 +219,10 @@ function number(value: number): string {
 	margin: 0;
 }
 
+/* MkUserInfo paints the count itself; the label keeps the muted colour. */
 .status b {
-	color: var(--text-strong);
+	color: var(--accent);
+	font-weight: bold;
 	font-variant-numeric: tabular-nums;
 }
 
@@ -224,6 +235,6 @@ function number(value: number): string {
 .joined {
 	margin: 0 16px;
 	color: var(--text-faint);
-	font-size: var(--fs-2xs);
+	font-size: 0.75em;
 }
 </style>

@@ -21,13 +21,14 @@ import {
   type ThemePreference,
 } from "../../stores/theme";
 import SettingsPage from "./SettingsPage.vue";
+import SettingsSection from "./SettingsSection.vue";
 import { applyFontScale, FONT_SCALES, fontScale, setFontScale } from "./font-scale";
 import { defaultStore } from "../../store/firefish-store";
 
 type IconName = InstanceType<typeof AppIcon>["$props"]["name"];
 
 const themes: { id: ThemePreference; label: string; icon: IconName }[] = [
-  { id: "auto", label: "跟随系统", icon: "display" },
+  { id: "auto", label: "自动", icon: "display" },
   { id: "light", label: "浅色", icon: "sun" },
   { id: "dark", label: "深色", icon: "moon" },
 ];
@@ -56,10 +57,9 @@ const useBlurEffect = defaultStore.makeGetterSetter("useBlurEffect");
 
 <template>
   <SettingsPage>
-    <section class="card">
-      <h2 class="card-title">主题</h2>
-      <p class="muted small">
-        选择界面主题，选择会保存在这台设备上。跟随系统时，系统切换深浅色会立即生效。
+    <SettingsSection title="主题" persist-key="settings-appearance-theme">
+      <p class="settings-hint">
+        选择界面主题，选择会保存在这台设备上。自动模式会跟随系统，系统切换深浅色时立即生效。
       </p>
       <div class="theme-options">
         <button
@@ -80,13 +80,12 @@ const useBlurEffect = defaultStore.makeGetterSetter("useBlurEffect");
           <span>切换为{{ theme === "dark" ? "浅色" : "深色" }}</span>
         </button>
       </div>
-      <p v-if="themePreference === 'auto'" class="muted small hint">
+      <p v-if="themePreference === 'auto'" class="settings-hint">
         当前系统为{{ systemLabel }}，界面正在跟随。
       </p>
-    </section>
+    </SettingsSection>
 
-    <section class="card">
-      <h2 class="card-title">显示</h2>
+    <SettingsSection title="显示" persist-key="settings-appearance-display">
       <div class="switch-list">
         <MkSwitch v-model="showGapBetweenNotesInTimeline">
           在时间线的帖子之间留出间隔
@@ -97,11 +96,10 @@ const useBlurEffect = defaultStore.makeGetterSetter("useBlurEffect");
         <MkSwitch v-model="loadRawImages">直接加载原始图片</MkSwitch>
         <MkSwitch v-model="useBlurEffect">使用背景模糊效果</MkSwitch>
       </div>
-    </section>
+    </SettingsSection>
 
-    <section class="card">
-      <h2 class="card-title">字体大小</h2>
-      <p class="muted small">调整界面文字的基准大小，同样只保存在这台设备上。</p>
+    <SettingsSection title="字体大小" persist-key="settings-appearance-font">
+      <p class="settings-hint">调整界面文字的基准大小，同样只保存在这台设备上。</p>
       <div class="theme-options">
         <button
           v-for="option in FONT_SCALES"
@@ -120,7 +118,7 @@ const useBlurEffect = defaultStore.makeGetterSetter("useBlurEffect");
       <p class="preview">
         这条示例文字使用当前的字体大小显示。昵称、正文与按钮会随之变化，图标和间距保持不变。
       </p>
-    </section>
+    </SettingsSection>
   </SettingsPage>
 </template>
 
@@ -128,7 +126,6 @@ const useBlurEffect = defaultStore.makeGetterSetter("useBlurEffect");
 .theme-options {
   display: flex;
   gap: var(--space-10);
-  margin-top: var(--space-12);
   flex-wrap: wrap;
 }
 
@@ -141,10 +138,9 @@ const useBlurEffect = defaultStore.makeGetterSetter("useBlurEffect");
   border-radius: var(--radius-md);
   background: var(--panel-2);
   color: var(--text-weak);
-  font-weight: var(--weight-semibold);
+  font-weight: 600;
   cursor: pointer;
-  transition: border-color var(--dur-base) ease, color var(--dur-base) ease,
-    background var(--dur-base) ease;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
 }
 
 .theme-option:hover {
@@ -153,7 +149,7 @@ const useBlurEffect = defaultStore.makeGetterSetter("useBlurEffect");
 }
 
 .theme-option:focus-visible {
-  outline: var(--focus-outline);
+  outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
 
@@ -177,25 +173,20 @@ const useBlurEffect = defaultStore.makeGetterSetter("useBlurEffect");
   border-style: dashed;
 }
 
-.hint {
-  margin-top: var(--space-10);
-}
-
 .switch-list {
   display: flex;
   flex-direction: column;
-  margin-top: var(--space-8);
 }
 
 .preview {
-  margin-top: var(--space-16);
-  padding: var(--space-14);
+  margin: 0;
+  padding: var(--space-16);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   background: var(--surface-inset);
   color: var(--text-weak);
   font-size: var(--fs-md);
-  line-height: var(--leading-relaxed);
+  line-height: 1.6;
 }
 
 .sample {

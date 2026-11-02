@@ -7,16 +7,21 @@
 //   MkRemoteCaution / MkMoved branch is replaced by the unavailable card.
 // - Mfm renders through lib/mfm.ts; fields, birthday, location and the
 //   city-timezone lookup are dropped (UserDetailed keeps those null/[]).
+// - The profile block keeps one text column at every width: the name sits
+//   directly under the banner with the avatar overlapping its bottom edge,
+//   and the 3:1 banner replaces the original's fixed 250px height. The
+//   wide/narrow branch and its sub column are therefore dropped — the reading
+//   column never exceeds the fork's 1000px narrow threshold.
 // - follow-list tabs stay out of the tab strip: users/following and
 //   users/followers do not exist, so only the counts are shown.
 // - The reactions tab is dropped: notes/reactions does not exist.
 <script lang="ts" setup>
-import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, ref, watch } from "vue";
 import { api, ApiError } from "../../api/client";
 import type { UserDetailed } from "../../api/types";
 import AppIcon from "../../components/AppIcon.vue";
-import MkA from "../../components/ui/MkA.vue";
 import MkAvatar from "../../components/ui/MkAvatar.vue";
+import MkButton from "../../components/ui/MkButton.vue";
 import MkInfo from "../../components/ui/MkInfo.vue";
 import MkUserName from "../../components/ui/MkUserName.vue";
 import PageHeader from "../../components/ui/PageHeader.vue";
@@ -49,12 +54,6 @@ const loadError = ref("");
 const missing = ref(false);
 
 const following = ref(false);
-const followBusy = ref(false);
-const followNotice = ref("");
-
-const WIDE_THRESHOLD = 1000;
-const rootEl = ref<HTMLElement | null>(null);
-const wide = ref(true);
 
 const isSelf = computed(() => {
 	if (!user.value || !session.me) return false;
@@ -112,7 +111,6 @@ async function load() {
 	loadError.value = "";
 	missing.value = false;
 	following.value = false;
-	followNotice.value = "";
 
 	if (!props.username) {
 		missing.value = true;
@@ -136,34 +134,13 @@ async function load() {
 
 // following/create answers with the followee's UserLite only (Misskey
 // contract), so the relationship after a follow is read back from
-// users/show; see useFollowRelation.
+// users/show; see useFollowRelation. The button already performs the
+// follow/unfollow itself, so the refresh only re-reads the state.
 const pendingRef = ref(false);
 const { refreshRelation } = useFollowRelation(user, following, pendingRef);
 
-async function toggleFollow() {
-	if (!user.value || followBusy.value) return;
-	followBusy.value = true;
-	followNotice.value = "";
-	try {
-		if (following.value) {
-			await api.unfollow(user.value.id);
-			following.value = false;
-			user.value.followersCount = Math.max(0, user.value.followersCount - 1);
-		} else {
-			await api.follow(user.value.id);
-			following.value = true;
-			user.value.followersCount += 1;
-		}
-		await refreshRelation();
-	} catch (err) {
-		if (err instanceof ApiError && err.status === 401) {
-			followNotice.value = "登录状态已失效，请重新登录后再操作。";
-		} else {
-			followNotice.value = errorMessage(err, "操作失败");
-		}
-	} finally {
-		followBusy.value = false;
-	}
+async function onFollowRefresh() {
+	await refreshRelation();
 }
 
 // Pinning happens in the note footer, which only updates the session copy
@@ -204,29 +181,10 @@ function onDeleted(id: string) {
 	user.value.pinnedNotes = user.value.pinnedNotes.filter((note) => note.id !== id);
 	user.value.pinnedNoteIds = user.value.pinnedNoteIds.filter((noteId) => noteId !== id);
 }
-
-let observer: ResizeObserver | null = null;
-
-function measure() {
-	wide.value = (rootEl.value?.clientWidth ?? 0) >= WIDE_THRESHOLD;
-}
-
-onMounted(() => {
-	measure();
-	if (rootEl.value && typeof ResizeObserver !== "undefined") {
-		observer = new ResizeObserver(measure);
-		observer.observe(rootEl.value);
-	}
-});
-
-onBeforeUnmount(() => {
-	observer?.disconnect();
-	observer = null;
-});
 </script>
 
 <template>
-	<div ref="rootEl" class="user-page">
+	<div class="user-page">
 		<PageHeader
 			v-model:tab="(tab as string)"
 			:title="headerTitle"
@@ -235,35 +193,15 @@ onBeforeUnmount(() => {
 			:tabs="viewUser ? TABS : null"
 			back
 			back-to="/"
-		>
-			<template #actions>
-				<template v-if="viewUser">
-					<RouterLink
-						v-if="isSelf"
-						:to="NAV_ITEM_DEFS.settings.to"
-						class="button ghost small"
-					>
-						{{ i18n.ts.editProfile }}
-					</RouterLink>
-					<FollowButton
-						v-else
-						:user="viewUser"
-						full
-						@refresh="toggleFollow"
-					/>
-				</template>
-			</template>
-		</PageHeader>
-
-		<p v-if="followNotice" class="notice error page-notice">{{ followNotice }}</p>
+		/>
 
 		<div v-if="loading" class="skeleton"></div>
 
-		<div v-else-if="missing" class="card placeholder">
+		<div v-else-if="missing" class="placeholder">
 			<AppIcon name="globe" />
 			<h2>没有找到这个账户</h2>
-			<p class="small">账户可能已经被删除或从未存在过；远程账户暂不支持浏览。</p>
-			<RouterLink to="/explore" class="button ghost small">去探索页看看</RouterLink>
+			<p>账户可能已经被删除或从未存在过；远程账户暂不支持浏览。</p>
+			<RouterLink to="/explore" class="placeholder-link">去探索页看看</RouterLink>
 		</div>
 
 		<MkInfo v-else-if="loadError" warn class="load-error">
@@ -271,7 +209,7 @@ onBeforeUnmount(() => {
 			<button type="button" class="retry" @click="load">重试</button>
 		</MkInfo>
 
-		<div v-else-if="viewUser" class="body" :class="{ wide }">
+		<div v-else-if="viewUser" class="body">
 			<div class="main">
 				<section class="profile">
 					<div class="banner-container">
@@ -284,8 +222,12 @@ onBeforeUnmount(() => {
 							"
 						></div>
 						<div class="fade"></div>
-						<div class="title">
-							<div class="nameColumn">
+					</div>
+
+					<div class="head">
+						<MkAvatar class="avatar" :user="viewUser" :disable-link="true" />
+						<div class="identity">
+							<div class="name-row">
 								<MkUserName class="name" :user="viewUser" :nowrap="true" />
 								<span
 									v-if="isLoggedIn && session.me && session.me.id !== viewUser.id && viewUser.isFollowed"
@@ -294,8 +236,8 @@ onBeforeUnmount(() => {
 									{{ i18n.ts.followsYou }}
 								</span>
 							</div>
-							<div class="bottom">
-								<span class="username">@{{ acct }}</span>
+							<div class="acct-row">
+								<span class="acct">@{{ acct }}</span>
 								<span v-if="viewUser.isAdmin" class="badge" title="管理员">
 									<AppIcon name="star" />
 								</span>
@@ -304,46 +246,43 @@ onBeforeUnmount(() => {
 								</span>
 							</div>
 						</div>
-					</div>
-					<MkAvatar class="avatar" :user="viewUser" :disable-link="true" />
-					<div class="title-below">
-						<div class="nameColumn">
-							<MkUserName class="name" :user="viewUser" :nowrap="true" />
-							<span
-								v-if="isLoggedIn && session.me && session.me.id !== viewUser.id && viewUser.isFollowed"
-								class="followed"
+						<div class="actions">
+							<MkButton
+								v-if="isSelf"
+								link
+								rounded
+								:to="NAV_ITEM_DEFS.settings.to"
 							>
-								{{ i18n.ts.followsYou }}
-							</span>
-						</div>
-						<div class="bottom">
-							<span class="username">@{{ acct }}</span>
-							<span v-if="viewUser.isAdmin" class="badge" title="管理员">
-								<AppIcon name="star" />
-							</span>
-							<span v-if="viewUser.isSuspended" class="badge danger" title="已冻结">
-								<AppIcon name="warning" />
-							</span>
+								{{ i18n.ts.editProfile }}
+							</MkButton>
+							<FollowButton v-else :user="viewUser" @refresh="onFollowRefresh" />
 						</div>
 					</div>
-					<div class="follow-container">
-						<FollowButton
-							v-if="!isSelf"
-							:user="viewUser"
-							full
-							large
-							@refresh="toggleFollow"
-						/>
-						<RouterLink v-else :to="NAV_ITEM_DEFS.settings.to" class="button ghost small">
-							编辑资料
-						</RouterLink>
+
+					<!-- Counts only: users/following and users/followers are not
+					     implemented, so the follow lists have no page to link to. -->
+					<div class="status">
+						<div class="item">
+							<b>{{ formatCount(viewUser.notesCount) }}</b>
+							<span>{{ i18n.ts.notes }}</span>
+						</div>
+						<div class="item">
+							<b>{{ formatCount(viewUser.followingCount) }}</b>
+							<span>{{ i18n.ts.following }}</span>
+						</div>
+						<div class="item">
+							<b>{{ formatCount(viewUser.followersCount) }}</b>
+							<span>{{ i18n.ts.followers }}</span>
+						</div>
 					</div>
+
 					<div class="description">
 						<!-- eslint-disable-next-line vue/no-v-html -->
 						<div v-if="viewUser.description" class="mfm" v-html="renderedDescription"></div>
 						<p v-else class="empty">还没有简介</p>
 					</div>
-					<div class="fields system">
+
+					<div class="fields">
 						<dl class="field">
 							<dt class="name">
 								<AppIcon name="clock" class="field-icon" />
@@ -352,21 +291,6 @@ onBeforeUnmount(() => {
 							<dd class="value">{{ createdAtText }}</dd>
 						</dl>
 					</div>
-					<div class="status">
-						<MkA :to="`/@${viewUser.username}`" :class="{ active: tab === 'home' }">
-							<b>{{ formatCount(viewUser.notesCount) }}</b>
-							<span>{{ i18n.ts.notes }}</span>
-						</MkA>
-						<span class="static" :title="i18n.ts.following">
-							<b>{{ formatCount(viewUser.followingCount) }}</b>
-							<span>{{ i18n.ts.following }}</span>
-						</span>
-						<span class="static" :title="i18n.ts.followers">
-							<b>{{ formatCount(viewUser.followersCount) }}</b>
-							<span>{{ i18n.ts.followers }}</span>
-						</span>
-					</div>
-					<p class="lists-note">关注与关注者列表接口尚未提供，这里只显示数量。</p>
 				</section>
 
 				<div class="contents">
@@ -384,9 +308,10 @@ onBeforeUnmount(() => {
 					</MkInfo>
 
 					<template v-if="tab === 'home'">
-						<UserPhotos :key="viewUser.id" :user="viewUser" />
+						<UserPhotos :key="`photos-${viewUser.id}`" :user="viewUser" />
+						<UserTimeline :key="`timeline-${viewUser.id}`" :user="viewUser" />
 					</template>
-					<UserTimeline v-else :key="viewUser.id" :user="viewUser" />
+					<UserPhotos v-else :key="`photos-${viewUser.id}`" :user="viewUser" />
 				</div>
 			</div>
 		</div>
@@ -398,161 +323,190 @@ onBeforeUnmount(() => {
 	min-width: 0;
 }
 
-.page-notice {
-	margin-top: var(--space-12);
-}
-
 .skeleton {
 	block-size: 220px;
-	margin-top: var(--space-16);
-	border: 1px solid var(--border);
-	border-radius: var(--radius-lg);
-	background: var(--panel);
-}
-
-.load-error {
-	display: flex;
-	align-items: center;
-	gap: var(--space-10);
-	margin-top: var(--space-12);
-}
-
-.load-error .retry {
-	padding: var(--space-4) var(--space-10);
-	border: 1px solid currentcolor;
-	border-radius: var(--radius-sm);
-	background: transparent;
-	color: inherit;
-	font: inherit;
-	font-size: var(--fs-xs);
-	cursor: pointer;
+	margin-block-start: var(--margin);
+	border-radius: var(--radius);
+	background: var(--panelHighlight);
 }
 
 .placeholder {
 	display: flex;
 	flex-direction: column;
 	align-items: center;
-	gap: var(--space-8);
-	margin-top: var(--space-16);
-	padding: var(--space-32) var(--space-20);
+	gap: 8px;
+	margin-block-start: var(--margin);
+	padding: 32px 20px;
+	border: 1px solid var(--divider);
+	border-radius: var(--radius);
+	background: var(--panel);
 	text-align: center;
 }
 
+.placeholder > .icon {
+	inline-size: 40px;
+	block-size: 40px;
+	color: var(--fgTransparent);
+}
+
+.placeholder h2 {
+	margin: 0;
+	font-size: 1.1em;
+	color: var(--fgHighlighted);
+}
+
+.placeholder p {
+	margin: 0;
+	color: var(--fgTransparentWeak);
+	font-size: 0.9em;
+}
+
+.placeholder-link {
+	color: var(--accent);
+	font-size: 0.9em;
+}
+
+.load-error {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	margin-block-start: var(--margin);
+}
+
+.load-error .retry {
+	padding: 4px 10px;
+	border: 1px solid currentcolor;
+	border-radius: 6px;
+	background: transparent;
+	color: inherit;
+	font: inherit;
+	font-size: 0.85em;
+	cursor: pointer;
+}
+
 .body {
-	display: grid;
-	grid-template-columns: minmax(0, 1fr);
-	margin-top: var(--space-16);
+	margin-block-start: var(--margin);
 	min-width: 0;
-}
-
-.body.wide {
-	grid-template-columns: minmax(0, 1fr) 320px;
-	align-items: start;
-}
-
-.body.wide .main {
-	grid-column: 1;
 }
 
 .main {
 	display: flex;
 	flex-direction: column;
-	gap: var(--space-16);
+	gap: var(--margin);
 	min-width: 0;
 }
 
 /* --- profile block ------------------------------------------------------ */
 .profile {
 	position: relative;
-	overflow: hidden;
-	border: 1px solid var(--border);
-	border-radius: var(--radius-lg);
+	overflow: clip;
+	border: 1px solid var(--divider);
+	border-radius: var(--radius);
 	background: var(--panel);
 }
 
+/* Firefish sizes the banner by the block height (250px); the port keeps the
+   same proportion of roughly 3:1 so it scales with the reading column. */
 .banner-container {
 	position: relative;
-	block-size: 200px;
+	overflow: clip;
+	aspect-ratio: 3 / 1;
+	min-block-size: 120px;
+	max-block-size: 260px;
 	border-block-end: 1px solid var(--divider);
-	background: var(--surface-inset);
 }
 
+/* Accounts without a banner keep the panel colour with Firefish's inset
+   shadow, so the strip still reads as a banner rather than a broken image. */
 .banner {
 	position: absolute;
 	inset: 0;
-	background-size: cover;
+	background-color: var(--panelHighlight);
 	background-position: center;
+	background-size: cover;
+	box-shadow: 0 0 128px var(--shadow) inset;
 }
 
 .fade {
 	position: absolute;
-	inset: 0;
-	background: linear-gradient(transparent, rgb(0 0 0 / 0.35));
+	inset-block-end: 0;
+	inset-inline: 0;
+	block-size: 78px;
+	background: linear-gradient(transparent, rgb(0 0 0 / 0.45));
+	pointer-events: none;
 }
 
-.banner-container .title {
-	position: absolute;
-	inset-block-end: 10px;
-	inset-inline: 16px;
-	display: none;
-	color: #fff;
-	text-shadow: 0 1px 3px rgb(0 0 0 / 0.5);
+.head {
+	display: flex;
+	align-items: flex-start;
+	gap: 16px;
+	min-width: 0;
+	padding-inline: 20px;
 }
 
-/* The overlaid title only shows on narrow viewports, mirroring the fork. */
-.user-page:not(.wide) .banner-container .title {
-	display: block;
+/* The avatar is centred on the banner's bottom edge, like the fork's
+   `inset-block-start: 170px` against a 250px banner. */
+.avatar {
+	flex: none;
+	--avatar-size: 96px;
+	margin-block-start: -48px;
+	background: var(--panel);
+	box-shadow: 1px 1px 3px rgb(0 0 0 / 0.2);
 }
 
-.nameColumn {
+.identity {
+	flex: 1 1 auto;
+	min-width: 0;
+	padding-block-start: 10px;
+}
+
+.name-row {
 	display: flex;
 	align-items: center;
-	gap: var(--space-8);
+	gap: 8px;
 	min-width: 0;
 }
 
-.nameColumn .name {
-	font-size: var(--fs-lg);
-	font-weight: var(--weight-bold);
-	overflow-wrap: anywhere;
+.name-row .name {
+	min-inline-size: 0;
+	overflow: hidden;
+	color: var(--fgHighlighted);
+	font-size: 1.4em;
+	font-weight: bold;
+	line-height: 1.25;
+	text-overflow: ellipsis;
 }
 
 .followed {
-	padding: 1px var(--space-8);
-	border-radius: var(--radius-full);
-	background: var(--accent-soft);
-	color: var(--accent);
-	font-size: var(--fs-2xs);
-	font-weight: var(--weight-bold);
+	flex: none;
+	padding: 2px 8px;
+	border-radius: 24px;
+	background: var(--accent);
+	color: var(--fgOnAccent);
+	font-size: 0.75em;
+	line-height: 1.5;
+	white-space: nowrap;
 }
 
-.banner-container .followed {
-	background: rgb(255 255 255 / 0.25);
-	color: #fff;
-}
-
-.bottom {
+.acct-row {
 	display: flex;
 	align-items: center;
-	gap: var(--space-6);
-	margin-top: 2px;
+	gap: 6px;
+	min-width: 0;
+	margin-block-start: 2px;
+	color: var(--fgTransparentWeak);
+	font-size: 0.85em;
 }
 
-.username {
-	color: inherit;
-	font-size: var(--fs-xs);
-	opacity: 0.85;
+.acct {
 	overflow-wrap: anywhere;
-}
-
-.banner-container .username {
-	color: #fff;
 }
 
 .badge {
 	display: inline-grid;
 	place-items: center;
-	color: var(--badge, var(--accent));
+	flex: none;
+	color: var(--badge);
 }
 
 .badge :deep(.icon) {
@@ -561,43 +515,59 @@ onBeforeUnmount(() => {
 }
 
 .badge.danger {
-	color: var(--danger);
+	color: var(--error);
 }
 
-.avatar {
-	display: block;
-	inline-size: var(--profile-avatar, 84px);
-	block-size: var(--profile-avatar, 84px);
-	margin: -42px 0 0 var(--space-16);
-	border: 3px solid var(--panel);
-	border-radius: 50%;
-	background: var(--panel);
+.actions {
+	display: flex;
+	align-items: center;
+	flex: none;
+	padding-block-start: 8px;
 }
 
-.title-below {
-	display: none;
-	padding: var(--space-10) var(--space-16) 0;
-	color: var(--text);
+.actions > * {
+	flex: none;
 }
 
-/* Below the banner, the name row replaces the overlay on wide viewports. */
-.user-page.wide .title-below {
-	display: block;
+.status {
+	display: flex;
+	margin-block-start: 12px;
+	padding-block: 12px;
+	padding-inline: 20px;
+	border-block-start: 1px solid var(--divider);
 }
 
-.title-below .nameColumn .name {
-	color: var(--text-strong);
+.status > .item {
+	display: flex;
+	flex: 1 1 0;
+	flex-direction: column;
+	align-items: center;
+	gap: 2px;
+	min-inline-size: 0;
+	text-align: center;
 }
 
-.follow-container {
-	padding: var(--space-12) var(--space-16) 0;
+.status b {
+	color: var(--fgHighlighted);
+	font-size: 1.15em;
+	font-weight: bold;
+	font-variant-numeric: tabular-nums;
+	line-height: 1.2;
+}
+
+.status .item > span {
+	color: var(--fgTransparentWeak);
+	font-size: 0.78em;
+	line-height: 1.2;
+	white-space: nowrap;
 }
 
 .description {
-	padding: var(--space-12) var(--space-16) 0;
-	color: var(--text);
-	font-size: var(--fs-sm);
-	line-height: var(--leading-relaxed);
+	padding: 12px 20px 0;
+	color: var(--fg);
+	font-size: 0.95em;
+	line-height: 1.6;
+	overflow-wrap: anywhere;
 }
 
 .description :deep(.mfm) {
@@ -607,33 +577,35 @@ onBeforeUnmount(() => {
 
 .description .empty {
 	margin: 0;
-	color: var(--text-weak);
+	color: var(--fgTransparent);
 }
 
-.fields.system {
-	padding: var(--space-12) var(--space-16) 0;
+.fields {
+	margin-block-start: 12px;
+	padding: 12px 20px 16px;
+	border-block-start: 1px solid var(--divider);
+	font-size: 0.85em;
 }
 
 .field {
 	display: flex;
-	gap: var(--space-8);
-	margin: 0 0 var(--space-6);
+	align-items: center;
+	gap: 8px;
+	margin: 0;
 }
 
 .field .name {
 	display: inline-flex;
 	align-items: center;
-	gap: var(--space-4);
 	flex: none;
-	color: var(--text-weak);
-	font-size: var(--fs-xs);
-	font-weight: var(--weight-bold);
+	gap: 4px;
+	color: var(--fgTransparentWeak);
+	font-weight: bold;
 }
 
 .field .value {
 	margin: 0;
-	color: var(--text);
-	font-size: var(--fs-xs);
+	color: var(--fg);
 	overflow-wrap: anywhere;
 }
 
@@ -642,62 +614,53 @@ onBeforeUnmount(() => {
 	block-size: 13px;
 }
 
-.status {
-	display: flex;
-	gap: var(--space-20);
-	padding: var(--space-14) var(--space-16) 0;
-}
-
-.status a,
-.status .static {
-	display: inline-flex;
-	align-items: baseline;
-	gap: var(--space-4);
-	color: var(--text-weak);
-	font-size: var(--fs-xs);
-}
-
-.status b {
-	color: var(--text-strong);
-	font-variant-numeric: tabular-nums;
-}
-
-.status a.active,
-.status a:hover {
-	color: var(--accent);
-}
-
-.status a.active b,
-.status a:hover b {
-	color: var(--accent);
-}
-
-.lists-note {
-	margin: var(--space-8) var(--space-16) var(--space-14);
-	color: var(--text-faint);
-	font-size: var(--fs-2xs);
-	line-height: 1.5;
-}
-
 /* --- contents column ---------------------------------------------------- */
 .contents {
 	display: flex;
 	flex-direction: column;
-	gap: var(--space-16);
+	gap: var(--margin);
 	min-width: 0;
 }
 
 .pinned {
 	display: flex;
 	flex-direction: column;
-	gap: 0;
-	border: 1px solid var(--border);
-	border-radius: var(--radius-lg);
+	border: 1px solid var(--divider);
+	border-radius: var(--radius);
 	background: var(--panel);
 	overflow: hidden;
 }
 
 .pin-tip {
 	margin: 0;
+}
+
+@media (max-width: 500px) {
+	.head {
+		flex-wrap: wrap;
+		gap: 10px 12px;
+		padding-inline: 16px;
+	}
+
+	.actions {
+		inline-size: 100%;
+		justify-content: flex-end;
+		padding-block-start: 0;
+	}
+
+	.avatar {
+		--avatar-size: 76px;
+		margin-block-start: -38px;
+	}
+
+	.name-row .name {
+		font-size: 1.2em;
+	}
+
+	.status,
+	.description,
+	.fields {
+		padding-inline: 16px;
+	}
 }
 </style>

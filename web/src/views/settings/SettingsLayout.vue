@@ -59,7 +59,7 @@ onBeforeUnmount(() => {
     <div class="body">
       <SectionMenu :def="menuDef" :active="activeTab.key" :narrow="narrow" label="设置分类" />
       <section class="content">
-        <div v-if="!session.ready" class="card muted">正在读取会话…</div>
+        <p v-if="!session.ready" class="settings-hint">正在读取会话…</p>
         <RouterView v-else />
       </section>
     </div>
@@ -74,14 +74,20 @@ onBeforeUnmount(() => {
 .body {
   display: grid;
   grid-template-columns: 196px minmax(0, 1fr);
-  gap: var(--space-24);
+  gap: var(--space-16);
   align-items: start;
-  margin-top: var(--space-20);
+  margin-top: var(--margin);
   padding-bottom: var(--space-16);
+  /* MkFolder headers are sticky; they stop below the sticky PageHeader rather
+     than sliding underneath it. */
+  --stickyTop: 52px;
 }
 
 .content {
   min-width: 0;
+  /* Firefish's MkSpacer gutter: every tab body and folder title lines up on
+     the same 16px inner edge. */
+  padding-inline: var(--margin);
 }
 
 .narrow .body {
@@ -91,7 +97,7 @@ onBeforeUnmount(() => {
      form that would size each row to its max-content width instead of the
      column, and the scrolling menu strip would push the page wider. */
   align-items: stretch;
-  gap: var(--space-14);
+  gap: var(--space-12);
   margin-top: var(--space-12);
 }
 

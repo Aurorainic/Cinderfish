@@ -3,6 +3,9 @@ import { computed, onMounted, ref } from "vue";
 import { api } from "../../api/client";
 import type { DriveFile } from "../../api/types";
 import AppIcon from "../../components/AppIcon.vue";
+import MkButton from "../../components/ui/MkButton.vue";
+import MkInfo from "../../components/ui/MkInfo.vue";
+import MkLoading from "../../components/ui/MkLoading.vue";
 import { instance } from "../../stores/instance";
 import AdminCallout from "./AdminCallout.vue";
 import { storageLabel } from "./meta";
@@ -57,55 +60,58 @@ onMounted(loadFiles);
 </script>
 
 <template>
-  <section class="card">
-    <div class="section-head">
+  <section class="_card">
+    <div class="_title section-head">
       <h2>文件</h2>
       <span v-if="files.length" class="count">{{ files.length }}</span>
     </div>
-    <p class="muted small section-desc">
-      媒体存储后端：<strong>{{ storage }}</strong>。这里显示你最近上传的 30 个文件。
-    </p>
-
-    <AdminCallout
-      class="files-alert"
-      title="实例级文件管理尚未提供"
-      tone="warn"
-    >
-      <p>
-        后端目前没有列出或清理全实例文件的接口，本页只能列出你自己上传的文件，无法查看其他账号的文件或实例总占用。
+    <div class="_content">
+      <p class="_caption section-desc">
+        媒体存储后端：<strong>{{ storage }}</strong>。这里显示你最近上传的 30 个文件。
       </p>
-    </AdminCallout>
 
-    <div v-if="error" class="notice error" role="alert">
-      <span>{{ error }}</span>
-      <button class="button ghost small" type="button" @click="loadFiles">重试</button>
-    </div>
+      <AdminCallout class="callout-row" title="实例级文件管理尚未提供" tone="warn">
+        <p>
+          后端目前没有列出或清理全实例文件的接口，本页只能列出你自己上传的文件，无法查看其他账号的文件或实例总占用。
+        </p>
+      </AdminCallout>
 
-    <p v-if="loading" class="hint">正在加载文件…</p>
-    <ul v-else-if="files.length" class="file-list">
-      <li v-for="file in files" :key="file.id" class="file-row">
-        <span class="thumb">
-          <img
-            v-if="isImage(file) && (file.thumbnailUrl || file.url)"
-            :src="file.thumbnailUrl || file.url"
-            alt=""
-            loading="lazy"
-          />
-          <AppIcon v-else name="image" />
-        </span>
-        <div class="file-main">
-          <span class="file-name">{{ file.name }}</span>
-          <span class="file-meta">
-            {{ file.type || "未知类型" }} · {{ formatSize(file.size) }} ·
-            {{ formatDate(file.createdAt) }}
+      <MkInfo v-if="error" class="notice-row" warn role="alert">
+        <span>{{ error }}</span>
+        <MkButton @click="loadFiles">重试</MkButton>
+      </MkInfo>
+
+      <MkLoading v-if="loading" />
+      <ul v-else-if="files.length" class="file-list">
+        <li v-for="file in files" :key="file.id" class="file-row">
+          <span class="thumb">
+            <img
+              v-if="isImage(file) && (file.thumbnailUrl || file.url)"
+              :src="file.thumbnailUrl || file.url"
+              alt=""
+              loading="lazy"
+            />
+            <AppIcon v-else name="image" />
           </span>
-        </div>
-        <a class="button ghost small" :href="file.url" target="_blank" rel="noopener noreferrer">
-          打开
-        </a>
-      </li>
-    </ul>
-    <p v-else-if="!error" class="hint">还没有上传过文件。</p>
+          <div class="file-main">
+            <span class="file-name">{{ file.name }}</span>
+            <span class="file-meta">
+              {{ file.type || "未知类型" }} · {{ formatSize(file.size) }} ·
+              {{ formatDate(file.createdAt) }}
+            </span>
+          </div>
+          <a
+            class="_textButton open"
+            :href="file.url"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            打开
+          </a>
+        </li>
+      </ul>
+      <p v-else-if="!error" class="_caption">还没有上传过文件。</p>
+    </div>
   </section>
 </template>
 
@@ -113,98 +119,102 @@ onMounted(loadFiles);
 .section-head {
   display: flex;
   align-items: center;
-  gap: var(--space-10);
-  margin-bottom: var(--space-6);
+  gap: 10px;
 }
 
 .section-head h2 {
-  font-size: var(--fs-md);
+  font-size: 1em;
 }
 
 .section-desc {
-  margin-bottom: var(--space-14);
+  margin-block-end: var(--margin);
 }
 
 .count {
   display: inline-grid;
   place-items: center;
-  min-width: 22px;
-  height: 22px;
-  padding: 0 var(--space-6);
-  border-radius: var(--radius-full);
-  background: var(--accent-soft);
+  min-inline-size: 22px;
+  block-size: 22px;
+  padding-inline: 6px;
+  border-radius: 999px;
+  background: var(--accentedBg);
   color: var(--accent);
-  font-size: var(--fs-xs);
-  font-weight: var(--weight-bold);
+  font-size: 0.78em;
+  font-weight: bold;
 }
 
-.files-alert {
-  margin-bottom: var(--space-14);
+.callout-row,
+.notice-row {
+  margin-block-end: var(--margin);
 }
 
 .file-list {
   list-style: none;
   margin: 0;
   padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-6);
 }
 
 .file-row {
   display: flex;
   align-items: center;
-  gap: var(--space-12);
-  padding: var(--space-8) var(--space-10);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--surface-inset);
+  gap: 12px;
+  padding-block: 8px;
+  border-block-start: solid 0.5px var(--hairline);
+}
+
+.file-row:first-child {
+  border-block-start: none;
 }
 
 .thumb {
   display: grid;
   place-items: center;
   flex: none;
-  width: 40px;
-  height: 40px;
+  inline-size: 40px;
+  block-size: 40px;
   overflow: hidden;
-  border-radius: var(--radius-sm);
-  background: var(--panel-2);
-  color: var(--text-weak);
+  border-radius: 4px;
+  background: var(--panelHighlight);
+  color: var(--fgTransparentWeak);
 }
 
 .thumb img {
-  width: 100%;
-  height: 100%;
+  inline-size: 100%;
+  block-size: 100%;
   object-fit: cover;
 }
 
 .thumb .icon {
-  width: 18px;
-  height: 18px;
+  inline-size: 18px;
+  block-size: 18px;
 }
 
 .file-main {
   flex: 1;
-  min-width: 0;
+  min-inline-size: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: 2px;
 }
 
 .file-name {
-  font-size: var(--fs-sm);
-  font-weight: var(--weight-semibold);
-  color: var(--text);
+  font-size: 0.9em;
+  font-weight: 600;
+  color: var(--fg);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .file-meta {
-  font-size: var(--fs-xs);
-  color: var(--text-weak);
+  font-size: 0.85em;
+  color: var(--fgTransparentWeak);
   overflow-wrap: anywhere;
+}
+
+.open {
+  flex: none;
+  font-size: 0.9em;
 }
 
 @media (max-width: 520px) {

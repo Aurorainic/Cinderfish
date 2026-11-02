@@ -11,12 +11,14 @@
 import { computed } from "vue";
 import { useRouter } from "vue-router";
 import AppIcon from "../../components/AppIcon.vue";
+import MkButton from "../../components/ui/MkButton.vue";
 import MkKeyValue from "../../components/ui/MkKeyValue.vue";
 import MkTime from "../../components/ui/MkTime.vue";
 import UserAvatar from "../../components/UserAvatar.vue";
 import { i18n } from "../../i18n";
 import { isAdmin, session, signout } from "../../stores/session";
 import SettingsPage from "./SettingsPage.vue";
+import SettingsSection from "./SettingsSection.vue";
 
 const router = useRouter();
 
@@ -39,19 +41,17 @@ function handleSignout() {
 
 <template>
   <SettingsPage>
-    <div v-if="!me" class="card">
-      <h2 class="card-title">需要登录</h2>
-      <p class="muted small">登录之后才会显示账户与会话相关的设置。</p>
-      <div class="gate-actions">
-        <RouterLink to="/login" class="button small">登录</RouterLink>
-        <RouterLink to="/signup" class="button ghost small">注册</RouterLink>
+    <div v-if="!me" class="_panel gate-panel">
+      <h2 class="gate-title">需要登录</h2>
+      <p class="settings-hint">登录之后才会显示账户与会话相关的设置。</p>
+      <div class="settings-actions">
+        <MkButton link to="/login" primary inline>登录</MkButton>
+        <MkButton link to="/signup" inline>注册</MkButton>
       </div>
     </div>
 
     <template v-else>
-      <section class="card">
-        <h2 class="card-title">账户</h2>
-
+      <SettingsSection title="账户信息" persist-key="settings-account-info">
         <div class="account-head">
           <UserAvatar :user="me" :size="64" />
           <div class="account-text">
@@ -59,7 +59,7 @@ function handleSignout() {
               {{ me.name || me.username }}
               <span v-if="isAdmin" class="badge admin">管理员</span>
             </div>
-            <div class="muted small">@{{ me.username }}</div>
+            <div class="settings-hint">@{{ me.username }}</div>
           </div>
         </div>
 
@@ -84,24 +84,22 @@ function handleSignout() {
           </MkKeyValue>
         </div>
 
-        <div class="row-actions">
-          <RouterLink :to="`/@${me.username}`" class="button ghost small">
+        <div class="settings-actions">
+          <MkButton link inline :to="`/@${me.username}`">
             <AppIcon name="user" />
             {{ i18n.ts.profile }}
-          </RouterLink>
-          <RouterLink to="/settings/profile" class="button ghost small">
+          </MkButton>
+          <MkButton link inline to="/settings/profile">
             {{ i18n.ts.editProfile }}
-          </RouterLink>
+          </MkButton>
         </div>
-      </section>
+      </SettingsSection>
 
-      <section class="card">
-        <h2 class="card-title">安全</h2>
-
+      <SettingsSection title="安全" persist-key="settings-account-security">
         <div class="setting-row">
           <div class="setting-text">
             <div class="setting-label">密码</div>
-            <p class="muted small">网页端尚未开放自助修改密码，需要时请由管理员在服务器上处理。</p>
+            <p class="settings-hint">网页端尚未开放自助修改密码，需要时请由管理员在服务器上处理。</p>
           </div>
           <span class="status">未开放</span>
         </div>
@@ -109,7 +107,7 @@ function handleSignout() {
         <div class="setting-row">
           <div class="setting-text">
             <div class="setting-label">两步验证</div>
-            <p class="muted small">服务器尚未提供两步验证接口。</p>
+            <p class="settings-hint">服务器尚未提供两步验证接口。</p>
           </div>
           <span class="status">未开放</span>
         </div>
@@ -117,50 +115,54 @@ function handleSignout() {
         <div class="setting-row">
           <div class="setting-text">
             <div class="setting-label">登录历史</div>
-            <p class="muted small">服务器尚未提供 i/signin-history 接口。</p>
+            <p class="settings-hint">服务器尚未提供 i/signin-history 接口。</p>
           </div>
           <span class="status">未开放</span>
         </div>
-      </section>
+      </SettingsSection>
 
-      <section class="card">
-        <h2 class="card-title">会话</h2>
-        <p class="muted small">退出后这台设备上的访问令牌会被清除。</p>
-        <div class="row-actions">
-          <button type="button" class="button danger" @click="handleSignout">
+      <SettingsSection title="会话" persist-key="settings-account-session">
+        <p class="settings-hint">退出后这台设备上的访问令牌会被清除。</p>
+        <div class="settings-actions">
+          <MkButton danger inline @click="handleSignout">
             <AppIcon name="logout" />
             退出登录
-          </button>
+          </MkButton>
         </div>
-      </section>
+      </SettingsSection>
 
-      <section class="card danger-card">
-        <h2 class="card-title">危险操作</h2>
+      <SettingsSection title="危险操作" persist-key="settings-account-danger">
         <div class="setting-row">
           <div class="setting-text">
             <div class="setting-label">注销账户</div>
-            <p class="muted small">
+            <p class="settings-hint">
               服务器尚未提供账户注销接口，笔记与媒体的删除也无法在网页端完成；需要时请联系实例管理员。
             </p>
           </div>
           <span class="status danger">不可用</span>
         </div>
-      </section>
+      </SettingsSection>
     </template>
   </SettingsPage>
 </template>
 
 <style scoped>
-.gate-actions {
+.gate-panel {
   display: flex;
+  flex-direction: column;
   gap: var(--space-8);
-  margin-top: var(--space-16);
+  padding: var(--margin);
+}
+
+.gate-title {
+  margin: 0;
+  font-size: 1.1em;
 }
 
 .account-head {
   display: flex;
   align-items: center;
-  gap: var(--space-14);
+  gap: 14px;
 }
 
 .account-text {
@@ -171,20 +173,20 @@ function handleSignout() {
   display: flex;
   align-items: center;
   gap: var(--space-8);
-  color: var(--text-strong);
-  font-size: var(--fs-md);
-  font-weight: var(--weight-bold);
+  color: var(--fgHighlighted);
+  font-size: 1em;
+  font-weight: 700;
   overflow-wrap: anywhere;
 }
 
 .badge {
   padding: 1px var(--space-8);
-  border: 1px solid var(--accent-border);
+  border: 1px solid var(--accent);
   border-radius: var(--radius-full);
   background: var(--accent-soft);
   color: var(--accent);
-  font-size: var(--fs-2xs);
-  font-weight: var(--weight-bold);
+  font-size: 0.72em;
+  font-weight: 700;
   letter-spacing: 0.02em;
 }
 
@@ -192,20 +194,12 @@ function handleSignout() {
   display: flex;
   flex-direction: column;
   gap: var(--space-10);
-  margin-top: var(--space-14);
 }
 
-.row-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--space-8);
-  flex-wrap: wrap;
-  margin-top: var(--space-14);
-}
-
-.row-actions .icon {
+.settings-actions .icon {
   width: 15px;
   height: 15px;
+  margin-inline-end: 4px;
 }
 
 .setting-row {
@@ -218,7 +212,7 @@ function handleSignout() {
 
 .setting-row:first-of-type {
   border-top: 0;
-  padding-top: var(--space-4);
+  padding-top: 0;
 }
 
 .setting-text {
@@ -226,32 +220,28 @@ function handleSignout() {
 }
 
 .setting-label {
-  color: var(--text-strong);
-  font-size: var(--fs-sm);
-  font-weight: var(--weight-semibold);
-  margin-bottom: var(--space-2);
+  margin-bottom: 2px;
+  color: var(--fgHighlighted);
+  font-size: 0.9em;
+  font-weight: 600;
 }
 
 .status {
   flex: none;
   margin-left: auto;
   padding: 1px var(--space-8);
-  border: 1px solid var(--border);
+  border: 1px solid var(--divider);
   border-radius: var(--radius-full);
-  color: var(--text-weak);
-  font-size: var(--fs-2xs);
-  font-weight: var(--weight-semibold);
+  color: var(--fgTransparentWeak);
+  font-size: 0.72em;
+  font-weight: 600;
   white-space: nowrap;
 }
 
 .status.danger {
-  border-color: var(--danger-border);
-  background: var(--danger-soft);
-  color: var(--danger);
-}
-
-.danger-card {
-  border-color: var(--danger-border);
+  border-color: var(--error);
+  background: color-mix(in srgb, var(--error) 15%, transparent);
+  color: var(--error);
 }
 
 .mono {

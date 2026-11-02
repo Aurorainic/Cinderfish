@@ -30,11 +30,11 @@
 		</template>
 	</PageHeader>
 
-	<div v-if="!session.me" class="card placeholder">
-		<AppIcon name="bell" />
+	<div v-if="!session.me" class="_panel _fullinfo auth-gate">
+		<AppIcon class="ghost" name="bell" />
 		<h2>需要登录</h2>
-		<p class="small">登录后可以查看回复、反应、关注与提及。</p>
-		<RouterLink to="/login" class="button small">登录</RouterLink>
+		<p>登录后可以查看回复、反应、关注与提及。</p>
+		<MkButton link to="/login" primary>登录</MkButton>
 	</div>
 
 	<div v-else class="notifications-page">
@@ -49,7 +49,12 @@
 					</template>
 				</MkDateSeparatedList>
 			</template>
-			<template #empty>{{ emptyText }}</template>
+			<template #empty>
+				<div class="_fullinfo empty-placeholder">
+					<AppIcon class="ghost" name="bell" />
+					<p>{{ emptyText }}</p>
+				</div>
+			</template>
 		</MkPagination>
 	</div>
 </template>
@@ -63,6 +68,7 @@ import { session } from "../stores/session";
 import { setUnreadNotifications, streaming, unreadNotifications } from "../stores/streaming";
 import NotificationItem from "../components/NotificationItem.vue";
 import AppIcon from "../components/AppIcon.vue";
+import MkButton from "../components/ui/MkButton.vue";
 import MkDateSeparatedList from "../components/ui/MkDateSeparatedList.vue";
 import MkPagination from "../components/ui/MkPagination.vue";
 import PageHeader from "../components/ui/PageHeader.vue";
@@ -211,7 +217,59 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .notifications-page {
-	padding-block-start: var(--space-12, 12px);
+	/* Firefish wraps the list in MkSpacer (12–24px); --margin gives the same
+	   gutter as the other ported pages. */
+	padding-block: var(--margin);
+}
+
+/* MkPagination's empty slot: Firefish centres the muted badge and its label in
+   the column (._fullinfo already supplies the 64px padding). */
+.empty-placeholder {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 12px;
+	color: var(--fgTransparentWeak);
+}
+
+.empty-placeholder > .ghost {
+	inline-size: 64px;
+	block-size: 64px;
+	opacity: 0.45;
+}
+
+.empty-placeholder > p {
+	margin: 0;
+	font-size: 0.95em;
+	line-height: 1.5;
+}
+
+/* Firefish's unauthenticated state uses the same centred badge and label as
+   its empty state; the panel only appears when the page has nothing else. */
+.auth-gate {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 12px;
+	color: var(--fgTransparentWeak);
+}
+
+.auth-gate > .ghost {
+	inline-size: 64px;
+	block-size: 64px;
+	opacity: 0.45;
+}
+
+.auth-gate > h2 {
+	margin: 0;
+	font-size: 1.05em;
+	color: var(--fg);
+}
+
+.auth-gate > p {
+	margin: 0;
+	font-size: 0.95em;
+	line-height: 1.5;
 }
 
 .mark {

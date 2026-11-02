@@ -7,6 +7,9 @@ import { instance, loadInstance } from "../../stores/instance";
 import { isLoggedIn, session } from "../../stores/session";
 import AppIcon from "../AppIcon.vue";
 import UserAvatar from "../UserAvatar.vue";
+import MkButton from "../ui/MkButton.vue";
+import MkInfo from "../ui/MkInfo.vue";
+import MkInput from "../ui/MkInput.vue";
 
 // The global post form. `os.openPostForm` renders it inside a PageWindow when
 // the post entry lives in the shell (bottom bar, deck), and the timeline pins
@@ -312,7 +315,7 @@ onBeforeUnmount(() => {
     <div class="composer-head">
       <UserAvatar v-if="session.me" :user="session.me" :size="fixed ? 34 : 40" />
       <div class="context">
-        <span v-if="replyTo" class="muted small">
+        <span v-if="replyTo" class="_caption">
           回复 <RouterLink :to="`/notes/${replyTo.id}`">@{{ replyTo.user.username }}</RouterLink>
           · {{ relativeTime(replyTo.createdAt) }}
         </span>
@@ -324,6 +327,7 @@ onBeforeUnmount(() => {
         class="icon-button"
         type="button"
         title="取消"
+        aria-label="取消"
         @click="cancel"
       >
         <AppIcon name="close" />
@@ -333,25 +337,25 @@ onBeforeUnmount(() => {
     <div v-if="draftPrompt" class="draft-banner">
       <span>有未发送的草稿</span>
       <button type="button" class="draft-action" @click="restoreDraft">恢复</button>
-      <button type="button" class="draft-action muted" @click="discardDraft">丢弃</button>
+      <button type="button" class="draft-action quiet" @click="discardDraft">丢弃</button>
     </div>
 
     <div v-if="showCw" class="field cw-field">
       <input
         v-model="cw"
-        class="input"
+        class="cw"
         type="text"
         maxlength="100"
         placeholder="内容警告（可选）"
         :aria-invalid="contentWarningRemaining < 0"
       />
-      <span class="muted small" aria-live="polite">剩余 {{ contentWarningRemaining }} 个字符</span>
+      <span class="_caption" aria-live="polite">剩余 {{ contentWarningRemaining }} 个字符</span>
     </div>
 
     <textarea
       ref="textarea"
       v-model="text"
-      class="textarea composer-text"
+      class="composer-text"
       :placeholder="replyTo ? '写下回复…' : renoteTo ? '引用并评论…' : '写点什么吧？'"
       :rows="fixed ? 3 : 4"
       @keydown.ctrl.enter="submit"
@@ -369,33 +373,33 @@ onBeforeUnmount(() => {
     <div v-if="files.length" class="previews">
       <div v-for="file in files" :key="file.id" class="preview">
         <img v-if="file.type.startsWith('image/')" :src="file.url" :alt="file.name" />
-        <span v-else class="muted small preview-name">{{ file.name }}</span>
-        <button type="button" class="remove" title="移除" @click="removeFile(file.id)">
+        <span v-else class="_caption preview-name">{{ file.name }}</span>
+        <button type="button" class="remove" title="移除" aria-label="移除" @click="removeFile(file.id)">
           <AppIcon name="close" />
         </button>
       </div>
     </div>
 
     <div v-if="visibility === 'specified'" class="recipients">
-      <input
+      <MkInput
         v-model="recipientsInput"
-        class="input"
         type="text"
         placeholder="收件人，逗号分隔：@alice, @bob@remote.example"
-        aria-label="收件人"
-      />
+      >
+        <template #label>收件人</template>
+      </MkInput>
       <p v-for="recipient in recipientList" :key="recipient.raw" class="recipient-row">
         <span class="recipient-handle" :class="{ bad: recipientErrors[displayHandle(recipient)] }">
           {{ displayHandle(recipient) }}
         </span>
-        <span v-if="recipientErrors[displayHandle(recipient)]" class="recipient-error small">
+        <span v-if="recipientErrors[displayHandle(recipient)]" class="recipient-error">
           {{ recipientErrors[displayHandle(recipient)] }}
         </span>
-        <span v-else class="muted small">将仅对这些用户可见</span>
+        <span v-else class="_caption">将仅对这些用户可见</span>
       </p>
     </div>
 
-    <p v-if="error" class="notice error small">{{ error }}</p>
+    <MkInfo v-if="error" class="form-error" warn>{{ error }}</MkInfo>
 
     <div class="composer-foot">
       <label class="tool-button" title="添加附件">
@@ -442,16 +446,16 @@ onBeforeUnmount(() => {
         </button>
       </div>
 
-      <label class="toggle small">
+      <label class="toggle">
         <input v-model="localOnly" type="checkbox" />
         仅本地
       </label>
 
       <span class="spacer"></span>
       <span class="counter" :class="{ over: remaining < 0 }">{{ remaining }}</span>
-      <button class="button small" type="button" :disabled="!canPost" @click="submit">
+      <MkButton gradate :disabled="!canPost" @click="submit">
         {{ posting ? "发布中…" : uploading ? "上传中…" : "发布" }}
-      </button>
+      </MkButton>
     </div>
   </section>
 </template>
@@ -459,27 +463,29 @@ onBeforeUnmount(() => {
 <style scoped>
 .composer {
   container-type: inline-size;
-  padding: 16px 18px;
-  margin-bottom: 16px;
+  padding-block: 16px;
+  padding-inline: 18px;
+  margin-block-end: 16px;
   background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
+  border: solid 0.5px var(--divider);
+  border-radius: var(--radius);
 }
 
 /* Pinned above a timeline: the panel merges into the feed's column. */
 .composer-fixed {
-  margin-bottom: 0;
+  margin-block-end: 0;
   border: 0;
-  border-bottom: 1px solid var(--divider);
+  border-block-end: solid 0.5px var(--divider);
   border-radius: 0;
-  padding: 12px 14px 10px;
+  padding-block: 12px 10px;
+  padding-inline: 14px;
 }
 
 .composer-head {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 10px;
+  margin-block-end: 10px;
 }
 
 .context {
@@ -491,13 +497,13 @@ onBeforeUnmount(() => {
 }
 
 .context-quote {
-  font-size: 0.78rem;
+  font-size: 0.85em;
   color: var(--renote);
 }
 
 .composer-title {
   font-weight: 700;
-  color: var(--text-strong);
+  color: var(--fgHighlighted);
 }
 
 .composer-fixed .composer-title {
@@ -505,30 +511,65 @@ onBeforeUnmount(() => {
 }
 
 .composer-fixed .composer-head {
-  margin-bottom: 4px;
+  margin-block-end: 4px;
+}
+
+.icon-button {
+  display: grid;
+  place-items: center;
+  flex: none;
+  inline-size: 32px;
+  block-size: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--fgTransparentWeak);
+  cursor: pointer;
+}
+
+.icon-button:hover {
+  background: var(--buttonBg);
+  color: var(--fg);
+}
+
+.icon-button:focus-visible {
+  outline: solid 2px var(--accent);
+  outline-offset: 1px;
+}
+
+.icon-button .icon {
+  inline-size: 18px;
+  block-size: 18px;
 }
 
 .draft-banner {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 8px;
-  padding: 6px 10px;
-  font-size: 0.8rem;
-  color: var(--text);
-  background: var(--accent-soft);
-  border-radius: var(--radius-sm);
+  margin-block-end: 8px;
+  padding-block: 6px;
+  padding-inline: 10px;
+  font-size: 0.85em;
+  color: var(--fg);
+  background: var(--accentedBg);
+  border-radius: var(--radius);
 }
 
 .draft-action {
-  padding: 2px 8px;
+  padding-block: 2px;
+  padding-inline: 8px;
   font: inherit;
-  font-size: 0.78rem;
+  font-size: 0.9em;
   color: var(--accent);
   background: none;
-  border: 1px solid transparent;
-  border-radius: var(--radius-sm);
+  border: solid 1px transparent;
+  border-radius: var(--radius);
   cursor: pointer;
+}
+
+.draft-action.quiet {
+  color: var(--fgTransparentWeak);
 }
 
 .draft-action:hover {
@@ -536,35 +577,57 @@ onBeforeUnmount(() => {
 }
 
 .draft-action:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: solid 2px var(--accent);
   outline-offset: 1px;
 }
 
 .cw-field {
-  margin-bottom: 8px;
+  margin-block-end: 8px;
+}
+
+/* Firefish renders the content warning and the body as bare fields: no border,
+   no background, the composer panel is the surface. */
+.cw,
+.composer-text {
+  display: block;
+  box-sizing: border-box;
+  inline-size: 100%;
+  margin: 0;
+  padding-block: 0;
+  padding-inline: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+}
+
+.cw {
+  margin-block-end: 6px;
+  font-size: 1em;
+}
+
+.cw:focus,
+.composer-text:focus {
+  outline: none;
 }
 
 .composer-text {
   min-height: 72px;
-  border: 0;
-  background: transparent;
-  padding: 4px 0;
+  font-size: 1.05em;
   resize: none;
-}
-
-.composer-text:focus {
-  box-shadow: none;
 }
 
 .quote-preview {
   display: flex;
   gap: 8px;
   align-items: flex-start;
-  margin: 8px 0 4px;
-  padding: 8px 10px;
-  border-left: 2px solid var(--renote);
-  border-radius: var(--radius-sm);
-  background: var(--panel-2);
+  margin-block: 8px 4px;
+  padding-block: 8px;
+  padding-inline: 10px;
+  border-inline-start: 2px solid var(--renote);
+  border-radius: var(--radius);
+  background: var(--panelHighlight);
 }
 
 .quote-body {
@@ -575,14 +638,14 @@ onBeforeUnmount(() => {
 }
 
 .quote-name {
-  font-size: 0.8rem;
+  font-size: 0.85em;
   font-weight: 700;
-  color: var(--text-strong);
+  color: var(--fgHighlighted);
 }
 
 .quote-text {
-  font-size: 0.82rem;
-  color: var(--muted);
+  font-size: 0.9em;
+  color: var(--fgTransparentWeak);
   overflow: hidden;
   text-overflow: ellipsis;
   display: -webkit-box;
@@ -594,24 +657,24 @@ onBeforeUnmount(() => {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin: 10px 0;
+  margin-block: 10px;
 }
 
 .preview {
   position: relative;
-  width: 88px;
-  height: 88px;
+  inline-size: 88px;
+  block-size: 88px;
   border-radius: var(--radius);
   overflow: hidden;
   background: var(--bg);
   display: grid;
   place-items: center;
-  border: 1px solid var(--border);
+  border: solid 0.5px var(--divider);
 }
 
 .preview img {
-  width: 100%;
-  height: 100%;
+  inline-size: 100%;
+  block-size: 100%;
   object-fit: cover;
 }
 
@@ -623,12 +686,13 @@ onBeforeUnmount(() => {
 
 .remove {
   position: absolute;
-  top: 4px;
-  right: 4px;
+  inset-block-start: 4px;
+  inset-inline-end: 4px;
   display: grid;
   place-items: center;
-  width: 22px;
-  height: 22px;
+  inline-size: 22px;
+  block-size: 22px;
+  padding: 0;
   border: 0;
   border-radius: 50%;
   background: rgba(0, 0, 0, 0.6);
@@ -636,11 +700,16 @@ onBeforeUnmount(() => {
   cursor: pointer;
 }
 
+.remove:focus-visible {
+  outline: solid 2px var(--accent);
+  outline-offset: 1px;
+}
+
 .recipients {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  margin: 4px 0 8px;
+  gap: 6px;
+  margin-block: 4px 8px;
 }
 
 .recipient-row {
@@ -649,7 +718,7 @@ onBeforeUnmount(() => {
   align-items: baseline;
   gap: 6px;
   margin: 0;
-  font-size: 0.78rem;
+  font-size: 0.85em;
 }
 
 .recipient-handle {
@@ -658,11 +727,15 @@ onBeforeUnmount(() => {
 }
 
 .recipient-handle.bad {
-  color: var(--danger);
+  color: var(--error);
 }
 
 .recipient-error {
-  color: var(--danger);
+  color: var(--error);
+}
+
+.form-error {
+  margin-block: 0 8px;
 }
 
 .composer-foot {
@@ -670,22 +743,22 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
-  border-top: 1px solid var(--divider);
-  padding-top: 10px;
-  margin-top: 4px;
+  border-block-start: solid 0.5px var(--divider);
+  padding-block-start: 10px;
+  margin-block-start: 4px;
 }
 
 .tool-button {
   display: grid;
   place-items: center;
-  width: 34px;
-  height: 34px;
+  inline-size: 34px;
+  block-size: 34px;
   border-radius: 50%;
-  border: 1px solid var(--border);
-  background: transparent;
-  color: var(--muted);
+  border: solid 0.5px var(--divider);
+  background: none;
+  color: var(--fgTransparentWeak);
   cursor: pointer;
-  font-size: 0.72rem;
+  font-size: 0.78em;
   font-weight: 700;
 }
 
@@ -693,12 +766,12 @@ onBeforeUnmount(() => {
 .tool-button.active {
   color: var(--accent);
   border-color: var(--accent);
-  background: var(--accent-soft);
+  background: var(--accentedBg);
 }
 
 .tool-button:focus-within,
 .tool-button:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: solid 2px var(--accent);
   outline-offset: 1px;
 }
 
@@ -707,42 +780,43 @@ onBeforeUnmount(() => {
   align-items: center;
   padding: 2px;
   gap: 2px;
-  border: 1px solid var(--border);
+  border: solid 0.5px var(--divider);
   border-radius: var(--radius);
-  background: var(--bg-raised);
+  background: var(--buttonBg);
 }
 
 .vis-option {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 4px 9px;
+  padding-block: 4px;
+  padding-inline: 9px;
   border: 0;
-  border-radius: calc(var(--radius) - 6px);
-  background: transparent;
-  color: var(--muted);
+  border-radius: 6px;
+  background: none;
+  color: var(--fgTransparentWeak);
   font: inherit;
-  font-size: 0.76rem;
+  font-size: 0.82em;
   cursor: pointer;
 }
 
 .vis-option:hover {
-  color: var(--text);
+  color: var(--fg);
 }
 
 .vis-option.active {
   color: var(--accent);
-  background: var(--accent-soft);
+  background: var(--accentedBg);
 }
 
 .vis-option:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: solid 2px var(--accent);
   outline-offset: 1px;
 }
 
 .vis-icon {
-  width: 14px;
-  height: 14px;
+  inline-size: 14px;
+  block-size: 14px;
   display: block;
 }
 
@@ -750,7 +824,7 @@ onBeforeUnmount(() => {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  color: var(--muted);
+  color: var(--fgTransparentWeak);
 }
 
 .spacer {
@@ -758,13 +832,13 @@ onBeforeUnmount(() => {
 }
 
 .counter {
-  font-size: 0.82rem;
-  color: var(--muted);
+  font-size: 0.85em;
+  color: var(--fgTransparentWeak);
   font-variant-numeric: tabular-nums;
 }
 
 .counter.over {
-  color: var(--danger);
+  color: var(--error);
   font-weight: 700;
 }
 

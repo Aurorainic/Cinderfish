@@ -111,8 +111,8 @@ input:checked + .track .knob {
 	background: var(--on-accent, #fff);
 }
 
-input:focus-visible + .track {
-	outline: var(--focus-outline);
+	input:focus-visible + .track {
+	outline: 2px solid var(--focus);
 	outline-offset: 2px;
 }
 
@@ -130,7 +130,7 @@ input:focus-visible + .track {
 
 .caption {
 	color: var(--text-faint);
-	font-size: var(--fs-xs);
+	font-size: 0.8em;
 	line-height: 1.5;
 }
 </style>

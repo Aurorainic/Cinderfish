@@ -4,6 +4,9 @@ import { instance, loadInstance, reloadInstance } from "../../stores/instance";
 import { session } from "../../stores/session";
 import { NAV_ITEM_DEFS } from "../../nav";
 import AppIcon from "../AppIcon.vue";
+import MkButton from "../ui/MkButton.vue";
+import MkInfo from "../ui/MkInfo.vue";
+import MkLoading from "../ui/MkLoading.vue";
 import WidgetCard from "./WidgetCard.vue";
 
 defineProps<{ widgetProps?: Record<string, unknown> }>();
@@ -69,7 +72,7 @@ onMounted(() => {
       </button>
     </template>
 
-    <p v-if="loading" class="desc state" aria-live="polite">正在读取实例信息…</p>
+    <MkLoading v-if="loading" mini />
 
     <template v-else>
       <p v-if="description" class="desc">{{ description }}</p>
@@ -81,20 +84,22 @@ onMounted(() => {
       </div>
     </template>
 
-    <p v-if="failure" class="notice error failure" :title="failure">
-      <span>{{ instance.meta ? "实例信息刷新失败" : "实例信息加载失败" }}</span>
-      <button type="button" class="button ghost small" :disabled="refreshing" @click="refresh">重试</button>
-      <span class="failure-detail">{{ failure }}</span>
-    </p>
+    <MkInfo v-if="failure" class="failure" warn>
+      <div class="failure-body">
+        <span>{{ instance.meta ? "实例信息刷新失败" : "实例信息加载失败" }}</span>
+        <MkButton mini :disabled="refreshing" @click="refresh">重试</MkButton>
+        <span class="failure-detail" :title="failure">{{ failure }}</span>
+      </div>
+    </MkInfo>
 
     <div class="actions">
       <template v-if="session.me">
-        <RouterLink :to="`/@${session.me.username}`" class="button ghost small">我的主页</RouterLink>
-        <RouterLink :to="NAV_ITEM_DEFS.settings.to" class="button small">设置</RouterLink>
+        <MkButton link mini :to="`/@${session.me.username}`">我的主页</MkButton>
+        <MkButton link mini :to="NAV_ITEM_DEFS.settings.to">设置</MkButton>
       </template>
       <template v-else>
-        <RouterLink to="/login" class="button ghost small">登录</RouterLink>
-        <RouterLink to="/signup" class="button small">注册</RouterLink>
+        <MkButton link mini to="/login">登录</MkButton>
+        <MkButton link mini to="/signup">注册</MkButton>
       </template>
     </div>
   </WidgetCard>
@@ -104,15 +109,15 @@ onMounted(() => {
 .refresh {
   display: grid;
   place-items: center;
-  width: 26px;
-  height: 26px;
+  inline-size: 26px;
+  block-size: 26px;
   padding: 0;
-  border: 1px solid var(--border);
+  border: solid 0.5px var(--divider);
   border-radius: 50%;
-  background: transparent;
+  background: none;
   color: var(--accent);
   cursor: pointer;
-  transition: color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+  transition: color 0.1s ease, border-color 0.1s ease, opacity 0.1s ease;
 }
 
 .refresh:hover:not(:disabled) {
@@ -120,26 +125,26 @@ onMounted(() => {
 }
 
 .refresh:disabled {
-  color: var(--muted);
+  color: var(--fgTransparentWeak);
   opacity: 0.6;
   cursor: default;
 }
 
 .refresh .icon {
-  width: 13px;
-  height: 13px;
+  inline-size: 13px;
+  block-size: 13px;
 }
 
 .desc {
   margin: 0;
-  color: var(--muted);
-  font-size: 0.85rem;
+  color: var(--fgTransparentWeak);
+  font-size: 0.9em;
   line-height: 1.6;
 }
 
 /* A loading or "no description" line is a state, not instance prose. */
 .desc.state {
-  color: var(--text-faint);
+  color: var(--fgTransparent);
   font-style: italic;
 }
 
@@ -147,36 +152,42 @@ onMounted(() => {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  margin-top: 10px;
+  margin-block-start: 10px;
 }
 
 .fact {
-  padding: 1px 8px;
-  border: 1px solid var(--border);
+  padding-block: 1px;
+  padding-inline: 8px;
+  border: solid 0.5px var(--divider);
   border-radius: 999px;
-  color: var(--muted);
-  font-size: 0.72rem;
+  color: var(--fgTransparentWeak);
+  font-size: 0.8em;
   line-height: 1.6;
 }
 
 .failure {
+  margin-block-start: 10px;
+}
+
+.failure-body {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 8px;
-  margin-top: 10px;
+  min-inline-size: 0;
 }
 
 .failure-detail {
   flex-basis: 100%;
-  color: var(--text-faint);
-  font-size: 0.72rem;
+  opacity: 0.75;
+  font-size: 0.8em;
   overflow-wrap: anywhere;
 }
 
 .actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
-  margin-top: 14px;
+  margin-block-start: 14px;
 }
 </style>

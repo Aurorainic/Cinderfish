@@ -1158,3 +1158,416 @@ p {
 	--fs-md: 1em;
 	--fs-lg: 1.15em;
 }
+
+/* ------------------------------------------------------------------ */
+/* Legacy compatibility layer                                         */
+/*                                                                    */
+/* The Firefish port replaced this stylesheet and with it the 2025     */
+/* Cinderfish utility classes and the remaining kebab-case tokens the  */
+/* files written before the port read. The admin console, the widgets, */
+/* the composer, the notification list and several profile components  */
+/* still use them, so tokens and classes are re-expressed here in      */
+/* terms of the Firefish tokens above: those files restyle with the    */
+/* theme instead of falling back to browser defaults.                  */
+/*                                                                    */
+/* This block is a shim, not a design system. New code uses the ported */
+/* `._button` / `._panel` primitives and the camelCase tokens above;   */
+/* nothing below is meant to grow.                                     */
+/* ------------------------------------------------------------------ */
+
+:root {
+	/* Spacing (`--space-N` is N px, the convention the aliases above
+	   already follow). */
+	--space-2: 2px;
+	--space-4: 4px;
+	--space-5: 5px;
+	--space-6: 6px;
+	--space-14: 14px;
+	--space-48: 48px;
+
+	/* Type: html is 14px (style.scss), so this ladder is 10 / 11 / 12 /
+	   14 / 16 / 19 px around the --fs-sm/--fs-md/--fs-lg values above. */
+	--fs-2xs: 0.72em;
+	--fs-xs: 0.78em;
+	--fs-xl: 1.35em;
+	--weight-normal: 400;
+	--weight-medium: 500;
+	--weight-semibold: 600;
+	--weight-bold: 700;
+	--leading-tight: 1.25;
+	--leading-relaxed: 1.6;
+
+	/* Corners stay derived from --radius: a second radius scale would put
+	   the two halves of the UI out of step. */
+	--radius-xs: calc(var(--radius) - 6px);
+	--radius-sm: calc(var(--radius) - 4px);
+
+	/* Motion: the durations style.scss uses for hover and state swaps. */
+	--dur-fast: 0.1s;
+	--dur-base: 0.2s;
+
+	/* Colour aliases. Mixed tokens derive from the semantic colours, so
+	   the light theme needs no second definition. */
+	--on-accent: var(--fgOnAccent);
+	--muted: var(--fgTransparentWeak);
+	--accent-strong: var(--accent);
+	--accent-border: color-mix(in srgb, var(--accent) 40%, transparent);
+	--danger-border: color-mix(in srgb, var(--error) 45%, transparent);
+	--danger-soft: color-mix(in srgb, var(--error) 12%, transparent);
+	--success-soft: color-mix(in srgb, var(--success) 12%, transparent);
+	--bg-raised: var(--panel);
+	--border-strong: var(--inputBorderHover);
+	--surface-selected: var(--accentedBg);
+	--popup-bg: var(--popup);
+	--badge-bg: var(--badge);
+	--window-header-bg: var(--windowHeader);
+	--cw-bg: var(--cwBg);
+	--cw-fg: var(--cwFg);
+	--input-border: var(--inputBorder);
+	--input-border-hover: var(--inputBorderHover);
+	--avatar-size: var(--avatarSize);
+	--nav-bg: var(--panel);
+	--nav-fg: var(--fg);
+	--nav-fg-hover: var(--navHoverFg);
+	--nav-hover-fg: var(--navHoverFg);
+	--nav-active: var(--accent);
+	--nav-indicator: var(--accent);
+
+	/* Focus ring, elevation and stacking. */
+	--focus-outline: 2px solid var(--accent);
+	--shadow-sm: 0 2px 8px var(--shadow);
+	--shadow-popover: 0 4px 32px var(--shadow);
+	--shadow-modal: 0 8px 48px var(--shadow);
+	--z-sticky: 100;
+}
+
+/* ---------- typography ---------- */
+
+.muted {
+	color: var(--muted);
+}
+
+.small {
+	font-size: 0.85em;
+}
+
+/* Field labels get typography only. No colour and no `display`: the label is
+   also used inside inline rows (MkSwitch) and inside the content-warning
+   chip (CwButton), which must keep inheriting `--cwFg` from its surface. */
+.label {
+	font-size: var(--fs-sm);
+	font-weight: var(--weight-medium);
+}
+
+.link {
+	color: var(--accent);
+	cursor: pointer;
+	text-underline-offset: 0.2em;
+}
+
+/* ---------- surfaces ---------- */
+
+.card {
+	padding: var(--space-16);
+	border: 1px solid var(--hairline);
+	border-radius: var(--radius);
+	background: var(--panel);
+}
+
+.card-title {
+	margin: 0 0 var(--space-12);
+	font-size: var(--fs-md);
+	font-weight: var(--weight-semibold);
+	color: var(--fgHighlighted);
+}
+
+/* `._panel` without the padding: the ported panel shells pad their own
+   head and body. */
+.panel {
+	border-radius: var(--radius);
+	background: var(--panel);
+}
+
+/* ---------- controls ---------- */
+
+/* Equivalent of the ported MkButton: a quiet filled control that keeps a
+   visible edge on a `.card`, which shares its --panel fill. Weight and
+   line-height are left inherited on purpose — MkNoteFooter and its
+   RenoteButton reuse `.button` for icon buttons and restyle it through
+   `:deep(.button)`, so only the properties they do not set may change. */
+.button {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	padding: var(--space-8) var(--space-16);
+	border: 1px solid var(--hairline);
+	border-radius: var(--radius);
+	background: var(--panel);
+	color: var(--fg);
+	font: inherit;
+	cursor: pointer;
+	text-decoration: none;
+	transition: background var(--dur-base) ease, border-color var(--dur-base) ease,
+		color var(--dur-base) ease;
+}
+
+.button:hover {
+	background: var(--panelHighlight);
+	text-decoration-color: transparent;
+}
+
+.button:active {
+	background: var(--buttonBg);
+}
+
+.button:disabled,
+.button[aria-disabled="true"] {
+	opacity: 0.6;
+	cursor: not-allowed;
+}
+
+.button:focus-visible {
+	outline: var(--focus-outline);
+	outline-offset: 2px;
+}
+
+.button.ghost {
+	border-color: var(--divider);
+	background: transparent;
+}
+
+.button.ghost:hover {
+	border-color: var(--accent-border);
+	background: var(--accentedBg);
+	color: var(--accent);
+}
+
+.button.small,
+.button.button-small,
+.button-small {
+	padding: var(--space-6) var(--space-12);
+	border-radius: var(--radius-sm);
+	font-size: var(--fs-sm);
+}
+
+/* Restricted to real form elements: MkInput wraps its field in a
+   `div.input` that is laid out by the component itself (scoped styles),
+   and a border here would draw a second frame around it. */
+input.input,
+textarea.input,
+select.input,
+input.textarea,
+textarea.textarea {
+	inline-size: 100%;
+	padding: var(--space-8) var(--space-12);
+	border: 1px solid var(--divider);
+	border-radius: var(--radius-sm);
+	background: var(--panelHighlight);
+	color: var(--fg);
+	font: inherit;
+	outline: none;
+	transition: border-color var(--dur-fast) ease, box-shadow var(--dur-fast) ease;
+}
+
+input.input::placeholder,
+textarea.input::placeholder,
+input.textarea::placeholder,
+textarea.textarea::placeholder {
+	color: var(--fgTransparentWeak);
+}
+
+input.input:focus,
+textarea.input:focus,
+select.input:focus,
+input.textarea:focus,
+textarea.textarea:focus {
+	border-color: var(--accent);
+	box-shadow: 0 0 0 3px var(--focus);
+}
+
+textarea.textarea {
+	min-block-size: 96px;
+	resize: vertical;
+}
+
+.icon-button {
+	display: inline-grid;
+	place-items: center;
+	flex: none;
+	inline-size: 34px;
+	block-size: 34px;
+	padding: 0;
+	border: 0;
+	border-radius: var(--radius-full);
+	background: transparent;
+	color: var(--fg);
+	cursor: pointer;
+	transition: background var(--dur-base) ease, color var(--dur-base) ease;
+}
+
+.icon-button:hover {
+	background: var(--buttonBg);
+	color: var(--accent);
+}
+
+.icon-button:focus-visible {
+	outline: var(--focus-outline);
+	outline-offset: 2px;
+}
+
+/* ---------- feedback ---------- */
+
+/* No font-size here: `.notice` is combined with `.small` at several call
+   sites, and a size on the block would win the cascade over `.small`. */
+.notice {
+	margin: 0 0 var(--space-14);
+	padding: var(--space-10) var(--space-14);
+	border-radius: var(--radius);
+	background: var(--infoBg);
+	color: var(--infoFg);
+}
+
+.notice.error {
+	border: 1px solid var(--danger-border);
+	background: var(--danger-soft);
+	color: var(--danger);
+}
+
+.notice.info {
+	background: var(--infoBg);
+	color: var(--infoFg);
+}
+
+.badge {
+	display: inline-block;
+	padding: 0 var(--space-8);
+	border: 1px solid var(--accent-border);
+	border-radius: var(--radius-full);
+	background: var(--accentedBg);
+	color: var(--accent);
+	font-size: var(--fs-xs);
+	font-weight: var(--weight-semibold);
+	line-height: 1.6;
+	vertical-align: middle;
+	white-space: nowrap;
+}
+
+.badge.danger {
+	border-color: var(--danger-border);
+	background: var(--danger-soft);
+	color: var(--danger);
+}
+
+.pill {
+	display: inline-block;
+	padding: 0 var(--space-10);
+	border: 1px solid var(--divider);
+	border-radius: var(--radius-full);
+	color: var(--fgTransparentWeak);
+	font-size: var(--fs-2xs);
+	font-weight: var(--weight-bold);
+	line-height: 1.8;
+	vertical-align: middle;
+	white-space: nowrap;
+}
+
+.pill.open {
+	border-color: color-mix(in srgb, var(--success) 45%, transparent);
+	background: var(--success-soft);
+	color: var(--success);
+}
+
+/* ---------- layout helpers ---------- */
+
+/* Top rather than centre: the only unsheltered consumer is the deck's
+   notification row, whose avatar should stay level with the first line. */
+.row {
+	display: flex;
+	align-items: flex-start;
+	gap: var(--space-8);
+}
+
+.stack {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-12);
+}
+
+/* Firefish's MkFolder header line (MkFolder.vue / style.scss), the one
+   component that balances a `.divider` between a title and its toggle. */
+.divider {
+	flex: 1;
+	margin: auto;
+	block-size: 1px;
+	background: var(--divider);
+}
+
+.grow {
+	flex: 1 1 auto;
+	min-inline-size: 0;
+}
+
+.list {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.list-item {
+	padding: var(--space-12) var(--space-16);
+	border-block-end: 1px solid var(--hairline);
+}
+
+.list-item:last-child {
+	border-block-end: none;
+}
+
+.page {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-16);
+	min-inline-size: 0;
+}
+
+.page-title {
+	display: flex;
+	align-items: center;
+	gap: var(--space-12);
+	margin: 0 0 var(--space-16);
+}
+
+.page-title h1 {
+	font-size: var(--fs-xl);
+}
+
+.section-title {
+	margin: 0;
+	font-size: var(--fs-md);
+	font-weight: var(--weight-bold);
+	color: var(--fgHighlighted);
+}
+
+/* Empty states. `:not(.inner)` keeps MkAvatar's `.inner.placeholder`
+   initial out of this rule: that element is an avatar, not an empty
+   state, and it is sized from its container by the component. */
+.placeholder:not(.inner) {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: var(--space-10);
+	padding: calc(var(--space-16) * 2);
+	text-align: center;
+	color: var(--muted);
+}
+
+.placeholder:not(.inner) > svg.icon {
+	flex: none;
+	inline-size: 3rem;
+	block-size: 3rem;
+	color: var(--accent);
+	opacity: 0.7;
+}
+
+.placeholder:not(.inner) > h2 {
+	font-size: var(--fs-lg);
+}

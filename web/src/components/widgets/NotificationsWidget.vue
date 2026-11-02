@@ -6,6 +6,8 @@ import { isLoggedIn, session } from "../../stores/session";
 import { setUnreadNotifications, unreadNotifications } from "../../stores/streaming";
 import AppIcon from "../AppIcon.vue";
 import NotificationItem from "../NotificationItem.vue";
+import MkButton from "../ui/MkButton.vue";
+import MkInfo from "../ui/MkInfo.vue";
 import PagedFeed from "../ui/PagedFeed.vue";
 import WidgetCard from "./WidgetCard.vue";
 
@@ -84,11 +86,11 @@ async function markAllRead(): Promise<void> {
 
     <div v-if="!isLoggedIn" class="empty">
       <span>登录后查看通知。</span>
-      <RouterLink to="/login" class="button small">登录</RouterLink>
+      <MkButton link mini to="/login">登录</MkButton>
     </div>
 
     <template v-else>
-      <p v-if="error" class="notice error inline-notice">{{ error }}</p>
+      <MkInfo v-if="error" class="inline-notice" warn>{{ error }}</MkInfo>
       <div class="scroll" :style="{ height: `${height}px` }">
         <PagedFeed
           :fetcher="fetcher"
@@ -99,7 +101,11 @@ async function markAllRead(): Promise<void> {
           <template #item="{ item }">
             <NotificationItem :notification="(item as Notification)" />
           </template>
-          <template #empty>还没有通知。</template>
+          <template #empty>
+            <div class="_fullinfo empty-placeholder">
+              <p>还没有通知。</p>
+            </div>
+          </template>
         </PagedFeed>
       </div>
     </template>
@@ -110,15 +116,15 @@ async function markAllRead(): Promise<void> {
 .action {
   display: grid;
   place-items: center;
-  width: 26px;
-  height: 26px;
+  inline-size: 26px;
+  block-size: 26px;
   padding: 0;
-  border: 1px solid var(--border);
+  border: solid 0.5px var(--divider);
   border-radius: 50%;
-  background: transparent;
+  background: none;
   color: var(--accent);
   cursor: pointer;
-  transition: color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+  transition: color 0.1s ease, border-color 0.1s ease, opacity 0.1s ease;
 }
 
 a.action {
@@ -130,19 +136,19 @@ a.action {
 }
 
 .action:disabled {
-  color: var(--muted);
+  color: var(--fgTransparentWeak);
   opacity: 0.6;
   cursor: default;
 }
 
 .action:focus-visible {
-  outline: var(--focus-outline);
+  outline: solid 2px var(--accent);
   outline-offset: 2px;
 }
 
 .action .icon {
-  width: 13px;
-  height: 13px;
+  inline-size: 13px;
+  block-size: 13px;
 }
 
 /* Rows carry their own hairline, so PagedFeed must not space them. */
@@ -150,7 +156,7 @@ a.action {
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
-  scrollbar-color: var(--border) transparent;
+  scrollbar-color: var(--divider) transparent;
 }
 
 .scroll :deep(.paged-feed) {
@@ -162,12 +168,28 @@ a.action {
   flex-direction: column;
   align-items: center;
   gap: 10px;
-  padding: 22px 14px;
-  color: var(--muted);
-  font-size: 0.85rem;
+  padding-block: 22px;
+  padding-inline: 14px;
+  color: var(--fgTransparentWeak);
+  font-size: 0.9em;
 }
 
 .inline-notice {
-  margin: 10px 12px 0;
+  margin-block-start: 10px;
+  margin-inline: 12px;
+}
+
+.empty-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  color: var(--fgTransparentWeak);
+}
+
+.empty-placeholder > p {
+  margin: 0;
+  font-size: 0.95em;
+  line-height: 1.5;
 }
 </style>

@@ -85,16 +85,16 @@ const notesLink = computed(() => {
   container-name: profile-card;
   container-type: inline-size;
   overflow: hidden;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
+  border: solid 0.5px var(--divider);
+  border-radius: var(--radius);
   background: var(--panel);
   min-width: 0;
 }
 
 .banner {
   height: 132px;
-  border-bottom: 1px solid var(--divider);
-  background: var(--surface-inset);
+  border-block-end: solid 0.5px var(--divider);
+  background: var(--panelHighlight);
 }
 
 .banner img {
@@ -105,76 +105,77 @@ const notesLink = computed(() => {
 }
 
 .body {
-  padding: 0 var(--space-20) var(--space-20);
+  padding-block: 0 20px;
+  padding-inline: 20px;
 }
 
 .avatar-frame {
   width: max-content;
-  margin-top: -42px;
+  margin-block-start: -42px;
   padding: 3px;
   border-radius: 50%;
   background: var(--panel);
 }
 
 .name {
-  margin: var(--space-10) 0 0;
-  font-size: var(--fs-xl);
+  margin: 10px 0 0;
+  font-size: 1.4em;
   line-height: 1.2;
-  color: var(--text-strong);
+  color: var(--fgHighlighted);
   overflow-wrap: anywhere;
 }
 
 .handle {
-  margin: var(--space-2) 0 0;
-  color: var(--text-weak);
-  font-size: var(--fs-sm);
+  margin: 2px 0 0;
+  color: var(--fgTransparentWeak);
+  font-size: 0.9em;
   overflow-wrap: anywhere;
 }
 
 .bio {
-  margin-top: var(--space-12);
+  margin-block-start: 12px;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
 
 .bio.empty {
-  color: var(--text-weak);
+  color: var(--fgTransparentWeak);
 }
 
 .joined {
-  margin-top: var(--space-8);
-  color: var(--text-weak);
-  font-size: var(--fs-xs);
+  margin-block-start: 8px;
+  color: var(--fgTransparentWeak);
+  font-size: 0.85em;
 }
 
 .counters {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-8) var(--space-20);
-  margin-top: var(--space-16);
-  padding-top: var(--space-14);
-  border-top: 1px solid var(--border);
+  gap: 8px 20px;
+  margin-block-start: 16px;
+  padding-block-start: 14px;
+  border-block-start: solid 0.5px var(--divider);
 }
 
 .counter {
   display: inline-flex;
   align-items: baseline;
-  gap: var(--space-6);
-  padding: var(--space-2) 0;
-  color: var(--text-weak);
-  font-size: var(--fs-sm);
+  gap: 6px;
+  padding-block: 2px;
+  color: var(--fgTransparentWeak);
+  font-size: 0.9em;
   white-space: nowrap;
 }
 
 .counter b {
-  color: var(--text-strong);
-  font-size: var(--fs-md);
+  color: var(--fgHighlighted);
+  font-size: 1em;
   font-variant-numeric: tabular-nums;
 }
 
 .counter.link {
-  border-radius: var(--radius-xs);
-  transition: color var(--dur-fast) ease;
+  border-radius: 4px;
+  transition: color 0.1s ease;
 }
 
 .counter.link:hover b,
@@ -183,14 +184,14 @@ const notesLink = computed(() => {
 }
 
 .counter.link:focus-visible {
-  outline: var(--focus-outline);
+  outline: solid 2px var(--accent);
   outline-offset: 2px;
 }
 
 .lists-note {
-  margin-top: var(--space-8);
-  color: var(--text-faint);
-  font-size: var(--fs-2xs);
+  margin-block-start: 8px;
+  color: var(--fgTransparent);
+  font-size: 0.8em;
   line-height: 1.5;
 }
 
@@ -200,19 +201,20 @@ const notesLink = computed(() => {
   }
 
   .body {
-    padding: 0 var(--space-14) var(--space-16);
+    padding-block: 0 16px;
+    padding-inline: 14px;
   }
 
   .avatar-frame {
-    margin-top: -36px;
+    margin-block-start: -36px;
   }
 
   .name {
-    font-size: var(--fs-lg);
+    font-size: 1.15em;
   }
 
   .counters {
-    gap: var(--space-6) var(--space-14);
+    gap: 6px 14px;
   }
 }
 </style>

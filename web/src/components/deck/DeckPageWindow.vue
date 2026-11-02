@@ -8,6 +8,8 @@ import NoteDetail from "../note/NoteDetail.vue";
 import NoteItem from "../note/Note.vue";
 import ProfileHeader from "../ProfileHeader.vue";
 import ProfileSection from "../profile/ProfileSection.vue";
+import MkInfo from "../ui/MkInfo.vue";
+import MkLoading from "../ui/MkLoading.vue";
 import PageWindow from "../ui/PageWindow.vue";
 import PagedFeed from "../ui/PagedFeed.vue";
 import { useFollowRelation } from "../../composables/use-follow-relation";
@@ -161,14 +163,14 @@ function onNoteDeleted(id: string): void {
   <PageWindow v-if="title" :title="title" @close="closeDeckPage">
     <div class="window-pad" @click.capture="interceptDeckClick">
       <template v-if="noteId">
-        <div v-if="noteLoading" class="skeleton"></div>
-        <p v-else-if="noteError" class="notice error">{{ noteError }}</p>
+        <MkLoading v-if="noteLoading" />
+        <MkInfo v-else-if="noteError" warn>{{ noteError }}</MkInfo>
         <NoteDetail v-else-if="note" :note="note" @deleted="onNoteDeleted" />
       </template>
 
       <template v-else>
-        <div v-if="userLoading" class="skeleton"></div>
-        <p v-else-if="userError" class="notice error">{{ userError }}</p>
+        <MkLoading v-if="userLoading" />
+        <MkInfo v-else-if="userError" warn>{{ userError }}</MkInfo>
         <template v-else-if="user">
           <ProfileHeader
             :user="user"
@@ -180,16 +182,16 @@ function onNoteDeleted(id: string): void {
             @follow="follow"
             @unfollow="unfollow"
           />
-          <p v-if="followNotice" class="notice error">{{ followNotice }}</p>
+          <MkInfo v-if="followNotice" class="follow-notice" warn>{{ followNotice }}</MkInfo>
           <ProfileSection class="profile-feed" title="最近的笔记" icon="feather" hint="按发布时间从新到旧" plain>
             <PagedFeed :key="username" :fetcher="profileNotesFetcher">
               <template #item="{ item }">
                 <NoteItem :note="(item as Note)" @deleted="onNoteDeleted" />
               </template>
               <template #empty>
-                <div class="placeholder">
-                  <AppIcon name="feather" />
-                  <span>还没有笔记。</span>
+                <div class="_fullinfo empty-placeholder">
+                  <AppIcon class="ghost" name="feather" />
+                  <p>还没有笔记。</p>
                 </div>
               </template>
             </PagedFeed>
@@ -213,9 +215,29 @@ function onNoteDeleted(id: string): void {
   gap: 0;
 }
 
-.skeleton {
-  height: 160px;
-  border-radius: var(--radius);
-  background: var(--panel-2);
+.follow-notice {
+  margin-block: 12px;
+}
+
+/* Firefish's empty state (MkPagination's _fullinfo slot): centred badge and
+   label instead of text hugging the window edge. */
+.empty-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  color: var(--fgTransparentWeak);
+}
+
+.empty-placeholder > .ghost {
+  inline-size: 64px;
+  block-size: 64px;
+  opacity: 0.45;
+}
+
+.empty-placeholder > p {
+  margin: 0;
+  font-size: 0.95em;
+  line-height: 1.5;
 }
 </style>

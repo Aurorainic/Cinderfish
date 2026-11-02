@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted } from "vue";
+import MkInfo from "../../components/ui/MkInfo.vue";
 import { instance, loadInstance } from "../../stores/instance";
 import SettingsPage from "./SettingsPage.vue";
+import SettingsSection from "./SettingsSection.vue";
 
 // Misskey spells the federation modes all / specified / none; the public and
 // allowlist spellings are accepted as aliases.
@@ -48,8 +50,7 @@ onMounted(() => {
 
 <template>
   <SettingsPage>
-    <section class="card">
-      <h2 class="card-title">实例</h2>
+    <SettingsSection title="实例" persist-key="settings-about-instance">
       <dl v-if="instance.meta" class="meta-list">
         <div class="meta-row">
           <dt>名称</dt>
@@ -76,28 +77,26 @@ onMounted(() => {
           <dd>{{ instance.meta.maxNoteTextLength }} 字符</dd>
         </div>
       </dl>
-      <p v-else-if="instance.error" class="notice error">读取实例信息失败：{{ instance.error }}</p>
-      <p v-else class="muted small">正在读取实例信息…</p>
-    </section>
+      <MkInfo v-else-if="instance.error" warn>读取实例信息失败：{{ instance.error }}</MkInfo>
+      <p v-else class="settings-hint">正在读取实例信息…</p>
+    </SettingsSection>
 
-    <section class="card">
-      <h2 class="card-title">协议入口</h2>
+    <SettingsSection title="协议入口" persist-key="settings-about-protocol">
       <ul class="links">
         <li v-for="link in links" :key="link.href">
           <a :href="link.href" target="_blank" rel="noopener">{{ link.label }}</a>
-          <span class="mono muted small">{{ link.href }}</span>
+          <span class="mono settings-hint">{{ link.href }}</span>
         </li>
       </ul>
-    </section>
+    </SettingsSection>
 
-    <section class="card">
-      <h2 class="card-title">客户端</h2>
-      <p class="muted small">
+    <SettingsSection title="客户端" persist-key="settings-about-client">
+      <p class="settings-hint">
         Cinderfish 前端使用 Vue 3 与 TypeScript 构建，界面遵循 Firefish / Iceshrimp 的信息密度；
         后端遵循 Misskey API 契约，通信层使用 ActivityPub。
       </p>
       <p class="license">Cinderfish · AGPL-3.0</p>
-    </section>
+    </SettingsSection>
   </SettingsPage>
 </template>
 
@@ -112,19 +111,19 @@ onMounted(() => {
 .meta-row {
   display: flex;
   gap: var(--space-12);
-  font-size: var(--fs-sm);
+  font-size: 0.9em;
 }
 
 .meta-row dt {
   flex: none;
   width: 80px;
-  color: var(--text-weak);
+  color: var(--fgTransparentWeak);
 }
 
 .meta-row dd {
   margin: 0;
   min-width: 0;
-  color: var(--text);
+  color: var(--fg);
 }
 
 .mono {
@@ -139,7 +138,7 @@ onMounted(() => {
   margin: 0;
   padding: 0;
   list-style: none;
-  font-size: var(--fs-sm);
+  font-size: 0.9em;
 }
 
 .links li {
@@ -151,8 +150,8 @@ onMounted(() => {
 
 .links a {
   flex: none;
-  color: var(--accent);
-  font-weight: var(--weight-semibold);
+  color: var(--link);
+  font-weight: 600;
 }
 
 .links a:hover {
@@ -160,16 +159,16 @@ onMounted(() => {
 }
 
 .links .mono {
-  color: var(--text-faint);
-  font-size: var(--fs-xs);
+  color: var(--fgTransparentWeak);
+  font-size: 0.8em;
 }
 
 .license {
-  margin-top: var(--space-14);
+  margin: 0;
   padding-top: var(--space-10);
   border-top: 1px solid var(--divider);
-  color: var(--text-faint);
-  font-size: var(--fs-xs);
+  color: var(--fgTransparentWeak);
+  font-size: 0.8em;
   text-align: center;
 }
 </style>
