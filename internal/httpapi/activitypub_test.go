@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/jackc/pgx/v5/pgxpool"
+
 	"github.com/Aurorainic/cinderfish/internal/config"
 	"github.com/Aurorainic/cinderfish/internal/httpapi"
 )
@@ -17,6 +19,7 @@ import (
 type fedInstance struct {
 	ts     *httptest.Server
 	srv    *httpapi.Server
+	pool   *pgxpool.Pool
 	domain string
 }
 
@@ -45,7 +48,7 @@ ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
 
 	ts := httptest.NewServer(srv)
 	t.Cleanup(ts.Close)
-	return &fedInstance{ts: ts, srv: srv, domain: domain}
+	return &fedInstance{ts: ts, srv: srv, pool: pool, domain: domain}
 }
 
 // get fetches path with the given Accept header.

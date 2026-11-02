@@ -12,8 +12,9 @@
 //   and the 3:1 banner replaces the original's fixed 250px height. The
 //   wide/narrow branch and its sub column are therefore dropped — the reading
 //   column never exceeds the fork's 1000px narrow threshold.
-// - follow-list tabs stay out of the tab strip: users/following and
-//   users/followers do not exist, so only the counts are shown.
+// - The follow counts link to the separate /@user/following and
+//   /@user/followers pages, as Firefish's userPage(user, 'following') does,
+//   rather than becoming tabs: the fork keeps both lists on their own pages.
 // - The reactions tab is dropped: notes/reactions does not exist.
 <script lang="ts" setup>
 import { computed, ref, watch } from "vue";
@@ -259,21 +260,25 @@ function onDeleted(id: string) {
 						</div>
 					</div>
 
-					<!-- Counts only: users/following and users/followers are not
-					     implemented, so the follow lists have no page to link to. -->
 					<div class="status">
 						<div class="item">
 							<b>{{ formatCount(viewUser.notesCount) }}</b>
 							<span>{{ i18n.ts.notes }}</span>
 						</div>
-						<div class="item">
+						<RouterLink
+							class="item"
+							:to="`/@${viewUser.username}/following`"
+						>
 							<b>{{ formatCount(viewUser.followingCount) }}</b>
 							<span>{{ i18n.ts.following }}</span>
-						</div>
-						<div class="item">
+						</RouterLink>
+						<RouterLink
+							class="item"
+							:to="`/@${viewUser.username}/followers`"
+						>
 							<b>{{ formatCount(viewUser.followersCount) }}</b>
 							<span>{{ i18n.ts.followers }}</span>
-						</div>
+						</RouterLink>
 					</div>
 
 					<div class="description">
@@ -544,7 +549,17 @@ function onDeleted(id: string) {
 	align-items: center;
 	gap: 2px;
 	min-inline-size: 0;
+	border-radius: var(--radius);
 	text-align: center;
+	transition: background 0.15s ease;
+}
+
+/* The follow counts are links to the list pages; they keep the counter
+   layout and only pick up a hover background, not the global link underline. */
+.status > a.item:hover,
+.status > a.item:focus-visible {
+	background: var(--panelHighlight);
+	text-decoration-color: transparent;
 }
 
 .status b {

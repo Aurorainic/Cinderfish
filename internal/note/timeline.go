@@ -75,6 +75,51 @@ func (q *queryBuilder) viewerArg(viewerID string) string {
 	return fmt.Sprintf("$%d", len(q.args))
 }
 
+// addNoteVisibility adds Misskey's generateVisibilityQuery
+// (packages/backend/src/core/QueryService.ts L270-315): public and home
+// notes are readable by everyone, a followers-only note by its author,
+// the author's followers and the user it answers, and a specified note
+// by its author and its audience. An empty viewerID is the anonymous
+// visitor, who only sees public and home notes.
+func (q *queryBuilder) addNoteVisibility(viewerID string) {
+	if viewerID == "" {
+		q.conds = append(q.conds, "n.visibility IN ('public','home')")
+		return
+	}
+	me := q.viewerArg(viewerID)
+	q.conds = append(q.conds, fmt.Sprintf(`(
+		n.visibility IN ('public','home')
+		OR n.user_id = %s
+		OR EXISTS (SELECT 1 FROM note_visibilities nv WHERE nv.note_id = n.id AND nv.visible_user_id = %s)
+		OR EXISTS (SELECT 1 FROM jsonb_array_elements_text(n.mentions) m WHERE m = %s)
+		OR (n.visibility = 'followers' AND (
+			EXISTS (SELECT 1 FROM followings f WHERE f.follower_id = %s AND f.followee_id = n.user_id)
+			OR n.reply_user_id = %s
+		))
+	)`, me, me, me, me, me))
+}
+
+// addPageCursors appends the id cursors of a page request.
+func (q *queryBuilder) addPageCursors(sinceID, untilID string) {
+	if sinceID != "" {
+		q.add("n.id > %s", sinceID)
+	}
+	if untilID != "" {
+		q.add("n.id < %s", untilID)
+	}
+}
+
+// paginationOrder mirrors Misskey's makePaginationQuery
+// (packages/backend/src/core/QueryService.ts L54-62): a sinceId without
+// untilId pages upward in ascending order, the direction a "load newer"
+// cursor expects; every other combination is newest first.
+func paginationOrder(sinceID, untilID string) string {
+	if sinceID != "" && untilID == "" {
+		return "ASC"
+	}
+	return "DESC"
+}
+
 // Timeline returns the notes of a timeline, newest first.
 //
 // The visibility rules mirror Misskey's generateVisibilityQuery: a note
@@ -119,21 +164,7 @@ func (s *TimelineService) Timeline(ctx context.Context, p TimelineParams) ([]*No
 	}
 
 	// Visibility filter.
-	if p.ViewerID != "" {
-		me := q.viewerArg(p.ViewerID)
-		q.conds = append(q.conds, fmt.Sprintf(`(
-			n.visibility IN ('public','home')
-			OR n.user_id = %s
-			OR EXISTS (SELECT 1 FROM note_visibilities nv WHERE nv.note_id = n.id AND nv.visible_user_id = %s)
-			OR EXISTS (SELECT 1 FROM jsonb_array_elements_text(n.mentions) m WHERE m = %s)
-			OR (n.visibility = 'followers' AND (
-				EXISTS (SELECT 1 FROM followings f WHERE f.follower_id = %s AND f.followee_id = n.user_id)
-				OR n.reply_user_id = %s
-			))
-		)`, me, me, me, me, me))
-	} else {
-		q.conds = append(q.conds, "n.visibility IN ('public','home')")
-	}
+	q.addNoteVisibility(p.ViewerID)
 
 	// Replies are excluded unless asked for. A reply to a note the viewer
 	// wrote is kept, matching Misskey's rule that a reply to one's own
@@ -242,6 +273,64 @@ func (s *TimelineService) UserNotes(ctx context.Context, userID string, limit in
 	rows, err := s.pool.Query(ctx, query, q.args...)
 	if err != nil {
 		return nil, fmt.Errorf("note: user notes query: %w", err)
+	}
+	defer rows.Close()
+
+	out := []*Note{}
+	for rows.Next() {
+		n, err := scanNote(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, n)
+	}
+	return out, rows.Err()
+}
+
+// Replies returns the notes that answer noteID, newest first unless a
+// sinceId is given without untilId.
+//
+// This is Misskey's notes/replies: the same generateVisibilityQuery
+// filter the timelines use, applied to notes whose reply_id is noteID.
+// Its generateBaseNoteFilteringQuery only removes notes of blocked,
+// muted and suspended users, which Cinderfish does not model yet, so
+// the soft-delete exclusion is the only further filter. local_only notes
+// stay visible, as they are in the timelines: every reader here is a
+// local account.
+func (s *TimelineService) Replies(ctx context.Context, noteID, viewerID string, limit int, sinceID, untilID string) ([]*Note, error) {
+	return s.notesLinkedTo(ctx, "reply_id", "reply", noteID, viewerID, limit, sinceID, untilID)
+}
+
+// Renotes returns the notes whose renote_id is noteID, newest first
+// unless a sinceId is given without untilId. Both pure renotes and quotes
+// carry renote_id, and both are included, as upstream notes/renotes does.
+func (s *TimelineService) Renotes(ctx context.Context, noteID, viewerID string, limit int, sinceID, untilID string) ([]*Note, error) {
+	return s.notesLinkedTo(ctx, "renote_id", "renote", noteID, viewerID, limit, sinceID, untilID)
+}
+
+// notesLinkedTo is the shared query behind Replies and Renotes: notes
+// whose column names noteID, filtered by the viewer's visibility and
+// cursor-bounded the way Misskey's makePaginationQuery does.
+func (s *TimelineService) notesLinkedTo(ctx context.Context, column, label, noteID, viewerID string, limit int, sinceID, untilID string) ([]*Note, error) {
+	if limit <= 0 {
+		limit = 10
+	}
+	if limit > 100 {
+		limit = 100
+	}
+
+	q := &queryBuilder{}
+	q.add("n."+column+" = %s", noteID)
+	q.conds = append(q.conds, "n.deleted_at IS NULL")
+	q.addNoteVisibility(viewerID)
+	q.addPageCursors(sinceID, untilID)
+
+	query := noteSelect + " WHERE " + strings.Join(q.conds, " AND ") +
+		" ORDER BY n.id " + paginationOrder(sinceID, untilID) + " LIMIT " + strconv.Itoa(limit)
+
+	rows, err := s.pool.Query(ctx, query, q.args...)
+	if err != nil {
+		return nil, fmt.Errorf("note: %s query: %w", label, err)
 	}
 	defer rows.Close()
 

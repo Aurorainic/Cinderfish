@@ -1152,3 +1152,190 @@ func TestEmbeddedParentVisibility(t *testing.T) {
 		t.Errorf("embedded reply = %v, want the public parent", body["reply"])
 	}
 }
+
+// repliesOf returns the ids of a notes/replies or notes/renotes page.
+func repliesOf(t *testing.T, ts *httptest.Server, path, token string, body map[string]any) []string {
+	t.Helper()
+	return timelineIDs(t, ts, path, token, body)
+}
+
+// TestNotesRepliesVisibility pins the notes/replies contract: the notes
+// whose reply_id names the target, filtered by Misskey's
+// generateVisibilityQuery the way the timelines are, and readable without
+// a credential like its neighbour notes/show.
+func TestNotesRepliesVisibility(t *testing.T) {
+	f := newFederationServer(t, "public")
+	aliceToken, _ := f.registerUser(t, "alice")
+	bobToken, bobID := f.registerUser(t, "bob")
+	carolToken, _ := f.registerUser(t, "carol")
+	daveToken, _ := f.registerUser(t, "dave")
+
+	parent := createNote(t, f.ts, aliceToken, map[string]any{"text": "parent"})
+	publicReply := createNote(t, f.ts, bobToken, map[string]any{"replyId": parent, "text": "public reply"})
+	homeReply := createNote(t, f.ts, aliceToken, map[string]any{"replyId": parent, "text": "home reply", "visibility": "home"})
+	followersReply := createNote(t, f.ts, bobToken, map[string]any{"replyId": parent, "text": "followers reply", "visibility": "followers"})
+
+	// Neither a note that answers nothing nor a reply to another note may
+	// appear.
+	createNote(t, f.ts, bobToken, map[string]any{"text": "unrelated"})
+	other := createNote(t, f.ts, aliceToken, map[string]any{"text": "other parent"})
+	createNote(t, f.ts, bobToken, map[string]any{"replyId": other, "text": "reply elsewhere"})
+
+	// dave follows bob, the author of the followers-only reply.
+	if resp, out := postWithToken(t, f.ts, "/api/following/create", daveToken, map[string]any{"userId": bobID}); resp.StatusCode != http.StatusOK {
+		t.Fatalf("dave follows bob: %d %v", resp.StatusCode, out)
+	}
+
+	cases := []struct {
+		name  string
+		token string
+		want  []string
+	}{
+		{"anonymous sees public and home", "", []string{publicReply, homeReply}},
+		{"outsider sees public and home", carolToken, []string{publicReply, homeReply}},
+		{"parent author sees the followers reply", aliceToken, []string{publicReply, homeReply, followersReply}},
+		{"reply author sees their own followers reply", bobToken, []string{publicReply, homeReply, followersReply}},
+		{"follower of the reply author sees the followers reply", daveToken, []string{publicReply, homeReply, followersReply}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := repliesOf(t, f.ts, "/api/notes/replies", tc.token, map[string]any{"noteId": parent})
+			if len(got) != len(tc.want) {
+				t.Fatalf("replies = %v, want %v", got, tc.want)
+			}
+			for _, id := range tc.want {
+				if !contains(got, id) {
+					t.Errorf("replies %v missing %s", got, id)
+				}
+			}
+			// Newest first: ids are time ordered strings.
+			for i := 1; i < len(got); i++ {
+				if got[i-1] < got[i] {
+					t.Errorf("replies %v are not newest first", got)
+					break
+				}
+			}
+		})
+	}
+
+	// limit caps the page.
+	if got := repliesOf(t, f.ts, "/api/notes/replies", aliceToken, map[string]any{"noteId": parent, "limit": 1}); len(got) != 1 {
+		t.Errorf("limit 1 returned %d notes", len(got))
+	}
+
+	// A deleted reply leaves the list.
+	resp, _ := postWithToken(t, f.ts, "/api/notes/delete", bobToken, map[string]any{"noteId": publicReply})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("delete reply: %d", resp.StatusCode)
+	}
+	got := repliesOf(t, f.ts, "/api/notes/replies", aliceToken, map[string]any{"noteId": parent})
+	if contains(got, publicReply) {
+		t.Errorf("deleted reply still listed: %v", got)
+	}
+}
+
+// TestNotesRepliesUnknownNote pins the absence of a NO_SUCH_NOTE error:
+// upstream notes/replies has none and answers an empty page.
+func TestNotesRepliesUnknownNote(t *testing.T) {
+	ts := newTestServer(t, "open")
+	if got := repliesOf(t, ts, "/api/notes/replies", "", map[string]any{"noteId": "00000000000000000000"}); len(got) != 0 {
+		t.Errorf("unknown note returned %v, want an empty page", got)
+	}
+}
+
+// TestNotesListRequiresNoteId covers the shared parameter validation of
+// notes/replies and notes/renotes.
+func TestNotesListRequiresNoteId(t *testing.T) {
+	ts := newTestServer(t, "open")
+	for _, path := range []string{"/api/notes/replies", "/api/notes/renotes"} {
+		resp, out := post(t, ts, path, map[string]any{})
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Errorf("%s status = %d, want 400", path, resp.StatusCode)
+		}
+		e, _ := out["error"].(map[string]any)
+		if e["code"] != "INVALID_PARAM" {
+			t.Errorf("%s code = %v, want INVALID_PARAM", path, e["code"])
+		}
+	}
+}
+
+// TestNotesRenotesVisibility pins the notes/renotes contract: the notes
+// whose renote_id names the target, filtered exactly like notes/replies.
+func TestNotesRenotesVisibility(t *testing.T) {
+	f := newFederationServer(t, "public")
+	aliceToken, _ := f.registerUser(t, "alice")
+	bobToken, bobID := f.registerUser(t, "bob")
+	carolToken, _ := f.registerUser(t, "carol")
+	erinToken, _ := f.registerUser(t, "erin")
+
+	parent := createNote(t, f.ts, aliceToken, map[string]any{"text": "parent"})
+	pureRenote := createNote(t, f.ts, bobToken, map[string]any{"renoteId": parent})
+	quote := createNote(t, f.ts, aliceToken, map[string]any{"renoteId": parent, "text": "quoted"})
+	followersRenote := createNote(t, f.ts, bobToken, map[string]any{"renoteId": parent, "visibility": "followers"})
+	localRenote := createNote(t, f.ts, aliceToken, map[string]any{"renoteId": parent, "localOnly": true})
+
+	// A reply is not a renote, and a renote of another note is not either.
+	createNote(t, f.ts, bobToken, map[string]any{"replyId": parent, "text": "a reply"})
+	other := createNote(t, f.ts, aliceToken, map[string]any{"text": "other parent"})
+	createNote(t, f.ts, bobToken, map[string]any{"renoteId": other})
+
+	// erin follows bob, the author of the followers-only renote.
+	if resp, out := postWithToken(t, f.ts, "/api/following/create", erinToken, map[string]any{"userId": bobID}); resp.StatusCode != http.StatusOK {
+		t.Fatalf("erin follows bob: %d %v", resp.StatusCode, out)
+	}
+
+	cases := []struct {
+		name  string
+		token string
+		want  []string
+	}{
+		{"anonymous sees the public and local-only renotes", "", []string{pureRenote, quote, localRenote}},
+		{"outsider sees the public and local-only renotes", carolToken, []string{pureRenote, quote, localRenote}},
+		// A followers-only renote belongs to the renoter's audience, not
+		// to the author of the renoted note.
+		{"note author sees the public and local-only renotes", aliceToken, []string{pureRenote, quote, localRenote}},
+		{"renote author sees their own followers renote", bobToken, []string{pureRenote, quote, localRenote, followersRenote}},
+		{"follower of the renote author sees the followers renote", erinToken, []string{pureRenote, quote, localRenote, followersRenote}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := repliesOf(t, f.ts, "/api/notes/renotes", tc.token, map[string]any{"noteId": parent})
+			if len(got) != len(tc.want) {
+				t.Fatalf("renotes = %v, want %v", got, tc.want)
+			}
+			for _, id := range tc.want {
+				if !contains(got, id) {
+					t.Errorf("renotes %v missing %s", got, id)
+				}
+			}
+		})
+	}
+
+	// Pagination follows Misskey's makePaginationQuery: untilId walks down,
+	// sinceId alone walks up.
+	all := repliesOf(t, f.ts, "/api/notes/renotes", aliceToken, map[string]any{"noteId": parent})
+	if len(all) < 3 {
+		t.Fatalf("seeded %d renotes, want at least 3", len(all))
+	}
+	page := repliesOf(t, f.ts, "/api/notes/renotes", aliceToken, map[string]any{"noteId": parent, "untilId": all[0], "limit": 2})
+	if len(page) != 2 || page[0] != all[1] || page[1] != all[2] {
+		t.Errorf("untilId page = %v, want %v", page, all[1:3])
+	}
+}
+
+// TestNotesRenotesUnknownNote pins the NO_SUCH_NOTE error with the id
+// notes/renotes uses upstream.
+func TestNotesRenotesUnknownNote(t *testing.T) {
+	ts := newTestServer(t, "open")
+	resp, out := post(t, ts, "/api/notes/renotes", map[string]any{"noteId": "00000000000000000000"})
+	if resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("status = %d, want 404", resp.StatusCode)
+	}
+	e, _ := out["error"].(map[string]any)
+	if e["code"] != "NO_SUCH_NOTE" {
+		t.Errorf("code = %v, want NO_SUCH_NOTE", e["code"])
+	}
+	if e["id"] != "12908022-2e21-46cd-ba6a-3edaf6093f46" {
+		t.Errorf("error id = %v", e["id"])
+	}
+}

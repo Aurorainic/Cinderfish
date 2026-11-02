@@ -127,6 +127,20 @@ export interface DriveFile {
   blurhash: string | null;
 }
 
+// One row of users/followers or users/following: the follow relation and the
+// far end's user. Misskey's Following schema carries both edges, but each
+// endpoint packs only its own side, so the missing one stays optional and
+// callers read `follower` for followers pages and `followee` for following
+// pages.
+export interface Following {
+  id: string;
+  createdAt: string;
+  followerId: string;
+  followeeId: string;
+  follower?: UserLite;
+  followee?: UserLite;
+}
+
 export interface Notification {
   id: string;
   createdAt: string;

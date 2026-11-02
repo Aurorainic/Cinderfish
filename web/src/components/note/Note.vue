@@ -19,7 +19,7 @@
 		/>
 		<div v-if="!detailedView" class="note-context" @click="noteClick">
 			<NoteHeaderInfo :note="note" :appear-note="appearNote" :collapsed-reply="collapsedReply && !!appearNote.reply" :pinned="pinned" />
-			<RenoteBar :note="note" :appear-note="appearNote" />
+			<RenoteBar :note="note" :appear-note="appearNote" :is-renote="isRenote" />
 		</div>
 		<article class="article" :style="{ cursor: expandOnNoteClick && !detailedView ? 'pointer' : '' }" @click="noteClick">
 			<div class="main">
@@ -162,8 +162,10 @@ onMounted(() => {
 </script>
 
 <style scoped>
+
 .note-container {
 	position: relative;
+	inline-size: 100%;
 	transition: box-shadow 0.1s ease;
 	font-size: 1.05em;
 	overflow: clip;
@@ -206,6 +208,8 @@ onMounted(() => {
 
 .article {
 	position: relative;
+	inline-size: 100%;
+	box-sizing: border-box;
 	overflow: clip;
 	padding-block-start: 20px;
 	padding-inline: 32px;
@@ -213,7 +217,11 @@ onMounted(() => {
 }
 
 .header-container {
-	display: flex;
+	/* Grid instead of flex: the header column must take every pixel the avatar
+	   leaves free. A flex row lets the note header collapse to its minimum
+	   content width inside paginated lists, which truncates short names. */
+	display: grid;
+	grid-template-columns: auto minmax(0, 1fr);
 	position: relative;
 	z-index: 2;
 }
@@ -227,8 +235,7 @@ onMounted(() => {
 }
 
 .header {
-	inline-size: 0;
-	flex-grow: 1;
+	min-inline-size: 0;
 }
 
 .main {

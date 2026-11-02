@@ -82,24 +82,34 @@ const showTicker = computed(() => {
 	display: flex;
 	align-items: center;
 	white-space: nowrap;
-	justify-self: flex-end;
-	width: 100%;
+	min-inline-size: 0;
 	font-size: 0.8em;
 }
 
 .cinderfish-note-header > .user-info {
-	inline-size: 0;
-	flex-grow: 1;
+	inline-size: 100%;
+	min-inline-size: 0;
 	line-height: 1.5;
-	display: flex;
+	/* Grid rather than flex: the name column may collapse to its minimum
+	   content width in a flex row when the meta column is auto-sized. */
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) auto;
+	align-items: start;
+	gap: 0.5em;
 	font-size: 1.2em;
 }
 
 .user-info > .who {
-	flex-grow: 1;
-	inline-size: 0;
+	min-inline-size: 0;
 	overflow: hidden;
 	text-overflow: ellipsis;
+}
+
+.name {
+	display: block;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
 .user-info > .meta {

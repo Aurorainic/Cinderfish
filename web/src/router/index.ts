@@ -37,6 +37,18 @@ export const router = createRouter({
       component: () => import("../views/NoteView.vue"),
     },
     {
+      path: "/@:handle/following",
+      name: "profile-following",
+      component: () => import("../views/profile/UserFollowList.vue"),
+      props: { mode: "following" },
+    },
+    {
+      path: "/@:handle/followers",
+      name: "profile-followers",
+      component: () => import("../views/profile/UserFollowList.vue"),
+      props: { mode: "followers" },
+    },
+    {
       path: "/@:handle",
       name: "profile",
       component: () => import("../views/ProfileView.vue"),

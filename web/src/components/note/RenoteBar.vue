@@ -6,7 +6,7 @@
 // the footer's more-menu on the renote itself, since Cinderfish renders each
 // renote as its own row).
 <template>
-	<div class="renote">
+	<div v-if="isRenote" class="renote">
 		<AppIcon name="renote" class="mark" />
 		<span class="text">
 			<MkAvatar class="avatar" :user="note.user" />
@@ -38,6 +38,9 @@ import { t } from "../../i18n";
 const props = defineProps<{
 	note: Note;
 	appearNote: Note;
+	// Firefish's MkRenoteBar decides for itself whether there is anything to
+	// say; a plain note has no renote strip above it.
+	isRenote: boolean;
 }>();
 
 const userPage = computed(

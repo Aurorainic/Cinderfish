@@ -897,7 +897,7 @@ POST /inbox                            POST /users/{id}/inbox
 
 ### 12A.2 与 Firefish 的关键差异（均为后端能力缺口）
 
-- 无 `notes/replies`、`notes/renotes`、`notes/conversation`、`notes/children`：详情页回复/转推/引用页签、对话树、转推聚合头像退化为计数提示（代码内有 TODO）。
+- `notes/replies`、`notes/renotes`、`users/following`、`users/followers` 已补齐（见 §12B），详情页回复/转推/引用页签与个人页关注/粉丝列表走真实端点；仍缺 `notes/conversation`、`notes/children`、`notes/reactions`，对话树与「谁反应了」浮层保持降级。
 - 无 polls 端点：投票只读、投稿表单隐藏投票入口。
 - 无 `i/registry`：pizzax 落到 localStorage 的 per-account 桶，不做云端同步。
 - 无自定义 emoji 注册表：`:shortcode:` 按纯文本渲染（与 Misskey 对未注册 emoji 的行为一致）。
@@ -910,6 +910,23 @@ POST /inbox                            POST /users/{id}/inbox
 - 内建浏览器走查（Go 二进制 @3991，`web/dist`，开发库 cinderfish）：1280×800 与 iPhone 14 Pro（393×852）两档下确认
   左导航 250px/图标态、中央 750px 面板列、右 widgets 栏、移动端底部 tab、笔记行 hairline 分隔、转贴条
   「@user 转发了」、日期分隔条、个人资料页横幅+头像+三列计数、设置页菜单列+分区面板、通知/笔记空态。
+
+## 12B. 四个读端点（2026-11-02）
+
+前端页签与关注列表所需的四个 Misskey 兼容读端点，全部按 `tmp/refcheck/misskey` 的 `paramDef`/`res` 落地：
+
+| 路由 | 语义 | 备注 |
+|------|------|------|
+| `POST /api/notes/replies` | `reply_id` 下的回复，按可见性过滤 | 目标不存在时返回 `200 []`（上游没有 `NO_SUCH_NOTE`） |
+| `POST /api/notes/renotes` | `renote_id` 下的转贴与引用 | 目标不存在时 404 `NO_SUCH_NOTE` |
+| `POST /api/users/followers` | 关注者列表，返回 `Following` 信封（`follower`/`followee` 为 UserLite） | 受 `followers_visibility` 约束，管理员可绕过 |
+| `POST /api/users/following` | 关注列表，同上 | 受 `following_visibility` 约束 |
+
+- 可见性过滤复用从时间线抽出的 `queryBuilder.addNoteVisibility`（与 `notes/show`、四条时间线同一套规则），避免两处口径漂移。
+- 新存储方法：`note.TimelineService.Replies/Renotes`、`account.Followers/Following/FollowVisibility/IsFollowing`；游标统一在 `id` 上，`sinceId` 单独出现时正序翻页。
+- 前端接线：`NoteDetailed` 的 回复/转发/引用 页签走 `MkPagination`；`/@user/following`、`/@user/followers` 两个新路由由 `views/profile/UserFollowList.vue` 渲染，403 显示 `MkInfo` 说明。
+- 测试：`TestNotesRepliesVisibility`（5 例）、`TestNotesRenotesVisibility`（5 例）、`TestUsersFollowListsPaginate`、`TestUsersFollowListPrivacy` 等；`go test ./...` 全绿。
+- 仍未做：`users/update` 不能写 `followersVisibility`/`followingVisibility`，这两项目前只能直接改库。
 
 ## 13. 文档索引
 

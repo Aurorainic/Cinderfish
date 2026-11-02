@@ -1,6 +1,7 @@
 import { ref } from "vue";
 import type {
   DriveFile,
+  Following,
   InstanceMeta,
   MeDetailed,
   Note,
@@ -280,6 +281,20 @@ export const api = {
     withReplies?: boolean;
   }) => post<Note[]>("/api/users/notes", params as Record<string, unknown>),
 
+  usersFollowers: (params: {
+    userId?: string;
+    limit?: number;
+    sinceId?: string;
+    untilId?: string;
+  }) => post<Following[]>("/api/users/followers", params as Record<string, unknown>),
+
+  usersFollowing: (params: {
+    userId?: string;
+    limit?: number;
+    sinceId?: string;
+    untilId?: string;
+  }) => post<Following[]>("/api/users/following", params as Record<string, unknown>),
+
   createNote: (params: {
     text?: string;
     cw?: string | null;
@@ -296,6 +311,23 @@ export const api = {
     }).then(unwrapCreatedNote),
 
   showNote: (noteId: string) => post<Note>("/api/notes/show", { noteId }),
+
+  notesReplies: (params: {
+    noteId: string;
+    limit?: number;
+    sinceId?: string;
+    untilId?: string;
+  }) => post<Note[]>("/api/notes/replies", params as Record<string, unknown>),
+
+  // notes/renotes returns both pure renotes and quotes: the backend has no
+  // `filter` parameter, so callers split the page on whether the note carries
+  // text (Firefish's quote/renote distinction).
+  notesRenotes: (params: {
+    noteId: string;
+    limit?: number;
+    sinceId?: string;
+    untilId?: string;
+  }) => post<Note[]>("/api/notes/renotes", params as Record<string, unknown>),
 
   deleteNote: (noteId: string) => post<Record<string, never>>("/api/notes/delete", { noteId }),
 

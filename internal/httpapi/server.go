@@ -108,6 +108,8 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("POST /api/i/unpin", s.handleIUnpin)
 	s.mux.HandleFunc("POST /api/users/show", s.handleUsersShow)
 	s.mux.HandleFunc("POST /api/users/notes", s.handleUsersNotes)
+	s.mux.HandleFunc("POST /api/users/followers", s.handleUsersFollowers)
+	s.mux.HandleFunc("POST /api/users/following", s.handleUsersFollowing)
 	s.mux.HandleFunc("POST /api/miauth/gen-token", s.handleMiAuthGenToken)
 
 	// Following. These give the Streaming API's follow/followed events a
@@ -132,6 +134,8 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("POST /api/notes/create", s.handleNotesCreate)
 	s.mux.HandleFunc("POST /api/notes/show", s.handleNotesShow)
 	s.mux.HandleFunc("POST /api/notes/delete", s.handleNotesDelete)
+	s.mux.HandleFunc("POST /api/notes/replies", s.handleNotesReplies)
+	s.mux.HandleFunc("POST /api/notes/renotes", s.handleNotesRenotes)
 	s.mux.HandleFunc("POST /api/notes/reactions/create", s.handleNotesReactionsCreate)
 	s.mux.HandleFunc("POST /api/notes/reactions/delete", s.handleNotesReactionsDelete)
 	s.mux.HandleFunc("POST /api/notes/local-timeline", s.handleLocalTimeline)

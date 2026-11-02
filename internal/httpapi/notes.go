@@ -21,6 +21,8 @@ const (
 	errIDNoteTooLong                  = "6d51c8a2-1e1e-4f7f-b1c9-9f5a0e2d0f3b"
 	errIDNoteEmpty                    = "8f7d1c2e-2b1c-4a3e-9c5a-1e2d3c4b5a6f"
 	errIDNoSuchNote                   = "24fcbfc6-2e37-42b6-8388-c29b3861a08d"
+	// notes/renotes carries its own NO_SUCH_NOTE id.
+	errIDNoSuchNoteRenotes = "12908022-2e21-46cd-ba6a-3edaf6093f46"
 	// notes/reactions/create has its own NO_SUCH_NOTE id.
 	errIDNoSuchNoteReaction  = "033d0620-5bfe-4027-965d-980b0c85a3ea"
 	errIDCannotReactToRenote = "eaccdc08-ddef-43fe-908f-d108faad57f5"
@@ -352,6 +354,84 @@ func (s *Server) handleNotesDelete(w http.ResponseWriter, r *http.Request) {
 
 	s.publishNoteDeleted(n)
 	writeJSON(w, http.StatusOK, map[string]any{})
+}
+
+// noteListRequest is the parameter set shared by notes/replies and
+// notes/renotes.
+type noteListRequest struct {
+	NoteID  string `json:"noteId"`
+	Limit   int    `json:"limit"`
+	SinceID string `json:"sinceId"`
+	UntilID string `json:"untilId"`
+}
+
+// handleNotesReplies implements POST /api/notes/replies: the notes that
+// answer one note, newest first unless a sinceId is given without untilId.
+func (s *Server) handleNotesReplies(w http.ResponseWriter, r *http.Request) {
+	s.serveNoteList(w, r, false)
+}
+
+// handleNotesRenotes implements POST /api/notes/renotes: the notes that
+// renote one note, newest first unless a sinceId is given without untilId.
+func (s *Server) handleNotesRenotes(w http.ResponseWriter, r *http.Request) {
+	s.serveNoteList(w, r, true)
+}
+
+// serveNoteList answers notes/replies and notes/renotes, which share
+// their parameters and response shape and differ only in the column they
+// match on.
+func (s *Server) serveNoteList(w http.ResponseWriter, r *http.Request, renotes bool) {
+	if s.timeline == nil || s.notes == nil || s.accounts == nil {
+		writeInternalServerError(w)
+		return
+	}
+
+	var body noteListRequest
+	if err := decodeOptionalJSON(r, &body); err != nil {
+		writeAPIError(w, err)
+		return
+	}
+	if body.NoteID == "" {
+		writeAPIError(w, invalidParamError("noteId is required"))
+		return
+	}
+
+	// Both endpoints are readable without a credential; an anonymous
+	// viewer sees only the public and home notes among the results.
+	viewerID := ""
+	if info, err := s.authenticate(r.Context(), r, bodyAsMap(r)); err == nil && info != nil {
+		viewerID = info.User.ID
+	}
+
+	var (
+		notes []*note.Note
+		err   error
+	)
+	if renotes {
+		// notes/renotes rejects an unknown target note; notes/replies has
+		// no such error upstream and answers an empty page instead.
+		if _, getErr := s.notes.Get(r.Context(), body.NoteID); getErr != nil {
+			writeAPIError(w, &APIError{
+				Message: "No such note.", Code: "NO_SUCH_NOTE",
+				ID: errIDNoSuchNoteRenotes, Kind: "client", Status: http.StatusNotFound,
+			})
+			return
+		}
+		notes, err = s.timeline.Renotes(r.Context(), body.NoteID, viewerID, body.Limit, body.SinceID, body.UntilID)
+	} else {
+		notes, err = s.timeline.Replies(r.Context(), body.NoteID, viewerID, body.Limit, body.SinceID, body.UntilID)
+	}
+	if err != nil {
+		writeInternalServerError(w)
+		return
+	}
+
+	out := make([]any, 0, len(notes))
+	for _, n := range notes {
+		pc := s.notePackContext(r.Context(), n, viewerID)
+		out = append(out, packNoteDetail(r.Context(), s, n, pc))
+	}
+	writeJSON(w, http.StatusOK, out)
 }
 
 // handleNotesReactionsCreate implements POST /api/notes/reactions/create.
