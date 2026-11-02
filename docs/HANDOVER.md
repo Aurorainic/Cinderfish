@@ -877,6 +877,40 @@ POST /inbox                            POST /users/{id}/inbox
 - **没有被拉黑的实例列表、没有 relay**：Relay 按定案不做。
 - **没有真实三方联调**：没有对 Mastodon/GoToSocial/真实 Misskey 实例跑过。双实例测试证明的是本实现自洽。
 
+## 12A. Firefish 前端整体移植（2026-11-01 起）
+
+方向见 `docs/superpowers/specs/2026-11-01-firefish-frontend-port-design.md`：前端不再是"借鉴 Firefish 风格的自研页面"，
+而是把 Firefish 客户端的组件体系（`firefish@02c31e0:packages/client/src`）整套搬进 `web/src`，改写为 Vue 3 + TypeScript +
+不额外引入依赖的形态，接口一律经 `web/src/api/client.ts`。
+
+### 12A.1 已落地的移植清单（全部带 `SPDX AGPL-3.0-only` 与 `Ported from firefish@02c31e0:<path>` 头）
+
+| 层 | 文件 | 来源 |
+|----|------|------|
+| 设计 token / 全局样式 | `web/src/styles/main.css` | `style.scss` + `themes/_dark.json5`、`_light.json5`（`:lighten/:alpha` 编译函数改写为静态值或 `color-mix()`） |
+| UI 原语 | `components/ui/`：MkButton、MkAvatar、MkUserName、MkA、MkTime、MkLoading、MkError、MkEllipsis、MkInfo、MkKeyValue、MkFolder、MkPagination、MkDateSeparatedList、MkInput、PopupMenu、DialogHost、PageHeader | `components/`、`components/global/`、`components/form/input.vue` |
+| 运行时 | `store/pizzax.ts`、`store/firefish-store.ts`、`lib/os.ts`、`i18n/` | `pizzax.ts`、`store.ts`、`os.ts`、`i18n.ts` |
+| 笔记集群 | `components/note/`：Note、NoteSimple、NoteSub、NoteDetailed、NoteHeader、NoteHeaderInfo、NoteFooterInfo、NoteContent、NoteMediaList、NoteFooter、RenoteButton、RenoteBar、ReactionsViewer、CwButton、Visibility、InstanceTicker、get-note-menu、use-note-capture | `MkNote*.vue`、`note/MkNote*.vue`、`MkCwButton`、`MkVisibility`、`MkInstanceTicker`、`scripts/get-note-menu.ts` |
+| 投稿表单 | `components/composer/PostForm.vue` | `MkPostForm.vue`（投票隐藏：无 polls 端点，审计 D2-g） |
+| 布局 | `layouts/AppShell.vue`、`components/layout/Navbar.vue`、`components/widgets/WidgetHost.vue` | `ui/universal.vue`、`ui/_common_/navbar.vue`、`ui/universal.widgets.vue` |
+| 页面 | `views/`：Timeline、Notifications、Profile（`views/profile/*`）、Explore、Settings（`views/settings/*` 8 个标签页）、Login、Signup、Note、NotFound | `pages/timeline.vue`、`notifications.vue`、`user/*`、`explore*`、`settings/*`、`auth.form.vue`、`note.vue`、`not-found.vue` |
+
+### 12A.2 与 Firefish 的关键差异（均为后端能力缺口）
+
+- 无 `notes/replies`、`notes/renotes`、`notes/conversation`、`notes/children`：详情页回复/转推/引用页签、对话树、转推聚合头像退化为计数提示（代码内有 TODO）。
+- 无 polls 端点：投票只读、投稿表单隐藏投票入口。
+- 无 `i/registry`：pizzax 落到 localStorage 的 per-account 桶，不做云端同步。
+- 无自定义 emoji 注册表：`:shortcode:` 按纯文本渲染（与 Misskey 对未注册 emoji 的行为一致）。
+- 无 `hashtags/trending`、`notes/featured`、`users/`（用户目录）、`users/following|followers` 列表：探索页退化为 `admin/show-users`（非管理员为空）、趋势小组件按本地时间线客户端统计、关注/粉丝只有计数。
+- 图标：没有 Phosphor 字体，沿用项目自带 `AppIcon` 的路径图标集，尺寸与位置按 Firefish 的 `ph-*` 规则对齐；`ph-*` 类本身不移植。
+
+### 12A.3 验证
+
+- 每次提交前 `cd web && pnpm typecheck && pnpm build` 全绿；`go vet ./...`、`go test ./...` 未受影响。
+- 内建浏览器走查（Go 二进制 @3991，`web/dist`，开发库 cinderfish）：1280×800 与 iPhone 14 Pro（393×852）两档下确认
+  左导航 250px/图标态、中央 750px 面板列、右 widgets 栏、移动端底部 tab、笔记行 hairline 分隔、转贴条
+  「@user 转发了」、日期分隔条、个人资料页横幅+头像+三列计数、设置页菜单列+分区面板、通知/笔记空态。
+
 ## 13. 文档索引
 
 | 文档 | 内容 |

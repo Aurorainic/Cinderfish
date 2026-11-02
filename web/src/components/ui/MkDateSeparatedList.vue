@@ -91,6 +91,27 @@ function getDateText(time: string): string {
 	margin-block-end: var(--margin, 16px);
 }
 
+/* Firefish's noGap variant stacks rows flush and draws a 0.5px hairline
+   between them, which is what makes a timeline read as one continuous panel. */
+.cinderfish-date-separated-list.noGap > * {
+	margin: 0 !important;
+	border: none;
+	border-radius: 0;
+	box-shadow: none;
+}
+
+.cinderfish-date-separated-list.noGap > *:first-child {
+	border-radius: var(--radius) var(--radius) 0 0;
+}
+
+.cinderfish-date-separated-list.noGap > *:last-child {
+	border-radius: 0 0 var(--radius) var(--radius);
+}
+
+.cinderfish-date-separated-list.noGap > *:not(:last-child) {
+	border-block-end: solid 0.5px var(--divider);
+}
+
 .cinderfish-date-separated-list > .list-move {
 	transition: transform 0.7s cubic-bezier(0.23, 1, 0.32, 1);
 }
