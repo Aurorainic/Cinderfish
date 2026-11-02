@@ -1028,6 +1028,7 @@ export const OsOverlay = defineComponent({
               {
                 key: form.id,
                 title: postFormTitle(form),
+                compact: true,
                 onClose: () => closePostForm(),
               },
               {

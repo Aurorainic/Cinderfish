@@ -5,11 +5,12 @@ import type { DriveFile, Note, NoteVisibility } from "../../api/types";
 import { relativeTime } from "../../lib/time";
 import { instance, loadInstance } from "../../stores/instance";
 import { isLoggedIn, session } from "../../stores/session";
-import AppIcon from "../AppIcon.vue";
+import AppIcon, { type AppIconName } from "../AppIcon.vue";
 import UserAvatar from "../UserAvatar.vue";
 import MkButton from "../ui/MkButton.vue";
 import MkInfo from "../ui/MkInfo.vue";
 import MkInput from "../ui/MkInput.vue";
+import { popupMenu } from "../../os";
 
 // The global post form. `os.openPostForm` renders it inside a PageWindow when
 // the post entry lives in the shell (bottom bar, deck), and the timeline pins
@@ -70,10 +71,6 @@ const canPost = computed(() => {
   return text.value.trim().length > 0 || files.value.length > 0 || !!props.renoteTo;
 });
 
-// Misskey's composer prompt reads as a question ("今どうしてる？"), Chinese
-// equivalent here; the header title names the action instead of repeating it.
-const title = computed(() => (props.replyTo ? "回复" : props.renoteTo ? "引用" : "发帖"));
-
 const quoteExcerpt = computed(() => {
   const target = props.renoteTo;
   if (!target) return "";
@@ -84,6 +81,54 @@ const quoteExcerpt = computed(() => {
 
 // Hand-written icons: the segmented control needs a lock the shared AppIcon
 // set does not carry, so all four live here for a consistent stroke weight.
+const visibilityButton = ref<HTMLElement | null>(null);
+const moreButton = ref<HTMLElement | null>(null);
+
+const visibilityIcon = computed<AppIconName>(() => {
+  switch (visibility.value) {
+    case "home":
+      return "home";
+    case "followers":
+      return "lock";
+    case "specified":
+      return "quote";
+    default:
+      return "globe";
+  }
+});
+
+// Firefish's MkVisibilityPicker: a popup menu anchored on the button, not a row
+// of chips inside the form.
+function openVisibilityMenu() {
+  popupMenu(
+    visibilityOptions.map((option) => ({
+      type: "button" as const,
+      text: option.label,
+      active: visibility.value === option.value,
+      action: () => {
+        visibility.value = option.value;
+      },
+    })),
+    visibilityButton.value,
+    { align: "right" },
+  );
+}
+
+// The `more` menu carries the toggles Firefish keeps out of the tool row.
+function openMoreMenu() {
+  popupMenu(
+    [
+      {
+        type: "switch" as const,
+        ref: localOnly,
+        text: "仅本地",
+      },
+    ],
+    moreButton.value,
+    { align: "right" },
+  );
+}
+
 const visibilityOptions: { value: NoteVisibility; label: string; path: string }[] = [
   { value: "public", label: "公开", path: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18ZM3 12h18M12 3c2.5 2.5 3.8 5.5 3.8 9s-1.3 6.5-3.8 9c-2.5-2.5-3.8-5.5-3.8-9S9.5 5.5 12 3Z" },
   { value: "home", label: "首页", path: "M3 10.5 12 3l9 7.5M5 9.5V21h5v-6h4v6h5V9.5" },
@@ -312,6 +357,10 @@ onBeforeUnmount(() => {
 
 <template>
   <section v-if="isLoggedIn" class="composer" :class="{ 'composer-fixed': fixed }">
+    <!-- Firefish's MkPostForm header: avatar on the left, and on the right the
+         remaining-characters counter, the local-only mark, the visibility button
+         and the gradient submit. The window title already says 发帖, so the
+         form does not repeat it. -->
     <div class="composer-head">
       <UserAvatar v-if="session.me" :user="session.me" :size="fixed ? 34 : 40" />
       <div class="context">
@@ -320,8 +369,23 @@ onBeforeUnmount(() => {
           · {{ relativeTime(replyTo.createdAt) }}
         </span>
         <span v-if="renoteTo" class="context-quote">引用 @{{ renoteTo.user.username }} 的笔记</span>
-        <span class="composer-title">{{ title }}</span>
       </div>
+      <span class="spacer"></span>
+      <span v-if="remaining < 500" class="text-count" :class="{ over: remaining < 0 }">{{ remaining }}</span>
+      <span v-if="localOnly" class="local-only" title="仅本地">
+        <AppIcon name="users" />
+      </span>
+      <button
+        ref="visibilityButton"
+        class="icon-button"
+        type="button"
+        title="可见性"
+        aria-label="可见性"
+        :disabled="posting"
+        @click="openVisibilityMenu"
+      >
+        <AppIcon :name="visibilityIcon" />
+      </button>
       <button
         v-if="!fixed && (replyTo || renoteTo)"
         class="icon-button"
@@ -332,6 +396,9 @@ onBeforeUnmount(() => {
       >
         <AppIcon name="close" />
       </button>
+      <MkButton v-if="!fixed" gradate :disabled="!canPost" @click="submit">
+        {{ posting ? "发布中…" : uploading ? "上传中…" : "发布" }}
+      </MkButton>
     </div>
 
     <div v-if="draftPrompt" class="draft-banner">
@@ -418,42 +485,22 @@ onBeforeUnmount(() => {
         <AppIcon name="eyeSlash" />
       </button>
 
-      <div class="vis-segmented" role="radiogroup" aria-label="可见性">
-        <button
-          v-for="option in visibilityOptions"
-          :key="option.value"
-          type="button"
-          class="vis-option"
-          :class="{ active: visibility === option.value }"
-          role="radio"
-          :aria-checked="visibility === option.value"
-          :title="`可见性：${option.label}`"
-          @click="visibility = option.value"
-        >
-          <svg
-            class="vis-icon"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.8"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            aria-hidden="true"
-          >
-            <path :d="option.path" />
-          </svg>
-          <span class="vis-label">{{ option.label }}</span>
-        </button>
-      </div>
-
-      <label class="toggle">
-        <input v-model="localOnly" type="checkbox" />
-        仅本地
-      </label>
-
+      <button
+        type="button"
+        class="tool-button"
+        :class="{ active: localOnly }"
+        title="仅本地"
+        aria-label="仅本地"
+        :aria-pressed="localOnly"
+        @click="localOnly = !localOnly"
+      >
+        <AppIcon name="users" />
+      </button>
       <span class="spacer"></span>
-      <span class="counter" :class="{ over: remaining < 0 }">{{ remaining }}</span>
-      <MkButton gradate :disabled="!canPost" @click="submit">
+      <button ref="moreButton" type="button" class="tool-button" title="更多" aria-label="更多" @click="openMoreMenu">
+        <AppIcon name="more" />
+      </button>
+      <MkButton v-if="fixed" gradate :disabled="!canPost" @click="submit">
         {{ posting ? "发布中…" : uploading ? "上传中…" : "发布" }}
       </MkButton>
     </div>
@@ -501,14 +548,7 @@ onBeforeUnmount(() => {
   color: var(--renote);
 }
 
-.composer-title {
-  font-weight: 700;
-  color: var(--fgHighlighted);
-}
 
-.composer-fixed .composer-title {
-  display: none;
-}
 
 .composer-fixed .composer-head {
   margin-block-end: 4px;
@@ -775,84 +815,29 @@ onBeforeUnmount(() => {
   outline-offset: 1px;
 }
 
-.vis-segmented {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px;
-  gap: 2px;
-  border: solid 0.5px var(--divider);
-  border-radius: var(--radius);
-  background: var(--buttonBg);
-}
-
-.vis-option {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding-block: 4px;
-  padding-inline: 9px;
-  border: 0;
-  border-radius: 6px;
-  background: none;
-  color: var(--fgTransparentWeak);
-  font: inherit;
-  font-size: 0.82em;
-  cursor: pointer;
-}
-
-.vis-option:hover {
-  color: var(--fg);
-}
-
-.vis-option.active {
-  color: var(--accent);
-  background: var(--accentedBg);
-}
-
-.vis-option:focus-visible {
-  outline: solid 2px var(--accent);
-  outline-offset: 1px;
-}
-
-.vis-icon {
-  inline-size: 14px;
-  block-size: 14px;
-  display: block;
-}
-
-.toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  color: var(--fgTransparentWeak);
-}
-
 .spacer {
   flex: 1;
 }
 
-.counter {
+.text-count {
   font-size: 0.85em;
   color: var(--fgTransparentWeak);
   font-variant-numeric: tabular-nums;
 }
 
-.counter.over {
+.text-count.over {
   color: var(--error);
   font-weight: 700;
+}
+
+.local-only {
+  display: inline-flex;
+  color: var(--fgTransparentWeak);
 }
 
 /* Narrow columns (~350px in deck) drop the segmented labels to icons only and
    let the footer wrap. */
 @container (max-width: 420px) {
-  .vis-label {
-    display: none;
-  }
-
-  .vis-option {
-    padding: 5px 7px;
-  }
-
   .preview {
     width: 72px;
     height: 72px;
