@@ -1072,6 +1072,25 @@ POST /inbox                            POST /users/{id}/inbox
   `TestRegistryIsolationAndErrors`（跨用户不可见、`NO_SUCH_KEY` 错误 id、匿名 401）。
 - 门禁：`gofmt -l` 空、`go vet ./...` 干净、`go test ./... -count=1` 全绿。
 
+## 12N. 批次：API 对接契约文档（2026-11-04）
+
+- 目的：为独立 workflow 里的新版前端提供**后端实测契约**（不是 Misskey 文档转述——逐个 handler 读码）。
+- 产物：`docs/research/api-contract/` 8 份，覆盖全部已注册路由：
+  `auth-users`（16 端点）、`notes-core`（14）、`timelines-notifications`（8 + Streaming）、
+  `drive-media`（11）、`following-relations`（7）、`admin-emoji-registry`（18）、
+  `meta-federation`（24，含 ActivityPub 全部路由）、`streaming`（协议、5 频道、17 条缺口）。
+- 每份含：请求字段表、响应 JSON 形状（packer 对象各写一次全字段）、错误码与错误 id 表、
+  `file:line` 引用、与 Misskey `c05e844` 的差异清单。绝大多数结论有对应测试作为行为证据。
+- 前端对接最关键的差异（详文见各份差异汇总）：
+  - id 是 **18 字符 base36**（非 ULID/UUID）；
+  - token 读取顺序是 body `i` 优先于 `Authorization: Bearer`（与上游相反），Streaming 则相反；
+  - 无 CORS，前端必须同源部署；
+  - Streaming 空闲约 120–180s 会被断（pong 不刷新 liveness），客户端需自建保活+重连；
+  - HTTP 时间线 `withRenotes` 无效、`users/notes` 的 `withReplies` 默认与上游相反；
+  - `admin/accounts/create` 不返回 `token`；`i/update` 响应不含 pinnedNotes。
+- 门禁不适用（仅新增文档，未动代码）；跨文档不一致（id 长度、`WWW-Authenticate` 细节）已订正。
+- 已知残留：各文档所引 `server.go` 行号以当前提交为准，后续改动 `registerRoutes` 需同步。
+
 ## 13. 文档索引
 
 | 文档 | 内容 |
@@ -1084,6 +1103,7 @@ POST /inbox                            POST /users/{id}/inbox
 | `docs/research/2026-11-01-runtime-adaptation-contract.md` | **运行时 shim 契约（shim/rewrite/drop）** |
 | `docs/research/2026-10-26-misskey-fediverse-firefish.md` | 首轮调研 |
 | `docs/research/2026-11-04-misskey-api-coverage.md` | **Misskey API 覆盖台账（当前工作线的进度依据）** |
+| `docs/research/api-contract/` | **后端 API 对接契约（8 份，新前端对接的唯一依据，见 §12N）** |
 | `docs/research/2026-10-26-go-ecosystem-and-dependency-decisions.md` | Go 生态与依赖取舍 |
 | `docs/research/2026-10-26-tech-stack-comparison.md` | 技术栈横向对比 |
 | `docs/research/2026-10-26-misskey-source-calibration.md` | **源码校准记录（含许可证约束与踩坑清单）** |
