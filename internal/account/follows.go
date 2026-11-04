@@ -74,7 +74,7 @@ func (s *Service) listFollows(ctx context.Context, anchor, other, userID string,
 	var q strings.Builder
 	q.WriteString(`
 SELECT f.id, f.created_at,
-       u.id, u.username, u.username_lower, u.host, u.password_hash, COALESCE(u.token, ''),
+       u.id, u.username, u.username_lower, u.host, COALESCE(u.password_hash, ''), COALESCE(u.token, ''),
        u.is_admin, u.is_suspended, u.created_at
 FROM followings f
 JOIN users u ON u.id = f.`)

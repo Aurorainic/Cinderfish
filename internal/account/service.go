@@ -232,10 +232,12 @@ FROM users WHERE username_lower = $1 AND host IS NULL
 	return scanUser(row)
 }
 
-// GetByID loads a local user by id.
+// GetByID loads any user by id, local or remote. A remote actor has no
+// password, so the hash is coalesced: the column is nullable and packing
+// a remote user must not fail.
 func (s *Service) GetByID(ctx context.Context, id string) (*User, error) {
 	row := s.pool.QueryRow(ctx, `
-SELECT id, username, username_lower, host, password_hash, COALESCE(token, ''),
+SELECT id, username, username_lower, host, COALESCE(password_hash, ''), COALESCE(token, ''),
        is_admin, is_suspended, created_at
 FROM users WHERE id = $1
 `, id)

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/Aurorainic/cinderfish/internal/idgen"
@@ -340,6 +341,156 @@ VALUES ($1,$2,$3,$4) ON CONFLICT (follower_id, followee_id) DO NOTHING
 	return nil
 }
 
+// FollowRequest is one pending follow request row.
+type FollowRequest struct {
+	ID         string
+	FollowerID string
+	FolloweeID string
+	// URI is the id of the Follow activity a remote actor sent. It is
+	// empty for a request a local user (or a local row) carries.
+	URI       string
+	CreatedAt time.Time
+}
+
+// FollowRequestQuery pages one side of the follow_requests table.
+// FollowerID lists the requests a user sent, FolloweeID the requests a
+// user received; a caller sets exactly one of them.
+type FollowRequestQuery struct {
+	FollowerID string
+	FolloweeID string
+	Limit      int
+	SinceID    string
+	UntilID    string
+	SinceDate  *time.Time
+	UntilDate  *time.Time
+}
+
+// FollowRequests returns pending requests. The id cursors bound the row
+// id and the date cursors bound created_at; ordering follows Misskey's
+// makePaginationQuery (packages/backend/src/core/QueryService.ts L54-84),
+// where a lower bound alone pages upward and everything else is newest
+// first.
+func (s *Store) FollowRequests(ctx context.Context, q FollowRequestQuery) ([]*FollowRequest, error) {
+	limit := q.Limit
+	if limit <= 0 {
+		limit = 10
+	}
+	if limit > 100 {
+		limit = 100
+	}
+
+	var conds []string
+	var args []any
+	add := func(col, op string, arg any) {
+		args = append(args, arg)
+		conds = append(conds, fmt.Sprintf("%s %s $%d", col, op, len(args)))
+	}
+	if q.FollowerID != "" {
+		add("follower_id", "=", q.FollowerID)
+	}
+	if q.FolloweeID != "" {
+		add("followee_id", "=", q.FolloweeID)
+	}
+	if q.SinceID != "" {
+		add("id", ">", q.SinceID)
+	}
+	if q.UntilID != "" {
+		add("id", "<", q.UntilID)
+	}
+	if q.SinceDate != nil {
+		add("created_at", ">", *q.SinceDate)
+	}
+	if q.UntilDate != nil {
+		add("created_at", "<", *q.UntilDate)
+	}
+
+	query := "SELECT " + followRequestColumns + " FROM follow_requests"
+	if len(conds) > 0 {
+		query += " WHERE " + strings.Join(conds, " AND ")
+	}
+	order := "DESC"
+	if (q.SinceID != "" && q.UntilID == "") ||
+		(q.SinceID == "" && q.UntilID == "" && q.SinceDate != nil && q.UntilDate == nil) {
+		order = "ASC"
+	}
+	args = append(args, limit)
+	query += fmt.Sprintf(" ORDER BY id %s LIMIT $%d", order, len(args))
+
+	rows, err := s.pool.Query(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("federation: list follow requests: %w", err)
+	}
+	defer rows.Close()
+
+	out := []*FollowRequest{}
+	for rows.Next() {
+		req, err := scanFollowRequest(rows)
+		if err != nil {
+			return nil, fmt.Errorf("federation: scan follow request: %w", err)
+		}
+		out = append(out, req)
+	}
+	return out, rows.Err()
+}
+
+// AcceptFollowRequest turns a pending request into a follow. The request
+// row is deleted, the following is recorded with the request's activity
+// id, and both users' counters are refreshed, all in one transaction.
+//
+// The returned request carries the uri the caller answers a remote
+// follower with; ErrRemoteNotFound means there was no pending request.
+func (s *Store) AcceptFollowRequest(ctx context.Context, followerID, followeeID string) (*FollowRequest, error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("federation: begin accept: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	req, err := scanFollowRequest(tx.QueryRow(ctx, `
+DELETE FROM follow_requests WHERE follower_id = $1 AND followee_id = $2
+RETURNING `+followRequestColumns, followerID, followeeID))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, ErrRemoteNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("federation: accept follow request: %w", err)
+	}
+
+	if _, err := tx.Exec(ctx, `
+INSERT INTO followings (id, follower_id, followee_id, uri, created_via)
+VALUES ($1,$2,$3,$4,'request') ON CONFLICT (follower_id, followee_id) DO NOTHING
+	`, idgen.New(), followerID, followeeID, nullIfEmpty(req.URI)); err != nil {
+		return nil, fmt.Errorf("federation: record accepted follow: %w", err)
+	}
+	if err := refreshFollowCounts(ctx, tx, followerID, followeeID); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("federation: commit accept: %w", err)
+	}
+	return req, nil
+}
+
+// RemoveFollowRequest deletes one pending request and returns it, without
+// recording a follow: following/requests/reject passes the follower the
+// caller received the request from, following/requests/cancel passes the
+// caller as the follower. The delete is a single statement, so it is
+// atomic on its own and needs no explicit transaction.
+//
+// ErrRemoteNotFound means there was no such request.
+func (s *Store) RemoveFollowRequest(ctx context.Context, followerID, followeeID string) (*FollowRequest, error) {
+	req, err := scanFollowRequest(s.pool.QueryRow(ctx, `
+DELETE FROM follow_requests WHERE follower_id = $1 AND followee_id = $2
+RETURNING `+followRequestColumns, followerID, followeeID))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, ErrRemoteNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("federation: remove follow request: %w", err)
+	}
+	return req, nil
+}
+
 // Follow records an accepted Follow.
 func (s *Store) Follow(ctx context.Context, uri, followerID, followeeID string) error {
 	if _, err := s.pool.Exec(ctx, `
@@ -348,8 +499,7 @@ VALUES ($1,$2,$3,$4,'activitypub') ON CONFLICT (follower_id, followee_id) DO NOT
 	`, idgen.New(), followerID, followeeID, nullIfEmpty(uri)); err != nil {
 		return fmt.Errorf("federation: record follow: %w", err)
 	}
-	_, _ = s.pool.Exec(ctx, "UPDATE users SET followers_count = (SELECT count(*) FROM followings WHERE followee_id = $1) WHERE id = $1", followeeID)
-	_, _ = s.pool.Exec(ctx, "UPDATE users SET following_count = (SELECT count(*) FROM followings WHERE follower_id = $1) WHERE id = $1", followerID)
+	_ = refreshFollowCounts(ctx, s.pool, followerID, followeeID)
 	return nil
 }
 
@@ -361,8 +511,43 @@ DELETE FROM followings WHERE follower_id = $1 AND followee_id = $2
 		return fmt.Errorf("federation: unfollow: %w", err)
 	}
 	_, _ = s.pool.Exec(ctx, "DELETE FROM follow_requests WHERE follower_id = $1 AND followee_id = $2", followerID, followeeID)
-	_, _ = s.pool.Exec(ctx, "UPDATE users SET followers_count = (SELECT count(*) FROM followings WHERE followee_id = $1) WHERE id = $1", followeeID)
-	_, _ = s.pool.Exec(ctx, "UPDATE users SET following_count = (SELECT count(*) FROM followings WHERE follower_id = $1) WHERE id = $1", followerID)
+	_ = refreshFollowCounts(ctx, s.pool, followerID, followeeID)
+	return nil
+}
+
+// followRequestColumns is the projection the follow request helpers scan.
+const followRequestColumns = `id, follower_id, followee_id, COALESCE(uri, ''), created_at`
+
+// scanFollowRequest reads one follow_requests row.
+func scanFollowRequest(row pgx.Row) (*FollowRequest, error) {
+	req := &FollowRequest{}
+	if err := row.Scan(&req.ID, &req.FollowerID, &req.FolloweeID, &req.URI, &req.CreatedAt); err != nil {
+		return nil, err
+	}
+	return req, nil
+}
+
+// execer is the statement runner shared by pgxpool.Pool and pgx.Tx, so a
+// helper can run both inside and outside a transaction.
+type execer interface {
+	Exec(ctx context.Context, sql string, arguments ...any) (pgconn.CommandTag, error)
+}
+
+// refreshFollowCounts recomputes both users' counters from the followings
+// table. The counters are derived data: a caller outside a transaction
+// may ignore the error, but a transactional caller returns it so the
+// whole change rolls back with them.
+func refreshFollowCounts(ctx context.Context, db execer, followerID, followeeID string) error {
+	if _, err := db.Exec(ctx, `
+UPDATE users SET followers_count = (SELECT count(*) FROM followings WHERE followee_id = $1) WHERE id = $1
+	`, followeeID); err != nil {
+		return fmt.Errorf("federation: refresh follower count: %w", err)
+	}
+	if _, err := db.Exec(ctx, `
+UPDATE users SET following_count = (SELECT count(*) FROM followings WHERE follower_id = $1) WHERE id = $1
+	`, followerID); err != nil {
+		return fmt.Errorf("federation: refresh following count: %w", err)
+	}
 	return nil
 }
 

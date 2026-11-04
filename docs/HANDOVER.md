@@ -942,6 +942,24 @@ POST /inbox                            POST /users/{id}/inbox
 - 前端冻结时的状态：工作树干净，最后提交 `2700334`；上一轮未提交的两处前端微调（MkPagination 的
   `transition` 去掉 `mode="out-in"`、通知行间距对齐）已按"非后端工作全废"的要求回退，未纳入提交。
 
+## 12D. 批次：关注请求端点（2026-11-04）
+
+按 Misskey `following/requests/*` 落地五个端点（契约取自 `tmp/refcheck/misskey/.../following/requests/`）：
+
+| 路由 | 语义 | 备注 |
+|------|------|------|
+| `POST /api/following/requests/list` | 收件箱：`followee = 我` 的待处理请求 | 返回 `{id, follower, followee}`（无 `createdAt`，与 `FollowRequestEntityService` 一致） |
+| `POST /api/following/requests/sent` | 发件箱：`follower = 我` 的请求 | 同上 |
+| `POST /api/following/requests/accept` | 接受：请求转 followings，远程关注者回 `Accept` | 无请求时 `NO_FOLLOW_REQUEST` |
+| `POST /api/following/requests/reject` | 拒绝：删请求，远程回 `Reject` | 参考实现无 not-found 错误，重复拒绝仍 200 |
+| `POST /api/following/requests/cancel` | 取消自己发出的请求 | 缺失时 `FOLLOW_REQUEST_NOT_FOUND`，返回 followee |
+
+- 存储层：`federation.FollowRequests`（id/created_at 双游标）、`AcceptFollowRequest`（单事务：删请求 → 插 following → 刷新双方计数）、`RemoveFollowRequest`；计数刷新抽成 `refreshFollowCounts`，`Follow`/`Unfollow` 一并复用。
+- 顺带修复：`account.Service.GetByID` 与 `account.listFollows` 对远程用户 `password_hash IS NULL` 的扫描失败（导致 `users/followers|following` 对含远程用户的列表 500）。
+- 测试：`TestFollowingRequestsListSeparatesIncomingAndOutgoing`、`TestFollowingRequestsPagination`、`TestFollowingRequestsAccept`、`TestFollowingRequestsAcceptAnswersRemoteFollower`、`TestFollowingRequestsReject`、`TestFollowingRequestsCancel`、`TestFollowingRequestsUnknownUser`、`TestFollowingRequestsNeedCredential`。
+- 门禁：`gofmt -l` 空、`go vet ./...` 干净、`go test ./... -count=1`（含数据库）全绿。
+- 已知缺口：目前没有代码写入「发出的待处理请求」（`sendRemoteFollow` 未落 `follow_requests` 行），所以 `sent`/`cancel` 只能作用于已有行；这需要与 `following/create` 的重复请求语义一起做。
+
 ## 13. 文档索引
 
 | 文档 | 内容 |

@@ -92,7 +92,7 @@ func (t *TokenService) Resolve(ctx context.Context, token string) (*User, *Acces
 
 	if auth.IsNativeUserToken(token) {
 		row := t.pool.QueryRow(ctx, `
-SELECT id, username, username_lower, host, password_hash, COALESCE(token, ''),
+SELECT id, username, username_lower, host, COALESCE(password_hash, ''), COALESCE(token, ''),
        is_admin, is_suspended, created_at
 FROM users WHERE token = $1
 `, token)

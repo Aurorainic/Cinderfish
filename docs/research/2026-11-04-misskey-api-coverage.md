@@ -15,25 +15,27 @@
 | 指标 | 数量 |
 |------|------|
 | Misskey 端点总数 | 440 |
-| Cinderfish 已实现（同名路径） | 35 |
-| 未实现 | 405 |
+| Cinderfish 已实现（同名路径） | 40 |
+| 未实现 | 400 |
 | 仅有 Cinderfish 侧别名/自有路径 | 5（`notifications`、`notifications/mark-all-as-read` 等别名） |
 
-## 2. 已实现（35）
+## 2. 已实现（40）
 
 ```
 admin/accounts/create      admin/show-users          admin/suspend-user
 admin/unsuspend-user       drive/files              drive/files/create
 drive/files/delete         drive/files/show         following/create
-following/delete           i                        i/notifications
-i/pin                      i/unpin                  i/update
-meta                       miauth/gen-token          notes/create
-notes/delete               notes/global-timeline     notes/hybrid-timeline
-notes/local-timeline       notes/reactions/create    notes/reactions/delete
-notes/renotes              notes/replies            notes/show
-notes/timeline             notifications/mark-all-as-read
-ping                       username/available        users/followers
-users/following            users/notes               users/show
+following/delete           following/requests/accept following/requests/cancel
+following/requests/list    following/requests/reject following/requests/sent
+i                          i/notifications          i/pin
+i/unpin                    i/update                 meta
+miauth/gen-token           notes/create             notes/delete
+notes/global-timeline      notes/hybrid-timeline    notes/local-timeline
+notes/reactions/create     notes/reactions/delete   notes/renotes
+notes/replies              notes/show               notes/timeline
+notifications/mark-all-as-read ping                 username/available
+users/followers            users/following          users/notes
+users/show
 ```
 
 另有 Cinderfish 自有别名：`POST /api/notifications`（Misskey 叫 `i/notifications`，两者都注册）。
@@ -52,7 +54,7 @@ users/following            users/notes               users/show
 | `clips/*` | 11 | 剪贴（首版可选） |
 | `flash/*` | 10 | Play（首版可选） |
 | `gallery/*` | 9 | 画廊（首版可选） |
-| `following/*` | 9 | 关注请求处理、列表、invalidate |
+| `following/*` | 4 | `following/list`、`following/update`、`following/update-all`、`invalidate` |
 | `pages/*` | 7 | 页面（首版可选） |
 | `antennas/*` | 7 | 天线（首版可选） |
 | `federation/*` / `hashtags/*` / `roles/*` / `invite/*` / `auth/*` / `sw/*` | 其余 | 视首版范围取舍 |
@@ -61,18 +63,22 @@ users/following            users/notes               users/show
 
 这些是 Firefish 客户端页面直接依赖、且当前会降级或空白的端点。
 
+> 2026-11-04 已实现并移出本表：`following/requests/list`、`following/requests/sent`、
+> `following/requests/accept`、`following/requests/reject`、`following/requests/cancel`
+> （见第 2 节）。仍未实现的前置依赖：`following/create` 对远端关注者不会写入待审行，
+> 所以 `requests/sent` 与 `cancel` 目前只能作用于库里已有的行。
+
 | 顺序 | 端点 | 解锁的界面/行为 | 现有降级 |
 |------|------|------------------|----------|
-| 1 | `following/requests/list`、`following/requests/accept`、`following/requests/reject`、`following/requests/sent` | 关注请求页、通知里的接受/拒绝按钮 | 目前只有入站请求排队，无接口处理 |
-| 2 | `users/update` 的 `followersVisibility` / `followingVisibility` | 隐私设置页的两个开关 | 只能直接改库 |
-| 3 | `i/favorites`、`notes/favorites/create`、`notes/favorites/delete` | 收藏页、笔记菜单的收藏项 | 无收藏功能 |
-| 4 | `notes/conversation`、`notes/children` | 笔记详情页的上下会话串 | 只渲染一层父帖 |
-| 5 | `notes/reactions` | 「谁回应了」名单浮层 | 只有计数 |
-| 6 | `hashtags/trend`、`hashtags/show` | 趋势小组件、标签页 | 客户端本地统计 |
-| 7 | `drive/folders*` | 云盘文件夹 | 扁平文件列表 |
-| 8 | `emojis` | 自定义表情渲染 | `:shortcode:` 纯文本 |
-| 9 | `notes/polls/vote` + 投票创建 | 投票功能 | 只读、表单隐藏入口 |
-| 10 | `i/registry/*` | 客户端设置云端同步 | localStorage |
+| 1 | `users/update` 的 `followersVisibility` / `followingVisibility` | 隐私设置页的两个开关 | 只能直接改库 |
+| 2 | `i/favorites`、`notes/favorites/create`、`notes/favorites/delete` | 收藏页、笔记菜单的收藏项 | 无收藏功能 |
+| 3 | `notes/conversation`、`notes/children` | 笔记详情页的上下会话串 | 只渲染一层父帖 |
+| 4 | `notes/reactions` | 「谁回应了」名单浮层 | 只有计数 |
+| 5 | `hashtags/trend`、`hashtags/show` | 趋势小组件、标签页 | 客户端本地统计 |
+| 6 | `drive/folders*` | 云盘文件夹 | 扁平文件列表 |
+| 7 | `emojis` | 自定义表情渲染 | `:shortcode:` 纯文本 |
+| 8 | `notes/polls/vote` + 投票创建 | 投票功能 | 只读、表单隐藏入口 |
+| 9 | `i/registry/*` | 客户端设置云端同步 | localStorage |
 
 ## 5. Tier 2（首版可选，明确不做要记录理由）
 
@@ -86,6 +92,18 @@ users/following            users/notes               users/show
 `Create` / `Delete` / `Like` / `Announce` / `Update` / `Block`，出站 `Follow` 走
 `following/create` 投递。未覆盖：`Move`、`Flag`、`Question`（投票）以及
 `EmojiReact`（Firefish/Misskey 的扩展反应类型，目前只认 `Like`）。
+
+2026-11-04 起出站侧还多了三种答复，全部走 `deliver_queue`（与 `Undo` 同一条通道，
+失败只记日志不回滚本地状态）：
+
+- `following/requests/accept` → `Accept`，内嵌远端关注者发来的原始 `Follow`（用
+  `follow_requests.uri`；缺 uri 时退回 `https://<本机>/users/<id>#follows/<followee>`）；
+- `following/requests/reject` → `Reject`，同样内嵌原始 `Follow`；
+- `following/requests/cancel` → `Undo(Follow)`，与 `following/delete` 共用
+  `sendRemoteUndoFollow`。
+
+未实现的入站行为：`follow_requests` 里的 `receiveFollowRequest` 通知、`followRequestAccepted`
+通知，以及 `following/create` 对远端关注的目标写入待审行（见第 4 节的说明）。
 
 ## 7. 维护方式
 

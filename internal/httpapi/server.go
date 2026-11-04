@@ -116,6 +116,11 @@ func (s *Server) registerRoutes() {
 	// source, which M4 left as a known gap.
 	s.mux.HandleFunc("POST /api/following/create", s.handleFollowingCreate)
 	s.mux.HandleFunc("POST /api/following/delete", s.handleFollowingDelete)
+	s.mux.HandleFunc("POST /api/following/requests/list", s.handleFollowingRequestsList)
+	s.mux.HandleFunc("POST /api/following/requests/sent", s.handleFollowingRequestsSent)
+	s.mux.HandleFunc("POST /api/following/requests/accept", s.handleFollowingRequestsAccept)
+	s.mux.HandleFunc("POST /api/following/requests/reject", s.handleFollowingRequestsReject)
+	s.mux.HandleFunc("POST /api/following/requests/cancel", s.handleFollowingRequestsCancel)
 
 	// Federation administration. The mode and allowlist live in the
 	// database so they change at runtime without a restart.
