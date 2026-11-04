@@ -931,6 +931,17 @@ POST /inbox                            POST /users/{id}/inbox
 - 测试：`TestNotesRepliesVisibility`（5 例）、`TestNotesRenotesVisibility`（5 例）、`TestUsersFollowListsPaginate`、`TestUsersFollowListPrivacy` 等；`go test ./...` 全绿。
 - 仍未做：`users/update` 不能写 `followersVisibility`/`followingVisibility`，这两项目前只能直接改库。
 
+## 12C. 工作面收敛到后端 API（2026-11-04）
+
+- 前端移植移交独立 workflow；本仓库此后只做后端 API 与联邦通讯，前端目录保持冻结（不再提交界面改动）。
+- 新增台账 `docs/research/2026-11-04-misskey-api-coverage.md`：按 Misskey `c05e844` 的 440 个端点逐一比对，
+  当前已实现 35、未实现 405，并给出 Tier 1 的顺序（关注请求、隐私字段、收藏、会话串、反应名单、趋势、
+  云盘文件夹、自定义表情、投票、注册表）。
+- 联邦侧盘点：`internal/federation/inbox.go` 已处理入站 `Follow`/`Accept`/`Reject`/`Undo`/`Create`/
+  `Delete`/`Like`/`Announce`/`Update`/`Block`；未覆盖 `Move`、`Flag`、`Question`、`EmojiReact`。
+- 前端冻结时的状态：工作树干净，最后提交 `2700334`；上一轮未提交的两处前端微调（MkPagination 的
+  `transition` 去掉 `mode="out-in"`、通知行间距对齐）已按"非后端工作全废"的要求回退，未纳入提交。
+
 ## 13. 文档索引
 
 | 文档 | 内容 |
@@ -942,6 +953,7 @@ POST /inbox                            POST /users/{id}/inbox
 | `docs/research/2026-11-01-firefish-port-capability-matrix.md` | **页面 → 端点能力矩阵与降级行为** |
 | `docs/research/2026-11-01-runtime-adaptation-contract.md` | **运行时 shim 契约（shim/rewrite/drop）** |
 | `docs/research/2026-10-26-misskey-fediverse-firefish.md` | 首轮调研 |
+| `docs/research/2026-11-04-misskey-api-coverage.md` | **Misskey API 覆盖台账（当前工作线的进度依据）** |
 | `docs/research/2026-10-26-go-ecosystem-and-dependency-decisions.md` | Go 生态与依赖取舍 |
 | `docs/research/2026-10-26-tech-stack-comparison.md` | 技术栈横向对比 |
 | `docs/research/2026-10-26-misskey-source-calibration.md` | **源码校准记录（含许可证约束与踩坑清单）** |
