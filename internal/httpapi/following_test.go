@@ -498,16 +498,25 @@ SELECT payload, inbox_url FROM deliver_queue ORDER BY id
 		if err := rows.Scan(&payload, &inbox); err != nil {
 			t.Fatalf("scan deliver queue: %v", err)
 		}
+		// A Follow carries the followee URI as a bare string, while
+		// Accept/Reject/Undo embed the activity object, so the field is
+		// decoded per shape instead of assuming a map.
 		var activity struct {
-			ID     string         `json:"id"`
-			Type   string         `json:"type"`
-			Actor  string         `json:"actor"`
-			Object map[string]any `json:"object"`
+			ID     string          `json:"id"`
+			Type   string          `json:"type"`
+			Actor  string          `json:"actor"`
+			Object json.RawMessage `json:"object"`
 		}
 		if err := json.Unmarshal(payload, &activity); err != nil {
 			t.Fatalf("decode queued activity: %v", err)
 		}
-		objectID, _ := activity.Object["id"].(string)
+		objectID := ""
+		var objMap map[string]any
+		if err := json.Unmarshal(activity.Object, &objMap); err == nil {
+			objectID, _ = objMap["id"].(string)
+		} else {
+			_ = json.Unmarshal(activity.Object, &objectID)
+		}
 		out = append(out, queuedActivity{
 			Type: activity.Type, Actor: activity.Actor,
 			ActivityID: activity.ID, ObjectID: objectID, Inbox: inbox,
@@ -883,5 +892,61 @@ func TestFollowingRequestsNeedCredential(t *testing.T) {
 		if e["code"] != "AUTHENTICATION_FAILED" {
 			t.Errorf("%s: code = %v, want AUTHENTICATION_FAILED", path, e["code"])
 		}
+	}
+}
+
+// TestFollowingCreateRemoteRecordsPendingRequest pins the outgoing half of
+// the follow-request bookkeeping: a Follow that is still waiting at the peer
+// shows up in following/requests/sent, and a second create is refused with
+// ALREADY_FOLLOWING instead of queueing another Follow.
+func TestFollowingCreateRemoteRecordsPendingRequest(t *testing.T) {
+	f := newFederationServer(t, "public")
+	token, meID := f.registerUser(t, "alice")
+	daveID := insertRemoteUser(t, f, "remote.example", "dave")
+
+	resp, out := postWithToken(t, f.ts, "/api/following/create", token, map[string]any{"userId": daveID})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("create: %d %v", resp.StatusCode, out)
+	}
+
+	queued := deliverQueue(t, f)
+	if len(queued) != 1 || queued[0].Type != "Follow" {
+		t.Fatalf("deliver queue = %v, want one Follow", queued)
+	}
+	wantFollowID := "https://fish.example/users/" + meID + "#follows/" + daveID
+	if queued[0].ActivityID != wantFollowID {
+		t.Errorf("follow id = %q, want %q", queued[0].ActivityID, wantFollowID)
+	}
+
+	sent := postListWithToken(t, f.ts, "/api/following/requests/sent", token, nil)
+	if len(sent) != 1 {
+		t.Fatalf("sent requests = %v, want the pending follow", sent)
+	}
+	item, _ := sent[0].(map[string]any)
+	followee, _ := item["followee"].(map[string]any)
+	if followee["id"] != daveID {
+		t.Errorf("sent followee = %v, want %s", followee["id"], daveID)
+	}
+
+	// While the request is pending the create is refused and nothing new is
+	// queued for delivery.
+	resp, out = postWithToken(t, f.ts, "/api/following/create", token, map[string]any{"userId": daveID})
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("second create: %d %v, want 400", resp.StatusCode, out)
+	}
+	e, _ := out["error"].(map[string]any)
+	if e["code"] != "ALREADY_FOLLOWING" {
+		t.Errorf("second create code = %v, want ALREADY_FOLLOWING", e["code"])
+	}
+	if queued := deliverQueue(t, f); len(queued) != 1 {
+		t.Errorf("deliver queue after duplicate = %v, want still one Follow", queued)
+	}
+
+	// Cancelling the request clears it from both the list and the table.
+	if resp, out := postWithToken(t, f.ts, "/api/following/requests/cancel", token, map[string]any{"userId": daveID}); resp.StatusCode != http.StatusOK {
+		t.Fatalf("cancel: %d %v", resp.StatusCode, out)
+	}
+	if sent := postListWithToken(t, f.ts, "/api/following/requests/sent", token, nil); len(sent) != 0 {
+		t.Errorf("sent requests after cancel = %v, want none", sent)
 	}
 }

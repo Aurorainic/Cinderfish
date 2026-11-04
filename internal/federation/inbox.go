@@ -152,6 +152,11 @@ func (i *Inbox) accept(ctx context.Context, actor *RemoteUser, activity Object) 
 	if err := i.store.Follow(ctx, obj.Ref("id"), followerID, actor.ID); err != nil {
 		return "", err
 	}
+	// The pending outgoing request is settled by this Accept; a missing row
+	// means it was cancelled meanwhile and is not an error.
+	if _, err := i.store.RemoveFollowRequest(ctx, followerID, actor.ID); err != nil && !errors.Is(err, ErrRemoteNotFound) {
+		return "", err
+	}
 	if i.OnFollow != nil {
 		i.OnFollow(ctx, followerID, actor.ID)
 	}

@@ -958,7 +958,11 @@ POST /inbox                            POST /users/{id}/inbox
 - 顺带修复：`account.Service.GetByID` 与 `account.listFollows` 对远程用户 `password_hash IS NULL` 的扫描失败（导致 `users/followers|following` 对含远程用户的列表 500）。
 - 测试：`TestFollowingRequestsListSeparatesIncomingAndOutgoing`、`TestFollowingRequestsPagination`、`TestFollowingRequestsAccept`、`TestFollowingRequestsAcceptAnswersRemoteFollower`、`TestFollowingRequestsReject`、`TestFollowingRequestsCancel`、`TestFollowingRequestsUnknownUser`、`TestFollowingRequestsNeedCredential`。
 - 门禁：`gofmt -l` 空、`go vet ./...` 干净、`go test ./... -count=1`（含数据库）全绿。
-- 已知缺口：目前没有代码写入「发出的待处理请求」（`sendRemoteFollow` 未落 `follow_requests` 行），所以 `sent`/`cancel` 只能作用于已有行；这需要与 `following/create` 的重复请求语义一起做。
+- 出站待确认已补齐（同日第二次提交）：`sendRemoteFollow` 在 Follow 入队成功后写入 `follow_requests` 行（uri = 发出的 Follow id），
+  因此 `requests/sent` 能看到「等待对方确认」的关注、`requests/cancel` 能撤回；入站 `Accept` 在记录 following 后清掉该行
+  （行已不存在不算错误）；`following/create` 对「已有待确认请求」同样返回 `ALREADY_FOLLOWING`，避免重复向对端投递 Follow。
+  测试：`TestFollowingCreateRemoteRecordsPendingRequest`（投递队列只有一条 Follow、sent 列表出现该请求、重复 create 400、cancel 后清空）；
+  `deliverQueue` 助手改为同时解析字符串 object（Follow）与对象 object（Accept/Reject/Undo）。
 
 ## 13. 文档索引
 

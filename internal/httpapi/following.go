@@ -55,7 +55,11 @@ func (s *Server) handleFollowingCreate(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	if s.federationStore.HasFollowing(r.Context(), info.User.ID, target.ID) {
+	if s.federationStore.HasFollowing(r.Context(), info.User.ID, target.ID) ||
+		s.federationStore.HasPendingFollowRequest(r.Context(), info.User.ID, target.ID) {
+		// Misskey answers ALREADY_FOLLOWING both for a follow that exists and
+		// for one whose request is still waiting, so the client cannot queue a
+		// second Follow at the peer.
 		writeAPIError(w, &APIError{
 			Message: "You are already following that user.", Code: "ALREADY_FOLLOWING",
 			ID: errIDAlreadyFollowing, Kind: "client", Status: http.StatusBadRequest,
@@ -165,6 +169,15 @@ func (s *Server) sendRemoteFollow(ctx context.Context, meID, targetID, host stri
 	}
 	if err := s.federationDeliver.Enqueue(ctx, inbox, followID, s.fedRenderer.KeyID(meID), meID, follow); err != nil {
 		log.Printf("httpapi: enqueue follow to %s: %v", inbox, err)
+		return
+	}
+
+	// The follow is pending at the peer until its Accept arrives, so it is
+	// recorded as a request: following/requests/sent lists it and
+	// following/requests/cancel can withdraw it. The inbox Accept handler
+	// clears the row when the follow is confirmed.
+	if err := s.federationStore.FollowRequest(ctx, followID, meID, targetID); err != nil {
+		log.Printf("httpapi: record outgoing follow request to %s: %v", targetID, err)
 	}
 }
 
