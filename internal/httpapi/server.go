@@ -145,6 +145,8 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("POST /api/notes/show", s.handleNotesShow)
 	s.mux.HandleFunc("POST /api/notes/delete", s.handleNotesDelete)
 	s.mux.HandleFunc("POST /api/notes/replies", s.handleNotesReplies)
+	s.mux.HandleFunc("POST /api/notes/conversation", s.handleNotesConversation)
+	s.mux.HandleFunc("POST /api/notes/children", s.handleNotesChildren)
 	s.mux.HandleFunc("POST /api/notes/renotes", s.handleNotesRenotes)
 	s.mux.HandleFunc("POST /api/notes/favorites/create", s.handleNotesFavoritesCreate)
 	s.mux.HandleFunc("POST /api/notes/favorites/delete", s.handleNotesFavoritesDelete)

@@ -985,6 +985,16 @@ POST /inbox                            POST /users/{id}/inbox
 - 测试：`TestNoteFavoritesRoundTrip`、`TestNoteFavoritesListPagination`、`TestNoteFavoritesErrors`。
 - 门禁：`gofmt -l` 空、`go vet ./...` 干净、`go test ./... -count=1` 全绿。
 
+## 12G. 批次：会话串与子帖（2026-11-04）
+
+- `POST /api/notes/conversation`：从 `reply_id` 逐级向上取父帖，最近的在前，支持 `limit`（默认 10，上限 100）与 `offset`；
+  遇到循环引用或不可见父帖即停止（Misskey 参考实现不做可见性检查，这里按本实例既有口径收紧，避免通过公开回复泄漏受限父帖）。
+- `POST /api/notes/children`：某帖的直接回复，最新在前，支持 `limit/sinceId/untilId/sinceDate/untilDate`，
+  可见性走与时间线相同的 `addNoteVisibility`（公共/首页、作者、被指定者、被提及者、关注者且是回复对象）。
+- 测试：`TestNotesConversationWalksAncestors`（顺序、offset、limit）、`TestNotesConversationStopsAtPrivateParent`
+  （匿名在 followers 父帖处截断、作者可见、未知笔记 404）、`TestNotesChildren`（顺序、作者/回复对象/局外人三种可见性、untilId 游标）。
+- 门禁：`gofmt -l` 空、`go vet ./...` 干净、`go test ./... -count=1` 全绿。
+
 ## 13. 文档索引
 
 | 文档 | 内容 |
