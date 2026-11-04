@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -17,6 +19,17 @@ type Reaction struct {
 	UserID    string
 	Emoji     string
 	CreatedAt time.Time
+}
+
+// ReactionQuery is the paging parameter set of notes/reactions.
+type ReactionQuery struct {
+	// Type filters to one reaction; empty means every reaction.
+	Type      string
+	Limit     int
+	SinceID   string
+	UntilID   string
+	SinceDate *time.Time
+	UntilDate *time.Time
 }
 
 // ReactionService records and summarises reactions.
@@ -54,6 +67,67 @@ DELETE FROM note_reactions WHERE note_id = $1 AND user_id = $2 AND emoji = $3
 		return fmt.Errorf("note: remove reaction: %w", err)
 	}
 	return nil
+}
+
+// List returns the reactions on a note, newest first, optionally filtered to
+// one reaction type. It backs Misskey's notes/reactions ("who reacted").
+func (s *ReactionService) List(ctx context.Context, noteID string, q ReactionQuery) ([]*Reaction, error) {
+	if q.Limit <= 0 {
+		q.Limit = 10
+	}
+	if q.Limit > 100 {
+		q.Limit = 100
+	}
+
+	var conds []string
+	var args []any
+	args = append(args, noteID)
+	conds = append(conds, fmt.Sprintf("note_id = $%d", len(args)))
+	if q.Type != "" {
+		args = append(args, q.Type)
+		conds = append(conds, fmt.Sprintf("emoji = $%d", len(args)))
+	}
+	if q.SinceID != "" {
+		args = append(args, q.SinceID)
+		conds = append(conds, fmt.Sprintf("id > $%d", len(args)))
+	}
+	if q.UntilID != "" {
+		args = append(args, q.UntilID)
+		conds = append(conds, fmt.Sprintf("id < $%d", len(args)))
+	}
+	if q.SinceDate != nil {
+		args = append(args, *q.SinceDate)
+		conds = append(conds, fmt.Sprintf("created_at > $%d", len(args)))
+	}
+	if q.UntilDate != nil {
+		args = append(args, *q.UntilDate)
+		conds = append(conds, fmt.Sprintf("created_at < $%d", len(args)))
+	}
+
+	order := "id DESC"
+	if q.SinceID != "" && q.UntilID == "" && q.UntilDate == nil {
+		order = "id ASC"
+	}
+
+	query := "SELECT id, note_id, user_id, emoji, created_at FROM note_reactions WHERE " +
+		strings.Join(conds, " AND ") + " ORDER BY " + order +
+		" LIMIT " + strconv.Itoa(q.Limit)
+
+	rows, err := s.pool.Query(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("note: list reactions: %w", err)
+	}
+	defer rows.Close()
+
+	out := []*Reaction{}
+	for rows.Next() {
+		r := &Reaction{}
+		if err := rows.Scan(&r.ID, &r.NoteID, &r.UserID, &r.Emoji, &r.CreatedAt); err != nil {
+			return nil, fmt.Errorf("note: scan reaction: %w", err)
+		}
+		out = append(out, r)
+	}
+	return out, rows.Err()
 }
 
 // Counts returns the number of reactions per emoji for a note.

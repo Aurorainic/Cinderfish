@@ -995,6 +995,16 @@ POST /inbox                            POST /users/{id}/inbox
   （匿名在 followers 父帖处截断、作者可见、未知笔记 404）、`TestNotesChildren`（顺序、作者/回复对象/局外人三种可见性、untilId 游标）。
 - 门禁：`gofmt -l` 空、`go vet ./...` 干净、`go test ./... -count=1` 全绿。
 
+## 12H. 批次：反应名单（2026-11-04）
+
+- `POST /api/notes/reactions`：返回 `NoteReaction` 数组 `{id, createdAt, type, user: UserLite}`，最新在前；
+  支持 `type` 过滤与 `limit/sinceId/untilId/sinceDate/untilDate` 游标；与 Misskey 一致**不要求凭证**。
+- 可见性：浏览者读不到的笔记一律答 404 `NO_SUCH_NOTE`（错误 id 用该端点自己的 `263fff3d-…`），不泄漏反应名单；
+  已删除用户的反应行跳过，不输出 `user: null`。
+- 测试：`TestNotesReactionsList`（顺序、UserLite 形状、type 过滤、untilId 游标）、
+  `TestNotesReactionsListVisibility`（局外人与匿名 404 且错误 id 正确、作者可见、未知笔记与缺参）。
+- 门禁：`gofmt -l` 空、`go vet ./...` 干净、`go test ./... -count=1` 全绿。
+
 ## 13. 文档索引
 
 | 文档 | 内容 |
