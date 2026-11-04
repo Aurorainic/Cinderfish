@@ -1033,6 +1033,21 @@ POST /inbox                            POST /users/{id}/inbox
   `TestDriveFoldersIsolationAndErrors`（他人不可见/不可删、自指与环拒绝、匿名 401）。
 - 门禁：`gofmt -l` 空、`go vet ./...` 干净、`go test ./... -count=1` 全绿。
 
+## 12K. 批次：自定义表情注册表（2026-11-04）
+
+- 迁移 **v8**：`emojis(id, name, host, category, aliases, url, is_sensitive, local_only, created_at)`，
+  本地名唯一（`host IS NULL` 部分唯一索引）、远端 `(name, host)` 唯一、`(category, name)` 索引。
+- 端点：
+  - `POST /api/emojis`（无凭证）：本地表情，按 category/name 排序，返回 `EmojiSimple` `{name, category, aliases, url, localOnly, isSensitive}`。
+  - `POST /api/admin/emoji/list`：全部表情（含远端占位），支持 `query`（名称或别名 ILIKE）、`limit`、`sinceId/untilId`。
+  - `POST /api/admin/emoji/add`：管理员用自己云盘里的文件注册表情；名称/别名需匹配 `^[a-zA-Z0-9_]+$`，重名答 `EMOJI_ALREADY_EXISTS`。
+  - `POST /api/admin/emoji/delete`：按 id 删除。
+- 顺带修复：`requireAdmin` 原来只用请求头取凭证（`authenticate(..., {})`），凡是把 token 放在请求体 `i` 字段的管理端点都会 401；
+  现在与普通 handler 一致，先读头再读体。
+- 测试：`TestEmojisRegistryLifecycle`（上传文件→注册→公共列表 EmojiSimple 形状与别名→管理列表→重名 400→非法名 400→删除后列表清空）、
+  `TestEmojisAdminOnly`（非管理员 403、匿名可读公共列表）。
+- 门禁：`gofmt -l` 空、`go vet ./...` 干净、`go test ./... -count=1` 全绿。
+
 ## 13. 文档索引
 
 | 文档 | 内容 |

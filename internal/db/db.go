@@ -396,6 +396,24 @@ ALTER TABLE drive_files
     ADD COLUMN IF NOT EXISTS folder_id TEXT REFERENCES drive_folders (id) ON DELETE SET NULL;
 CREATE INDEX IF NOT EXISTS idx_drive_files_folder ON drive_files (folder_id) WHERE folder_id IS NOT NULL;
 `,
+
+	// v8: custom emoji registry (Misskey emojis and admin/emoji/*).
+	8: `
+CREATE TABLE IF NOT EXISTS emojis (
+    id           TEXT PRIMARY KEY,
+    name         TEXT NOT NULL,
+    host         TEXT,
+    category     TEXT,
+    aliases      JSONB NOT NULL DEFAULT '[]'::jsonb,
+    url          TEXT NOT NULL,
+    is_sensitive BOOLEAN NOT NULL DEFAULT FALSE,
+    local_only   BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_emojis_name_local ON emojis (name) WHERE host IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_emojis_name_host ON emojis (name, host) WHERE host IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_emojis_category ON emojis (category, name);
+`,
 }
 
 // Migrate applies pending migrations in order and returns the version

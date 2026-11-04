@@ -72,7 +72,9 @@ func authFromContext(ctx context.Context) *AuthInfo {
 const errIDForbidden = "f4f0d9f1-3a2e-4a8b-9c7d-2e1b0f6a8c53"
 
 func (s *Server) requireAdmin(w http.ResponseWriter, r *http.Request) bool {
-	info, err := s.authenticate(r.Context(), r, map[string]any{})
+	// Read the credential the same way the handlers do: header first, then
+	// the body's `i` field. Misskey clients send the token in the body.
+	info, err := s.authenticate(r.Context(), r, bodyAsMap(r))
 	if err != nil || info == nil {
 		writeAuthenticationError(w)
 		return false

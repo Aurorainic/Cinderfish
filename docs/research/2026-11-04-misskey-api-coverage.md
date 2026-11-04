@@ -33,9 +33,13 @@ miauth/gen-token           notes/create             notes/delete
 notes/global-timeline      notes/hybrid-timeline    notes/local-timeline
 notes/reactions           hashtags/trend
 drive/folders             drive/folders/create     drive/folders/show
-drive/folders/update      drive/folders/delete/create     notes/reactions           hashtags/trend
+drive/folders/update      drive/folders/delete
+emojis                    admin/emoji/list         admin/emoji/add
+admin/emoji/delete/create     notes/reactions           hashtags/trend
 drive/folders             drive/folders/create     drive/folders/show
-drive/folders/update      drive/folders/delete/delete   notes/renotes
+drive/folders/update      drive/folders/delete
+emojis                    admin/emoji/list         admin/emoji/add
+admin/emoji/delete/delete   notes/renotes
 notes/replies              notes/show               notes/timeline
 notifications/mark-all-as-read ping                 username/available
 users/followers            users/following          users/notes
@@ -79,7 +83,9 @@ users/show
 | 3 | `notes/conversation`、`notes/children` | 笔记详情页的上下会话串 | 只渲染一层父帖 |
 | 4 | `notes/reactions           hashtags/trend
 drive/folders             drive/folders/create     drive/folders/show
-drive/folders/update      drive/folders/delete` | 「谁回应了」名单浮层 | 只有计数 |
+drive/folders/update      drive/folders/delete
+emojis                    admin/emoji/list         admin/emoji/add
+admin/emoji/delete` | 「谁回应了」名单浮层 | 只有计数 |
 | 5 | `hashtags/trend`、`hashtags/show` | 趋势小组件、标签页 | 客户端本地统计 |
 | 6 | `drive/folders*` | 云盘文件夹 | 扁平文件列表 |
 | 7 | `emojis` | 自定义表情渲染 | `:shortcode:` 纯文本 |

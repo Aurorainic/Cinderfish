@@ -37,6 +37,7 @@ type Server struct {
 	favorites     *note.FavoriteService
 	hashtags      *note.HashtagService
 	folders       *media.FolderService
+	emojis        *media.EmojiService
 
 	storage media.Storage
 	drive   *media.DriveService
@@ -86,6 +87,7 @@ func NewServerWithDB(cfg *config.Config, pool *pgxpool.Pool) *Server {
 	s.favorites = note.NewFavoriteService(pool)
 	s.hashtags = note.NewHashtagService(pool)
 	s.folders = media.NewFolderService(pool)
+	s.emojis = media.NewEmojiService(pool)
 	return s
 }
 
@@ -133,6 +135,10 @@ func (s *Server) registerRoutes() {
 
 	// Federation administration. The mode and allowlist live in the
 	// database so they change at runtime without a restart.
+	s.mux.HandleFunc("POST /api/emojis", s.handleEmojis)
+	s.mux.HandleFunc("POST /api/admin/emoji/list", s.handleAdminEmojiList)
+	s.mux.HandleFunc("POST /api/admin/emoji/add", s.handleAdminEmojiAdd)
+	s.mux.HandleFunc("POST /api/admin/emoji/delete", s.handleAdminEmojiDelete)
 	s.mux.HandleFunc("POST /api/admin/accounts/create", s.handleAdminAccountsCreate)
 	s.mux.HandleFunc("POST /api/admin/show-users", s.handleAdminShowUsers)
 	s.mux.HandleFunc("POST /api/admin/suspend-user", s.handleAdminSuspendUser)
