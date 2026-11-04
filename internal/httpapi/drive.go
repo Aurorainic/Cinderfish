@@ -45,7 +45,17 @@ func (s *Server) handleDriveFilesCreate(w http.ResponseWriter, r *http.Request) 
 	contentType := header.Header.Get("Content-Type")
 	name := media.SanitizeName(header.Filename)
 
-	stored, err := s.drive.Save(r.Context(), info.User.ID, name, file, contentType)
+	// folderId is optional: an absent or empty field uploads to the root.
+	var folderID *string
+	if v := r.FormValue("folderId"); v != "" {
+		if err := s.checkOwnFolder(r, info.User.ID, v); err != nil {
+			writeAPIError(w, err)
+			return
+		}
+		folderID = &v
+	}
+
+	stored, err := s.drive.Save(r.Context(), info.User.ID, name, file, contentType, folderID)
 	if err != nil {
 		if errors.Is(err, media.ErrTooLarge) {
 			writeAPIError(w, &APIError{
@@ -64,6 +74,31 @@ func (s *Server) handleDriveFilesCreate(w http.ResponseWriter, r *http.Request) 
 	writeJSON(w, http.StatusOK, packDriveFile(stored))
 }
 
+// checkOwnFolder verifies a folder id belongs to the caller before an upload
+// or a listing uses it.
+func (s *Server) checkOwnFolder(r *http.Request, userID, folderID string) *APIError {
+	folder, err := s.folders.GetFolder(r.Context(), folderID)
+	if err != nil {
+		if errors.Is(err, media.ErrNotFound) {
+			return &APIError{
+				Message: "No such folder.", Code: "NO_SUCH_FOLDER",
+				ID: errIDNoSuchFolder, Kind: "client", Status: http.StatusBadRequest,
+			}
+		}
+		return &APIError{
+			Message: "Could not load the folder.", Code: "INTERNAL_ERROR",
+			ID: errIDInternal, Kind: "server", Status: http.StatusInternalServerError,
+		}
+	}
+	if folder.UserID != userID {
+		return &APIError{
+			Message: "The folder is not yours.", Code: "ACCESS_DENIED",
+			ID: errIDForbidden, Kind: "permission", Status: http.StatusForbidden,
+		}
+	}
+	return nil
+}
+
 // handleDriveFilesList implements POST /api/drive/files.
 func (s *Server) handleDriveFilesList(w http.ResponseWriter, r *http.Request) {
 	if s.drive == nil {
@@ -75,9 +110,10 @@ func (s *Server) handleDriveFilesList(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var body struct {
-		Limit   int    `json:"limit"`
-		SinceID string `json:"sinceId"`
-		UntilID string `json:"untilId"`
+		Limit    int     `json:"limit"`
+		SinceID  string  `json:"sinceId"`
+		UntilID  string  `json:"untilId"`
+		FolderID *string `json:"folderId"`
 	}
 	if err := decodeOptionalJSON(r, &body); err != nil {
 		writeAPIError(w, err)
@@ -90,7 +126,13 @@ func (s *Server) handleDriveFilesList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	files, err := s.drive.List(r.Context(), info.User.ID, body.Limit, body.SinceID, body.UntilID)
+	if body.FolderID != nil {
+		if err := s.checkOwnFolder(r, info.User.ID, *body.FolderID); err != nil {
+			writeAPIError(w, err)
+			return
+		}
+	}
+	files, err := s.drive.List(r.Context(), info.User.ID, body.Limit, body.SinceID, body.UntilID, body.FolderID)
 	if err != nil {
 		writeAPIError(w, &APIError{
 			Message: "Could not list the files.", Code: "INTERNAL_ERROR",
@@ -216,7 +258,7 @@ func packDriveFile(f *media.File) map[string]any {
 		"thumbnailUrl": nil,
 		"webpublicUrl": nil,
 		"comment":      nil,
-		"folderId":     nil,
+		"folderId":     f.FolderID,
 		"blurhash":     nil,
 	}
 }

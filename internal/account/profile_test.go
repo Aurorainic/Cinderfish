@@ -114,7 +114,7 @@ func TestUpdateProfileAvatar(t *testing.T) {
 		t.Fatalf("Register other: %v", err)
 	}
 
-	file, err := drive.Save(ctx, user.ID, "avatar.png", bytes.NewBufferString("png"), "image/png")
+	file, err := drive.Save(ctx, user.ID, "avatar.png", bytes.NewBufferString("png"), "image/png", nil)
 	if err != nil {
 		t.Fatalf("drive.Save: %v", err)
 	}

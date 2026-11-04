@@ -36,6 +36,7 @@ type Server struct {
 	notifications *note.NotificationService
 	favorites     *note.FavoriteService
 	hashtags      *note.HashtagService
+	folders       *media.FolderService
 
 	storage media.Storage
 	drive   *media.DriveService
@@ -84,6 +85,7 @@ func NewServerWithDB(cfg *config.Config, pool *pgxpool.Pool) *Server {
 	s.notifications = note.NewNotificationService(pool)
 	s.favorites = note.NewFavoriteService(pool)
 	s.hashtags = note.NewHashtagService(pool)
+	s.folders = media.NewFolderService(pool)
 	return s
 }
 
@@ -167,6 +169,11 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("POST /api/notifications/mark-all-as-read", s.handleNotificationsMarkAllAsRead)
 
 	s.mux.HandleFunc("POST /api/drive/files/create", s.handleDriveFilesCreate)
+	s.mux.HandleFunc("POST /api/drive/folders", s.handleDriveFolders)
+	s.mux.HandleFunc("POST /api/drive/folders/create", s.handleDriveFoldersCreate)
+	s.mux.HandleFunc("POST /api/drive/folders/show", s.handleDriveFoldersShow)
+	s.mux.HandleFunc("POST /api/drive/folders/update", s.handleDriveFoldersUpdate)
+	s.mux.HandleFunc("POST /api/drive/folders/delete", s.handleDriveFoldersDelete)
 	s.mux.HandleFunc("POST /api/drive/files", s.handleDriveFilesList)
 	s.mux.HandleFunc("POST /api/drive/files/show", s.handleDriveFilesShow)
 	s.mux.HandleFunc("POST /api/drive/files/delete", s.handleDriveFilesDelete)

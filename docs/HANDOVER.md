@@ -1019,6 +1019,20 @@ POST /inbox                            POST /users/{id}/inbox
   `TestHashtagsTrendEmptyState`。
 - 门禁：`gofmt -l` 空、`go vet ./...` 干净、`go test ./... -count=1` 全绿。
 
+## 12J. 批次：云盘文件夹（2026-11-04）
+
+- 迁移 **v7**：`drive_folders(id, user_id, name, parent_id, created_at)`＋`drive_files.folder_id`
+  （外键 `ON DELETE SET NULL`，另有 user/parent、folder 两个索引）。
+- 端点：`drive/folders`（按 folderId 列子文件夹，nil 为根）、`create`、`show`、`update`、`delete`。
+  返回 Misskey `DriveFolder` 形状 `{id, createdAt, name, parentId, foldersCount, filesCount, parent}`。
+- `drive/files/create` 与 `drive/files` 现在接受 `folderId`（上传用 multipart 字段，列表用 JSON 字段），
+  并校验文件夹归属；打包的 DriveFile 的 `folderId` 不再是硬编码 `nil`。
+- 语义：`update` 的 `parentId` 用“缺省 vs 显式 null”区分（null = 移到根）；移动到自己或后代返回 400；
+  `delete` 在一个事务里把文件与子文件夹上移到父级再删行，与 Misskey 一致（不丢内容）。
+- 测试：`TestDriveFoldersLifecycle`（create 嵌套、分层列表、show 计数、改名、显式 null 移到根、删除）、
+  `TestDriveFoldersIsolationAndErrors`（他人不可见/不可删、自指与环拒绝、匿名 401）。
+- 门禁：`gofmt -l` 空、`go vet ./...` 干净、`go test ./... -count=1` 全绿。
+
 ## 13. 文档索引
 
 | 文档 | 内容 |

@@ -377,6 +377,25 @@ CREATE TABLE IF NOT EXISTS note_favorites (
 CREATE INDEX IF NOT EXISTS idx_note_favorites_user ON note_favorites (user_id, id DESC);
 CREATE INDEX IF NOT EXISTS idx_note_favorites_note ON note_favorites (note_id);
 `,
+
+	// v7: drive folders (Misskey drive/folders/*).
+	7: `
+CREATE TABLE IF NOT EXISTS drive_folders (
+    id         TEXT PRIMARY KEY,
+    user_id    TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    name       TEXT NOT NULL,
+    parent_id  TEXT REFERENCES drive_folders (id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_drive_folders_user ON drive_folders (user_id, parent_id, id DESC);
+
+-- A file may live in a folder; deleting the folder returns its files to the
+-- parent rather than destroying them, which the delete handler does
+-- explicitly, so the FK only has to avoid dangling ids.
+ALTER TABLE drive_files
+    ADD COLUMN IF NOT EXISTS folder_id TEXT REFERENCES drive_folders (id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS idx_drive_files_folder ON drive_files (folder_id) WHERE folder_id IS NOT NULL;
+`,
 }
 
 // Migrate applies pending migrations in order and returns the version

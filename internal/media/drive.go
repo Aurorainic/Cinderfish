@@ -34,6 +34,7 @@ type File struct {
 	StorageBackend string
 	ThumbnailKey   *string
 	IsSensitive    bool
+	FolderID       *string
 	CreatedAt      time.Time
 	URL            string
 }
@@ -62,7 +63,7 @@ func (s *DriveService) SetMaxFileSize(n int64) {
 //
 // The content is hashed while it is written, so identical uploads of the
 // same bytes reuse one stored object.
-func (s *DriveService) Save(ctx context.Context, userID, name string, r io.Reader, contentType string) (*File, error) {
+func (s *DriveService) Save(ctx context.Context, userID, name string, r io.Reader, contentType string, folderID *string) (*File, error) {
 	if name == "" {
 		name = "file"
 	}
@@ -106,6 +107,7 @@ func (s *DriveService) Save(ctx context.Context, userID, name string, r io.Reade
 	f := &File{
 		ID:             idgen.New(),
 		UserID:         userID,
+		FolderID:       folderID,
 		Name:           name,
 		ContentType:    contentType,
 		Size:           n,
@@ -117,9 +119,9 @@ func (s *DriveService) Save(ctx context.Context, userID, name string, r io.Reade
 	}
 
 	if _, err := s.pool.Exec(ctx, `
-INSERT INTO drive_files (id, user_id, name, content_type, size, md5, storage_key, storage_backend)
-VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
-`, f.ID, f.UserID, f.Name, f.ContentType, f.Size, f.MD5, f.StorageKey, f.StorageBackend); err != nil {
+INSERT INTO drive_files (id, user_id, name, content_type, size, md5, storage_key, storage_backend, folder_id)
+VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+`, f.ID, f.UserID, f.Name, f.ContentType, f.Size, f.MD5, f.StorageKey, f.StorageBackend, f.FolderID); err != nil {
 		return nil, fmt.Errorf("media: insert file: %w", err)
 	}
 	return f, nil
@@ -129,13 +131,13 @@ VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
 func (s *DriveService) Get(ctx context.Context, id string) (*File, error) {
 	row := s.pool.QueryRow(ctx, `
 SELECT id, user_id, name, content_type, size, md5, storage_key, storage_backend,
-       thumbnail_key, is_sensitive, created_at
+       thumbnail_key, is_sensitive, folder_id, created_at
 FROM drive_files WHERE id = $1
 `, id)
 
 	var f File
 	err := row.Scan(&f.ID, &f.UserID, &f.Name, &f.ContentType, &f.Size, &f.MD5,
-		&f.StorageKey, &f.StorageBackend, &f.ThumbnailKey, &f.IsSensitive, &f.CreatedAt)
+		&f.StorageKey, &f.StorageBackend, &f.ThumbnailKey, &f.IsSensitive, &f.FolderID, &f.CreatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -154,7 +156,7 @@ func (s *DriveService) GetMany(ctx context.Context, ids []string) ([]*File, erro
 	}
 	rows, err := s.pool.Query(ctx, `
 SELECT id, user_id, name, content_type, size, md5, storage_key, storage_backend,
-       thumbnail_key, is_sensitive, created_at
+       thumbnail_key, is_sensitive, folder_id, created_at
 FROM drive_files WHERE id = ANY($1)
 `, ids)
 	if err != nil {
@@ -166,7 +168,7 @@ FROM drive_files WHERE id = ANY($1)
 	for rows.Next() {
 		var f File
 		if err := rows.Scan(&f.ID, &f.UserID, &f.Name, &f.ContentType, &f.Size, &f.MD5,
-			&f.StorageKey, &f.StorageBackend, &f.ThumbnailKey, &f.IsSensitive, &f.CreatedAt); err != nil {
+			&f.StorageKey, &f.StorageBackend, &f.ThumbnailKey, &f.IsSensitive, &f.FolderID, &f.CreatedAt); err != nil {
 			return nil, fmt.Errorf("media: scan file list: %w", err)
 		}
 		f.URL = s.storage.URL(f.StorageKey)
@@ -176,7 +178,7 @@ FROM drive_files WHERE id = ANY($1)
 }
 
 // List returns a user's files, newest first.
-func (s *DriveService) List(ctx context.Context, userID string, limit int, sinceID, untilID string) ([]*File, error) {
+func (s *DriveService) List(ctx context.Context, userID string, limit int, sinceID, untilID string, folderID *string) ([]*File, error) {
 	if limit <= 0 {
 		limit = 10
 	}
@@ -186,9 +188,15 @@ func (s *DriveService) List(ctx context.Context, userID string, limit int, since
 
 	query := `
 SELECT id, user_id, name, content_type, size, md5, storage_key, storage_backend,
-       thumbnail_key, is_sensitive, created_at
+       thumbnail_key, is_sensitive, folder_id, created_at
 FROM drive_files WHERE user_id = $1`
 	args := []any{userID}
+	if folderID == nil {
+		query += " AND folder_id IS NULL"
+	} else {
+		args = append(args, *folderID)
+		query += fmt.Sprintf(" AND folder_id = $%d", len(args))
+	}
 	if sinceID != "" {
 		args = append(args, sinceID)
 		query += fmt.Sprintf(" AND id > $%d", len(args))
@@ -209,7 +217,7 @@ FROM drive_files WHERE user_id = $1`
 	for rows.Next() {
 		var f File
 		if err := rows.Scan(&f.ID, &f.UserID, &f.Name, &f.ContentType, &f.Size, &f.MD5,
-			&f.StorageKey, &f.StorageBackend, &f.ThumbnailKey, &f.IsSensitive, &f.CreatedAt); err != nil {
+			&f.StorageKey, &f.StorageBackend, &f.ThumbnailKey, &f.IsSensitive, &f.FolderID, &f.CreatedAt); err != nil {
 			return nil, fmt.Errorf("media: scan file list: %w", err)
 		}
 		f.URL = s.storage.URL(f.StorageKey)
