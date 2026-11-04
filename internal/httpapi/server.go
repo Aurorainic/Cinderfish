@@ -35,6 +35,7 @@ type Server struct {
 	noteReactions *note.ReactionService
 	notifications *note.NotificationService
 	favorites     *note.FavoriteService
+	hashtags      *note.HashtagService
 
 	storage media.Storage
 	drive   *media.DriveService
@@ -82,6 +83,7 @@ func NewServerWithDB(cfg *config.Config, pool *pgxpool.Pool) *Server {
 	s.noteReactions = note.NewReactionService(pool)
 	s.notifications = note.NewNotificationService(pool)
 	s.favorites = note.NewFavoriteService(pool)
+	s.hashtags = note.NewHashtagService(pool)
 	return s
 }
 
@@ -149,6 +151,7 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("POST /api/notes/children", s.handleNotesChildren)
 	s.mux.HandleFunc("POST /api/notes/renotes", s.handleNotesRenotes)
 	s.mux.HandleFunc("POST /api/notes/reactions", s.handleNotesReactions)
+	s.mux.HandleFunc("POST /api/hashtags/trend", s.handleHashtagsTrend)
 	s.mux.HandleFunc("POST /api/notes/favorites/create", s.handleNotesFavoritesCreate)
 	s.mux.HandleFunc("POST /api/notes/favorites/delete", s.handleNotesFavoritesDelete)
 	s.mux.HandleFunc("POST /api/i/favorites", s.handleIFavorites)

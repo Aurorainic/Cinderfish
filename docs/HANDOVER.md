@@ -1005,6 +1005,20 @@ POST /inbox                            POST /users/{id}/inbox
   `TestNotesReactionsListVisibility`（局外人与匿名 404 且错误 id 正确、作者可见、未知笔记与缺参）。
 - 门禁：`gofmt -l` 空、`go vet ./...` 干净、`go test ./... -count=1` 全绿。
 
+## 12I. 批次：话题标签与趋势（2026-11-04）
+
+- **建笔记时抽取标签**：`note.ExtractHashtags` 按 Misskey `extract-hashtags` 的规则（需要前置字符、尾随标点截断、
+  大小写不敏感去重）解析正文，写入 `notes.tags`。此前该列恒为空，趋势与标签页都无从计算。
+- `POST /api/hashtags/trend`：从本地笔记派生（`n.user_host IS NULL`，排除已删除），近 7 个 UTC 自然日内按
+  **去重用户数**排名前 10；每项返回 `{tag, chart[7], usersCount}`，`usersCount = max(chart)`（与 Misskey 一致）。
+  无需凭证。
+- 说明：Misskey 用 Redis 维护每日标签统计，Cinderfish 用 SQL 从 `notes.tags` 现算；远端用户的笔记不参与排名，
+  避免联邦流量带偏本地趋势。
+- 测试：`TestExtractHashtags`（10 个用例：无标签、行首、多标签、大小写、标点截断、空标签体、URL fragment、日文标签）、
+  `TestHashtagsTrend`（两用户同标签排在前面、单用户重复不重复计数、30 天前与已删除笔记不计入、7 个桶且今日桶正确、匿名 200）、
+  `TestHashtagsTrendEmptyState`。
+- 门禁：`gofmt -l` 空、`go vet ./...` 干净、`go test ./... -count=1` 全绿。
+
 ## 13. 文档索引
 
 | 文档 | 内容 |

@@ -268,6 +268,11 @@ SELECT id FROM users WHERE username_lower = lower($1) AND host IS NULL
 		// than a nil slice.
 		p.FileIDs = []string{}
 	}
+	tags := []string{}
+	if p.Text != nil {
+		tags = ExtractHashtags(*p.Text)
+	}
+
 	n := &Note{
 		ID:             idgen.New(),
 		UserID:         p.UserID,
@@ -281,7 +286,7 @@ SELECT id FROM users WHERE username_lower = lower($1) AND host IS NULL
 		RenoteID:       p.RenoteID,
 		RenoteUserID:   renoteUserID,
 		RenoteUserHost: renoteUserHost,
-		Tags:           []string{},
+		Tags:           tags,
 		Mentions:       mentions,
 		Emojis:         []string{},
 		CreatedAt:      now,

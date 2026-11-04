@@ -31,7 +31,7 @@ i                          i/notifications          i/pin
 i/unpin                    i/update                 meta
 miauth/gen-token           notes/create             notes/delete
 notes/global-timeline      notes/hybrid-timeline    notes/local-timeline
-notes/reactions/create     notes/reactions/delete   notes/renotes
+notes/reactions           hashtags/trend/create     notes/reactions           hashtags/trend/delete   notes/renotes
 notes/replies              notes/show               notes/timeline
 notifications/mark-all-as-read ping                 username/available
 users/followers            users/following          users/notes
@@ -73,7 +73,7 @@ users/show
 | 1 | `users/update` 的 `followersVisibility` / `followingVisibility` | 隐私设置页的两个开关 | 只能直接改库 |
 | 2 | `i/favorites`、`notes/favorites/create`、`notes/favorites/delete` | 收藏页、笔记菜单的收藏项 | 无收藏功能 |
 | 3 | `notes/conversation`、`notes/children` | 笔记详情页的上下会话串 | 只渲染一层父帖 |
-| 4 | `notes/reactions` | 「谁回应了」名单浮层 | 只有计数 |
+| 4 | `notes/reactions           hashtags/trend` | 「谁回应了」名单浮层 | 只有计数 |
 | 5 | `hashtags/trend`、`hashtags/show` | 趋势小组件、标签页 | 客户端本地统计 |
 | 6 | `drive/folders*` | 云盘文件夹 | 扁平文件列表 |
 | 7 | `emojis` | 自定义表情渲染 | `:shortcode:` 纯文本 |
