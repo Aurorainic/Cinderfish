@@ -17,6 +17,11 @@ type Profile struct {
 	Name        string
 	Description string
 	AvatarURL   string
+	// FollowersVisibility / FollowingVisibility are Misskey's
+	// "public" | "followers" | "private" switches. An empty value reads as
+	// "public", which is the column default.
+	FollowersVisibility string
+	FollowingVisibility string
 }
 
 // ErrNoSuchAvatarFile is returned when an avatar file id does not name
@@ -32,10 +37,11 @@ func (s *Service) AttachDrive(drive *media.DriveService) {
 // GetProfile loads a user's profile. A user without a profile row reads
 // as the zero value instead of failing.
 func (s *Service) GetProfile(ctx context.Context, userID string) (*Profile, error) {
-	var name, description, avatarURL *string
+	var name, description, avatarURL, followersVis, followingVis *string
 	err := s.pool.QueryRow(ctx, `
-SELECT name, description, avatar_url FROM user_profiles WHERE user_id = $1
-`, userID).Scan(&name, &description, &avatarURL)
+SELECT name, description, avatar_url, followers_visibility, following_visibility
+FROM user_profiles WHERE user_id = $1
+`, userID).Scan(&name, &description, &avatarURL, &followersVis, &followingVis)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return &Profile{}, nil
 	}
@@ -43,9 +49,11 @@ SELECT name, description, avatar_url FROM user_profiles WHERE user_id = $1
 		return nil, fmt.Errorf("account: get profile: %w", err)
 	}
 	return &Profile{
-		Name:        derefString(name),
-		Description: derefString(description),
-		AvatarURL:   derefString(avatarURL),
+		Name:                derefString(name),
+		Description:         derefString(description),
+		AvatarURL:           derefString(avatarURL),
+		FollowersVisibility: derefString(followersVis),
+		FollowingVisibility: derefString(followingVis),
 	}, nil
 }
 
@@ -94,6 +102,32 @@ func (s *Service) UpdateProfile(ctx context.Context, userID string, name, descri
 		fmt.Sprintf(" WHERE user_id = $%d", len(args))
 	if _, err := s.pool.Exec(ctx, query, args...); err != nil {
 		return fmt.Errorf("account: update profile: %w", err)
+	}
+	return nil
+}
+
+// UpdateVisibility writes the two follow-list visibility switches. A nil
+// pointer leaves that switch unchanged; the caller validates the values
+// against Misskey's "public" | "followers" | "private" set.
+func (s *Service) UpdateVisibility(ctx context.Context, userID string, followers, following *string) error {
+	var sets []string
+	var args []any
+	if followers != nil {
+		args = append(args, *followers)
+		sets = append(sets, fmt.Sprintf("followers_visibility = $%d", len(args)))
+	}
+	if following != nil {
+		args = append(args, *following)
+		sets = append(sets, fmt.Sprintf("following_visibility = $%d", len(args)))
+	}
+	if len(sets) == 0 {
+		return nil
+	}
+	args = append(args, userID)
+	query := "UPDATE user_profiles SET " + strings.Join(sets, ", ") +
+		fmt.Sprintf(" WHERE user_id = $%d", len(args))
+	if _, err := s.pool.Exec(ctx, query, args...); err != nil {
+		return fmt.Errorf("account: update visibility: %w", err)
 	}
 	return nil
 }

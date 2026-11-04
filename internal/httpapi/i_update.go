@@ -68,6 +68,9 @@ func (s *Server) handleIUpdate(w http.ResponseWriter, r *http.Request) {
 		Name        nullableField `json:"name"`
 		Description nullableField `json:"description"`
 		AvatarID    nullableField `json:"avatarId"`
+		// Misskey's users/update privacy switches.
+		FollowersVisibility nullableField `json:"followersVisibility"`
+		FollowingVisibility nullableField `json:"followingVisibility"`
 	}
 	if err := decodeOptionalJSON(r, &body); err != nil {
 		writeAPIError(w, err)
@@ -98,11 +101,29 @@ func (s *Server) handleIUpdate(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	for _, field := range []struct {
+		name  string
+		value *string
+	}{
+		{"followersVisibility", body.FollowersVisibility.asUpdatePointer()},
+		{"followingVisibility", body.FollowingVisibility.asUpdatePointer()},
+	} {
+		if field.value != nil && !validFollowVisibility(*field.value) {
+			writeAPIError(w, invalidParamError(field.name+" must be public, followers or private"))
+			return
+		}
+	}
+
 	if avatarID := body.AvatarID.asUpdatePointer(); avatarID != nil && *avatarID != "" {
 		if err := s.checkOwnAvatarFile(r, info.User.ID, *avatarID); err != nil {
 			writeAPIError(w, err)
 			return
 		}
+	}
+
+	if err := s.accounts.UpdateVisibility(r.Context(), info.User.ID, body.FollowersVisibility.asUpdatePointer(), body.FollowingVisibility.asUpdatePointer()); err != nil {
+		writeInternalServerError(w)
+		return
 	}
 
 	if err := s.accounts.UpdateProfile(r.Context(), info.User.ID, body.Name.asUpdatePointer(), body.Description.asUpdatePointer(), body.AvatarID.asUpdatePointer()); err != nil {
@@ -121,6 +142,16 @@ func (s *Server) handleIUpdate(w http.ResponseWriter, r *http.Request) {
 	s.applyUserCounts(r.Context(), info.User.ID, packed)
 	s.applyUnreadNotifications(r.Context(), info.User.ID, packed)
 	writeJSON(w, http.StatusOK, packed)
+}
+
+// validFollowVisibility reports whether v is one of Misskey's three
+// follow-list visibility values.
+func validFollowVisibility(v string) bool {
+	switch v {
+	case "public", "followers", "private":
+		return true
+	}
+	return false
 }
 
 // checkOwnAvatarFile verifies that the given drive file exists and

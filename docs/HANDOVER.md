@@ -964,6 +964,16 @@ POST /inbox                            POST /users/{id}/inbox
   测试：`TestFollowingCreateRemoteRecordsPendingRequest`（投递队列只有一条 Follow、sent 列表出现该请求、重复 create 400、cancel 后清空）；
   `deliverQueue` 助手改为同时解析字符串 object（Follow）与对象 object（Accept/Reject/Undo）。
 
+## 12E. 批次：users/update 与关注列表可见性（2026-11-04）
+
+- 新增 `POST /api/users/update`，与既有的 `i/update` 指向同一 handler（Misskey 两者等价，`users/update` 是正名）。
+- 请求体新增 `followersVisibility` / `followingVisibility`，取值 `public|followers|private`，非法值 400 `INVALID_PARAM`；
+  未提供的字段保持不变（`nullableField` 的既有语义）。
+- 存储：`account.Profile` 读取两列，新增 `Service.UpdateVisibility`；`packUserDetailed` 不再硬编码 `public`，
+  从 profile 读取，`users/show`、`api/i`、`users/update` 响应都回显真实值。
+- 测试：`TestUsersUpdateVisibility`（别名路由生效、两字段落库并在 users/show 与 api/i 回显、部分更新不动另一字段、非法值 400 且不改状态）。
+- 门禁：`gofmt -l` 空、`go vet ./...` 干净、`go test ./... -count=1` 全绿。
+
 ## 13. 文档索引
 
 | 文档 | 内容 |

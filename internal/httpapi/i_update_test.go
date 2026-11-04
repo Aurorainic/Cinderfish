@@ -189,3 +189,56 @@ func TestIUpdateLengthCaps(t *testing.T) {
 		t.Errorf("stored name/description = %v/%v, want the last accepted values", me["name"], me["description"])
 	}
 }
+
+// TestUsersUpdateVisibility pins Misskey's users/update privacy switches:
+// the canonical route is an alias of i/update, both values persist, a partial
+// update leaves the other switch alone, and an unknown value is refused.
+func TestUsersUpdateVisibility(t *testing.T) {
+	ts := newTestServer(t, "open")
+	userID, token := createUser(t, ts, uniqueName(t))
+
+	resp, body := post(t, ts, "/api/users/update", map[string]any{
+		"i": token, "followersVisibility": "followers", "followingVisibility": "private",
+	})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("users/update: %d %v", resp.StatusCode, body)
+	}
+	if body["followersVisibility"] != "followers" || body["followingVisibility"] != "private" {
+		t.Errorf("response visibility = %v/%v, want followers/private",
+			body["followersVisibility"], body["followingVisibility"])
+	}
+
+	// Both users/show (someone else's view) and api/i (own view) carry them.
+	_, show := post(t, ts, "/api/users/show", map[string]any{"userId": userID})
+	if show["followersVisibility"] != "followers" || show["followingVisibility"] != "private" {
+		t.Errorf("users/show visibility = %v/%v", show["followersVisibility"], show["followingVisibility"])
+	}
+	_, me := post(t, ts, "/api/i", map[string]any{"i": token})
+	if me["followersVisibility"] != "followers" || me["followingVisibility"] != "private" {
+		t.Errorf("api/i visibility = %v/%v", me["followersVisibility"], me["followingVisibility"])
+	}
+
+	// A partial update only moves the field it names.
+	resp, body = post(t, ts, "/api/i/update", map[string]any{
+		"i": token, "followersVisibility": "public",
+	})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("partial update: %d %v", resp.StatusCode, body)
+	}
+	if body["followersVisibility"] != "public" || body["followingVisibility"] != "private" {
+		t.Errorf("partial visibility = %v/%v, want public/private",
+			body["followersVisibility"], body["followingVisibility"])
+	}
+
+	// An unknown value is a client error and changes nothing.
+	resp, body = post(t, ts, "/api/users/update", map[string]any{
+		"i": token, "followingVisibility": "friends",
+	})
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("invalid visibility: %d %v, want 400", resp.StatusCode, body)
+	}
+	_, me = post(t, ts, "/api/i", map[string]any{"i": token})
+	if me["followingVisibility"] != "private" {
+		t.Errorf("invalid update changed followingVisibility to %v", me["followingVisibility"])
+	}
+}

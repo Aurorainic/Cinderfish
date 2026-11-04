@@ -77,8 +77,8 @@ func packUserDetailed(u *account.User, createdAt time.Time, isMe bool, prof *acc
 	packed["pinnedPageId"] = nil
 	packed["pinnedPage"] = nil
 	packed["publicReactions"] = false
-	packed["followersVisibility"] = "public"
-	packed["followingVisibility"] = "public"
+	packed["followersVisibility"] = visibilityOrDefault(prof, true)
+	packed["followingVisibility"] = visibilityOrDefault(prof, false)
 	packed["chatScope"] = "followers"
 	packed["canChat"] = false
 	packed["roles"] = []any{}
@@ -90,6 +90,23 @@ func packUserDetailed(u *account.User, createdAt time.Time, isMe bool, prof *acc
 	packed["hasPendingFollowRequestFromYou"] = false
 	packed["hasPendingFollowRequestToYou"] = false
 	return packed
+}
+
+// visibilityOrDefault reads one follow-list switch off the profile. The
+// column defaults to "public", and a user without a profile row reads as the
+// zero value, so an empty string means "public".
+func visibilityOrDefault(prof *account.Profile, followers bool) string {
+	if prof == nil {
+		return "public"
+	}
+	v := prof.FollowingVisibility
+	if followers {
+		v = prof.FollowersVisibility
+	}
+	if v == "" {
+		return "public"
+	}
+	return v
 }
 
 // packMeDetailed renders the authenticated user in the MeDetailed schema.
