@@ -34,6 +34,7 @@ type Server struct {
 	timeline      *note.TimelineService
 	noteReactions *note.ReactionService
 	notifications *note.NotificationService
+	favorites     *note.FavoriteService
 
 	storage media.Storage
 	drive   *media.DriveService
@@ -80,6 +81,7 @@ func NewServerWithDB(cfg *config.Config, pool *pgxpool.Pool) *Server {
 	s.timeline = note.NewTimelineService(pool)
 	s.noteReactions = note.NewReactionService(pool)
 	s.notifications = note.NewNotificationService(pool)
+	s.favorites = note.NewFavoriteService(pool)
 	return s
 }
 
@@ -144,6 +146,9 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("POST /api/notes/delete", s.handleNotesDelete)
 	s.mux.HandleFunc("POST /api/notes/replies", s.handleNotesReplies)
 	s.mux.HandleFunc("POST /api/notes/renotes", s.handleNotesRenotes)
+	s.mux.HandleFunc("POST /api/notes/favorites/create", s.handleNotesFavoritesCreate)
+	s.mux.HandleFunc("POST /api/notes/favorites/delete", s.handleNotesFavoritesDelete)
+	s.mux.HandleFunc("POST /api/i/favorites", s.handleIFavorites)
 	s.mux.HandleFunc("POST /api/notes/reactions/create", s.handleNotesReactionsCreate)
 	s.mux.HandleFunc("POST /api/notes/reactions/delete", s.handleNotesReactionsDelete)
 	s.mux.HandleFunc("POST /api/notes/local-timeline", s.handleLocalTimeline)

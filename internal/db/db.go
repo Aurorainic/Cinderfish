@@ -364,6 +364,19 @@ CREATE UNIQUE INDEX idx_users_username_lower_remote ON users (username_lower, ho
 ALTER TABLE user_profiles
     ADD COLUMN IF NOT EXISTS pinned_note_ids TEXT[] NOT NULL DEFAULT '{}';
 `,
+
+	// v6: note favorites (Misskey notes/favorites/* and i/favorites).
+	6: `
+CREATE TABLE IF NOT EXISTS note_favorites (
+    id         TEXT PRIMARY KEY,
+    user_id    TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    note_id    TEXT NOT NULL REFERENCES notes (id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (user_id, note_id)
+);
+CREATE INDEX IF NOT EXISTS idx_note_favorites_user ON note_favorites (user_id, id DESC);
+CREATE INDEX IF NOT EXISTS idx_note_favorites_note ON note_favorites (note_id);
+`,
 }
 
 // Migrate applies pending migrations in order and returns the version

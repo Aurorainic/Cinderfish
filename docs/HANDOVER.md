@@ -974,6 +974,17 @@ POST /inbox                            POST /users/{id}/inbox
 - 测试：`TestUsersUpdateVisibility`（别名路由生效、两字段落库并在 users/show 与 api/i 回显、部分更新不动另一字段、非法值 400 且不改状态）。
 - 门禁：`gofmt -l` 空、`go vet ./...` 干净、`go test ./... -count=1` 全绿。
 
+## 12F. 批次：收藏（2026-11-04）
+
+- 迁移 **v6** 新建 `note_favorites(id, user_id, note_id, created_at, UNIQUE(user_id,note_id))`，带 user/note 两个索引；
+  前端（Firefish）的收藏页与笔记菜单依赖它。
+- 端点：`POST /api/notes/favorites/create`（返回 `{id, createdAt, noteId, note}`）、`POST /api/notes/favorites/delete`（幂等）、
+  `POST /api/i/favorites`（按 id/时间游标分页，最新在前，删除过的笔记跳过）。
+- 创建对同一笔记重复调用返回同一行（`ON CONFLICT DO NOTHING` + 回读），与 Misskey 的幂等语义一致；目标笔记不存在答 404 `NO_SUCH_NOTE`。
+- 未做：Misskey 对 create 有「每小时 20 次」限流，本实现还没有限流器，代码里留了 TODO。
+- 测试：`TestNoteFavoritesRoundTrip`、`TestNoteFavoritesListPagination`、`TestNoteFavoritesErrors`。
+- 门禁：`gofmt -l` 空、`go vet ./...` 干净、`go test ./... -count=1` 全绿。
+
 ## 13. 文档索引
 
 | 文档 | 内容 |
