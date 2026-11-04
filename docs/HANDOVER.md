@@ -1060,6 +1060,18 @@ POST /inbox                            POST /users/{id}/inbox
   过期 400 `ALREADY_EXPIRED`、匿名 401、未知笔记 404 且错误 id 正确。
 - 门禁：`gofmt -l` 空、`go vet ./...` 干净、`go test ./... -count=1` 全绿。
 
+## 12M. 批次：客户端注册表 i/registry（2026-11-04）
+
+- 迁移 **v9**：`user_registry(user_id, domain, scope TEXT[], key, value JSONB, updated_at)`，
+  主键 `(user_id, domain, scope, key)`；`domain` 以空串表示本地（PostgreSQL 主键里 NULL 不参与唯一，故不用 NULL）。
+- 端点（全部需登录）：`i/registry/set`、`get`、`get-detail`、`keys`、`get-all`、`remove`、`clear`。
+  取值缺失答 `NO_SUCH_KEY`（`ac3ed68a-…`）；`get` 原样返回存储的 JSON，`get-detail` 额外给 `updatedAt`。
+- scope 归一化：排序 + 去重后作为键的一部分，所以客户端以不同顺序传同一批 scope 命中的是同一行。
+- Misskey 的 `domain` 参数（跨实例注册表）保留在签名里但不做跨实例读写，只服务本地客户端配置同步。
+- 测试：`TestRegistryRoundTrip`（set/get/get-detail/keys/get-all/覆盖写/remove/clear、scope 隔离与顺序无关）、
+  `TestRegistryIsolationAndErrors`（跨用户不可见、`NO_SUCH_KEY` 错误 id、匿名 401）。
+- 门禁：`gofmt -l` 空、`go vet ./...` 干净、`go test ./... -count=1` 全绿。
+
 ## 13. 文档索引
 
 | 文档 | 内容 |

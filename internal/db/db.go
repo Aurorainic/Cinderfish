@@ -414,6 +414,21 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_emojis_name_local ON emojis (name) WHERE h
 CREATE UNIQUE INDEX IF NOT EXISTS idx_emojis_name_host ON emojis (name, host) WHERE host IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_emojis_category ON emojis (category, name);
 `,
+
+	// v9: per-user client registry (Misskey i/registry/*). The scope is a
+	// normalized text[] so equality is stable in the primary key.
+	9: `
+CREATE TABLE IF NOT EXISTS user_registry (
+    user_id    TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    domain     TEXT NOT NULL DEFAULT '',
+    scope      TEXT[] NOT NULL DEFAULT '{}',
+    key        TEXT NOT NULL,
+    value      JSONB NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (user_id, domain, scope, key)
+);
+CREATE INDEX IF NOT EXISTS idx_user_registry_user ON user_registry (user_id, scope);
+`,
 }
 
 // Migrate applies pending migrations in order and returns the version

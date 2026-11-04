@@ -36,12 +36,18 @@ drive/folders             drive/folders/create     drive/folders/show
 drive/folders/update      drive/folders/delete
 emojis                    admin/emoji/list         admin/emoji/add
 admin/emoji/delete
-notes/polls/vote/create     notes/reactions           hashtags/trend
+notes/polls/vote
+i/registry/set            i/registry/get           i/registry/get-detail
+i/registry/keys           i/registry/get-all       i/registry/remove
+i/registry/clear/create     notes/reactions           hashtags/trend
 drive/folders             drive/folders/create     drive/folders/show
 drive/folders/update      drive/folders/delete
 emojis                    admin/emoji/list         admin/emoji/add
 admin/emoji/delete
-notes/polls/vote/delete   notes/renotes
+notes/polls/vote
+i/registry/set            i/registry/get           i/registry/get-detail
+i/registry/keys           i/registry/get-all       i/registry/remove
+i/registry/clear/delete   notes/renotes
 notes/replies              notes/show               notes/timeline
 notifications/mark-all-as-read ping                 username/available
 users/followers            users/following          users/notes
@@ -88,11 +94,17 @@ drive/folders             drive/folders/create     drive/folders/show
 drive/folders/update      drive/folders/delete
 emojis                    admin/emoji/list         admin/emoji/add
 admin/emoji/delete
-notes/polls/vote` | 「谁回应了」名单浮层 | 只有计数 |
+notes/polls/vote
+i/registry/set            i/registry/get           i/registry/get-detail
+i/registry/keys           i/registry/get-all       i/registry/remove
+i/registry/clear` | 「谁回应了」名单浮层 | 只有计数 |
 | 5 | `hashtags/trend`、`hashtags/show` | 趋势小组件、标签页 | 客户端本地统计 |
 | 6 | `drive/folders*` | 云盘文件夹 | 扁平文件列表 |
 | 7 | `emojis` | 自定义表情渲染 | `:shortcode:` 纯文本 |
-| 8 | `notes/polls/vote` + 投票创建 | 投票功能 | 只读、表单隐藏入口 |
+| 8 | `notes/polls/vote
+i/registry/set            i/registry/get           i/registry/get-detail
+i/registry/keys           i/registry/get-all       i/registry/remove
+i/registry/clear` + 投票创建 | 投票功能 | 只读、表单隐藏入口 |
 | 9 | `i/registry/*` | 客户端设置云端同步 | localStorage |
 
 ## 5. Tier 2（首版可选，明确不做要记录理由）

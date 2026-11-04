@@ -38,6 +38,7 @@ type Server struct {
 	hashtags      *note.HashtagService
 	folders       *media.FolderService
 	emojis        *media.EmojiService
+	registry      *account.RegistryService
 
 	storage media.Storage
 	drive   *media.DriveService
@@ -88,6 +89,7 @@ func NewServerWithDB(cfg *config.Config, pool *pgxpool.Pool) *Server {
 	s.hashtags = note.NewHashtagService(pool)
 	s.folders = media.NewFolderService(pool)
 	s.emojis = media.NewEmojiService(pool)
+	s.registry = account.NewRegistryService(pool)
 	return s
 }
 
@@ -135,6 +137,13 @@ func (s *Server) registerRoutes() {
 
 	// Federation administration. The mode and allowlist live in the
 	// database so they change at runtime without a restart.
+	s.mux.HandleFunc("POST /api/i/registry/set", s.handleRegistrySet)
+	s.mux.HandleFunc("POST /api/i/registry/get", s.handleRegistryGet)
+	s.mux.HandleFunc("POST /api/i/registry/get-detail", s.handleRegistryGetDetail)
+	s.mux.HandleFunc("POST /api/i/registry/keys", s.handleRegistryKeys)
+	s.mux.HandleFunc("POST /api/i/registry/get-all", s.handleRegistryGetAll)
+	s.mux.HandleFunc("POST /api/i/registry/remove", s.handleRegistryRemove)
+	s.mux.HandleFunc("POST /api/i/registry/clear", s.handleRegistryClear)
 	s.mux.HandleFunc("POST /api/emojis", s.handleEmojis)
 	s.mux.HandleFunc("POST /api/admin/emoji/list", s.handleAdminEmojiList)
 	s.mux.HandleFunc("POST /api/admin/emoji/add", s.handleAdminEmojiAdd)
