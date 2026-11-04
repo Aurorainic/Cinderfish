@@ -114,15 +114,21 @@ func packNoteDetail(ctx context.Context, s *Server, n *note.Note, pc notePackCon
 		if poll, err := s.notes.Poll(ctx, n.ID); err == nil {
 			counts, _ := s.notes.VoteCounts(ctx, n.ID)
 			myVote := -1
+			voted := map[int]bool{}
 			if pc.ViewerID != "" {
 				myVote, _ = s.notes.MyVote(ctx, n.ID, pc.ViewerID)
+				if mine, err := s.notes.MyVotes(ctx, n.ID, pc.ViewerID); err == nil {
+					for _, c := range mine {
+						voted[c] = true
+					}
+				}
 			}
 			choices := make([]any, 0, len(poll.Choices))
 			for i, text := range poll.Choices {
 				choices = append(choices, map[string]any{
 					"text":    text,
 					"votes":   counts[i],
-					"isVoted": i == myVote,
+					"isVoted": i == myVote || voted[i],
 				})
 			}
 			packed["hasPoll"] = true

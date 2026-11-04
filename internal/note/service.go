@@ -128,6 +128,9 @@ var (
 	ErrTextTooLong               = errors.New("note: text is too long")
 	ErrInvalidVisibility         = errors.New("note: invalid visibility")
 	ErrPollExpired               = errors.New("note: poll is already expired")
+	ErrNoPoll                    = errors.New("note: the note has no poll")
+	ErrAlreadyVoted              = errors.New("note: already voted in this poll")
+	ErrChoiceOutOfRange          = errors.New("note: poll choice is out of range")
 )
 
 // Create stores a new note.
@@ -567,17 +570,79 @@ SELECT choice FROM poll_votes WHERE note_id = $1 AND user_id = $2 LIMIT 1
 	return choice, nil
 }
 
+// checkVoteAllowed enforces the duplicate-vote rules before anything is
+// written.
+func (s *Service) checkVoteAllowed(ctx context.Context, poll *Poll, noteID, userID string, choice int) error {
+	existing, err := s.votedChoices(ctx, noteID, userID)
+	if err != nil {
+		return err
+	}
+	if len(existing) == 0 {
+		return nil
+	}
+	if !poll.Multiple || existing[choice] {
+		return ErrAlreadyVoted
+	}
+	return nil
+}
+
+// MyVotes returns every choice the user voted for in a poll; a single-choice
+// poll has at most one. The packer uses it so multiple-choice polls show all
+// the viewer's ticks.
+func (s *Service) MyVotes(ctx context.Context, noteID, userID string) ([]int, error) {
+	set, err := s.votedChoices(ctx, noteID, userID)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]int, 0, len(set))
+	for choice := range set {
+		out = append(out, choice)
+	}
+	return out, nil
+}
+
+// votedChoices returns the set of choices the user already voted for.
+func (s *Service) votedChoices(ctx context.Context, noteID, userID string) (map[int]bool, error) {
+	rows, err := s.pool.Query(ctx, `
+SELECT choice FROM poll_votes WHERE note_id = $1 AND user_id = $2
+`, noteID, userID)
+	if err != nil {
+		return nil, fmt.Errorf("note: voted choices: %w", err)
+	}
+	defer rows.Close()
+
+	out := map[int]bool{}
+	for rows.Next() {
+		var choice int
+		if err := rows.Scan(&choice); err != nil {
+			return nil, fmt.Errorf("note: scan voted choice: %w", err)
+		}
+		out[choice] = true
+	}
+	return out, rows.Err()
+}
+
 // Vote records a vote in a poll.
 func (s *Service) Vote(ctx context.Context, noteID, userID string, choice int) error {
 	poll, err := s.Poll(ctx, noteID)
 	if err != nil {
+		if errors.Is(err, ErrNotFound) {
+			return ErrNoPoll
+		}
 		return err
 	}
 	if poll.ExpiresAt != nil && poll.ExpiresAt.Before(time.Now()) {
 		return ErrPollExpired
 	}
 	if choice < 0 || choice >= len(poll.Choices) {
-		return errors.New("note: choice is out of range")
+		return ErrChoiceOutOfRange
+	}
+
+	// Misskey rejects a second vote in a single-choice poll, and the same
+	// choice twice in a multiple-choice one; only a different choice in a
+	// multiple poll replaces nothing and simply adds a row.
+	if err := s.checkVoteAllowed(ctx, poll, noteID, userID, choice); err != nil {
+		return err
 	}
 
 	tx, err := s.pool.Begin(ctx)

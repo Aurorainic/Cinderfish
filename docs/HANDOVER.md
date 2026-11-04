@@ -1048,6 +1048,18 @@ POST /inbox                            POST /users/{id}/inbox
   `TestEmojisAdminOnly`（非管理员 403、匿名可读公共列表）。
 - 门禁：`gofmt -l` 空、`go vet ./...` 干净、`go test ./... -count=1` 全绿。
 
+## 12L. 批次：投票（2026-11-04）
+
+- `POST /api/notes/polls/vote`（需登录）：`{noteId, choice}`。笔记不存在/不可见 → 404 `NO_SUCH_NOTE`（用该端点自己的 `ecafbd2e-…`）；
+  无投票 → `NO_POLL`；已过期 → `ALREADY_EXPIRED`；单选重复投票、或复选里重复同一选项 → `ALREADY_VOTED`；越界选项 400。
+- 服务层：`Vote` 增加 `ErrNoPoll`/`ErrAlreadyVoted`/`ErrChoiceOutOfRange` 分类（原先只有 `ErrPollExpired` 和通用错误），
+  并新增 `votedChoices`/`MyVotes`；打包时多选投票的 `isVoted` 现在按“我投过的全部选项”标记，而不是只看第一条。
+- 投票创建此前已支持（`notes/create` 的 `poll` 参数），本批只补投票动作。
+- 测试：`TestNotesPollsVote`——首次投票后 `votes`/`votesCount` 变化、单选二次 400 `ALREADY_VOTED`、
+  多选两个不同选项成功且 `isVoted` 都为 true、重复同一选项 400、无投票笔记 `NO_POLL`、越界 400、
+  过期 400 `ALREADY_EXPIRED`、匿名 401、未知笔记 404 且错误 id 正确。
+- 门禁：`gofmt -l` 空、`go vet ./...` 干净、`go test ./... -count=1` 全绿。
+
 ## 13. 文档索引
 
 | 文档 | 内容 |

@@ -35,11 +35,13 @@ notes/reactions           hashtags/trend
 drive/folders             drive/folders/create     drive/folders/show
 drive/folders/update      drive/folders/delete
 emojis                    admin/emoji/list         admin/emoji/add
-admin/emoji/delete/create     notes/reactions           hashtags/trend
+admin/emoji/delete
+notes/polls/vote/create     notes/reactions           hashtags/trend
 drive/folders             drive/folders/create     drive/folders/show
 drive/folders/update      drive/folders/delete
 emojis                    admin/emoji/list         admin/emoji/add
-admin/emoji/delete/delete   notes/renotes
+admin/emoji/delete
+notes/polls/vote/delete   notes/renotes
 notes/replies              notes/show               notes/timeline
 notifications/mark-all-as-read ping                 username/available
 users/followers            users/following          users/notes
@@ -85,7 +87,8 @@ users/show
 drive/folders             drive/folders/create     drive/folders/show
 drive/folders/update      drive/folders/delete
 emojis                    admin/emoji/list         admin/emoji/add
-admin/emoji/delete` | 「谁回应了」名单浮层 | 只有计数 |
+admin/emoji/delete
+notes/polls/vote` | 「谁回应了」名单浮层 | 只有计数 |
 | 5 | `hashtags/trend`、`hashtags/show` | 趋势小组件、标签页 | 客户端本地统计 |
 | 6 | `drive/folders*` | 云盘文件夹 | 扁平文件列表 |
 | 7 | `emojis` | 自定义表情渲染 | `:shortcode:` 纯文本 |
