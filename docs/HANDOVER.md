@@ -1105,6 +1105,27 @@ POST /inbox                            POST /users/{id}/inbox
 - 完整包结构：`backend / client / firefish-js / megalodon / sw`，含 `locales/` 全量翻译、
   `packages/client/src/pages` 65 页、`src/ui` 五种布局（universal / deck / zen / visitor / _common_）。
 
+## 12P. 批次：前端移植基线——技术栈替换、从零重建（2026-11-04）
+
+- 用户裁决：**前端从头开始**——不是在现有 `web/src` 上渐进重排，而是完全的技术栈替换：
+  以 Firefish 客户端源码（`tmp/refcheck/firefish-full/packages/client/src`，Vue 2 + Options API +
+  nirax 自研路由 + pizzax）为蓝本，在 Cinderfish 现代栈（Vue 3 Composition API + `vue-router` +
+  TypeScript + Vite + `pnpm`）上**逐模块翻译重建** `web/`。
+- 保留的是 Firefish 的**结构、信息架构、视觉语言与交互**，不是它的依赖树（不需要 gulp、
+  sass-rs 链、megalodon）。
+- 分层约定（移植时的目录镜像）：
+  - `web/src/api/` — RPC 封装，对接 `docs/research/api-contract/` 记录的真实后端契约（含
+    body `i` 优先的认证、18 字符 base36 id、无 CORS 同源约束）；
+  - `web/src/store|composables/` — pizzax 的 Composition API 等价物；
+  - `web/src/router/` — nirax → vue-router 的路由表翻译（以 Firefish `router.ts` 的定义为准）；
+  - `web/src/pages|components|ui|widgets/` — 逐组件翻译，文件名与组件层级对齐 Firefish 原名
+    （`Mk*` → `Cf*` 前缀，避免与 Vue 生态组件撞名）；
+  - `web/src/themes/` — Firefish 主题系统照搬（SCSS 变量 + 主题 JSON）；
+  - i18n：先直连 `tmp/refcheck/firefish-full/locales/ja-JP.yml`、`zh-CN.yml`，构建期转 JSON。
+- 旧 `web/src` 的组件不作为翻译来源，仅在后端契约不确定时交叉印证。
+- Streaming / OAuth 的客户端行为以 `docs/research/api-contract/` 为准，其中与 Firefish 假设
+  不符处（心跳保活、`withRenotes`、token 读取顺序）在 shim 层吸收，不污染页面组件。
+
 ## 13. 文档索引
 
 | 文档 | 内容 |

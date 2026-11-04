@@ -44,7 +44,7 @@ These decisions are settled; do not reopen them without an explicit request.
 |------|----------|
 | Language | Go 1.26 |
 | Frontend | Vue 3 + TypeScript + Vite |
-| Frontend baseline | Whole-port of the Firefish client structure (2026-11-01); the old incremental redesign is superseded |
+| Frontend baseline | **技术栈替换的整体移植（2026-11-04）：从零重建 `web/`，按 Firefish 客户端 `packages/client/src` 的结构逐文件翻译；旧前端全部废弃** |
 | Frontend runtime | Firefish's `os.*` surface is provided as shims over Cinderfish code; see the runtime adaptation contract |
 | Datastore | PostgreSQL is the only mandatory dependency; Redis is optional behind the queue abstraction and disabled by default |
 | Mastodon API | Explicitly abandoned — no endpoints, no reserved routes |
