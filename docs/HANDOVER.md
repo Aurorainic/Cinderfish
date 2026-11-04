@@ -1091,6 +1091,20 @@ POST /inbox                            POST /users/{id}/inbox
 - 门禁不适用（仅新增文档，未动代码）；跨文档不一致（id 长度、`WWW-Authenticate` 细节）已订正。
 - 已知残留：各文档所引 `server.go` 行号以当前提交为准，后续改动 `registerRoutes` 需同步。
 
+## 12O. 批次：Firefish 完整参考源码就位（2026-11-04）
+
+- 用户决定：前端移植以 **jclaudan/firefish 镜像**（GitHub）为工作参考，不是 sparse 的 Codeberg 上游检出。
+- 主仓库 `tmp/refcheck/firefish-jclaudan-mirror` 已解除 sparse（`git sparse-checkout disable`）
+  并 `git fetch --unshallow`（经代理 `127.0.0.1:19823`），现为完整 25784 提交、51 个 tag 的镜像，
+  HEAD `b425f61`（2023-10-08 "add umbrel support"，即 Firefish 1.0.3 前后）。
+- 该镜像 checkout 到 worktree `tmp/refcheck/firefish-full/`（40 MB，去 `.git`，`tmp/` 整体 gitignore）。
+- **结构事实**：仓库根没有 `packages/client/index.html`，也没有 `scripts/copy-index.mjs`——
+  index 由 `packages/backend/src/server/web` 的模板 + `gulpfile.js` 在构建时组装；
+  Vite 入口是 `packages/client/src/init.ts`（非 `main.ts`），`base: "/assets/"`。
+  前端移植时由 Cinderfish 自己的 `web/index.html` 承担模板角色即可。
+- 完整包结构：`backend / client / firefish-js / megalodon / sw`，含 `locales/` 全量翻译、
+  `packages/client/src/pages` 65 页、`src/ui` 五种布局（universal / deck / zen / visitor / _common_）。
+
 ## 13. 文档索引
 
 | 文档 | 内容 |
@@ -1104,6 +1118,7 @@ POST /inbox                            POST /users/{id}/inbox
 | `docs/research/2026-10-26-misskey-fediverse-firefish.md` | 首轮调研 |
 | `docs/research/2026-11-04-misskey-api-coverage.md` | **Misskey API 覆盖台账（当前工作线的进度依据）** |
 | `docs/research/api-contract/` | **后端 API 对接契约（8 份，新前端对接的唯一依据，见 §12N）** |
+| `tmp/refcheck/firefish-full/` | **Firefish 完整源码快照（jclaudan 镜像 `b425f61`，2023-10-08，去 `.git`，gitignore 内）——前端移植的工作参考，见 §12O** |
 | `docs/research/2026-10-26-go-ecosystem-and-dependency-decisions.md` | Go 生态与依赖取舍 |
 | `docs/research/2026-10-26-tech-stack-comparison.md` | 技术栈横向对比 |
 | `docs/research/2026-10-26-misskey-source-calibration.md` | **源码校准记录（含许可证约束与踩坑清单）** |
