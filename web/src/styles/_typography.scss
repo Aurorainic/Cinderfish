@@ -1,0 +1,128 @@
+// Typography scale and icon sizing.
+//
+// The 14px / 1.6 root is what gives Firefish its density; do not raise it
+// without re-checking the timeline, sidebar and deck column widths.
+
+html {
+	touch-action: manipulation;
+	background-attachment: fixed;
+	background-size: cover;
+	background-position: center;
+	color: var(--fg);
+	accent-color: var(--accent);
+	overflow: auto;
+	overflow-wrap: break-word;
+	font-family: Roboto, "Helvetica Neue", Arial, sans-serif;
+	font-size: 14px;
+	line-height: 1.6;
+	scroll-padding: 60px;
+
+	&.useCJKFont {
+		font-family: "Hiragino Maru Gothic Pro", "BIZ UDGothic", Roboto,
+			"Helvetica Neue", Arial, sans-serif;
+	}
+
+	&.useSystemFont {
+		font-family:
+			system-ui,
+			-apple-system,
+			BlinkMacSystemFont,
+			"Segoe UI",
+			Roboto,
+			Oxygen,
+			Ubuntu,
+			Cantarell,
+			"Open Sans",
+			"Helvetica Neue",
+			sans-serif;
+	}
+}
+
+h1 {
+	font-size: 1.5em;
+	font-weight: 700;
+}
+
+h2 {
+	font-size: 1.25em;
+	font-weight: 700;
+}
+
+h3 {
+	font-size: 1.1em;
+	font-weight: 700;
+}
+
+small {
+	font-size: 0.85em;
+}
+
+code,
+kbd,
+samp,
+pre {
+	font-family: "Fira code", "Fira Mono", Consolas, Menlo, Courier, monospace;
+	font-size: 0.95em;
+}
+
+._caption {
+	font-size: 0.8em;
+	opacity: 0.7;
+}
+
+._monospace {
+	font-family: "Fira code", "Fira Mono", Consolas, Menlo, Courier, monospace !important;
+}
+
+._code {
+	@extend ._monospace;
+	background: #26233a;
+	color: #e0def4;
+	font-size: 14px;
+	line-height: 1.5;
+	padding: 5px;
+}
+
+// Phosphor icon size helpers. Firefish templates write `ph-lg`, `ph-2x`, ...
+// on `<i>` elements; the font itself is not part of this port yet, so the
+// sizes must still apply to the placeholder boxes.
+$ph-sizes: (
+	xxs: 0.5em,
+	xs: 0.75em,
+	sm: 0.875em,
+	1x: 1em,
+	2x: 2em,
+	3x: 3em,
+	4x: 4em,
+	5x: 5em,
+	6x: 6em,
+	7x: 7em,
+	8x: 8em,
+	9x: 9em,
+	10x: 10em,
+);
+
+@each $name, $size in $ph-sizes {
+	.ph-#{$name} {
+		font-size: $size;
+	}
+}
+
+.ph-lg {
+	font-size: 1.3333em;
+	line-height: 0.75em;
+	vertical-align: -0.0667em;
+	justify-content: center;
+}
+
+.ph-xl {
+	font-size: 1.5em;
+	line-height: 0.6666em;
+	vertical-align: -0.075em;
+}
+
+.ph-fw {
+	text-align: center;
+	width: 1.25em;
+	display: inline-flex;
+}

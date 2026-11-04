@@ -1,0 +1,33 @@
+// Theme-independent design tokens.
+//
+// Ported from the `:root` block of firefish@02c31e0:packages/client/src/style.scss.
+// Theme *colours* are not here: `web/src/themes/apply.ts` writes them to
+// <html> as `--bg`, `--fg`, `--accent`, `--panel`, ... at runtime.
+
+:root {
+	--radius: 12px;
+	--marginFull: 16px;
+	--marginHalf: 10px;
+	--avatarSize: 48px;
+
+	--margin: var(--marginFull);
+
+	// Set by the host from user preferences (Firefish resets these in init.ts).
+	--modalBgFilter: blur(4px);
+	--blur: blur(15px);
+
+	// Vertical fade behind sticky headers. Generated from
+	// https://larsenwork.com/easing-gradients/
+	--gradient: hsl(0, 0%, 0%) 0%, hsla(0, 0%, 0%, 0.987) 8.1%,
+		hsla(0, 0%, 0%, 0.951) 15.5%, hsla(0, 0%, 0%, 0.896) 22.5%,
+		hsla(0, 0%, 0%, 0.825) 29%, hsla(0, 0%, 0%, 0.741) 35.3%,
+		hsla(0, 0%, 0%, 0.648) 41.2%, hsla(0, 0%, 0%, 0.55) 47.1%,
+		hsla(0, 0%, 0%, 0.45) 52.9%, hsla(0, 0%, 0%, 0.352) 58.8%,
+		hsla(0, 0%, 0%, 0.259) 64.7%, hsla(0, 0%, 0%, 0.175) 71%,
+		hsla(0, 0%, 0%, 0.104) 77.5%, hsla(0, 0%, 0%, 0.049) 84.5%,
+		hsla(0, 0%, 0%, 0.013) 91.9%, hsla(0, 0%, 0%, 0) 100%;
+
+	@media (max-width: 500px) {
+		--margin: var(--marginHalf);
+	}
+}

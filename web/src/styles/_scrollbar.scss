@@ -1,0 +1,49 @@
+// Scrollbars, ported verbatim from Firefish's style.scss: a 6px thin bar with
+// a 12px thumb on the body, both tinted from the theme.
+
+* {
+	scrollbar-color: var(--scrollbarHandle) transparent;
+}
+
+body::-webkit-scrollbar {
+	width: 12px;
+	height: 12px;
+}
+
+body::-webkit-scrollbar-thumb {
+	border-radius: 100px;
+	background-clip: content-box;
+	border: 3px solid transparent;
+}
+
+::-webkit-scrollbar {
+	width: 6px;
+	height: 6px;
+}
+
+::-webkit-scrollbar-track {
+	background: inherit;
+}
+
+::-webkit-scrollbar-thumb {
+	background: var(--scrollbarHandle);
+	min-height: 80px;
+
+	&:hover {
+		background: var(--scrollbarHandleHover);
+		background-clip: content-box;
+	}
+
+	&:active {
+		background: var(--accent);
+		background-clip: content-box;
+	}
+}
+
+.hide-scrollbar {
+	scrollbar-width: none;
+
+	&::-webkit-scrollbar {
+		display: none;
+	}
+}

@@ -1,0 +1,138 @@
+// Reset.
+//
+// Firefish relies on the browser default stylesheet far more than a typical
+// app does; this file only removes defaults that fight the shell and keeps the
+// rest close to firefish@02c31e0:packages/client/src/style.scss.
+
+*,
+*::before,
+*::after {
+	box-sizing: border-box;
+}
+
+html,
+body {
+	margin: 0;
+	padding: 0;
+}
+
+html {
+	text-size-adjust: 100%;
+	-webkit-text-size-adjust: 100%;
+	tab-size: 2;
+	overflow-x: clip;
+}
+
+body {
+	min-height: 100vh;
+	background: var(--bg);
+	color: var(--fg);
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p,
+figure,
+blockquote,
+dl,
+dd {
+	margin: 0;
+}
+
+ul,
+ol {
+	margin: 0;
+	padding: 0;
+}
+
+img,
+video,
+canvas {
+	max-width: 100%;
+}
+
+img {
+	border-style: none;
+}
+
+button,
+input,
+select,
+textarea {
+	font: inherit;
+	color: inherit;
+}
+
+button {
+	background: none;
+	border: none;
+	padding: 0;
+	cursor: pointer;
+}
+
+textarea,
+input {
+	-webkit-tap-highlight-color: transparent;
+}
+
+optgroup,
+option {
+	background: var(--panel);
+	color: var(--fg);
+}
+
+hr {
+	margin: var(--margin) 0;
+	border: none;
+	height: 1px;
+	background: var(--divider);
+}
+
+fieldset {
+	border: 0;
+	margin: 0;
+	padding: 0;
+}
+
+[hidden] {
+	display: none !important;
+}
+
+::selection {
+	color: #fff;
+	background-color: var(--accent);
+}
+
+a {
+	color: inherit;
+	text-decoration: underline;
+	text-decoration-color: transparent;
+	cursor: pointer;
+	transition: text-decoration-color 0.2s;
+	-webkit-tap-highlight-color: transparent;
+
+	&:hover {
+		text-decoration-color: currentColor;
+	}
+}
+
+:focus-visible {
+	outline: auto;
+}
+
+// One-second cross-fade applied while a theme is being swapped
+// (`applyTheme()` toggles this class on <html>, like Firefish does).
+html._themeChanging_ {
+	&,
+	*,
+	::before,
+	::after {
+		transition:
+			background 1s ease,
+			border 1s ease !important;
+	}
+}

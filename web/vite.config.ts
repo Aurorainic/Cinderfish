@@ -5,6 +5,11 @@ import vue from "@vitejs/plugin-vue";
 // run on :5173 while the API stays on :3000.
 export default defineConfig({
   plugins: [vue()],
+  resolve: {
+    alias: {
+      "@": decodeURIComponent(new URL("./src", import.meta.url).pathname),
+    },
+  },
   server: {
     port: 5173,
     proxy: {

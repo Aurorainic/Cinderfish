@@ -1,0 +1,48 @@
+// Application shell helpers.
+//
+// Firefish has no equivalent section: its shell components carry their own
+// styles. These few classes are shared by the router placeholders and the
+// layout switch (`universal` / `deck` / `zen` / `visitor`), so they live with
+// the global layer instead of being duplicated per page.
+
+#app {
+	min-height: 100vh;
+	color: var(--fg);
+	background: var(--bg);
+}
+
+.cf-page {
+	padding: var(--margin);
+}
+
+.cf-page-placeholder {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	min-height: 40vh;
+	padding: 32px;
+	color: var(--fgTransparentWeak);
+	font-size: 0.9em;
+	letter-spacing: 0.02em;
+	text-align: center;
+}
+
+.cf-stub-note {
+	padding: 8px 16px;
+	border-radius: var(--radius);
+	background: var(--infoBg);
+	color: var(--infoFg);
+	font-size: 0.85em;
+}
+
+.cf-visually-hidden {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	padding: 0;
+	margin: -1px;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	white-space: nowrap;
+	border: 0;
+}

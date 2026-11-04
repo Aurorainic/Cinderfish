@@ -1,0 +1,520 @@
+// Endpoint constants and request/response types for every route registered by
+// `internal/httpapi/server.go`.
+//
+// Paths are relative to `/api` unless noted. They are kept as a const object
+// (not string literals at call sites) so a route rename is a single edit and
+// so `EndpointName` can drive `api()`'s typing.
+
+import type {
+	AdminEmoji,
+	AllowlistResponse,
+	DriveFile,
+	DriveFolder,
+	EmojiSimple,
+	FederationModeResponse,
+	FollowRequest,
+	Following,
+	HashtagTrend,
+	MeDetailed,
+	MetaDetailed,
+	MetaLite,
+	MiAuthTokenResponse,
+	Note,
+	NoteCreateResponse,
+	NoteDetailed,
+	NoteFavorite,
+	NoteReaction,
+	Notification,
+	NoteVisibility,
+	PingResponse,
+	RegistryDetail,
+	SigninResponse,
+	SignupResponse,
+	UserNameAvailability,
+	UserDetailed,
+	UserLite,
+} from "./types";
+
+export const ENDPOINTS = {
+	// meta / ping
+	meta: "meta",
+	ping: "ping",
+
+	// auth
+	signup: "signup",
+	signin: "signin",
+	usernameAvailable: "username/available",
+	miAuthGenToken: "miauth/gen-token",
+
+	// current user
+	i: "i",
+	iUpdate: "i/update",
+	usersUpdate: "users/update",
+	iPin: "i/pin",
+	iUnpin: "i/unpin",
+	iFavorites: "i/favorites",
+	iNotifications: "i/notifications",
+
+	// users
+	usersShow: "users/show",
+	usersNotes: "users/notes",
+	usersFollowers: "users/followers",
+	usersFollowing: "users/following",
+
+	// following
+	followingCreate: "following/create",
+	followingDelete: "following/delete",
+	followingRequestsList: "following/requests/list",
+	followingRequestsSent: "following/requests/sent",
+	followingRequestsAccept: "following/requests/accept",
+	followingRequestsReject: "following/requests/reject",
+	followingRequestsCancel: "following/requests/cancel",
+
+	// registry
+	registrySet: "i/registry/set",
+	registryGet: "i/registry/get",
+	registryGetDetail: "i/registry/get-detail",
+	registryKeys: "i/registry/keys",
+	registryGetAll: "i/registry/get-all",
+	registryRemove: "i/registry/remove",
+	registryClear: "i/registry/clear",
+
+	// notes
+	notesCreate: "notes/create",
+	notesShow: "notes/show",
+	notesDelete: "notes/delete",
+	notesReplies: "notes/replies",
+	notesConversation: "notes/conversation",
+	notesChildren: "notes/children",
+	notesRenotes: "notes/renotes",
+	notesReactions: "notes/reactions",
+	notesReactionsCreate: "notes/reactions/create",
+	notesReactionsDelete: "notes/reactions/delete",
+	notesFavoritesCreate: "notes/favorites/create",
+	notesFavoritesDelete: "notes/favorites/delete",
+	notesPollsVote: "notes/polls/vote",
+	hashtagsTrend: "hashtags/trend",
+
+	// timelines
+	notesTimeline: "notes/timeline",
+	notesLocalTimeline: "notes/local-timeline",
+	notesHybridTimeline: "notes/hybrid-timeline",
+	notesGlobalTimeline: "notes/global-timeline",
+
+	// notifications
+	notifications: "notifications",
+	notificationsMarkAllAsRead: "notifications/mark-all-as-read",
+
+	// drive
+	driveFiles: "drive/files",
+	driveFilesCreate: "drive/files/create",
+	driveFilesShow: "drive/files/show",
+	driveFilesDelete: "drive/files/delete",
+	driveFolders: "drive/folders",
+	driveFoldersCreate: "drive/folders/create",
+	driveFoldersShow: "drive/folders/show",
+	driveFoldersUpdate: "drive/folders/update",
+	driveFoldersDelete: "drive/folders/delete",
+
+	// emoji
+	emojis: "emojis",
+	adminEmojiList: "admin/emoji/list",
+	adminEmojiAdd: "admin/emoji/add",
+	adminEmojiDelete: "admin/emoji/delete",
+
+	// admin
+	adminAccountsCreate: "admin/accounts/create",
+	adminShowUsers: "admin/show-users",
+	adminSuspendUser: "admin/suspend-user",
+	adminUnsuspendUser: "admin/unsuspend-user",
+	adminFederationMode: "admin/federation/mode",
+	adminFederationAllowlist: "admin/federation/allowlist",
+} as const;
+
+export type EndpointName = (typeof ENDPOINTS)[keyof typeof ENDPOINTS];
+
+/** Body for routes whose successful response carries no data (`{}`). */
+export type EmptyResponse = Record<string, never>;
+
+export interface PaginationParams {
+	limit?: number;
+	sinceId?: string;
+	untilId?: string;
+	sinceDate?: number;
+	untilDate?: number;
+}
+
+export interface TimelineParams extends PaginationParams {
+	withFiles?: boolean;
+	withRenotes?: boolean;
+	withReplies?: boolean;
+	includeMyRenotes?: boolean;
+	includeRenotedMyNotes?: boolean;
+	includeLocalRenotes?: boolean;
+}
+
+export interface MetaRequest {
+	detail?: boolean;
+}
+
+export interface SignupParams {
+	username: string;
+	password: string;
+	invitationCode?: string;
+}
+
+export interface SigninParams {
+	username: string;
+	password: string;
+}
+
+export interface MiAuthGenTokenParams {
+	session: string;
+	name?: string;
+	description?: string;
+	iconUrl?: string;
+	permission?: string[];
+}
+
+export interface IUpdateParams {
+	name?: string | null;
+	description?: string | null;
+	avatarId?: string | null;
+	followersVisibility?: "public" | "followers" | "private";
+	followingVisibility?: "public" | "followers" | "private";
+}
+
+export interface UsersShowParams {
+	userId?: string;
+	username?: string;
+	/** Must be empty/null; the backend rejects non-empty hosts. */
+	host?: string | null;
+}
+
+export interface UsersNotesParams {
+	userId?: string;
+	username?: string;
+	limit?: number;
+	sinceId?: string;
+	untilId?: string;
+	withFiles?: boolean;
+	withReplies?: boolean;
+}
+
+export interface UsersFollowersParams {
+	userId?: string;
+	limit?: number;
+	sinceId?: string;
+	untilId?: string;
+}
+
+export interface NoteIdParams {
+	noteId: string;
+}
+
+export interface NoteListParams extends PaginationParams {
+	noteId: string;
+}
+
+export interface NoteReactionsListParams extends PaginationParams {
+	noteId: string;
+	type?: string;
+}
+
+export interface PollParam {
+	choices: string[];
+	multiple?: boolean;
+	expiredAfter?: number;
+	expiresAt?: number;
+}
+
+export interface NotesCreateParams {
+	visibility?: NoteVisibility;
+	visibleUserIds?: string[];
+	text?: string | null;
+	cw?: string | null;
+	localOnly?: boolean;
+	fileIds?: string[];
+	mediaIds?: string[];
+	replyId?: string | null;
+	renoteId?: string | null;
+	poll?: PollParam;
+}
+
+export interface NotificationsParams extends PaginationParams {
+	markAsRead?: boolean;
+	includeTypes?: string[];
+	excludeTypes?: string[];
+}
+
+export interface RegistryParams {
+	key?: string;
+	value?: unknown;
+	scope?: string[];
+	domain?: string | null;
+}
+
+export interface RegistryGetParams {
+	key?: string;
+	scope?: string[];
+	domain?: string | null;
+}
+
+export interface DriveFilesParams extends PaginationParams {
+	folderId?: string | null;
+}
+
+export interface DriveFolderCreateParams {
+	name?: string;
+	parentId?: string | null;
+}
+
+export interface DriveFolderUpdateParams {
+	folderId: string;
+	name?: string | null;
+	parentId?: string | null;
+}
+
+export interface AdminEmojiListParams extends PaginationParams {
+	query?: string | null;
+}
+
+export interface AdminEmojiAddParams {
+	name: string;
+	fileId: string;
+	category?: string | null;
+	aliases?: string[];
+}
+
+export interface AdminAccountsCreateParams {
+	username: string;
+	password: string;
+}
+
+export interface AdminShowUsersParams {
+	limit?: number;
+	offset?: number;
+}
+
+export interface FollowingRequestsParams extends PaginationParams {
+	userId?: string;
+}
+
+/**
+ * Endpoint -> request/response contract. This is the typed surface used by
+ * `api()`, `CfPagination` and future page ports.
+ */
+export interface EndpointMap {
+	[ENDPOINTS.meta]: { req: MetaRequest; res: MetaDetailed | MetaLite };
+	[ENDPOINTS.ping]: { req: Record<string, never>; res: PingResponse };
+
+	[ENDPOINTS.signup]: { req: SignupParams; res: SignupResponse };
+	[ENDPOINTS.signin]: { req: SigninParams; res: SigninResponse };
+	[ENDPOINTS.usernameAvailable]: {
+		req: { username: string };
+		res: UserNameAvailability;
+	};
+	[ENDPOINTS.miAuthGenToken]: {
+		req: MiAuthGenTokenParams;
+		res: MiAuthTokenResponse;
+	};
+
+	[ENDPOINTS.i]: { req: Record<string, never>; res: MeDetailed };
+	[ENDPOINTS.iUpdate]: { req: IUpdateParams; res: MeDetailed };
+	[ENDPOINTS.usersUpdate]: { req: IUpdateParams; res: MeDetailed };
+	[ENDPOINTS.iPin]: { req: NoteIdParams; res: MeDetailed };
+	[ENDPOINTS.iUnpin]: { req: NoteIdParams; res: MeDetailed };
+	[ENDPOINTS.iFavorites]: {
+		req: PaginationParams;
+		res: NoteFavorite[];
+	};
+	[ENDPOINTS.iNotifications]: {
+		req: NotificationsParams;
+		res: Notification[];
+	};
+
+	[ENDPOINTS.usersShow]: { req: UsersShowParams; res: UserDetailed };
+	[ENDPOINTS.usersNotes]: { req: UsersNotesParams; res: NoteDetailed[] };
+	[ENDPOINTS.usersFollowers]: {
+		req: UsersFollowersParams;
+		res: Following[];
+	};
+	[ENDPOINTS.usersFollowing]: {
+		req: UsersFollowersParams;
+		res: Following[];
+	};
+
+	[ENDPOINTS.followingCreate]: { req: { userId: string }; res: UserLite };
+	[ENDPOINTS.followingDelete]: { req: { userId: string }; res: UserLite };
+	[ENDPOINTS.followingRequestsList]: {
+		req: FollowingRequestsParams;
+		res: FollowRequest[];
+	};
+	[ENDPOINTS.followingRequestsSent]: {
+		req: FollowingRequestsParams;
+		res: FollowRequest[];
+	};
+	[ENDPOINTS.followingRequestsAccept]: {
+		req: { userId: string };
+		res: EmptyResponse;
+	};
+	[ENDPOINTS.followingRequestsReject]: {
+		req: { userId: string };
+		res: EmptyResponse;
+	};
+	[ENDPOINTS.followingRequestsCancel]: {
+		req: { userId: string };
+		res: UserLite;
+	};
+
+	[ENDPOINTS.registrySet]: { req: RegistryParams; res: EmptyResponse };
+	[ENDPOINTS.registryGet]: { req: RegistryGetParams; res: unknown };
+	[ENDPOINTS.registryGetDetail]: {
+		req: RegistryGetParams;
+		res: RegistryDetail;
+	};
+	[ENDPOINTS.registryKeys]: { req: RegistryGetParams; res: string[] };
+	[ENDPOINTS.registryGetAll]: {
+		req: RegistryGetParams;
+		res: Record<string, unknown>;
+	};
+	[ENDPOINTS.registryRemove]: { req: RegistryGetParams; res: EmptyResponse };
+	[ENDPOINTS.registryClear]: { req: RegistryGetParams; res: EmptyResponse };
+
+	[ENDPOINTS.notesCreate]: {
+		req: NotesCreateParams;
+		res: NoteCreateResponse;
+	};
+	[ENDPOINTS.notesShow]: { req: NoteIdParams; res: NoteDetailed };
+	[ENDPOINTS.notesDelete]: { req: NoteIdParams; res: EmptyResponse };
+	[ENDPOINTS.notesReplies]: { req: NoteListParams; res: NoteDetailed[] };
+	[ENDPOINTS.notesRenotes]: { req: NoteListParams; res: NoteDetailed[] };
+	[ENDPOINTS.notesConversation]: {
+		req: { noteId: string; limit?: number; offset?: number };
+		res: Note[];
+	};
+	[ENDPOINTS.notesChildren]: { req: NoteListParams; res: Note[] };
+	[ENDPOINTS.notesReactions]: {
+		req: NoteReactionsListParams;
+		res: NoteReaction[];
+	};
+	[ENDPOINTS.notesReactionsCreate]: {
+		req: { noteId: string; reaction: string };
+		res: EmptyResponse;
+	};
+	[ENDPOINTS.notesReactionsDelete]: {
+		req: { noteId: string; reaction?: string };
+		res: EmptyResponse;
+	};
+	[ENDPOINTS.notesFavoritesCreate]: {
+		req: NoteIdParams;
+		res: NoteFavorite;
+	};
+	[ENDPOINTS.notesFavoritesDelete]: {
+		req: NoteIdParams;
+		res: EmptyResponse;
+	};
+	[ENDPOINTS.notesPollsVote]: {
+		req: { noteId: string; choice: number };
+		res: EmptyResponse;
+	};
+	[ENDPOINTS.hashtagsTrend]: { req: Record<string, never>; res: HashtagTrend[] };
+
+	[ENDPOINTS.notesTimeline]: { req: TimelineParams; res: NoteDetailed[] };
+	[ENDPOINTS.notesLocalTimeline]: { req: TimelineParams; res: NoteDetailed[] };
+	[ENDPOINTS.notesHybridTimeline]: { req: TimelineParams; res: NoteDetailed[] };
+	[ENDPOINTS.notesGlobalTimeline]: { req: TimelineParams; res: NoteDetailed[] };
+
+	[ENDPOINTS.notifications]: {
+		req: NotificationsParams;
+		res: Notification[];
+	};
+	[ENDPOINTS.notificationsMarkAllAsRead]: {
+		req: Record<string, never>;
+		res: EmptyResponse;
+	};
+
+	[ENDPOINTS.driveFiles]: { req: DriveFilesParams; res: DriveFile[] };
+	[ENDPOINTS.driveFilesCreate]: {
+		req: { folderId?: string | null };
+		res: DriveFile;
+	};
+	[ENDPOINTS.driveFilesShow]: { req: { fileId: string }; res: DriveFile };
+	[ENDPOINTS.driveFilesDelete]: { req: { fileId: string }; res: EmptyResponse };
+	[ENDPOINTS.driveFolders]: { req: DriveFilesParams; res: DriveFolder[] };
+	[ENDPOINTS.driveFoldersCreate]: {
+		req: DriveFolderCreateParams;
+		res: DriveFolder;
+	};
+	[ENDPOINTS.driveFoldersShow]: {
+		req: { folderId: string };
+		res: DriveFolder;
+	};
+	[ENDPOINTS.driveFoldersUpdate]: {
+		req: DriveFolderUpdateParams;
+		res: DriveFolder;
+	};
+	[ENDPOINTS.driveFoldersDelete]: {
+		req: { folderId: string };
+		res: EmptyResponse;
+	};
+
+	[ENDPOINTS.emojis]: {
+		req: Record<string, never>;
+		res: { emojis: EmojiSimple[] };
+	};
+	[ENDPOINTS.adminEmojiList]: {
+		req: AdminEmojiListParams;
+		res: AdminEmoji[];
+	};
+	[ENDPOINTS.adminEmojiAdd]: { req: AdminEmojiAddParams; res: AdminEmoji };
+	[ENDPOINTS.adminEmojiDelete]: { req: { id: string }; res: EmptyResponse };
+
+	[ENDPOINTS.adminAccountsCreate]: {
+		req: AdminAccountsCreateParams;
+		res: UserDetailed;
+	};
+	[ENDPOINTS.adminShowUsers]: {
+		req: AdminShowUsersParams;
+		res: UserDetailed[];
+	};
+	[ENDPOINTS.adminSuspendUser]: {
+		req: { userId: string };
+		res: EmptyResponse;
+	};
+	[ENDPOINTS.adminUnsuspendUser]: {
+		req: { userId: string };
+		res: EmptyResponse;
+	};
+	[ENDPOINTS.adminFederationMode]: {
+		req: { mode: "public" | "allowlist" | "none" };
+		res: FederationModeResponse;
+	};
+	[ENDPOINTS.adminFederationAllowlist]: {
+		req: { host?: string; remove?: boolean };
+		res: AllowlistResponse;
+	};
+}
+
+export type EndpointParams<E extends EndpointName> = EndpointMap[E]["req"];
+export type EndpointResult<E extends EndpointName> = EndpointMap[E]["res"];
+
+/** Endpoints that page components paginate over. */
+export type PagingEndpoint =
+	| typeof ENDPOINTS.notesTimeline
+	| typeof ENDPOINTS.notesLocalTimeline
+	| typeof ENDPOINTS.notesHybridTimeline
+	| typeof ENDPOINTS.notesGlobalTimeline
+	| typeof ENDPOINTS.notifications
+	| typeof ENDPOINTS.iNotifications
+	| typeof ENDPOINTS.iFavorites
+	| typeof ENDPOINTS.usersNotes
+	| typeof ENDPOINTS.usersFollowers
+	| typeof ENDPOINTS.usersFollowing
+	| typeof ENDPOINTS.notesReplies
+	| typeof ENDPOINTS.notesRenotes
+	| typeof ENDPOINTS.notesChildren
+	| typeof ENDPOINTS.notesReactions
+	| typeof ENDPOINTS.driveFiles
+	| typeof ENDPOINTS.driveFolders
+	| typeof ENDPOINTS.adminEmojiList;

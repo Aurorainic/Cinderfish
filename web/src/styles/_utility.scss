@@ -1,0 +1,497 @@
+// Shared utility classes.
+//
+// Ported from firefish@02c31e0:packages/client/src/style.scss. Page and
+// component ports write these class names directly in templates
+// (`_button`, `_panel`, `_gap`, ...), so they must stay identical.
+//
+// All `@extend` targets live in this file on purpose: Sass cannot extend a
+// selector that is defined in another module.
+
+._noSelect {
+	user-select: none;
+	-webkit-user-select: none;
+	-webkit-touch-callout: none;
+}
+
+._ghost {
+	&,
+	* {
+		@extend ._noSelect;
+		pointer-events: none;
+	}
+}
+
+._modalBg {
+	position: fixed;
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: 100%;
+	background: var(--modalBg);
+	-webkit-backdrop-filter: var(--modalBgFilter);
+	backdrop-filter: var(--modalBgFilter);
+}
+
+._shadow {
+	box-shadow: 0 4px 32px var(--shadow) !important;
+}
+
+._button {
+	appearance: none;
+	display: inline-block;
+	padding: 0;
+	margin: 0;
+	background: none;
+	border: none;
+	cursor: pointer;
+	color: inherit;
+	touch-action: manipulation;
+	-webkit-tap-highlight-color: transparent;
+	font-size: 1em;
+	font-family: inherit;
+	line-height: inherit;
+	text-decoration: none;
+
+	&,
+	* {
+		@extend ._noSelect;
+	}
+
+	* {
+		pointer-events: none;
+	}
+
+	&:disabled {
+		opacity: 0.5;
+		cursor: default;
+	}
+
+	> i:only-child {
+		display: block;
+		margin: auto;
+	}
+}
+
+._buttonIcon {
+	@extend ._button;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: calc(var(--height, 40px) - (var(--margin) * 2));
+	height: calc(var(--height, 40px) - (var(--margin) * 2));
+	box-sizing: border-box;
+	position: relative;
+	border-radius: 5px;
+	outline: none;
+
+	&::before {
+		content: "";
+		position: absolute;
+		width: 2.7em;
+		height: 2.7em;
+		border-radius: inherit;
+		transition: background 0.2s;
+	}
+
+	&:hover::before,
+	&:focus::before,
+	&.highlighted::before {
+		background: var(--buttonBg);
+	}
+
+	&:focus-visible::before {
+		outline: auto;
+	}
+
+	&.highlighted {
+		color: var(--accent);
+	}
+}
+
+._buttonPrimary {
+	@extend ._button;
+	color: var(--fgOnAccent);
+	background: var(--accent);
+
+	&:not(:disabled):hover {
+		background: var(--X8);
+	}
+
+	&:not(:disabled):active {
+		background: var(--X9);
+	}
+}
+
+._buttonGradate {
+	@extend ._buttonPrimary;
+	color: var(--fgOnAccent);
+	background: linear-gradient(90deg, var(--buttonGradateA), var(--buttonGradateB));
+
+	&:not(:disabled):hover {
+		background: linear-gradient(90deg, var(--X8), var(--X8));
+	}
+
+	&:not(:disabled):active {
+		background: linear-gradient(90deg, var(--X8), var(--X8));
+	}
+}
+
+._help {
+	color: var(--accent);
+	cursor: help;
+}
+
+._textButton {
+	@extend ._button;
+	color: var(--accent);
+
+	&:not(:disabled):hover {
+		text-decoration: underline;
+	}
+}
+
+._borderButton {
+	@extend ._button;
+	display: block;
+	width: 100%;
+	padding: 10px;
+	box-sizing: border-box;
+	text-align: center;
+	border: solid 0.5px var(--divider);
+	border-radius: var(--radius);
+
+	&:active {
+		border-color: var(--accent);
+	}
+}
+
+._panel {
+	background: var(--panel);
+	border-radius: var(--radius);
+	overflow: clip;
+}
+
+._block {
+	background: var(--panel);
+	border-radius: var(--radius);
+	overflow: visible;
+
+	& + ._block {
+		margin-top: var(--margin);
+	}
+}
+
+._popup {
+	background: var(--popup);
+	border-radius: var(--radius);
+	contain: content;
+}
+
+._margin {
+	margin: var(--margin) 0;
+}
+
+._gap {
+	margin: var(--margin) 0;
+
+	&:first-child {
+		margin-top: 0;
+	}
+}
+
+._gaps {
+	display: flex;
+	flex-direction: column;
+	gap: var(--margin);
+}
+
+._gaps_m {
+	display: flex;
+	flex-direction: column;
+	gap: 1.5em;
+}
+
+._gaps_s {
+	display: flex;
+	flex-direction: column;
+	gap: 0.75em;
+}
+
+._inputs {
+	display: flex;
+	margin: 32px 0;
+
+	&:first-child {
+		margin-top: 8px;
+	}
+
+	&:last-child {
+		margin-bottom: 8px;
+	}
+
+	> * {
+		flex: 1;
+		margin: 0 !important;
+
+		&:not(:first-child) {
+			margin-left: 8px !important;
+		}
+
+		&:not(:last-child) {
+			margin-right: 8px !important;
+		}
+	}
+}
+
+._card {
+	@extend ._panel;
+
+	> ._title {
+		margin: 0;
+		padding: 22px 32px;
+		font-size: 1em;
+		border-bottom: solid 1px var(--panelHeaderDivider);
+		font-weight: bold;
+		background: var(--panelHeaderBg);
+		color: var(--panelHeaderFg);
+
+		@media (max-width: 500px) {
+			padding: 16px;
+			font-size: 1em;
+		}
+	}
+
+	> ._content {
+		padding: 32px;
+
+		@media (max-width: 500px) {
+			padding: 16px;
+		}
+
+		&._noPad {
+			padding: 0 !important;
+		}
+
+		& + ._content {
+			border-top: solid 0.5px var(--divider);
+		}
+	}
+
+	> ._footer {
+		border-top: solid 0.5px var(--divider);
+		padding: 24px 32px;
+
+		@media (max-width: 500px) {
+			padding: 16px;
+		}
+	}
+}
+
+._narrow_ ._card {
+	> ._title {
+		padding: 16px;
+		font-size: 1em;
+	}
+
+	> ._content {
+		padding: 16px;
+	}
+
+	> ._footer {
+		padding: 16px;
+	}
+}
+
+._monolithic_ {
+	._section:not(:empty) {
+		box-sizing: border-box;
+		padding: var(--root-margin, 32px);
+
+		@media (max-width: 500px) {
+			--root-margin: 10px;
+		}
+
+		& + ._section:not(:empty) {
+			border-top: solid 0.5px var(--divider);
+		}
+	}
+}
+
+._acrylic {
+	background: var(--acrylicPanel);
+	-webkit-backdrop-filter: var(--blur, blur(15px));
+	backdrop-filter: var(--blur, blur(15px));
+
+	@supports not (backdrop-filter: var(--blur, blur(15px))) {
+		&::after {
+			content: "";
+			position: absolute;
+			top: 0;
+			right: 0;
+			left: 0;
+			bottom: 0;
+			z-index: -1;
+			background: var(--bg);
+			opacity: 0.75;
+		}
+	}
+}
+
+._formBlock {
+	margin: 1.5em 0;
+}
+
+._formRoot {
+	> ._formBlock:first-child {
+		margin-top: 0;
+	}
+
+	> ._formBlock:last-child {
+		margin-bottom: 0;
+	}
+}
+
+._formLinks {
+	> *:not(:last-child) {
+		margin-bottom: 8px;
+	}
+}
+
+._formLinksGrid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+	grid-gap: 12px;
+
+	> button {
+		width: 100% !important;
+	}
+}
+
+._flexList {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.2em;
+	width: min-content;
+	min-width: 100%;
+
+	&._center {
+		justify-content: center;
+	}
+}
+
+._table {
+	> ._row {
+		display: flex;
+
+		&:not(:last-child) {
+			margin-bottom: 16px;
+
+			@media (max-width: 500px) {
+				margin-bottom: 8px;
+			}
+		}
+
+		> ._cell {
+			flex: 1;
+
+			> ._label {
+				font-size: 80%;
+				opacity: 0.7;
+
+				> ._icon {
+					margin-right: 4px;
+					display: none;
+				}
+			}
+		}
+	}
+}
+
+._fullinfo {
+	padding: 64px 32px;
+	text-align: center;
+
+	> img {
+		vertical-align: bottom;
+		height: 128px;
+		margin-bottom: 16px;
+		border-radius: 16px;
+	}
+}
+
+._keyValue {
+	display: flex;
+
+	> * {
+		flex: 1;
+	}
+}
+
+._link {
+	position: relative;
+	color: var(--link);
+	text-underline-offset: 0.2em;
+}
+
+._beta {
+	margin-left: 0.7em;
+	font-size: 65%;
+	padding: 2px 3px;
+	color: var(--accent);
+	border: solid 1px var(--accent);
+	border-radius: 4px;
+	vertical-align: top;
+}
+
+._blur_text {
+	filter: blur(6px);
+	transition: filter 0.3s;
+
+	&:hover {
+		filter: blur(0);
+	}
+}
+
+// Panels inside the timeline get a soft drop shadow. Firefish scopes this to
+// containers that opt out of gap handling.
+:not(.noGap):not(._block) > {
+	.note-container,
+	._gap > ._block,
+	._panel,
+	.noGap,
+	.profile,
+	.card {
+		&:not(.caution) {
+			box-shadow: 0 4px 25px rgba(0, 0, 0, 0.04);
+			border-radius: var(--radius);
+			overflow: clip;
+		}
+	}
+}
+
+.widgets ._panel {
+	box-shadow: none !important;
+}
+
+// Swiper overrides from Firefish's timeline carousel.
+.swiper {
+	margin-inline: -24px !important;
+	padding-inline: 24px !important;
+	overflow: clip !important;
+	mask: linear-gradient(
+		to right,
+		transparent,
+		black 24px calc(100% - 24px),
+		transparent
+	);
+	-webkit-mask: linear-gradient(
+		to right,
+		transparent,
+		black 24px calc(100% - 24px),
+		transparent
+	);
+}
+
+.swiper-slide {
+	min-height: 100vh;
+}

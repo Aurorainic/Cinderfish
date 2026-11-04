@@ -1,0 +1,173 @@
+// Keyframes and transition helpers ported from Firefish's style.scss.
+
+@keyframes spin {
+	0% {
+		transform: rotate(0deg);
+	}
+	100% {
+		transform: rotate(360deg);
+	}
+}
+
+.fa-pulse {
+	animation: spin 1s infinite;
+}
+
+@keyframes blink {
+	0% {
+		opacity: 1;
+	}
+	70% {
+		opacity: 0;
+	}
+	100% {
+		opacity: 1;
+	}
+}
+
+@keyframes tada {
+	from {
+		transform: scale3d(1, 1, 1);
+	}
+
+	10%,
+	20% {
+		transform: scale3d(0.9, 0.9, 0.9) rotate3d(0, 0, 1, -3deg);
+	}
+
+	30%,
+	50%,
+	70%,
+	90% {
+		transform: scale3d(1.1, 1.1, 1.1) rotate3d(0, 0, 1, 3deg);
+	}
+
+	40%,
+	60%,
+	80% {
+		transform: scale3d(1.1, 1.1, 1.1) rotate3d(0, 0, 1, -3deg);
+	}
+
+	to {
+		transform: scale3d(1, 1, 1);
+	}
+}
+
+@keyframes bounce {
+	0% {
+		transform: scaleX(0.9) scaleY(0.9);
+	}
+	19% {
+		transform: scaleX(1.1) scaleY(1.1);
+	}
+	48% {
+		transform: scaleX(0.95) scaleY(0.95);
+	}
+	100% {
+		transform: scaleX(1) scaleY(1);
+	}
+}
+
+@keyframes reset {
+	to {
+		transform: none;
+		opacity: 1;
+	}
+}
+
+@keyframes scaleIn {
+	from {
+		transform: scale(0);
+		opacity: 0;
+	}
+}
+
+@keyframes scaleInSmall {
+	from {
+		transform: scale(0.8);
+		opacity: 0;
+	}
+}
+
+@keyframes fadeIn {
+	0% {
+		opacity: 0;
+	}
+	100% {
+		opacity: 1;
+	}
+}
+
+._zoom {
+	transition-duration: 0.5s, 0.5s;
+	transition-property: opacity, transform;
+	transition-timing-function: cubic-bezier(0, 0.5, 0.5, 1);
+}
+
+.zoom-enter-active,
+.zoom-leave-active {
+	transition:
+		opacity 0.5s,
+		transform 0.5s !important;
+}
+
+.zoom-enter-from,
+.zoom-leave-to {
+	opacity: 0;
+	transform: scale(0.9);
+}
+
+._anime_bounce {
+	will-change: transform;
+	animation: bounce ease 0.7s;
+	animation-iteration-count: 1;
+	transform-origin: 50% 50%;
+}
+
+._anime_bounce_ready {
+	will-change: transform;
+	transform: scaleX(0.9) scaleY(0.9);
+}
+
+._anime_bounce_standBy {
+	transition: transform 0.1s ease;
+}
+
+.instant {
+	animation-duration: 0s !important;
+}
+
+@media (prefers-reduced-motion) {
+	@keyframes tada {
+		from {
+			transform: scale3d(1, 1, 1);
+		}
+
+		50% {
+			transform: scale3d(1.1, 1.1, 1.1);
+		}
+
+		to {
+			transform: scale3d(1, 1, 1);
+		}
+	}
+
+	@keyframes blink {
+		0% {
+			opacity: 1;
+		}
+		100% {
+			opacity: 1;
+		}
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	*,
+	*::before,
+	*::after {
+		animation-duration: 0.01ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 0.01ms !important;
+	}
+}

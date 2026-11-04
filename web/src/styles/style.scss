@@ -1,0 +1,8 @@
+// Equivalent of firefish@02c31e0:packages/client/src/style.scss: the base
+// layer plus the shared utility classes (`_button`, `_panel`, `_card`, ...)
+// and animation helpers that ported templates reference by name.
+
+@use "./global";
+@use "./utility";
+@use "./animations";
+@use "./shell";

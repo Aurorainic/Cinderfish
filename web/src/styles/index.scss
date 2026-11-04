@@ -1,0 +1,9 @@
+// Single stylesheet entry. Import it once from `web/src/main.ts`:
+//
+//   import "./styles/index.scss";
+//
+// Components must not import this file again (it would duplicate the reset in
+// their own chunk); they only use the CSS custom properties written by
+// `web/src/themes/apply.ts` and the global utility classes.
+
+@use "./style";

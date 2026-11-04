@@ -1,0 +1,11 @@
+// Base layer: theme-independent tokens, reset, typography and scrollbars.
+//
+// Firefish keeps everything in one `src/style.scss`. Splitting the base out
+// lets layout and page code state what it may assume exists without pulling in
+// the utility classes. Theme *colours* are injected at runtime by
+// `web/src/themes/apply.ts`.
+
+@use "./vars";
+@use "./reset";
+@use "./typography";
+@use "./scrollbar";
