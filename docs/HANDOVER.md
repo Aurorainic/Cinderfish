@@ -1,6 +1,6 @@
 # Cinderfish 交接说明
 
-- 最后更新：2026-11-01（Firefish 前端整体移植 Task 3：壳、导航与 Deck）
+- 最后更新：2026-11-05（前端第二波：Note 组件树、时间线、通知、Drive 已落地并通过浏览器走查，见 §12R）
 - 项目名 **Cinderfish**（2026-10-28 定名，Go module `github.com/Aurorainic/cinderfish`）
 - 仓库：当前目录 `/home/lainsaka/文档/MilnFish`，分支 `main`；远程 `origin` 为
   `https://github.com/Aurorainic/Cinderfish.git`（GitHub 仓库已更名，本地目录改名待办）
@@ -27,8 +27,12 @@ Go 单二进制的个人/极小规模联邦社交实例。后端契约是 **Miss
 | Firefish 前端整体移植（Task 2–3：运行时 shim、壳/导航/Deck 与页面窗口） | ✅ | `feat(web): rebuild Firefish-style shell and adaptive deck`（分支 `frontend-ui-redesign`，见 §11.17） |
 | Firefish 前端整体移植（Task 4：流式更新、`useChannel`、通知别名、auth/timeline 语义收口） | ✅ | `ab897e6` … `422a9a8`（分支 `frontend-ui-redesign`） |
 | **前端重定基：Firefish 原版复原（Iceshrimp 弃用）** | 🚧 | 决策记录 `docs/research/2026-11-01-firefish-rebaseline-decision.md`；主题色板/导航/笔记密度/操作行已复原（`2c61c51`、`438cec0`、`0ca52d1`、`459d5e7`）；jclaudan 镜像评估后仅作备份（`5e763be`）；待续：PageHeader tab、composer 面板化、widgets 栏 Firefish 化 |
+| **前端移植基线切到分支 `firefish-port`（worktree `.worktrees/firefish-port/`）** | ✅ | `e54d2d1` 重定基决策 · `9ce4a00` 删除旧前端 · `6910c41` 新骨架（§12P–§12Q） |
+| **前端第一波：骨架重建**（themes/styles/api/store/router/ui/os/account/i18n + 21 个 `Cf*` 原子组件，123 个占位页） | ✅ | `6910c41`，记录见 §12Q |
+| **前端第二波：Note 组件树 + 时间线/通知/Drive**（+48 个 `Mk*` 组件、MFM 渲染器、单 `defaultStore`、`check-port` 门禁、浏览器走查） | ✅ | `6007474`（文档 `a723987`），记录见 §12R |
 
-- Firefish 字典来源：`firefish@02c31e0a2804de48c9d73028df525e197d8df622:locales/zh-CN.yml`；当前 `web/src/i18n/zh-CN.ts` 只保留首批白名单页面词条，Cinderfish 品牌文案允许改写，其余未移植功能不复制。
+- Firefish 字典来源：`firefish@02c31e0a2804de48c9d73028df525e197d8df622:locales/zh-CN.yml`；第一波的 `web/src/i18n/zh-CN.ts` 已随旧前端删除（`9ce4a00`），现在是 `web/src/i18n/locales/{zh-CN,ja-JP}.json`（扁平键，由 `web/scripts/gen-locale.mjs` 从 Firefish locales 生成，见 §12Q）。
+- **提交号的权威来源是 `git log`**：本文件按批次记录做了什么、证据是什么；M3 笔记、M4 Streaming、M5 联邦等后端批次的提交号以 `git log` 为准，前端两波移植的提交号已在 §2 里程碑与 §12Q/§12R 中列明。
 
 ## 3. 契约以源码为准
 
@@ -107,7 +111,22 @@ go run ./cmd/cinderfish-admin --config config.toml create --username root --pass
 
 只跑 API 时可以不构建前端：`web_dist` 目录不存在，服务器自动退回纯 API 模式。
 
-数据库迁移在启动时自动执行（不可变的版本化脚本）。当前 schema 版本为 **5**（`internal/db/db.go` 的 `migrations` 1–5）。
+前端单独开发（vite dev server 反代到 3000 端口，见 `web/vite.config.ts`）：
+
+```bash
+cd web
+pnpm install
+pnpm dev            # http://127.0.0.1:5173，/api /media /streaming 等反代到 127.0.0.1:3000
+pnpm typecheck      # vue-tsc --noEmit
+pnpm run check:port # 移植规约门禁（web/scripts/check-port.mjs），见 §12R.1
+pnpm build          # 产出 web/dist，由 Go 二进制静态托管
+```
+
+`pnpm run check:port` 会拦下六类问题：引入新依赖、旧的 `i18n.ts.xxx` 调用、`$ref`/`$computed`、直接 `fetch`、页面自己读 token，
+以及**模板里用到但未 import/未全局注册的组件**（第二波踩过：`pages/Note.vue` 漏 import `MkNoteDetailed`，`vue-tsc` 不报错、页面静默空白），
+外加 `t()` 引用了 zh-CN 词典里不存在的键。
+
+数据库迁移在启动时自动执行（不可变的版本化脚本）。当前 schema 版本为 **9**（`internal/db/db.go` 的 `migrations` 1–9）。
 
 数据库测试包（`internal/account`、`internal/httpapi`）都会 TRUNCATE 同一批表，因此每个包用 `internal/testdb` 在 `TestMain` 里持有 PostgreSQL advisory lock，直到该包的测试二进制退出——这样 `go test ./...` 并行跑包时不会互相清表（不加锁时会随机出现"找不到用户"之类的假失败）。
 
@@ -143,10 +162,35 @@ internal/streaming/         Streaming API：事件总线、WebSocket 连接、�
 internal/federation/        联邦：HTTP 签名、三模式策略、AP 渲染/解析、inbox、投递队列
 internal/httpapi/           路由装配与全部端点处理器、静态托管与 SPA fallback
 internal/testdb/            数据库测试的 advisory lock 辅助
-web/                        Vue 3 + TypeScript 前端（api/stores/components/views/layouts）
+web/                        Vue 3 + TS + Vite 前端（Firefish 客户端整体移植，目录见 §8.1）
 ```
 
 依赖方向单向：`httpapi → 领域包 → db/media(接口)`。`streaming` 只定义接口，实现由 `httpapi` 注入。
+
+### 8.1 前端目录（第二波之后）
+
+```
+web/src/
+  api/            typed RPC（client/endpoints/types/errors/pagination/stream）—— 页面唯一允许的出网方式
+  store/          pizzax 三作用域 store；base.ts 是唯一 defaultStore（store.ts 仅为 re-export shim）
+  composables/    usePagination / useNoteCapture / useTheme / useInterval
+  os/             弹层总线（alert/confirm/popupMenu/…）与 os.api 别名
+  account/        会话层（me/$i、登录注册、MiAuth、路由守卫）
+  themes/         主题引擎（值语言、色彩数学、light/dark 表、Rosé Pine）
+  styles/         全局 SCSS（reset/typography/utility/animations/scrollbar/mfm）
+  ui/             四壳（universal/deck/zen/visitor）+ layouts
+  router/         vue-router 表（Firefish 131 条路径全保留）
+  components/     48 个 Mk* 移植组件 + global/ 15 个自动注册全局组件 + ui/ 21 个 Cf* 原子组件
+  directives/     size/appear/tooltip/user-preview/hotkey
+  filters/        user/note/bytes
+  scripts/        22 个移植脚本（upload/select-file/get-note-menu/reaction-picker/scroll/sound/…）
+  pages/          198 个页面文件：8 个已实装，其余为 TODO: port 占位
+  i18n/           扁平键 t()（zh-CN / ja-JP），生成脚本 web/scripts/gen-locale.mjs
+```
+
+前端依赖只有 `vue`、`vue-router`、`mfm-js`（MFM 解析）与 `@phosphor-icons/web`（图标字体）；
+Firefish 其余依赖（swiper/photoswipe/vue-plyr/katex/blurhash/chart.js/date-fns/tinycolor2 等）**故意不装**，
+对应组件按 §12R.3 的降级表实现。
 
 ## 9. 已实现的端点
 
@@ -1262,6 +1306,7 @@ cd web && pnpm build                     # 成功：主 chunk 208 KB / gzip 70 K
 | `deploy/` | systemd 单元、Caddyfile、生产配置模板 |
 | `web/` | Vue 3 前端源码（构建到 `web/dist`） |
 | `.archify/architecture-cinderfish-overall/` | 项目整体结构图（Archify 产物，随里程碑更新） |
+| `docs/research/2026-11-05-firefish-port-wave2-contract.md` | **第二波施工契约（模块映射、降级清单、写作用域、验收口径）——续作移植任务的模板，见 §12R** |
 
 ## 14. 已知的未验证项
 
@@ -1283,3 +1328,5 @@ cd web && pnpm build                     # 成功：主 chunk 208 KB / gzip 70 K
 - **Streaming 未做真实 Misskey 客户端联调**：已用自写 WebSocket 客户端验证（握手、`connect`、`connected`、笔记投递全部通过），但**没有**用 misskey-js 或 Misskey Web 前端实际连过。
 - **联邦没有任何第三方联调**：只跑了本实现的双实例测试（真签名、真 HTTP、真库），没有对 Mastodon / GoToSocial / 真实 Misskey 实例互通。这是 M5 之后最该补的验证。
 - **Streaming 多进程中继只手测了单连接的 LISTEN/NOTIFY 往返**，没有做真正的双进程联调。
+- **前端移植的第三波之前还有这些活（2026-11-05 记录，逐条见 §12R.3/§12R.4）**：PostForm/发帖链路、个人页、设置页、
+  用户列表、Deck 与访客壳的浏览器走查、Streaming 实时推送实测、CfTab 选项卡标签修复、剩余 26 个主题、37 个 locale。
