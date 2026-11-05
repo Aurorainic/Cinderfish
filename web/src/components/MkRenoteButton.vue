@@ -23,8 +23,8 @@
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { useRouter } from "vue-router";
-import type { Note } from "@/api/types";
+import { post } from "@/os/post";
+import type { Note, NoteDetailed } from "@/api/types";
 import { ENDPOINTS } from "@/api/endpoints";
 import { apiWithDialog, popupMenu } from "@/os";
 import type { MenuItem } from "@/os";
@@ -40,8 +40,8 @@ import { t } from "@/i18n";
  *     action; it is never queried per note.
  *   - `notes/unrenote` does not exist in Cinderfish (docs/research/api-contract/
  *     notes-core.md); the undo entry is not rendered.
- *   - Quoting opens the share composer route with `?renoteId=`, the Firefish
- *     share-form query (there is no `os.post` dialog in this wave).
+ *   - Quoting opens the composer through `os.post({ renote })`, matching
+ *     Firefish's own call.
  */
 const props = defineProps<{
 	note: Note;
@@ -49,7 +49,6 @@ const props = defineProps<{
 	detailedView?: boolean;
 }>();
 
-const router = useRouter();
 const buttonRef = ref<HTMLElement | null>(null);
 const hasRenotedBefore = ref(false);
 
@@ -60,7 +59,8 @@ const canRenote = computed(
 );
 
 function quote(): void {
-	void router.push({ path: "/share", query: { renoteId: props.note.id } });
+	pleaseLogin();
+	void post({ renote: props.note as unknown as NoteDetailed });
 }
 
 function renote(ev?: MouseEvent): void {

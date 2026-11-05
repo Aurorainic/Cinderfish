@@ -12,23 +12,20 @@
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useRouter } from "vue-router";
-import type { Note } from "@/api/types";
+import type { Note, NoteDetailed } from "@/api/types";
 import { me } from "@/account";
+import { post } from "@/os/post";
 import { pleaseLogin } from "@/scripts/please-login";
 import { defaultStore } from "@/store";
 import { t } from "@/i18n";
 
 /**
- * Ported from Firefish. Firefish calls `os.post({ renote })` to open the compose
- * dialog; there is no `os.post` shim in this wave, so the Firefish share-form
- * route `/share?renoteId=` is used instead.
+ * Ported from Firefish. Quoting opens the composer with `renote`, which is the
+ * same path Firefish's `os.post({ renote })` takes.
  */
 const props = defineProps<{
 	note: Note;
 }>();
-
-const router = useRouter();
 
 const canRenote = computed(
 	() =>
@@ -38,7 +35,7 @@ const canRenote = computed(
 
 function quote(): void {
 	pleaseLogin();
-	void router.push({ path: "/share", query: { renoteId: props.note.id } });
+	void post({ renote: props.note as unknown as NoteDetailed });
 }
 </script>
 

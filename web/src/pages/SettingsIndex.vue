@@ -1,20 +1,241 @@
+<!-- Ported from firefish@b425f61:packages/client/src/pages/settings/index.vue (AGPL-3.0-only) -->
 <template>
-  <div class="cf-page-placeholder">
-    <p>TODO: port SettingsIndex</p>
-    <RouterView />
-  </div>
+	<MkSpacer :content-max="900" :margin-min="20" :margin-max="32">
+		<div ref="el" class="vvcocwet" :class="{ wide: !narrow }">
+			<div class="body">
+				<div v-if="!narrow || !hasChild" class="nav">
+					<MkSuperMenu :def="menuDef" :grid="narrow" />
+					<CfInfo class="missing">
+						邮箱、整合、主题、插件、导入导出等设置页尚未移植，菜单里只列出本波已实现的页面。
+					</CfInfo>
+				</div>
+				<section v-if="!(narrow && !hasChild)" class="main">
+					<div class="child">
+						<RouterView />
+					</div>
+				</section>
+			</div>
+		</div>
+	</MkSpacer>
 </template>
 
 <script setup lang="ts">
-import { RouterView } from "vue-router";
+// Firefish's settings shell: a sticky vertical menu beside the child route on
+// wide containers, menu-only (or child-only) on narrow ones, and an automatic
+// redirect to /settings/profile when the bare /settings route is opened wide.
+//
+// Differences from upstream, all forced by what this wave has:
+//   * the menu lists only the pages that exist as real ports (12 of the ~30
+//     children); the rest of the router table is still `TODO: port` and linking
+//     to it would be a dead end;
+//   * no accounts block, no `emailNotConfiguredWarning` banner (the email page it
+//     links to is not ported), no clear-cache / logout buttons (they need
+//     `unisonReload`, which does not exist here);
+//   * no MkStickyContainer/MkPageHeader: upstream hides the header on this page
+//     anyway (`hideHeader: true`), and the shell renders the title.
+import {
+	computed,
+	onActivated,
+	onBeforeUnmount,
+	onMounted,
+	ref,
+	watch,
+} from "vue";
+import { RouterView, useRoute, useRouter } from "vue-router";
+import MkSuperMenu, { type MkSuperMenuGroup } from "@/components/MkSuperMenu.vue";
+import MkSpacer from "@/components/global/MkSpacer.vue";
+import CfInfo from "@/components/ui/CfInfo.vue";
+import { t } from "@/i18n";
+import { definePageMetadata } from "@/scripts/page-metadata";
 
-defineOptions({ name: "CfPageSettingsIndex" });
+const NARROW_THRESHOLD = 600;
+
+const route = useRoute();
+const router = useRouter();
+
+const el = ref<HTMLElement | null>(null);
+const narrow = ref(false);
+let observer: ResizeObserver | null = null;
+
+// The router table names the empty child "settings-index", so "is a child page
+// open?" is a name test rather than the `matched.length` Firefish's nirax gives.
+const hasChild = computed(
+	() => route.name !== "settings-index" && route.path !== "/settings",
+);
+
+function isActive(path: string): boolean {
+	return route.path === path || route.path.startsWith(`${path}/`);
+}
+
+const menuDef = computed<MkSuperMenuGroup[]>(() => [
+	{
+		title: t("basicSettings"),
+		items: [
+			{
+				icon: "ph-user ph-bold ph-lg",
+				text: t("profile"),
+				to: "/settings/profile",
+				active: isActive("/settings/profile"),
+			},
+			{
+				icon: "ph-keyhole ph-bold ph-lg",
+				text: t("privacy"),
+				to: "/settings/privacy",
+				active: isActive("/settings/privacy"),
+			},
+			{
+				icon: "ph-smiley ph-bold ph-lg",
+				text: t("reaction"),
+				to: "/settings/reaction",
+				active: isActive("/settings/reaction"),
+			},
+			{
+				icon: "ph-cloud ph-bold ph-lg",
+				text: t("drive"),
+				to: "/settings/drive",
+				active: isActive("/settings/drive"),
+			},
+			{
+				icon: "ph-bell ph-bold ph-lg",
+				text: t("notifications"),
+				to: "/settings/notifications",
+				active: isActive("/settings/notifications"),
+			},
+			{
+				icon: "ph-lock ph-bold ph-lg",
+				text: t("security"),
+				to: "/settings/security",
+				active: isActive("/settings/security"),
+			},
+		],
+	},
+	{
+		title: t("clientSettings"),
+		items: [
+			{
+				icon: "ph-gear-six ph-bold ph-lg",
+				text: t("general"),
+				to: "/settings/general",
+				active: isActive("/settings/general"),
+			},
+			{
+				icon: "ph-list ph-bold ph-lg",
+				text: t("navbar"),
+				to: "/settings/navbar",
+				active: isActive("/settings/navbar"),
+			},
+			{
+				icon: "ph-speaker-high ph-bold ph-lg",
+				text: t("sounds"),
+				to: "/settings/sounds",
+				active: isActive("/settings/sounds"),
+			},
+			{
+				icon: "ph-columns ph-bold ph-lg",
+				text: t("deck"),
+				to: "/settings/deck",
+				active: isActive("/settings/deck"),
+			},
+		],
+	},
+	{
+		title: t("otherSettings"),
+		items: [
+			{
+				icon: "ph-identification-card ph-bold ph-lg",
+				text: t("accountInfo"),
+				to: "/settings/account-info",
+				active: isActive("/settings/account-info"),
+			},
+			{
+				icon: "ph-dots-three-outline ph-bold ph-lg",
+				text: t("other"),
+				to: "/settings/other",
+				active: isActive("/settings/other"),
+			},
+		],
+	},
+]);
+
+function measure(): void {
+	const target = el.value;
+	if (target == null) return;
+	narrow.value = target.offsetWidth < NARROW_THRESHOLD;
+}
+
+function redirectIfNeeded(): void {
+	if (narrow.value || hasChild.value) return;
+	void router.replace("/settings/profile");
+}
+
+onMounted(() => {
+	measure();
+
+	if (typeof ResizeObserver !== "undefined" && el.value != null) {
+		observer = new ResizeObserver((entries) => {
+			const entry = entries[0];
+			if (entry == null) return;
+			const size =
+				entry.borderBoxSize?.[0]?.inlineSize ?? entry.contentRect.width;
+			narrow.value = size < NARROW_THRESHOLD;
+		});
+		observer.observe(el.value);
+	}
+
+	redirectIfNeeded();
+});
+
+onActivated(() => {
+	measure();
+	redirectIfNeeded();
+});
+
+onBeforeUnmount(() => {
+	observer?.disconnect();
+	observer = null;
+});
+
+watch(
+	() => route.path,
+	() => {
+		redirectIfNeeded();
+	},
+);
+
+definePageMetadata({
+	title: t("settings"),
+	icon: "ph-gear-six ph-bold ph-lg",
+});
 </script>
 
 <style lang="scss" scoped>
-.cf-page-placeholder {
-  padding: 32px;
-  text-align: center;
-  opacity: 0.7;
+.vvcocwet {
+	> .body {
+		> .nav {
+			> .missing {
+				margin-top: 16px;
+				font-size: 0.85em;
+			}
+		}
+	}
+
+	&.wide {
+		> .body {
+			display: flex;
+			align-items: flex-start;
+			height: 100%;
+
+			> .nav {
+				width: 34%;
+				padding-inline-end: 32px;
+				box-sizing: border-box;
+			}
+
+			> .main {
+				flex: 1;
+				min-width: 0;
+			}
+		}
+	}
 }
 </style>

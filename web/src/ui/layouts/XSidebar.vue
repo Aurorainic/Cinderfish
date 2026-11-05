@@ -1,97 +1,53 @@
+<!-- Ported from firefish@b425f61:packages/client/src/ui/_common_/navbar.vue (AGPL-3.0-only) -->
 <template>
-	<aside class="x-sidebar">
-		<div class="brand">
-			<RouterLink to="/" class="brand-link">Cinderfish</RouterLink>
-		</div>
-		<nav class="nav">
-			<RouterLink to="/" class="nav-item" :class="{ active: route.path === '/' }">
-				<span class="icon">⌂</span><span class="label">{{ t("timeline") }}</span>
-			</RouterLink>
-			<RouterLink to="/my/notifications" class="nav-item">
-				<span class="icon">🔔</span><span class="label">{{ t("notifications") }}</span>
-			</RouterLink>
-			<RouterLink to="/explore" class="nav-item">
-				<span class="icon">⌕</span><span class="label">{{ t("explore") }}</span>
-			</RouterLink>
-			<RouterLink to="/my/favorites" class="nav-item">
-				<span class="icon">★</span><span class="label">{{ t("favorites") }}</span>
-			</RouterLink>
-			<RouterLink to="/my/drive" class="nav-item">
-				<span class="icon">▤</span><span class="label">{{ t("drive") }}</span>
-			</RouterLink>
-			<RouterLink to="/settings" class="nav-item">
-				<span class="icon">⚙</span><span class="label">{{ t("settings") }}</span>
-			</RouterLink>
-		</nav>
-		<div class="bottom">
-			<CfAccountButton />
-		</div>
-	</aside>
+	<MkNavbar :icon-only="collapsed" />
 </template>
 
 <script setup lang="ts">
-import { useRoute } from "vue-router";
-import { translate as t } from "@/i18n";
-import CfAccountButton from "@/account/CfAccountButton.vue";
+// XSidebar is the shell layer around MkNavbar: it decides whether the navbar
+// renders full width (Firefish's `sideFull`) or as the 80px icon rail
+// (`sideIcon`, which Firefish also forces below 1279px). The rail *is*
+// MkNavbar's `iconOnly` state — upstream's `ui/_common_/navbar.vue` renders both
+// shapes from one component, so there is no separate rail component here.
+//
+// DEGRADED: Firefish's `classic` UI (centred column, transparent nav, wallpaper
+// mask) is not ported; `defaultStore.menuDisplay === "top"` has no Cinderfish
+// implementation to switch to, so only sideFull/sideIcon are honoured.
+import { computed, onUnmounted, ref, type Ref } from "vue";
+import { store } from "@/store/base";
+import MkNavbar from "@/components/MkNavbar.vue";
 
-const route = useRoute();
-</script>
+const props = withDefaults(
+	defineProps<{
+		/** "always" pins the rail (the deck shell uses it). */
+		iconOnly?: "auto" | "always";
+	}>(),
+	{
+		iconOnly: "auto",
+	},
+);
 
-<style scoped>
-.x-sidebar {
-	position: sticky;
-	inset-block-start: 0;
-	display: flex;
-	flex-direction: column;
-	inline-size: 230px;
-	block-size: 100dvh;
-	flex-shrink: 0;
-	padding: 16px 8px;
-	box-sizing: border-box;
-	border-inline-end: solid 0.5px var(--divider);
-	background: var(--navBg, var(--panel));
+const NARROW_THRESHOLD = 1279;
 
-	> .brand {
-		padding-block: 8px 16px;
-		padding-inline: 12px;
-		font-size: 1.25em;
-		font-weight: bold;
-	}
+const narrow: Ref<boolean> = ref(
+	typeof window === "undefined"
+		? false
+		: window.innerWidth <= NARROW_THRESHOLD,
+);
 
-	> .nav {
-		display: flex;
-		flex-direction: column;
-		gap: 2px;
-
-		> .nav-item {
-			display: flex;
-			align-items: center;
-			gap: 12px;
-			padding: 10px 12px;
-			color: var(--navFg);
-			border-radius: var(--radius, 12px);
-			text-decoration: none;
-
-			&:hover {
-				color: var(--navHoverFg);
-				background: var(--buttonBg);
-			}
-
-			&.active {
-				color: var(--navActive);
-				background: var(--accentedBg);
-				font-weight: bold;
-			}
-
-			> .icon {
-				inline-size: 20px;
-				text-align: center;
-			}
-		}
-	}
-
-	> .bottom {
-		margin-block-start: auto;
-	}
+if (typeof window !== "undefined") {
+	const media = window.matchMedia(`(max-width: ${NARROW_THRESHOLD}px)`);
+	const onChange = (event: MediaQueryListEvent): void => {
+		narrow.value = event.matches;
+	};
+	media.addEventListener("change", onChange);
+	onUnmounted(() => media.removeEventListener("change", onChange));
 }
-</style>
+
+const collapsed = computed(
+	() =>
+		props.iconOnly === "always" ||
+		narrow.value ||
+		store.state.menuDisplay === "sideIcon",
+);
+</script>

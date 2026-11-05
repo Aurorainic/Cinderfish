@@ -154,6 +154,7 @@
 import { computed, ref, type Ref } from "vue";
 import { api } from "@/api/client";
 import type { Note, NoteDetailed } from "@/api/types";
+import { post } from "@/os/post";
 import MkNoteHeader from "@/components/MkNoteHeader.vue";
 import MkSubNoteContent from "@/components/MkSubNoteContent.vue";
 import MkReactionsViewer from "@/components/MkReactionsViewer.vue";
@@ -262,11 +263,7 @@ useNoteCapture({
 
 function reply(_viaKeyboard = false): void {
 	pleaseLogin();
-	// Degradation: the composer (MkPostForm) is not part of this wave.
-	void os.alert({
-		type: "info",
-		text: "回复发帖待实现（本波未移植 PostForm）",
-	});
+	void post({ reply: props.note as unknown as NoteDetailed });
 }
 
 function react(_viaKeyboard = false): void {

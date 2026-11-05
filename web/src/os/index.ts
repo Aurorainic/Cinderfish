@@ -48,6 +48,8 @@ export {
 	type PopupPriority,
 } from "./state";
 export type { DialogInput, DialogProps, DialogResult, DialogType, MenuItem } from "./types";
+export { post, type PostFormProps } from "./post";
+export { openEmojiPicker, type OpenEmojiPickerProps } from "./open-emoji-picker";
 
 /**
  * Firefish's `apiWithDialog`: run a mutation and surface failures as an error

@@ -34,6 +34,15 @@
 							<div class="note _gap">
 								<MkNoteDetailed :key="appearNote.id" :note="appearNote" class="note" />
 							</div>
+							<!-- Firefish has no reply entry on this page (only the keymap
+							     shortcut and MkNote's footer button); the composer is
+							     reachable here through the same os.post call MkNote uses. -->
+							<div class="reply-bar _gap">
+								<CfButton class="reply" @click="reply()">
+									<i class="ph-arrow-u-up-left ph-bold ph-lg"></i>
+									{{ t("reply") }}
+								</CfButton>
+							</div>
 							<CfButton
 								v-if="!showPrev && hasPrev"
 								class="load prev"
@@ -84,6 +93,8 @@ import { api } from "@/api/client";
 import type { NoteDetailed } from "@/api/types";
 import { t } from "@/i18n";
 import { defaultStore } from "@/store/base";
+import { post } from "@/os/post";
+import { pleaseLogin } from "@/scripts/please-login";
 import { definePageMetadata } from "@/scripts/page-metadata";
 
 const route = useRoute();
@@ -169,9 +180,30 @@ async function fetchNote(): Promise<void> {
 
 watch(noteId, fetchNote, { immediate: true });
 
+/**
+ * Open the composer as a reply to the note being read. Mirrors MkNote.reply:
+ * `pleaseLogin` throws for visitors, so the composer is only opened signed in.
+ * The posted reply is not spliced in here — MkNoteDetailed owns its reply list,
+ * and Streaming delivers the new note to it.
+ */
+function reply(): void {
+	if (appearNote.value == null) return;
+	pleaseLogin();
+	void post({ reply: appearNote.value });
+}
+
 const headerActions = computed<
 	{ text: string; icon: string; handler: () => void }[]
->(() => []);
+>(() => {
+	if (appearNote.value == null) return [];
+	return [
+		{
+			text: t("reply"),
+			icon: "ph-arrow-u-up-left ph-bold ph-lg",
+			handler: reply,
+		},
+	];
+});
 
 const headerTabs = computed<{ key: string; title: string }[]>(() => []);
 
@@ -213,6 +245,28 @@ definePageMetadata(
 
 				&.prev {
 					margin-top: var(--margin);
+				}
+			}
+
+			> .reply-bar {
+				display: flex;
+				justify-content: center;
+
+				> .reply {
+					min-width: 0;
+					margin: 0 auto;
+					padding-inline: 1.2em;
+					border-radius: 999px;
+					background: var(--accentedBg);
+					color: var(--accent);
+
+					> i {
+						margin-right: 0.5em;
+					}
+
+					&:active {
+						background: var(--accentDarken);
+					}
 				}
 			}
 

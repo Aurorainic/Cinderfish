@@ -27,7 +27,9 @@ export interface Column {
 		| "channel"
 		| "list"
 		| "mentions"
-		| "direct";
+		| "direct"
+		// Cinderfish addition: `i/favorites` exists, so favourites get a column.
+		| "favorites";
 	name: string | null;
 	width: number;
 	widgets?: ColumnWidget[];
@@ -76,6 +78,15 @@ function deepClone<T>(value: T): T {
 	return JSON.parse(JSON.stringify(value)) as T;
 }
 
+/** Column ids: Firefish imports `uuid`, which is not a dependency (contract §2). */
+export function createDeckId(): string {
+	const cryptoObject = globalThis.crypto as Crypto | undefined;
+	if (cryptoObject != null && typeof cryptoObject.randomUUID === "function") {
+		return cryptoObject.randomUUID();
+	}
+	return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
 export async function loadDeck(): Promise<void> {
 	let deck: { columns?: Column[]; layout?: string[][] };
 	try {
@@ -89,12 +100,12 @@ export async function loadDeck(): Promise<void> {
 				? (error as { code?: string }).code
 				: null;
 		if (code === "NO_SUCH_KEY") {
-			if (deckStore.state.profile === "default") {
-				saveDeck();
-				return;
-			}
+			// Switching profiles reloads in place, so the deck is cleared before
+			// the empty entry is seeded — otherwise one profile's columns would
+			// carry over into the next.
 			deckStore.set("columns", []);
 			deckStore.set("layout", []);
+			if (deckStore.state.profile === "default") saveDeck();
 			return;
 		}
 		throw error;
@@ -118,6 +129,8 @@ export function saveDeck(): void {
 				columns: deckStore.state.columns,
 				layout: deckStore.state.layout,
 			},
+		}).catch(() => {
+			// Offline: the localStorage copy stays authoritative until the next write.
 		});
 	}, 1000);
 }

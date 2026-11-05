@@ -14,6 +14,11 @@
 		</template>
 		<MkSpacer :content-max="800">
 			<div class="cmuxhskf">
+				<MkPostForm
+					v-if="showFixedPostForm"
+					class="post-form _block"
+					fixed
+				/>
 				<div class="tl _block">
 					<MkTimeline :key="src" :src="src" :sound="true" />
 				</div>
@@ -28,10 +33,13 @@
 //   * no swiper — only the selected tab's MkTimeline is rendered;
 //   * no tutorial dialog, no list/antenna pickers (no endpoints);
 //   * no recommended timeline (no endpoint);
-//   * no PostForm — the fixed form block is omitted entirely rather than stubbed.
+//   * the fixed PostForm is ported as-is (top of the column, gated by
+//     defaultStore.state.showFixedPostForm). Like Firefish, `posted` is not
+//     handled here: MkTimeline prepends the new note from Streaming.
 // `src` stays persisted in defaultStore.state.tl, exactly like Firefish.
 import { computed } from "vue";
 import MkTimeline from "@/components/MkTimeline.vue";
+import MkPostForm from "@/components/MkPostForm.vue";
 import { t } from "@/i18n";
 import { instance } from "@/instance";
 import { me } from "@/account";
@@ -107,6 +115,10 @@ const src = computed<TimelineSource>(() => {
 	const stored = defaultStore.reactiveState.tl.value.src;
 	return availableSources.value.includes(stored) ? stored : "home";
 });
+
+const showFixedPostForm = computed(
+	() => defaultStore.reactiveState.showFixedPostForm.value,
+);
 
 function onTabUpdate(key: string): void {
 	const next = key as TimelineSource;

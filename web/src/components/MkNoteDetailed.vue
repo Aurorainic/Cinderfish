@@ -34,18 +34,15 @@
 			detailedView
 		></MkNote>
 
-		<!-- TODO: the tab labels do not render. Firefish passes Vue 2 `<option>`
-		     VNodes into MkTab; a native tag is resolved by the Vue 3 compiler, so
-		     only one collapsed node reaches CfTab and the label is lost. Same bug
-		     for the details pages of any component that uses `<option value>`;
-		     firefish@b425f61:packages/client/src/components/MkTab.vue has to be
-		     ported properly before this bar is visible again. -->
-		<CfTab v-model="tab" :style="'underline'" @update:modelValue="loadTab">
-			<option v-for="entry in tabOptions" :key="entry.key" :value="entry.key">
-				<span v-if="entry.count != null" class="count">{{ entry.count }}</span>
-				<span class="title">{{ entry.title }}</span>
-			</option>
-		</CfTab>
+		<CfTab
+			v-model="tab"
+			:tabs="tabOptions"
+			style="underline"
+			@update:modelValue="loadTab"
+		/>
+
+		<CfInfo v-if="tabError" class="tab-message" warn>{{ tabError }}</CfInfo>
+		<div v-else-if="tabEmpty" class="tab-empty">{{ t("noNotes") }}</div>
 
 		<template v-if="directReplies && tab === 'replies'">
 			<MkNoteSub
@@ -58,7 +55,7 @@
 				:parentId="replyNote.id"
 			/>
 		</template>
-		<MkLoading v-else-if="tab === 'replies' && note.repliesCount > 0" />
+		<MkLoading v-else-if="tab === 'replies' && directReplies == null" />
 
 		<template v-if="directQuotes && tab === 'quotes'">
 			<MkNoteSub
@@ -71,7 +68,7 @@
 				:parentId="quoteNote.id"
 			/>
 		</template>
-		<MkLoading v-else-if="tab === 'quotes' && directQuotes && directQuotes.length > 0" />
+		<MkLoading v-else-if="tab === 'quotes' && directQuotes == null" />
 
 		<template v-if="tab === 'renotes' && renotes">
 			<MkA
@@ -85,7 +82,7 @@
 				<MkAcct :user="item.user" class="acct" />
 			</MkA>
 		</template>
-		<MkLoading v-else-if="tab === 'renotes' && note.renoteCount > 0" />
+		<MkLoading v-else-if="tab === 'renotes' && renotes == null" />
 
 		<template v-if="tab === 'reactions' && reactedUsers">
 			<MkA
@@ -100,7 +97,7 @@
 				<MkEmoji :emoji="item.type" :is-reaction="true" class="reaction" />
 			</MkA>
 		</template>
-		<MkLoading v-else-if="tab === 'reactions' && reactionsCount > 0" />
+		<MkLoading v-else-if="tab === 'reactions' && reactedUsers == null" />
 	</div>
 	<div v-else class="_panel muted" @click="muted.muted = false">
 		<small>{{ softMuteText }}</small>
@@ -119,6 +116,7 @@
 import { computed, onMounted, onUnmounted, onUpdated, ref, type Ref } from "vue";
 import { api } from "@/api/client";
 import type { Note, NoteDetailed, NoteReaction } from "@/api/types";
+import CfInfo from "@/components/ui/CfInfo.vue";
 import CfTab from "@/components/ui/CfTab.vue";
 import MkNote from "@/components/MkNote.vue";
 import MkNoteSub from "@/components/MkNoteSub.vue";
@@ -147,13 +145,7 @@ const props = defineProps<{
 	pinned?: boolean;
 }>();
 
-const tab = ref<string>("replies");
-
-interface TabOption {
-	key: string;
-	title: string;
-	count: number | null;
-}
+const tab = ref<string | number>("replies");
 
 const note = ref(deepClone(props.note)) as Ref<DetailNote>;
 const muted = ref<Muted>(
@@ -208,31 +200,51 @@ const reactionsCount = Object.values(props.note.reactions).reduce(
 // exactly as upstream; the renote/quote counts only arrive once
 // `notes/children` resolves, so the list has to stay reactive instead of being
 // decided once during setup.
-const tabOptions = computed<TabOption[]>(() => [
-	{
-		key: "replies",
-		title: t("_notification._types.reply"),
-		count: note.value.repliesCount > 0 ? note.value.repliesCount : null,
-	},
-	{
-		key: "renotes",
-		title: t("_notification._types.renote"),
-		count: note.value.renoteCount > 0 ? note.value.renoteCount : null,
-	},
-	{
-		key: "reactions",
-		title: t("reaction"),
-		count: reactionsCount > 0 ? reactionsCount : null,
-	},
-	{
-		key: "quotes",
-		title: t("_notification._types.quote"),
-		count:
-			directQuotes.value != null && directQuotes.value.length > 0
-				? directQuotes.value.length
-				: null,
-	},
-]);
+const tabOptions = computed(() => {
+	const tabs = [
+		{
+			value: "replies",
+			label: t("_notification._types.reply"),
+			count: note.value.repliesCount > 0 ? note.value.repliesCount : undefined,
+		},
+	];
+	if (note.value.renoteCount > 0) {
+		tabs.push({
+			value: "renotes",
+			label: t("_notification._types.renote"),
+			count: note.value.renoteCount,
+		});
+	}
+	if (reactionsCount > 0) {
+		tabs.push({ value: "reactions", label: t("reaction"), count: reactionsCount });
+	}
+	if (directQuotes.value != null && directQuotes.value.length > 0) {
+		tabs.push({
+			value: "quotes",
+			label: t("_notification._types.quote"),
+			count: directQuotes.value.length,
+		});
+	}
+	return tabs;
+});
+
+const tabError = ref<string | null>(null);
+
+// Only report "empty" once the list has actually arrived; `null` is loading.
+const tabEmpty = computed<boolean>(() => {
+	switch (tab.value) {
+		case "replies":
+			return directReplies.value != null && directReplies.value.length === 0;
+		case "quotes":
+			return directQuotes.value != null && directQuotes.value.length === 0;
+		case "renotes":
+			return renotes.value != null && renotes.value.length === 0;
+		case "reactions":
+			return reactedUsers.value != null && reactedUsers.value.length === 0;
+		default:
+			return false;
+	}
+});
 
 const keymap = {
 	r: () => reply(true),
@@ -317,13 +329,15 @@ function blur(): void {
 	noteEl.value?.blur();
 }
 
-directReplies.value = null;
-void os
-	.api<NoteDetailed[]>("notes/children", {
-		noteId: note.value.id,
-		limit: 30,
-	})
-	.then((res) => {
+async function loadChildren(): Promise<void> {
+	directReplies.value = null;
+	directQuotes.value = null;
+	tabError.value = null;
+	try {
+		const res = await api<NoteDetailed[]>("notes/children", {
+			noteId: note.value.id,
+			limit: 30,
+		});
 		const sorted = res.reduce<NoteDetailed[]>((acc, resNote) => {
 			if (resNote.userId == note.value.userId) {
 				return [...acc, resNote];
@@ -337,7 +351,16 @@ void os
 		directQuotes.value = sorted.filter(
 			(resNote) => resNote.renoteId === note.value.id,
 		) as DetailNote[];
-	});
+	} catch {
+		// Keeping the lists non-null ends the spinners and lets the error banner
+		// take over instead of spinning forever.
+		directReplies.value = [];
+		directQuotes.value = [];
+		tabError.value = t("pageLoadError");
+	}
+}
+
+void loadChildren();
 
 conversation.value = null;
 if (note.value.replyId != null) {
@@ -350,31 +373,46 @@ if (note.value.replyId != null) {
 		.then((res) => {
 			conversation.value = res.reverse() as DetailNote[];
 			focus();
+		})
+		.catch(() => {
+			conversation.value = [];
 		});
 }
 
-function loadTab(): void {
-	if (tab.value === "renotes" && renotes.value == null) {
-		renotes.value = null;
-		void os
-			.api<NoteDetailed[]>("notes/renotes", {
-				noteId: note.value.id,
-				limit: 100,
-			})
-			.then((res) => {
-				renotes.value = res as DetailNote[];
-			});
+async function loadRenotes(): Promise<void> {
+	renotes.value = null;
+	tabError.value = null;
+	try {
+		const res = await api<NoteDetailed[]>("notes/renotes", {
+			noteId: note.value.id,
+			limit: 100,
+		});
+		renotes.value = res as DetailNote[];
+	} catch {
+		renotes.value = [];
+		tabError.value = t("pageLoadError");
 	}
-	if (tab.value === "reactions" && reactedUsers.value == null) {
-		void os
-			.api<NoteReaction[]>("notes/reactions", {
-				noteId: note.value.id,
-				limit: 30,
-			})
-			.then((res) => {
-				reactedUsers.value = res;
-			});
+}
+
+async function loadReactions(): Promise<void> {
+	reactedUsers.value = null;
+	tabError.value = null;
+	try {
+		reactedUsers.value = await api<NoteReaction[]>("notes/reactions", {
+			noteId: note.value.id,
+			limit: 30,
+		});
+	} catch {
+		reactedUsers.value = [];
+		tabError.value = t("pageLoadError");
 	}
+}
+
+// The payload is passed in rather than read from `tab` so the fetch does not
+// depend on whether v-model's update ran before this listener.
+function loadTab(value: string | number): void {
+	if (value === "renotes" && renotes.value == null) void loadRenotes();
+	if (value === "reactions" && reactedUsers.value == null) void loadReactions();
 }
 
 function onWheel(): void {
@@ -575,10 +613,14 @@ onUnmounted(() => {
 		> .clips,
 		> :deep(.user-card-mini),
 		> :deep(.reacted-users > *) {
-			padding-inline: 16px !important;
+			padding-inline: 16px;
 		}
+		// Keep the tab bar flush with the note body on narrow screens. The enclosing
+		// `.max-width_500px` class already gives this selector more weight than
+		// CfTab's own padding, so no `!important` is needed; the 90px end padding is
+		// the mask fade CfTab relies on.
 		> :deep(.underline) {
-			padding-left: 16px !important;
+			padding-inline: 16px 90px;
 		}
 	}
 
@@ -591,6 +633,17 @@ onUnmounted(() => {
 	padding: 8px;
 	text-align: center;
 	opacity: 0.7;
+}
+
+.tab-message {
+	margin: 12px 32px;
+}
+
+.tab-empty {
+	padding: 24px;
+	text-align: center;
+	color: var(--fgTransparentWeak);
+	font-size: 0.9em;
 }
 
 .clips {

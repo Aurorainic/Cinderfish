@@ -1,6 +1,6 @@
 # Cinderfish 交接说明
 
-- 最后更新：2026-11-05（前端第二波：Note 组件树、时间线、通知、Drive 已落地并通过浏览器走查，见 §12R）
+- 最后更新：2026-11-05（前端第三波：发帖链路、个人页、设置、内容页、Firefish 导航壳、deck 与 widgets 已落地并通过浏览器走查，见 §12S）
 - 项目名 **Cinderfish**（2026-10-28 定名，Go module `github.com/Aurorainic/cinderfish`）
 - 仓库：当前目录 `/home/lainsaka/文档/MilnFish`，分支 `main`；远程 `origin` 为
   `https://github.com/Aurorainic/Cinderfish.git`（GitHub 仓库已更名，本地目录改名待办）
@@ -30,6 +30,7 @@ Go 单二进制的个人/极小规模联邦社交实例。后端契约是 **Miss
 | **前端移植基线切到分支 `firefish-port`（worktree `.worktrees/firefish-port/`）** | ✅ | `e54d2d1` 重定基决策 · `9ce4a00` 删除旧前端 · `6910c41` 新骨架（§12P–§12Q） |
 | **前端第一波：骨架重建**（themes/styles/api/store/router/ui/os/account/i18n + 21 个 `Cf*` 原子组件，123 个占位页） | ✅ | `6910c41`，记录见 §12Q |
 | **前端第二波：Note 组件树 + 时间线/通知/Drive**（+48 个 `Mk*` 组件、MFM 渲染器、单 `defaultStore`、`check-port` 门禁、浏览器走查） | ✅ | `6007474`（文档 `a723987`），记录见 §12R |
+| **前端第三波：发帖链路 + 个人页/关注列表 + 设置 + 内容页 + 导航壳/deck/widgets**（13 个并行作用域，浏览器实测发帖与设置保存落库） | ✅ | 见 §12S |
 
 - Firefish 字典来源：`firefish@02c31e0a2804de48c9d73028df525e197d8df622:locales/zh-CN.yml`；第一波的 `web/src/i18n/zh-CN.ts` 已随旧前端删除（`9ce4a00`），现在是 `web/src/i18n/locales/{zh-CN,ja-JP}.json`（扁平键，由 `web/scripts/gen-locale.mjs` 从 Firefish locales 生成，见 §12Q）。
 - **提交号的权威来源是 `git log`**：本文件按批次记录做了什么、证据是什么；M3 笔记、M4 Streaming、M5 联邦等后端批次的提交号以 `git log` 为准，前端两波移植的提交号已在 §2 里程碑与 §12Q/§12R 中列明。
@@ -180,11 +181,13 @@ web/src/
   styles/         全局 SCSS（reset/typography/utility/animations/scrollbar/mfm）
   ui/             四壳（universal/deck/zen/visitor）+ layouts
   router/         vue-router 表（Firefish 131 条路径全保留）
-  components/     48 个 Mk* 移植组件 + global/ 15 个自动注册全局组件 + ui/ 21 个 Cf* 原子组件
+  components/     Mk* 移植组件 + global/ 15 个自动注册全局组件 + ui/ 21 个 Cf* 原子组件
+                  + form/ 8 个设置表单包装 + user/ 6 个个人页子视图 + MkPostForm/MkNavbar/MkWidgets 等
+  widgets/        12 个首版小组件 + WidgetCard/WidgetConfigDialog/index.ts
   directives/     size/appear/tooltip/user-preview/hotkey
-  filters/        user/note/bytes
-  scripts/        22 个移植脚本（upload/select-file/get-note-menu/reaction-picker/scroll/sound/…）
-  pages/          198 个页面文件：8 个已实装，其余为 TODO: port 占位
+  filters/        user/note/bytes/number
+  scripts/        第三波脚本（autocomplete/preprocess/emojilist/katex-macro/get-user-menu/langmap/…）
+  pages/          133 个页面文件：37 个已实装，其余为 TODO: port 占位
   i18n/           扁平键 t()（zh-CN / ja-JP），生成脚本 web/scripts/gen-locale.mjs
 ```
 
@@ -1262,8 +1265,8 @@ cd web && pnpm build                     # 成功：主 chunk 208 KB / gzip 70 K
 
 ### 12R.3 已知降级与残留（续作必读）
 
-- **PostForm 尚未移植**：回复/引用在 `MkNote*` 里是 `os.alert` 提示；`showFixedPostForm` 块整体不渲染。发布相关页面时不要假设 `MkPostForm` 存在。
-- **CfTab 选项卡标签不显示**（未修）：Firefish 用 Vue 2 的 `<option>` VNode 传给 MkTab，Vue 3 编译器把它当原生标签折叠，标签与 value 丢失。修法是把 CfTab 契约改成 `{value,label}[]` 数组，属独立任务。
+- ~~**PostForm 尚未移植**~~：第三波已完成（§12S），回复/引用/时间线固定发帖框都走 `os.post`。
+- ~~**CfTab 选项卡标签不显示**~~：第三波已改成 `{ value, label, count?, icon? }[]` 数组契约并修复（§12S.2）。
 - **Streaming 共享订阅**：`useChannel("main")` 返回同一个订阅的包装，`dispose()` 会拆掉所有人的监听。现有组件一律只用 `channel.on()` 返回的 unsubscribe。
 - **分页**：`usePagination/CfPagination` 只有一个 limit（Firefish 首屏 10、后续 30 两档），本波用单档。
 - **媒体**：无缩略图/blurhash/PhotoSwipe/vue-plyr/媒体代理，图片直接用 `file.url`，视频音频用原生控件。
@@ -1271,13 +1274,98 @@ cd web && pnpm build                     # 成功：主 chunk 208 KB / gzip 70 K
 - **无端点的功能**：UrlPreview 卡片（只渲染纯链接样式）、推荐/列表/天线/频道时间线、翻译、编辑、Drive 文件改名/移动/URL 上传、通知折叠、用户预览卡、hotkey、声音。
 - **声音**：`scripts/sound.ts` API 齐全但恒静音（`web/public/static-assets/sounds/` 无 mp3）。
 
-### 12R.4 第三波建议顺序
+### 12R.4 第三波建议顺序（已完成，记录见 §12S）
 
 1. `MkPostForm` + `MkPostFormAttaches` + `MkPollEditor` 接线 + `MkVisibilityPicker` + `MkEmojiPicker`（发帖是个人实例的核心路径；`uploadFile`/`selectFiles` 已冻结可直接用）；
 2. `pages/user/index*.vue`（个人页，`users/show` + `users/notes` + 关注按钮已在）；
 3. `MkUserCardMini`/`MkUserList` → `pages/user/followers|following.vue`（端点已有）；
 4. 设置页（`i/update` + `i/registry/*` 端点已在）；
-5. 再按 Firefish 路由表推进剩余占位页（当前 198 个页面文件里 8 个已实装、共 131 条路由）。
+5. 再按 Firefish 路由表推进剩余占位页（第三波后：133 个页面文件里 37 个已实装、96 个占位、共 131 条路由）。
+
+## 12S. 批次：前端第三波——发帖链路、个人页、设置、内容页、壳层与 widgets（2026-11-05）
+
+**工作方式**：Lead 先写施工契约 `docs/research/2026-11-05-firefish-port-wave3-contract.md`
+（模块映射、强制降级表、13 个互不重叠的写作用域、跨作用域接口），再并行分派 13 个 agent；
+Lead 负责合并接缝、修视觉与运行期缺陷、真实二进制走查、文档与提交。
+
+### 12S.1 落地清单
+
+| 层 | 文件 | 说明 |
+|----|------|------|
+| 发帖链路 | `components/MkPostForm.vue`、`MkPostFormAttaches.vue`、`MkVisibilityPicker.vue`、`MkEmojiPicker(.section/Dialog).vue`、`MkCheatSheetDialog.vue`、`scripts/{autocomplete,preprocess,katex-macro,emojilist}.ts`、`os/{post.ts,MkPostFormDialog.vue,open-emoji-picker.ts}` | `notes/create`（visibility/visibleUserIds/text/cw/localOnly/fileIds/replyId/renoteId/poll）、`drive/files/create`（`uploadFile`/`selectFiles`，签名沿用第二波）、`emojis`；`os.post(props)` 与 `os.openEmojiPicker(target, props, textarea)` 按契约实现 |
+| 个人页 | `pages/{UserProfile,UserIndex,UserInfo}.vue`、`components/user/{UserHome,UserNotes,UserPhotos,UserActivity,UserReactions}.vue`、`components/{MkUserInfo,MkUserCardMini,MkUserList,MkUserOnlineIndicator,MkShowMoreButton,MkNumber}.vue`、`scripts/get-user-menu.ts`、`filters/number.ts` | 五页签（笔记/回复/文件/活动/回应）、置顶区、关注按钮与用户菜单；`users/show`、`users/notes`（显式 `withReplies`/`withFiles`）、`following/create|delete`；远程账号按契约显示说明，不伪造资料 |
+| 关注列表 | `pages/{UserFollowing,UserFollowers}.vue`、`components/user/FollowList.vue` | `users/following|followers` 分页，403 用 `CfInfo` 说明可见性限制；行卡片用 `MkUserCardMini`（端点只给 `UserLite`） |
+| 设置 | `pages/SettingsIndex.vue` + 12 个子页（Profile/Privacy/General/AccountInfo/Notifications/Reaction/Drive/Security/Other/Navbar/Sounds/Deck）、`components/MkSuperMenu.vue`、`components/form/*.vue`（8 个）、`scripts/langmap.ts` | 左菜单按容器宽度切竖排/胶囊；隐私页写 `users/update` 的两项 visibility；个人资料只做后端真实支持的 `name`/`description`/`avatarId`；其余偏好落 `defaultStore`，无端点的项明确标注「未开放」 |
+| 内容页 | `pages/{Favorites,FollowRequestsSent,Explore,Tag,Search}.vue` | `i/favorites` + `notes/favorites/delete`、`following/requests/{sent,cancel}`、`hashtags/trend` + 四条时间线；搜索无端点，渲染「搜索接口尚未提供」与探索入口，不伪造结果 |
+| 静态页 | `pages/{About,Announcements,MfmCheatSheet,Share,Preview,Scratchpad,ApiConsole}.vue` | 关于页读 `meta`；公告无端点走空态说明；MFM 速查展示已支持节点；API 控制台用 `api()` 真实调用 |
+| 壳层 | `components/MkNavbar.vue`、`ui/layouts/{XSidebar,UniversalLayout,VisitorLayout,DeckLayout,DeckColumn}.vue`、`ui/{UniversalShell,DeckShell,VisitorShell}.vue`、`store/deck.ts` | Firefish navbar（头像菜单、`store.menu` 顺序、未读徽标、发帖按钮、图标态、移动抽屉）、移动底栏 + 发帖 FAB、访客壳登录弹窗；deck 列宽 350/420、列菜单、添加列、窄屏单列横滑、registry profile |
+| widgets | `components/MkWidgets.vue`、`widgets/*`（12 个）、`widgets/index.ts`、`store/widgets.ts` | post-form / notifications / timeline / trends / memo / instance-cloud / activity / photos / user-list / clock / digital-clock / server-info；增删、上下移、配置弹窗；数据接已有端点 |
+
+### 12S.2 本波修掉的真实缺陷
+
+1. **`CfTab` 标签不显示（第二波遗留）**：`<option>` VNode 在 Vue 3 被编译器折叠。重写为
+   `tabs: { value, label, count?, icon? }[]` 数组契约，删除 `CfTabItem.vue`；笔记详情的
+   回复/转发/引用页签标签与计数恢复显示。
+2. **个人页头部错位**：`.title` 原本在 `.banner-container` 外，`position:absolute; bottom:0`
+   相对整张卡片定位，名字压住统计行、头像盖住简介。现在按 Firefish 结构把标题放回横幅内，
+   另加一份移动端标题放在头像下方；简介去掉负 `top` 偏移。
+3. **无头像占位是「+」**：`MkAvatar` 的 `noAvatar::before` 从文字加号改为
+   `/static-assets/avatar.svg` 中性人形图标（导航栏 `CfAvatar` 原本就是 `ph-user`）。
+4. **并行期懒加载收口**：`MkNavbar` / `UniversalLayout` 里用 `import.meta.glob` 探测
+   `os/post.ts`、`MkWidgets.vue` 的写法改成直接 import；`VisitorShell.vue` 改为委派
+   `VisitorLayout`，三个壳的入口方式一致。
+5. **发帖提交按钮缺 `data-cy-open-post-form-submit`**：走查脚本点不到按钮才发现，已补。
+6. **引用/转贴/子帖回复未接 composer**：`MkQuoteButton`/`MkRenoteButton` 原本跳
+   `/share?renoteId=`（不会创建引用），`MkNoteSub` 的回复仍是提示框；现在三处都走
+   `os.post({ renote })` / `os.post({ reply })`。
+7. **删除 65 个未被路由引用的嵌套占位页**（`pages/settings|admin|messaging|my-lists|my-clips|my-groups|my-antennas`）。
+   这些是第一波按 Firefish 原路径镜像出来的死文件，路由只使用顶层同名页面；页面文件从
+   198 降到 133，剩余占位 96、已实装 37。
+
+### 12S.3 验证证据
+
+```
+cd web && pnpm exec vue-tsc --noEmit    # exit 0
+cd web && pnpm run check:port           # exit 0，390 文件，hardTotal 0
+cd web && pnpm build                    # exit 0
+gofmt -l internal/ cmd/                 # 空
+go vet ./...                            # exit 0
+CINDERFISH_TEST_DATABASE_URL=… CINDERFISH_TEST_REDIS_URL=… go test -count=1 ./...  # 全绿
+```
+
+浏览器走查：Helium/Chromium 156 无头 + CDP，真实 Go 二进制 `:3991`（schema v9、开发库、
+`federation_mode=none`、`registration_mode=open`），种子账号 `w3alice`/`w3bob`（走查后已从开发库删除，
+用户数回到 21）。桌面 1440×900、移动 390×844。
+
+| 场景 | 证据 |
+|------|------|
+| 桌面 18 条路由 | `/`、`/@w3alice`、`/@w3alice/followers`、`/@w3alice/following`、`/notes/:id`、`/my/notifications`、`/my/drive`、`/my/favorites`、`/my/follow-requests/sent`、`/explore`、`/settings/{profile,privacy,general,reaction,navbar,deck}`、`/about`、`/mfm-cheat-sheet`：全部渲染，`scrollWidth == clientWidth`，无 JS 异常 |
+| 发帖 | 点导航「帖子」打开 composer，输入后提交；`notes/timeline` 回读命中同一文本（`postedVerified: true`） |
+| 移动发帖 | 390px 点 FAB 打开同一 composer，提交后回读命中（`postedVerified: true`） |
+| 设置保存 | `/settings/profile` 改昵称保存后 `/api/i` 返回新名字（`saveVerified: true`） |
+| 个人页 | 五页签与置顶区、注册时间、三项计数；他人资料显示「取消关注 / 关注了您」；桌面与移动头部均不重叠 |
+| 笔记详情 | 回复/转发/引用页签标签与计数可见（CfTab 修复），回复列表正常 |
+| deck | `localStorage.ui=deck` 后 `/` 渲染列式布局（主列 350px、列头、添加列入口、右侧 +/齿轮），无横向溢出 |
+| 移动 | 390px 下底栏五项 + 发帖 FAB + 抽屉；时间线、个人页、通知、设置页均渲染 |
+| 探索 | `hashtags/trend` 读到 `#wave3`、`#cinderfish` 与人数 |
+
+### 12S.4 已知降级与残留（续作必读）
+
+- **导航仍有未实装入口**：`聊天`、`频道` 与「更多」里的书签/列表/天线/剪辑/分组/画廊/页面等仍指向
+  `TODO: port` 占位页；导航只按 Firefish 的 `store.menu` 渲染，未按后端能力裁剪。
+- **设置只移植 12 页**：邮箱、整合、主题编辑、插件、导入导出、状态栏、自定义 CSS/KaTeX、webhook、
+  应用、API、迁移、偏好备份、删除账号、账户、无障碍、实例静音/词过滤、关注请求设置等仍是占位。
+- **无端点的页面已明确降级**：搜索（`notes/search`/`users/search` 不存在）、公告、活动/回应页签
+  （无 `charts/user/notes`、`users/reactions`）。只显示说明，不伪造数据。
+- **widgets 只做 12 个**：rss/rss-ticker、aiscript、job-queue、server-info 之外的 server-metric、
+  online-users、calendar、federation、unix-clock、slideshow、button 等未移植；拖拽排序改为上/下移按钮。
+- **deck**：列拖拽排序改为菜单上下移；widgets 列复用全局 `MkWidgets`，没有独立的列内列表编辑。
+- **媒体**：仍无缩略图/blurhash/PhotoSwipe/媒体代理；图片直接用 `file.url`，视频音频用原生控件。
+- **通知摘要**与 Firefish 一致，保留正文里的 MFM 原文（`get-note-summary` 只取 `text`/`cw`）。
+- **未走查**：图片上传的浏览器交互（上传脚本此前由 API 验证）、投票提交、引用/转贴按钮点击后的
+  实际发帖、关注按钮点击、设置页除 profile/navbar/deck 外的保存动作、通知的流式实时插入。
+- `i/registry/*` 已被 deck 列与设置页使用；`notes/edit`、`i/change-password`、2FA、注销、改邮箱
+  在后端不存在，页面按「未开放」显示。
 
 ## 13. 文档索引
 
@@ -1307,6 +1395,7 @@ cd web && pnpm build                     # 成功：主 chunk 208 KB / gzip 70 K
 | `web/` | Vue 3 前端源码（构建到 `web/dist`） |
 | `.archify/architecture-cinderfish-overall/` | 项目整体结构图（Archify 产物，随里程碑更新） |
 | `docs/research/2026-11-05-firefish-port-wave2-contract.md` | **第二波施工契约（模块映射、降级清单、写作用域、验收口径）——续作移植任务的模板，见 §12R** |
+| `docs/research/2026-11-05-firefish-port-wave3-contract.md` | **第三波施工契约（发帖链路、个人页、设置、内容页、壳层/widgets 的模块映射与 13 个写作用域），见 §12S** |
 
 ## 14. 已知的未验证项
 
@@ -1316,7 +1405,7 @@ cd web && pnpm build                     # 成功：主 chunk 208 KB / gzip 70 K
   两档走查，shell 渲染、主题应用、图标字体、时间线出帖都看过；但**登录/注册表单、设置页、Deck 壳、
   访客壳，以及构建产物（`web/dist` 经 Go 静态托管）仍未走查**，Streaming 只验证了首屏 REST 拉取，
   实时推送（新帖插入、通知红点）没有实测。
-- **CfTab 选项卡标签不显示（2026-11-05 已知缺陷）**：见 §12R.3，属未修项。
+- ~~**CfTab 选项卡标签不显示**~~：第三波已修（§12S.2 第 1 条），笔记详情页签实测可见。
 - **30 个 Firefish 内置主题只移植了 4 个**（light/dark 基础表 + 两个 Rosé Pine），
   其余 26 个调色板未转。
 - **i18n 只覆盖 zh-CN / ja-JP**，其余 37 个 locale 未生成；`yaml` devDependency 未装
@@ -1328,5 +1417,10 @@ cd web && pnpm build                     # 成功：主 chunk 208 KB / gzip 70 K
 - **Streaming 未做真实 Misskey 客户端联调**：已用自写 WebSocket 客户端验证（握手、`connect`、`connected`、笔记投递全部通过），但**没有**用 misskey-js 或 Misskey Web 前端实际连过。
 - **联邦没有任何第三方联调**：只跑了本实现的双实例测试（真签名、真 HTTP、真库），没有对 Mastodon / GoToSocial / 真实 Misskey 实例互通。这是 M5 之后最该补的验证。
 - **Streaming 多进程中继只手测了单连接的 LISTEN/NOTIFY 往返**，没有做真正的双进程联调。
-- **前端移植的第三波之前还有这些活（2026-11-05 记录，逐条见 §12R.3/§12R.4）**：PostForm/发帖链路、个人页、设置页、
-  用户列表、Deck 与访客壳的浏览器走查、Streaming 实时推送实测、CfTab 选项卡标签修复、剩余 26 个主题、37 个 locale。
+- **前端移植第三波已完成的验证（2026-11-05，见 §12S.3）**：发帖链路、个人页五页签、关注/粉丝列表、
+  12 个设置子页、收藏/探索/标签/搜索、导航壳、deck 列与 12 个 widget 已落地；桌面 18 条路由与
+  移动 4 条路由实测无溢出、无 JS 异常，浏览器真实发帖与设置保存均回读 API 确认。
+- **第三波仍未验证/未实装（2026-11-05，逐条见 §12S.4）**：引用/转贴按钮点击后的实际发帖、图片上传的
+  浏览器交互、投票提交、关注按钮点击、设置页除 profile/navbar/deck 外的保存、Streaming 实时插入；
+  聊天/频道/列表/天线/剪辑/分组/画廊等导航入口仍是占位页；设置页还有约 18 页、widgets 还有约 10 个、
+  剩余 26 个主题、37 个 locale 未移植。

@@ -1,17 +1,268 @@
+<!-- Ported from firefish@b425f61:packages/client/src/pages/settings/sounds.vue (AGPL-3.0-only) -->
 <template>
-  <div class="cf-page-placeholder">
-    <p>TODO: port SettingsSounds</p>
-  </div>
+	<div class="_formRoot cf-settings-sounds">
+		<section class="_formBlock">
+			<h2 class="sectionTitle">{{ t("masterVolume") }}</h2>
+
+			<div class="rangeField">
+				<span class="label">
+					<i :class="muted ? 'ph-speaker-none' : 'ph-speaker-high'" class="ph-bold ph-lg"></i>
+					{{ percent(masterVolumeRef) }}
+				</span>
+				<div class="rangeRow">
+					<input
+						v-model.number="masterVolumeRef"
+						type="range"
+						min="0"
+						max="1"
+						step="0.05"
+						:aria-label="t('masterVolume')"
+					/>
+					<CfButton inline @click="toggleMute()">
+						{{ muted ? "取消静音" : "静音" }}
+					</CfButton>
+				</div>
+			</div>
+
+			<CfInfo class="note">
+				音量设为 0 即静音，播放时会直接跳过（<code>scripts/sound.ts</code> 的
+				<code>playFile</code>）。
+			</CfInfo>
+		</section>
+
+		<section class="_formBlock">
+			<h2 class="sectionTitle">{{ t("sounds") }}</h2>
+
+			<ul class="sounds">
+				<li v-for="key in soundKeys" :key="key.key" class="sound">
+					<span class="soundName">{{ t(`_sfx.${key.sfx}`) }}</span>
+					<span class="soundType">{{ key.value.type || t("none") }}</span>
+					<label class="soundVolume">
+						<input
+							v-model.number="key.value.volume"
+							type="range"
+							min="0"
+							max="1"
+							step="0.05"
+							@change="saveSound(key.storeKey, key.value)"
+						/>
+						<span class="value">{{ percent(key.value.volume) }}</span>
+					</label>
+				</li>
+			</ul>
+
+			<div class="row">
+				<CfButton danger @click="reset()">
+					<i class="ph-arrow-clockwise ph-bold ph-lg"></i>
+					{{ t("default") }}
+				</CfButton>
+			</div>
+		</section>
+
+		<CfInfo class="note" :warn="true">
+			本波<strong>未提供</strong>提示音资源：<code>web/public/static-assets/sounds/</code>
+			下没有任何 mp3，<code>scripts/sound.ts</code> 的 <code>SOUND_ASSETS_AVAILABLE</code>
+			为 false，所以即使设置音量也不会出声。
+			音色选择需要 <code>get-sounds</code> 端点与试听弹窗，两者都未提供；
+			自定义音效（插件/上传）同样未实现。这里只保留主音量、静音与每类提示音的音量。
+		</CfInfo>
+	</div>
 </template>
 
-<script setup lang="ts">
+<script lang="ts" setup>
+// Firefish's sounds page edits a ColdDeviceStorage entry per sound type through
+// `os.form` and lists the available files from `get-sounds`. Neither the
+// `get-sounds` endpoint nor the sound assets exist in Cinderfish, so the page
+// keeps what works: the master volume (honoured by `scripts/sound.ts`), a mute
+// shortcut, and the per-type volumes, with an explicit note that nothing plays.
+import { computed, reactive, ref, watch } from "vue";
+import CfButton from "@/components/ui/CfButton.vue";
+import CfInfo from "@/components/ui/CfInfo.vue";
+import { t } from "@/i18n";
+import { definePageMetadata } from "@/scripts/page-metadata";
+import { ColdDeviceStorage, type SoundConfig } from "@/store";
+
 defineOptions({ name: "CfPageSettingsSounds" });
+
+type SoundKey =
+	| "note"
+	| "noteMy"
+	| "notification"
+	| "chat"
+	| "chatBg"
+	| "antenna"
+	| "channel";
+
+interface SoundRow {
+	key: SoundKey;
+	/** ColdDeviceStorage key (`sound_<key>`). */
+	storeKey: "sound_note" | "sound_noteMy" | "sound_notification" | "sound_chat" | "sound_chatBg" | "sound_antenna" | "sound_channel";
+	/** Flat i18n key suffix under `_sfx.` (Firefish names). */
+	sfx: string;
+	value: SoundConfig;
+}
+
+const SFX_KEYS: { key: SoundKey; storeKey: SoundRow["storeKey"]; sfx: string }[] = [
+	{ key: "note", storeKey: "sound_note", sfx: "note" },
+	{ key: "noteMy", storeKey: "sound_noteMy", sfx: "noteMy" },
+	{ key: "notification", storeKey: "sound_notification", sfx: "notification" },
+	{ key: "chat", storeKey: "sound_chat", sfx: "chat" },
+	{ key: "chatBg", storeKey: "sound_chatBg", sfx: "chatBg" },
+	{ key: "antenna", storeKey: "sound_antenna", sfx: "antenna" },
+	{ key: "channel", storeKey: "sound_channel", sfx: "channel" },
+];
+
+const masterVolumeRef = ref<number>(ColdDeviceStorage.get("sound_masterVolume"));
+
+const muted = computed(() => masterVolumeRef.value === 0);
+
+watch(masterVolumeRef, (value) => {
+	ColdDeviceStorage.set(
+		"sound_masterVolume",
+		Math.min(1, Math.max(0, Number(value) || 0)),
+	);
+});
+
+// `reactive` (not `ref`) so the nested `volume` inputs mutate the same objects
+// that are written back to the cold store on change.
+const soundKeys = reactive<SoundRow[]>(
+	SFX_KEYS.map((item) => ({
+		...item,
+		value: { ...ColdDeviceStorage.get(item.storeKey) },
+	})),
+);
+
+function percent(value: number): string {
+	return `${Math.floor(value * 100)}%`;
+}
+
+function toggleMute(): void {
+	masterVolumeRef.value = muted.value ? 0.3 : 0;
+}
+
+function saveSound(
+	storeKey: SoundRow["storeKey"],
+	value: SoundConfig,
+): void {
+	ColdDeviceStorage.set(storeKey, { ...value });
+}
+
+function reset(): void {
+	masterVolumeRef.value = ColdDeviceStorage.defaults.sound_masterVolume;
+	for (const row of soundKeys) {
+		const fresh = { ...ColdDeviceStorage.defaults[row.storeKey] };
+		row.value = fresh;
+		ColdDeviceStorage.set(row.storeKey, fresh);
+	}
+}
+
+definePageMetadata({
+	title: t("sounds"),
+	icon: "ph-speaker-high ph-bold ph-lg",
+});
 </script>
 
 <style lang="scss" scoped>
-.cf-page-placeholder {
-  padding: 32px;
-  text-align: center;
-  opacity: 0.7;
+.cf-settings-sounds {
+	.sectionTitle {
+		margin: 0 0 4px;
+		color: var(--fg);
+		font-size: 1em;
+		opacity: 0.85;
+	}
+
+	.rangeField {
+		display: block;
+		margin-block-start: 12px;
+
+		> .label {
+			display: flex;
+			align-items: center;
+			gap: 8px;
+			color: var(--fg);
+			font-size: 0.9em;
+		}
+	}
+
+	.rangeRow {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		margin-block-start: 8px;
+
+		input[type="range"] {
+			flex: 1;
+			min-inline-size: 0;
+			accent-color: var(--accent);
+		}
+	}
+
+	.sounds {
+		margin: 12px 0 0;
+		padding: 0;
+		list-style: none;
+		border-radius: var(--radius);
+		background: var(--panel);
+		overflow: hidden;
+	}
+
+	.sound {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 8px 12px;
+		padding: 10px 14px;
+
+		&:not(:last-child) {
+			border-block-end: solid 0.5px var(--divider);
+		}
+
+		> .soundName {
+			flex: 1 1 8em;
+			font-size: 0.9em;
+		}
+
+		> .soundType {
+			color: var(--fgTransparentWeak);
+			font-size: 0.8em;
+		}
+
+		> .soundVolume {
+			display: flex;
+			align-items: center;
+			gap: 8px;
+			flex: 1 1 12em;
+
+			input[type="range"] {
+				flex: 1;
+				min-inline-size: 0;
+				accent-color: var(--accent);
+			}
+
+			> .value {
+				min-inline-size: 3em;
+				color: var(--fgTransparentWeak);
+				font-size: 0.8em;
+				font-variant-numeric: tabular-nums;
+				text-align: end;
+			}
+		}
+	}
+
+	.row {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 8px;
+		margin-block-start: 16px;
+	}
+
+	.note {
+		margin-block-start: 12px;
+		font-size: 0.85em;
+
+		code {
+			word-break: break-all;
+		}
+	}
 }
 </style>

@@ -97,13 +97,11 @@ function onClick(ev: MouseEvent): void {
 	color: var(--fgTransparentWeak);
 }
 .eiwwqkts.noAvatar::before {
-	content: "+";
+	content: "";
 	position: absolute;
 	inset: 0;
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	font-size: 1.4em;
+	border-radius: inherit;
+	background: url("/static-assets/avatar.svg") center / 58% no-repeat;
 	opacity: 0.55;
 }
 @keyframes earwiggleleft {

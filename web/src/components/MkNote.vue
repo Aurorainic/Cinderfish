@@ -199,8 +199,7 @@
 //   * promotion / featured banners, translations, channel info and the plugin
 //     note-view interruptors are dropped (no endpoints / no plugin system);
 //   * the muted placeholder uses `t()` interpolation instead of `<I18n>`;
-//   * "open in window" is dropped (`os.pageWindow` is not part of the shim);
-//   * reply opens an alert because the composer (MkPostForm) is not in this wave.
+//   * "open in window" is dropped (`os.pageWindow` is not part of the shim).
 import { computed, ref, type Ref } from "vue";
 import { api } from "@/api/client";
 import type { Note, NoteDetailed } from "@/api/types";
@@ -231,6 +230,7 @@ import { me } from "@/account";
 import { t } from "@/i18n";
 import * as os from "@/os";
 import type { MenuItem } from "@/os";
+import { post } from "@/os/post";
 import type { NoteMenuItem } from "@/scripts/get-note-menu";
 
 type ViewNote = Note &
@@ -318,10 +318,10 @@ useNoteCapture({
 
 function reply(_viaKeyboard = false): void {
 	pleaseLogin();
-	// Degradation: the composer (MkPostForm) is not part of this wave.
-	void os.alert({
-		type: "info",
-		text: "回复发帖待实现（本波未移植 PostForm）",
+	// Firefish passes `animation: !viaKeyboard` too; the dialog has no such prop
+	// in this port, and MkPostFormDialog owns its own transition.
+	void post({ reply: appearNote.value as NoteDetailed }).then(() => {
+		focus();
 	});
 }
 
