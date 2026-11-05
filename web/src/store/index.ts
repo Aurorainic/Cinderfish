@@ -1,3 +1,6 @@
+// Aggregation barrel for the store layer (Cinderfish-only; Firefish imports
+// each module directly). The Firefish-derived modules re-export their own
+// provenance headers.
 export {
 	ColdDeviceStorage,
 	get as getCold,
@@ -50,14 +53,20 @@ export type {
 export {
 	defaultReactions,
 	defaultStore,
+	menuOptions,
 	noteActions,
 	notePostInterruptors,
 	noteViewInterruptors,
 	postFormActions,
+	setStoreAccount,
+	store,
 	userActions,
+	type MenuOption,
+	type NoteVisibilityPreference,
 	type StatusbarItem,
+	type TimelineMemory,
+	type TimelineSource,
 	type WidgetItem,
-} from "./store";
-
-/** Firefish calls the widget list entry `Widget`; alias kept for port parity. */
-export type Widget = import("./store").WidgetItem;
+} from "./base";
+/** Firefish calls the widget list entry Widget; alias kept for port parity. */
+export type Widget = import("./base").WidgetItem;

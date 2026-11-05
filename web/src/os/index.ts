@@ -2,6 +2,16 @@ import { api } from "../api/client";
 import { ApiError } from "../api/errors";
 import { alert } from "./dialogs";
 
+// Firefish's `os.api` surface: ported call sites write `os.api("endpoint", params)`.
+// Keep the alias here so the 300+ upstream call sites need no rewrite.
+export {
+  api,
+  apiForm,
+  apiGet,
+  pendingApiRequestsCount,
+  resolveMediaUrl,
+} from "../api/client";
+
 export { CfDialog, CfModal, CfPopupHost, CfPopupMenu, CfToast, CfWaitingDialog } from "./components";
 export {
 	alert,

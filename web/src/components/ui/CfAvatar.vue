@@ -7,7 +7,8 @@
 		:title="acct(user)"
 		@click.stop="emit('click', $event)"
 	>
-		<img class="inner" :src="src" decoding="async" alt="" />
+		<img v-if="!noAvatar" class="inner" :src="src" decoding="async" alt="" />
+		<span v-else class="inner no-avatar ph-bold ph-user"></span>
 		<span
 			v-if="showIndicator"
 			class="indicator"
@@ -46,7 +47,10 @@ const emit = defineEmits<{
 	click: [event: MouseEvent];
 }>();
 
-const src = computed(() => resolveMediaUrl(props.user.avatarUrl));
+// Cinderfish accounts have no avatar upload yet (avatarUrl is always null), so
+// render a neutral placeholder instead of the browser's broken-image box.
+const src = computed(() => resolveMediaUrl(props.user.avatarUrl) || "/favicon.svg");
+const noAvatar = computed(() => props.user.avatarUrl == null);
 
 const square = computed(() =>
 	props.user.isCat

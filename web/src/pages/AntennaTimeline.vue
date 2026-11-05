@@ -1,3 +1,12 @@
+<!-- Ported from firefish@b425f61:packages/client/src/pages/antenna-timeline.vue (AGPL-3.0-only) -->
+<!--
+	TODO(wave-3): keep as a placeholder.
+	Firefish's antenna timeline needs `antennas/notes` plus the `antenna` streaming
+	channel and `antennas/list`. None of them exist in the backend
+	(see docs/research/2026-11-05-firefish-port-wave2-contract.md §5 and
+	docs/research/api-contract/), so this page renders no data instead of faking a
+	timeline. Wire MkTimeline with src="antenna" once the endpoints land.
+-->
 <template>
   <div class="cf-page-placeholder">
     <p>TODO: port AntennaTimeline</p>

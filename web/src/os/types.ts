@@ -8,6 +8,13 @@ export interface MenuItem {
 	to?: string;
 	href?: string;
 	separator?: boolean;
+	/** Destructive action styling (Firefish `danger`). */
+	danger?: boolean;
+	/** Show an unread/attention dot (Firefish `indicate`). */
+	indicate?: boolean;
+	/** Secondary line under the label (Firefish `caption`). */
+	caption?: string;
+	target?: string;
 	children?: MenuItem[];
 }
 

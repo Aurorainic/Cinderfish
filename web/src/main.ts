@@ -1,10 +1,21 @@
 // Application entry point (index.html loads /src/main.ts into #app).
+// Phosphor icon font, the two weights Firefish's UI uses (scripts/icon.ts
+// emits "ph-bold" / "ph-fill" class names).
+//
+// The @font-face rules are imported from `styles/index.scss`, not here: a
+// bare `import "@phosphor-icons/web/bold"` from the entry does emit the icon
+// classes, but the package ships them in `src/bold/style.css`, whose
+// `@font-face` ends up in a JS-injected stylesheet whose relative `url()`
+// Vite cannot rewrite, so every glyph falls back to a system box.
 import "./styles/index.scss";
 
 import { computed, createApp, defineAsyncComponent, markRaw, type Component } from "vue";
 import App from "./App.vue";
 import { me, refreshAccount, restoreSession } from "./account";
+import { install as installComponents } from "./components";
 import { initTheme } from "./composables/use-theme";
+import { install as installDirectives } from "./directives";
+import { updateInstance } from "./instance";
 import { router } from "./router";
 import { store } from "./store/base";
 import { ShellKey, SHELL_STORAGE_KEY, type ShellMode, type ShellRegistry } from "./ui/tokens";
@@ -61,9 +72,18 @@ const registry: ShellRegistry = {
 };
 
 const app = createApp(App);
+// Global components (components/global/*.vue -> <MkA>, <Mfm>, ...) and the
+// ported directives (v-appear / v-size / v-tooltip / ...). Both are installed
+// before the router so the first rendered page already has them.
+app.use(installDirectives);
+app.use(installComponents);
 app.provide(ShellKey, registry);
 app.use(router);
 app.mount("#app");
+
+// Instance metadata (name / version / features) asynchronously; the reactive
+// object in @/instance starts from the cached copy so first paint is correct.
+void updateInstance();
 
 // Rehydrate the session from storage, then refresh the cached profile in the
 // background; a stale token simply leaves the stored object in place until the

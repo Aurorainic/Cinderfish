@@ -12,11 +12,23 @@
 			<button
 				v-else
 				class="item _button"
-				:class="{ active: item.active }"
+				:class="{ active: item.active, danger: item.danger }"
 				@click="select(item)"
 			>
 				<i v-if="item.icon" :class="item.icon"></i>
-				<span class="text">{{ item.text }}</span>
+				<span class="text">
+					<span class="label">{{ item.text }}</span>
+					<!-- Firefish renders MenuItem.caption as a smaller second line. -->
+					<span v-if="item.caption" class="caption">{{
+						item.caption
+					}}</span>
+				</span>
+				<!-- Firefish's `indicate` marks an entry that wants attention. -->
+				<span
+					v-if="item.indicate"
+					class="indicate"
+					aria-hidden="true"
+				></span>
 			</button>
 		</template>
 	</div>
@@ -153,11 +165,48 @@ onBeforeUnmount(() => {
 		color: var(--accent);
 	}
 
+	&.danger {
+		color: var(--error);
+
+		> i,
+		> .text > .label,
+		> .text > .caption {
+			color: inherit;
+		}
+	}
+
 	.text {
+		display: flex;
+		flex-direction: column;
 		flex: 1;
+		min-inline-size: 0;
 		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
+
+		> .label {
+			overflow: hidden;
+			text-overflow: ellipsis;
+			white-space: nowrap;
+		}
+
+		> .caption {
+			overflow: hidden;
+			text-overflow: ellipsis;
+			white-space: nowrap;
+			font-size: 0.8em;
+			line-height: 1.3;
+			opacity: 0.7;
+		}
+	}
+
+	// Upstream MkMenu draws the unread dot right after the label; here it sits
+	// on the trailing edge of the row (contract task: "项右侧一个 accent 圆点").
+	> .indicate {
+		flex-shrink: 0;
+		margin-inline-start: auto;
+		inline-size: 8px;
+		block-size: 8px;
+		border-radius: 100%;
+		background: var(--accent);
 	}
 }
 </style>

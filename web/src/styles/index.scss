@@ -7,3 +7,16 @@
 // `web/src/themes/apply.ts` and the global utility classes.
 
 @use "./style";
+@use "./mfm";
+
+// Phosphor icon font — the two weights the ported components use
+// (`ph-bold`, `ph-fill`).
+//
+// Imported through Sass rather than from `main.ts` on purpose: the package
+// resolves `@phosphor-icons/web/bold` to `src/bold/style.css`, and a plain JS
+// import of that file makes Vite inject the CSS at runtime, where the
+// `@font-face` urls stay relative to the page and never resolve. Going
+// through the Sass graph keeps the assets in the CSS pipeline, so Vite
+// rewrites each `url()` and emits the woff2 files next to the bundle.
+@import "@phosphor-icons/web/bold/style.css";
+@import "@phosphor-icons/web/fill/style.css";
