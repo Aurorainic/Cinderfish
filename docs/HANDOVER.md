@@ -1170,6 +1170,71 @@ POST /inbox                            POST /users/{id}/inbox
     （`withRenotes` 无效、`users/notes` 的 `withReplies` 默认值相反、`admin/accounts/create`
     不返回 token 等）。
 
+## 12R. 批次：前端第二波——Note 组件树 + 时间线/通知/Drive 落地（2026-11-05）
+
+- **工作方式**：Lead 先写施工契约 `docs/research/2026-11-05-firefish-port-wave2-contract.md`（模块映射、降级清单、写作用域、验收口径），再并行分派 7 个 agent（各持一个作用域）+ 1 个整合 agent，最后由 Lead 统一 typecheck/build/浏览器走查并提交。
+- **单一 defaultStore 修复**：第一波留下两个 `Storage("base")` 实例（`store/base.ts` 与 `store/store.ts` 各自 new），它们共用同名 pizzax 键却互不可见。本波合并到 `store/base.ts`，`store/store.ts` 降为 re-export shim，`@/store`、`@/store/base`、`@/store/store` 已是同一对象。
+- **新增依赖**（Firefish 同款）：`mfm-js@0.23.3`（MFM 解析）、`@phosphor-icons/web@2.0.3`（图标字体 bold + fill）。其余 Firefish 依赖（swiper/photoswipe/vue-plyr/katex/blurhash/vue-draggable-plus/chart.js/date-fns/tinycolor2 等）一律不装，按契约 §5 降级。
+
+### 12R.1 落地清单
+
+| 层 | 文件 | 说明 |
+|----|------|------|
+| 基础设施 | `web/src/config.ts`、`instance.ts`、`stream.ts`、`const.ts`、`components/index.ts`、`directives/{size,appear,tooltip,user-preview,hotkey}`、`scripts/{array,clone,copy-to-clipboard,please-login,reduced-motion,focus,use-tooltip,format-time-string,extract-mentions,scroll,sound,device-kind,page-metadata,upload,select-file}`、`filters/{user,note,bytes}` | `os.api`/`os.apiGet`/`os.apiForm` shim；`os/types.ts` 的 MenuItem 增加 danger/indicate/caption/target |
+| 全局组件（15） | `components/global/`：MkA、MkAcct、MkAvatar、MkEmoji、MkUserName、MkEllipsis、MkTime、MkUrl、MkLoading、MkError、MkPageHeader、MkSpacer、MkStickyContainer、MkMisskeyFlavoredMarkdown（全局名 `Mfm`）+ `emoji-registry.ts` | 由 `import.meta.glob` 自动注册，模板直接用、不必 import |
+| MFM | `MkMisskeyFlavoredMarkdown.vue` + `components/{MkLink,MkMention,MkCode,MkFormula,MkSparkle,MkGoogle}.vue` + `styles/mfm.scss` | 节点全覆盖：text/emoji/mention/hashtag/url/link/bold/small/italic/strike/inlineCode/blockCode/math/quote/search/fn（x2-x4、spin、jump、shake、twitch、blur、rainbow、sparkle、rotate、flip、scale、fg、bg、font）/plain；未知节点退化为原文不抛异常 |
+| Note 树（11） | `MkNote`、`MkNoteSub`、`MkSubNoteContent`、`MkNoteHeader`、`MkNoteSimple`、`MkNotePreview`、`MkNoteDetailed`、`MkNotes`、`MkCwButton`、`MkPoll`、`MkPollEditor` + `scripts/get-note-menu`、`get-note-summary`、`check-word-mute`、`extract-mfm`、`reaction-picker` | 折叠/展开、CW、投票、反应 picker、子帖预览、线程递归、`useNoteCapture` 单帖流式更新 |
+| 媒体与操作（19） | `MkMediaList`、`MkMedia`、`MkMediaBanner`、`MkMediaCaption`、`MkImgWithBlurhash`、`MkReactionsViewer`(+.reaction/.details)、`MkReactionIcon`、`MkReactionTooltip`、`MkStarButton(NoEmoji)`、`MkRenoteButton`、`MkQuoteButton`、`MkVisibility`、`MkInstanceTicker`、`MkAvatars`、`MkUrlPreview`、`MkFileTypeIcon` | 网格布局与 Firefish 类名一致；原生 `<video>`/`<audio>` |
+| 时间线 | `MkTimeline`、`pages/Timeline.vue`、`pages/Note.vue`、`pages/IndexRoute.vue` | 四条时间线端点 + 四个 Streaming 频道；home 额外订阅 `main` 的 follow/unfollow 刷新 |
+| 通知 | `MkNotification`、`MkNotifications`、`MkFollowButton`、`MkNotificationSettingWindow`、`pages/Notifications.vue`、`pages/FollowRequests.vue` | 后端只有 mention/reply/renote/quote/reaction 五种类型 |
+| Drive | `MkDrive`、`MkDrive.file`、`MkDrive.folder`、`MkDrive.navFolder`、`MkDriveFileThumbnail`、`MkDriveWindow`、`MkDriveSelectDialog`、`pages/Drive.vue`、`pages/AttachedFiles.vue` + `scripts/upload`、`select-file` | `uploadFile(file,{folderId,name})` / `selectFiles({multiple,label})` 签名已冻结，下一波 PostForm 直接用 |
+| 质量门禁 | `web/scripts/check-port.mjs`（`pnpm run check:port`） | 硬规则：禁止新依赖、禁止旧的 `i18n.ts.` 调用、禁止 `$ref/$computed`、禁止直接 fetch、禁止页面自读 token；另有 `unresolvedComponents`（模板里用到但未 import/未全局注册的组件，本波一次真实故障的来源）与 `missingKeys`（`t()` 的键不在 zh-CN 词典） |
+
+### 12R.2 验证证据（Lead 统一执行）
+
+```
+cd web && pnpm exec vue-tsc --noEmit     # exit 0
+cd web && pnpm run check:port            # exit 0（401 文件，全部规则零违规）
+cd web && pnpm build                     # 成功：主 chunk 208 KB / gzip 70 KB，字体 woff2 入产物
+```
+
+浏览器走查方式：无头 Chromium 131 + CDP 脚本（登录态用 `localStorage.account` + `cinderfish.token` 注入），1440×900 与 390×844 两档；后端是真实 Go 二进制，数据库用测试账号 uiwave/uiwave2 灌入笔记、回复、引用、转贴、反应、CW、投票、长文、MFM 全节点样例。
+
+| 页面 | 证据 |
+|------|------|
+| `/` 时间线 | home/local/social 三个 tab；首屏出帖；反应条、操作按钮、`$[x2]/$[x3]/$[fg]/$[bg]/$[blur]/$[flip]/$[spin]`、mention/hashtag/URL 卡片、引用块、MFM 代码块、`> 引用` 全部正确渲染；桌面 `scrollWidth == clientWidth == 1440`，移动端 390 无横向溢出 |
+| `/notes/:id` | 正文、时间、反应、操作按钮、回复列表渲染正常 |
+| `/my/notifications` | 5 种通知类型混排，文本长度 172 → 736 |
+| `/my/drive`、`/my/follow-requests` | 正常空态/列表，无 JS 异常 |
+| 全量 | `exceptionErrors`、`consoleErrors` 均为空；`document.fonts.check("16px 'Phosphor-Bold'")` = true |
+
+走查中修掉的真实接缝错误（都已包含在本波提交内）：
+1. 两个 `Storage("base")` 实例并行（第一波遗留）；
+2. Phosphor 字体用字面量 import 时不重写 `@font-face` 的 url → 图标全是方框，改为在 `styles/index.scss` 里 `@import` 它的 CSS；
+3. `pages/Note.vue` 渲染 `<MkNoteDetailed>` 却忘了 import（它不在 `components/global/`，不会被自动注册）→ 详情页空白；`vue-tsc` 不报错，已加进 `check-port.mjs` 的 `unresolvedComponents` 规则；
+4. `os` 未导出 `api`/`apiGet`/`apiForm`，Firefish 的 `os.api(...)` 调用点无法编译；
+5. `/static-assets/badges/info.png` 不存在导致构建失败，改用 `web/public/static-assets/badges/info.svg`；
+6. 后端 `avatarUrl` 恒 null，头像满屏破图，`MkAvatar`/`CfAvatar` 加了无头像占位。
+
+### 12R.3 已知降级与残留（续作必读）
+
+- **PostForm 尚未移植**：回复/引用在 `MkNote*` 里是 `os.alert` 提示；`showFixedPostForm` 块整体不渲染。发布相关页面时不要假设 `MkPostForm` 存在。
+- **CfTab 选项卡标签不显示**（未修）：Firefish 用 Vue 2 的 `<option>` VNode 传给 MkTab，Vue 3 编译器把它当原生标签折叠，标签与 value 丢失。修法是把 CfTab 契约改成 `{value,label}[]` 数组，属独立任务。
+- **Streaming 共享订阅**：`useChannel("main")` 返回同一个订阅的包装，`dispose()` 会拆掉所有人的监听。现有组件一律只用 `channel.on()` 返回的 unsubscribe。
+- **分页**：`usePagination/CfPagination` 只有一个 limit（Firefish 首屏 10、后续 30 两档），本波用单档。
+- **媒体**：无缩略图/blurhash/PhotoSwipe/vue-plyr/媒体代理，图片直接用 `file.url`，视频音频用原生控件。
+- **表情**：后端 `emojis`/`reactionEmojis` 恒 `[]`，自定义表情走 `api("emojis")` 注册表按名匹配，匹配不到渲染纯文本。
+- **无端点的功能**：UrlPreview 卡片（只渲染纯链接样式）、推荐/列表/天线/频道时间线、翻译、编辑、Drive 文件改名/移动/URL 上传、通知折叠、用户预览卡、hotkey、声音。
+- **声音**：`scripts/sound.ts` API 齐全但恒静音（`web/public/static-assets/sounds/` 无 mp3）。
+
+### 12R.4 第三波建议顺序
+
+1. `MkPostForm` + `MkPostFormAttaches` + `MkPollEditor` 接线 + `MkVisibilityPicker` + `MkEmojiPicker`（发帖是个人实例的核心路径；`uploadFile`/`selectFiles` 已冻结可直接用）；
+2. `pages/user/index*.vue`（个人页，`users/show` + `users/notes` + 关注按钮已在）；
+3. `MkUserCardMini`/`MkUserList` → `pages/user/followers|following.vue`（端点已有）；
+4. 设置页（`i/update` + `i/registry/*` 端点已在）；
+5. 再按 Firefish 路由表推进剩余占位页（当前 198 个页面文件里 8 个已实装、共 131 条路由）。
+
 ## 13. 文档索引
 
 | 文档 | 内容 |
@@ -1201,9 +1266,12 @@ POST /inbox                            POST /users/{id}/inbox
 ## 14. 已知的未验证项
 
 - **浏览器可视化走查（Task 8 波次）未做**：2026-10-31 的最终轮，内建浏览器返回 `BROWSER_USER_TAKEOVER`（用户接管面板），按工具契约当轮停止。因此 1440/1280/1100/840/720/600/380 的截图、`scrollWidth` 溢出实测与登录态视觉复核**都没有执行**；同一轮的后端 API 走查（未读数、通知类型、回复可见性、纯转贴反应、四条时间线）已用真实二进制完成，见 §11.15.7。本波次没有改 CSS 或 DOM 结构，风险低，但不能当作已验证。
-- **新前端骨架未做浏览器运行时验证（2026-11-05）**：§12Q 的第一波移植只过了 `vue-tsc` 与
-  `vite build`，没有起 dev server 或构建产物做浏览器走查——shell 渲染、主题应用、登录流、
-  Streaming 连接的运行时行为全部未验证。续作 agent 填充页面时应在真实浏览器里先跑一轮骨架。
+- **新前端骨架的浏览器验证已部分补上（2026-11-05，第二波）**：§12R 用无头 Chromium + CDP 对
+  `/`、`/notes/:id`、`/my/notifications`、`/my/drive`、`/my/follow-requests` 做了桌面（1440）与移动（390）
+  两档走查，shell 渲染、主题应用、图标字体、时间线出帖都看过；但**登录/注册表单、设置页、Deck 壳、
+  访客壳，以及构建产物（`web/dist` 经 Go 静态托管）仍未走查**，Streaming 只验证了首屏 REST 拉取，
+  实时推送（新帖插入、通知红点）没有实测。
+- **CfTab 选项卡标签不显示（2026-11-05 已知缺陷）**：见 §12R.3，属未修项。
 - **30 个 Firefish 内置主题只移植了 4 个**（light/dark 基础表 + 两个 Rosé Pine），
   其余 26 个调色板未转。
 - **i18n 只覆盖 zh-CN / ja-JP**，其余 37 个 locale 未生成；`yaml` devDependency 未装
