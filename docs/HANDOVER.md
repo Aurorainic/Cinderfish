@@ -1126,6 +1126,50 @@ POST /inbox                            POST /users/{id}/inbox
 - Streaming / OAuth 的客户端行为以 `docs/research/api-contract/` 为准，其中与 Firefish 假设
   不符处（心跳保活、`withRenotes`、token 读取顺序）在 shim 层吸收，不污染页面组件。
 
+## 12Q. 批次：前端骨架重建完成——第一波移植落地（2026-11-05）
+
+- **旧前端已删除**（提交 `9ce4a00`）：原 `web/src`（164 文件、约 29741 行）整体移除，
+  保留 `web/index.html`、`tsconfig.json`、`vite.config.ts`、`package.json` 作为种子。
+- **新骨架已落地**（提交 `6910c41`，320 文件、21406 行）：8 个并行 agent 按 §12P 的分层约定
+  翻译 Firefish 客户端，随后合并去重（删除 6 棵并行重复目录树
+  `api-client`、`store-composables`、`os-dialog-ui`、`scaffold-theme`、`account-session`、
+  `ui-primitives`、`layouts`、`router-entry`，以 `web/src/{api,store,composables,os,account,
+  components/ui,themes,styles}` 为 canonical）。
+- 落地清单（每层与 Firefish 原件的对应关系见各目录 `PORTING-NOTES.md`）：
+  - `themes/`：主题引擎全量（值语言、色彩数学、light/dark token 表、Rosé Pine 默认主题、
+    CSS 变量写入）；4 个主题 85 个变量与上游逐字节一致（用真实 tinycolor2 对照验证）。
+  - `styles/`：全局样式架构 935 行，Firefish 工具类原名保留。
+  - `api/`：类型化 RPC 层，对接 §12N 契约——body `i` 优先、错误信封、**全部 70 条路由的
+    `endpoints.ts`**、游标分页、Streaming 客户端（30s 应用层心跳对抗 ~120s 空闲断连）。
+  - `store/` + `composables/`：pizzax 三作用域 + BroadcastChannel 跨页签同步、
+    defaultStore/deck/cold、useTheme（亮/暗/跟随系统）、usePagination、useNoteCapture。
+  - `router/`：nirax → vue-router，Firefish **131 条路径**全保留，路由名冲突已加后缀；
+    页面为占位组件。
+  - `ui/`：universal/deck/zen/visitor 四 shell + `layouts/`，布局解析顺序与 Firefish 一致
+    （`?zen` → 登出 visitor → `ui=deck` → universal）。
+  - `os/`：popup 栈、z-index 分带（1e6/2e6/3e6）、alert/confirm/prompt/toast/menu。
+  - `account/`：`$i` 会话层、登录/注册/miauth 表单、路由守卫（`meta.requiresLogin`）。
+  - `i18n/`：zh-CN 1838 键 + ja-JP 1833 键（从 Firefish locales YAML 生成，生成脚本
+    `web/scripts/gen-locale.mjs` 需 `yaml` devDependency——**故意未装**，JSON 已提交）。
+  - `components/ui/`：21 个 `Cf*` 基础组件，类名/props 对齐 Mk* 原件。
+- **验证证据**：`pnpm install` 通过；`vue-tsc --noEmit` exit 0（strict）；
+  `vite build` 成功（主 chunk 284 KB / gzip 93 KB，276 个产物文件）。
+  修复过的接缝错误：`Miauth`/`Oauth` 页面大小写、`PaginationState.reversed` 补齐、
+  `Emitter` 泛型约束、占位组件模板中的尖括号（117 处）。
+- **当前状态**：123 个页面是 `TODO: port` 占位；shell + 基础设施全部可用。
+  下一波按 Firefish 页面逐个填充，建议顺序：`pages/Timeline.vue` + `components/note/` 组件树
+  → `PostForm`（composer）→ `pages/UserProfile.vue` → `pages/Notifications.vue` →
+  `pages/Drive.vue` → 其余按 Firefish 路由表推进。
+- **对接注意**（续作 agent 必读）：
+  - 页面组件一律通过 `web/src/api/client.ts` 的 `api()` 调用，不得自行 fetch；
+  - Streaming 事件从 `web/src/api/stream.ts` 的 `useStream()` 取，配 `useNoteCapture`；
+  - i18n 用 `web/src/i18n/index.ts` 的 `t()`（**扁平键**，`i.ts._ago.justNow` 这种嵌套取值
+    不存在，用 `t("ago.justNow")`）；
+  - 主题变量名与 Firefish 一致（`--panel`、`--accent`、`--divider`…），组件 SCSS 直接用；
+  - 后端契约疑问查 `docs/research/api-contract/`，不要按 Misskey 文档假设
+    （`withRenotes` 无效、`users/notes` 的 `withReplies` 默认值相反、`admin/accounts/create`
+    不返回 token 等）。
+
 ## 13. 文档索引
 
 | 文档 | 内容 |
@@ -1157,6 +1201,13 @@ POST /inbox                            POST /users/{id}/inbox
 ## 14. 已知的未验证项
 
 - **浏览器可视化走查（Task 8 波次）未做**：2026-10-31 的最终轮，内建浏览器返回 `BROWSER_USER_TAKEOVER`（用户接管面板），按工具契约当轮停止。因此 1440/1280/1100/840/720/600/380 的截图、`scrollWidth` 溢出实测与登录态视觉复核**都没有执行**；同一轮的后端 API 走查（未读数、通知类型、回复可见性、纯转贴反应、四条时间线）已用真实二进制完成，见 §11.15.7。本波次没有改 CSS 或 DOM 结构，风险低，但不能当作已验证。
+- **新前端骨架未做浏览器运行时验证（2026-11-05）**：§12Q 的第一波移植只过了 `vue-tsc` 与
+  `vite build`，没有起 dev server 或构建产物做浏览器走查——shell 渲染、主题应用、登录流、
+  Streaming 连接的运行时行为全部未验证。续作 agent 填充页面时应在真实浏览器里先跑一轮骨架。
+- **30 个 Firefish 内置主题只移植了 4 个**（light/dark 基础表 + 两个 Rosé Pine），
+  其余 26 个调色板未转。
+- **i18n 只覆盖 zh-CN / ja-JP**，其余 37 个 locale 未生成；`yaml` devDependency 未装
+  （重新生成 locale 前要先 `pnpm add -D yaml`）。
 - **S3 后端未做真实服务端验证**：只验证了编译、接口与 URL 生成逻辑。
 - **缩略图/WebP 生成未实现**：`drive_files.thumbnail_key` 字段已留，图片处理管道还没写。
 - **前端没有真实第三方客户端联调**：页面已在构建产物上用浏览器走查，但没有用 misskey-js 或 Misskey Web 前端连过本实例。
