@@ -4195,8 +4195,11 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
   `TestRemoteMentionIsDeliveredAndNotifies` 覆盖（2026-11-07，见 §12CD）：本地笔记 @ 远端账号会
   解析成 Mention 标签、经投递队列送到对端并产生 `mention` 通知（顺带修掉了入站提及被写成
   `reply` 的缺陷）。仍未验证的：流式推送下的未读实时插入、directNotes 与类型过滤组合。
-- **第十七波未测边角（2026-11-06，见 §12AG.4）**：远程目录、hostname、`state=admin` 与未登录视角
-  未走查；用户页签的 offset 分页已实测能从 20 增至 24。
+- **第十七波的部分边角（2026-11-06，见 §12AG.4）**：`users` 目录的未登录视角、`state=admin`、
+  `origin=remote`、`hostname`（需与 `origin=combined` 组合，与 Misskey 一致）与两种 createdAt 排序
+  已由 `TestUsersDirectoryFilters` 覆盖（2026-11-07），并确认封禁账号从目录消失。
+  `state=alive` 因为没有 `users.updatedAt` 列而与 `all` 等价（用例固定了这一点）。
+  **界面**上的发现页用户页签仍未走查。
 - **第十八波未测边角（2026-11-06，见 §12AH.4）**：退避曲线/并发压测、S3 真实桶展示未验证；
   手动重试与配置写入按设计未做。
 - **第十九波未测边角（2026-11-06，见 §12AI.4）**：规则/合规链接未进入注册流程、远端实例计数与
