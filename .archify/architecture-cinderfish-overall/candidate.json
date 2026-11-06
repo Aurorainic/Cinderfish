@@ -10,7 +10,7 @@
       "url": "https://github.com/Aurorainic/Cinderfish.git",
       "provider": "github",
       "link_mode": "web",
-      "revision": "d8c080f8642dcbe5aa980cfa8a57ca012ae2c595"
+      "revision": "4c52fd520164f94300ba76429f0eea45eedadaf9"
     }
   },
   "components": [
@@ -69,7 +69,7 @@
       "id": "httpapi",
       "type": "backend",
       "label": "httpapi",
-      "sublabel": "Misskey RPC 136 路由 · AP 路由 · WS 升级",
+      "sublabel": "Misskey RPC 137 路由 · AP 路由 · WS 升级",
       "pos": [300, 320],
       "size": [200, 64],
       "sources": [
@@ -257,7 +257,7 @@
       "title": "当前状态",
       "items": [
         "M1–M7 全部完成；2026-11-04 起工作面收敛为后端 API 与联邦，web 前端移植由独立 workflow 推进",
-        "Misskey API 覆盖 136 条注册路由（Misskey 全集 440），差集台账 docs/research/2026-11-04-misskey-api-coverage.md",
+        "Misskey API 覆盖 137 条注册路由（Misskey 全集 440），差集台账 docs/research/2026-11-04-misskey-api-coverage.md",
         "迁移 v18 · 34 张表；单二进制内嵌迁移脚本，启动时自动升级；另有 cinderfish-admin / cinderfish-media-migrate 两个 CLI",
         "周边能力已接入：邮件验证/重置、TOTP 两步验证、Webhook、举报、公告、账号导入导出"
       ]

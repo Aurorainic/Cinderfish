@@ -2,7 +2,7 @@
 
 - 产出：`cinderfish-overall.html`
 - 源：`candidate.json`（Archify architecture schema v1）
-- 绘制时基线：`d8c080f`（出站笔记投递与 Update 活动之后，2026-11-06）
+- 绘制时基线：`4c52fd5`（admin/drive/show-file 之后，2026-11-06）
 - 画布：1096×812，宽画布契约不触发（宽度低于 1240）
 
 ## 目录命名

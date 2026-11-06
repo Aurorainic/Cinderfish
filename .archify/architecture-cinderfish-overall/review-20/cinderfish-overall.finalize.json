@@ -1,0 +1,672 @@
+{
+  "schemaVersion": 1,
+  "ok": false,
+  "command": "finalize",
+  "status": "skipped",
+  "type": "architecture",
+  "quality": "showcase",
+  "startedAt": "2026-11-06T13:13:15.000Z",
+  "specification": {
+    "path": "/home/lainsaka/文档/MilnFish/.worktrees/firefish-port/.archify/architecture-cinderfish-overall/candidate.json",
+    "sha256": "b79abd2dc5f67a6b628c39248d323c5dc7df63ce613985e752f3aff8fe74ee5a",
+    "bytes": 10776
+  },
+  "artifact": {
+    "path": "/home/lainsaka/文档/MilnFish/.worktrees/firefish-port/.archify/architecture-cinderfish-overall/cinderfish-overall.html",
+    "sha256": "34096dda0edb4d6ee4e3e24e023721501b69fe0c380d492005a15d8e6dbd62c0",
+    "bytes": 880296
+  },
+  "stages": {
+    "validate": {
+      "status": "pass",
+      "exitCode": 0,
+      "durationMs": null,
+      "execution": "embedded-in-deliver",
+      "command": [
+        "/home/lainsaka/.nvm/versions/node/v24.22.1/bin/node",
+        "/home/lainsaka/.agents/skills/archify/bin/archify.mjs",
+        "deliver",
+        "architecture",
+        "/home/lainsaka/文档/MilnFish/.worktrees/firefish-port/.archify/architecture-cinderfish-overall/candidate.json",
+        "/home/lainsaka/文档/MilnFish/.worktrees/firefish-port/.archify/architecture-cinderfish-overall/cinderfish-overall.html",
+        "--quality",
+        "showcase",
+        "--repo-root",
+        "/home/lainsaka/文档/MilnFish/.worktrees/firefish-port",
+        "--json"
+      ],
+      "receipt": {
+        "schemaVersion": 1,
+        "ok": true,
+        "command": "validate",
+        "specification": {
+          "sha256": "b79abd2dc5f67a6b628c39248d323c5dc7df63ce613985e752f3aff8fe74ee5a",
+          "bytes": 10776
+        },
+        "validation": {
+          "checksPassed": 9,
+          "checkCount": 9,
+          "compositionProfile": "showcase",
+          "compositionStatus": "pass",
+          "errors": 0,
+          "warnings": 0
+        }
+      }
+    },
+    "deliver": {
+      "status": "pass",
+      "exitCode": 0,
+      "durationMs": 704,
+      "command": [
+        "/home/lainsaka/.nvm/versions/node/v24.22.1/bin/node",
+        "/home/lainsaka/.agents/skills/archify/bin/archify.mjs",
+        "deliver",
+        "architecture",
+        "/home/lainsaka/文档/MilnFish/.worktrees/firefish-port/.archify/architecture-cinderfish-overall/candidate.json",
+        "/home/lainsaka/文档/MilnFish/.worktrees/firefish-port/.archify/architecture-cinderfish-overall/cinderfish-overall.html",
+        "--quality",
+        "showcase",
+        "--repo-root",
+        "/home/lainsaka/文档/MilnFish/.worktrees/firefish-port",
+        "--json"
+      ],
+      "receipt": {
+        "schemaVersion": 1,
+        "receiptId": "884acd1e-347b-4ae3-a693-4f13f8e635c7",
+        "ok": true,
+        "command": "deliver",
+        "type": "architecture",
+        "input": "/home/lainsaka/文档/MilnFish/.worktrees/firefish-port/.archify/architecture-cinderfish-overall/candidate.json",
+        "output": "/home/lainsaka/文档/MilnFish/.worktrees/firefish-port/.archify/architecture-cinderfish-overall/cinderfish-overall.html",
+        "specification": {
+          "sha256": "b79abd2dc5f67a6b628c39248d323c5dc7df63ce613985e752f3aff8fe74ee5a",
+          "bytes": 10776
+        },
+        "artifact": {
+          "sha256": "34096dda0edb4d6ee4e3e24e023721501b69fe0c380d492005a15d8e6dbd62c0",
+          "bytes": 880296
+        },
+        "validation": {
+          "checksPassed": 9,
+          "checkCount": 9,
+          "compositionProfile": "showcase",
+          "compositionStatus": "pass",
+          "errors": 0,
+          "warnings": 0
+        },
+        "evidence": {
+          "verified": true,
+          "repository": "https://github.com/Aurorainic/Cinderfish",
+          "revision": "4c52fd520164f94300ba76429f0eea45eedadaf9",
+          "references": 25
+        },
+        "update": {
+          "status": "unavailable",
+          "installedVersion": null,
+          "availableVersion": null,
+          "releaseNotes": null,
+          "checkedAt": null,
+          "source": null,
+          "noticeRequired": false,
+          "noticeText": null,
+          "reason": "disabled"
+        }
+      }
+    },
+    "check": {
+      "status": "pass",
+      "exitCode": 0,
+      "durationMs": 186,
+      "command": [
+        "/home/lainsaka/.nvm/versions/node/v24.22.1/bin/node",
+        "/home/lainsaka/.agents/skills/archify/bin/archify.mjs",
+        "check",
+        "/home/lainsaka/文档/MilnFish/.worktrees/firefish-port/.archify/architecture-cinderfish-overall/cinderfish-overall.html",
+        "--require-provenance"
+      ],
+      "receipt": {
+        "ok": true,
+        "file": "/home/lainsaka/文档/MilnFish/.worktrees/firefish-port/.archify/architecture-cinderfish-overall/cinderfish-overall.html",
+        "artifact": {
+          "sha256": "34096dda0edb4d6ee4e3e24e023721501b69fe0c380d492005a15d8e6dbd62c0",
+          "bytes": 880296
+        },
+        "checks": [
+          {
+            "name": "single_svg",
+            "ok": true,
+            "details": [
+              "found 1 <svg> block(s)"
+            ]
+          },
+          {
+            "name": "finite_svg",
+            "ok": true,
+            "details": []
+          },
+          {
+            "name": "orthogonal_arrows",
+            "ok": true,
+            "details": []
+          },
+          {
+            "name": "label_route_clearance",
+            "ok": true,
+            "details": []
+          },
+          {
+            "name": "relationship_crossings",
+            "ok": true,
+            "details": []
+          },
+          {
+            "name": "relationship_corridors",
+            "ok": true,
+            "details": []
+          },
+          {
+            "name": "container_border_runs",
+            "ok": true,
+            "details": []
+          },
+          {
+            "name": "route_rhythm",
+            "ok": true,
+            "details": []
+          },
+          {
+            "name": "legend_clearance",
+            "ok": true,
+            "details": []
+          }
+        ],
+        "composition": {
+          "schemaVersion": 1,
+          "profile": "showcase",
+          "status": "pass",
+          "summary": {
+            "errors": 0,
+            "warnings": 0
+          },
+          "metrics": {
+            "properCrossings": 0,
+            "resolvedCrossovers": 12,
+            "ambiguousCorridors": 0,
+            "arrowheadCollisions": 0,
+            "containerBorderRuns": 0,
+            "labelRouteClearanceIssues": 0,
+            "labelCanvasOverflowIssues": 0,
+            "minLabelRouteClearance": 5,
+            "desktopReadabilityIssues": 0,
+            "viewportHeightIssues": 0,
+            "minProjectedNodeTextPx": 6.194343065693431,
+            "maxBends": 5,
+            "routesOverSuggestedBends": 3,
+            "maxStretch": 1.512,
+            "routesOverSuggestedStretch": 2,
+            "minSegmentPx": 12,
+            "minInteriorSegmentPx": 78,
+            "shortSegmentCount": 1,
+            "shortEndpointSegmentCount": 1,
+            "shortInteriorSegmentCount": 0,
+            "microSegmentCount": 0
+          },
+          "suggestedLimits": {
+            "bendsPerRelationship": 2,
+            "stretch": 1.35,
+            "segmentPx": 16,
+            "microSegmentPx": 8
+          },
+          "routeReview": {
+            "crossings": [
+              {
+                "left": {
+                  "from": "config",
+                  "to": "main",
+                  "label": "加载",
+                  "collectionIndex": 3,
+                  "artifactIndex": 4
+                },
+                "right": {
+                  "from": "httpapi",
+                  "to": "account",
+                  "label": "注册 / 登录 / TOTP",
+                  "collectionIndex": 5,
+                  "artifactIndex": 6
+                },
+                "point": [
+                  395,
+                  128
+                ]
+              },
+              {
+                "left": {
+                  "from": "main",
+                  "to": "httpapi",
+                  "label": "装配路由",
+                  "collectionIndex": 4,
+                  "artifactIndex": 5
+                },
+                "right": {
+                  "from": "httpapi",
+                  "to": "account",
+                  "label": "注册 / 登录 / TOTP",
+                  "collectionIndex": 5,
+                  "artifactIndex": 6
+                },
+                "point": [
+                  400,
+                  296
+                ],
+                "sharedNode": "httpapi"
+              },
+              {
+                "left": {
+                  "from": "httpapi",
+                  "to": "note",
+                  "label": "笔记 / 时间线",
+                  "collectionIndex": 6,
+                  "artifactIndex": 7
+                },
+                "right": {
+                  "from": "httpapi",
+                  "to": "streaming",
+                  "label": "WS 升级",
+                  "collectionIndex": 7,
+                  "artifactIndex": 8
+                },
+                "point": [
+                  530,
+                  308
+                ],
+                "sharedNode": "httpapi"
+              },
+              {
+                "left": {
+                  "from": "httpapi",
+                  "to": "note",
+                  "label": "笔记 / 时间线",
+                  "collectionIndex": 6,
+                  "artifactIndex": 7
+                },
+                "right": {
+                  "from": "federation",
+                  "to": "note",
+                  "label": "远程对象 / 提及",
+                  "collectionIndex": 13,
+                  "artifactIndex": 14
+                },
+                "point": [
+                  525,
+                  335.61538461538464
+                ],
+                "sharedNode": "note"
+              },
+              {
+                "left": {
+                  "from": "httpapi",
+                  "to": "streaming",
+                  "label": "WS 升级",
+                  "collectionIndex": 7,
+                  "artifactIndex": 8
+                },
+                "right": {
+                  "from": "federation",
+                  "to": "note",
+                  "label": "远程对象 / 提及",
+                  "collectionIndex": 13,
+                  "artifactIndex": 14
+                },
+                "point": [
+                  525,
+                  308
+                ]
+              },
+              {
+                "left": {
+                  "from": "httpapi",
+                  "to": "media",
+                  "label": "Drive 上传",
+                  "collectionIndex": 8,
+                  "artifactIndex": 9
+                },
+                "right": {
+                  "from": "httpapi",
+                  "to": "mail",
+                  "label": "验证 / 重置密码",
+                  "collectionIndex": 9,
+                  "artifactIndex": 10
+                },
+                "point": [
+                  530,
+                  402
+                ],
+                "sharedNode": "httpapi"
+              },
+              {
+                "left": {
+                  "from": "httpapi",
+                  "to": "media",
+                  "label": "Drive 上传",
+                  "collectionIndex": 8,
+                  "artifactIndex": 9
+                },
+                "right": {
+                  "from": "federation",
+                  "to": "note",
+                  "label": "远程对象 / 提及",
+                  "collectionIndex": 13,
+                  "artifactIndex": 14
+                },
+                "point": [
+                  525,
+                  402
+                ]
+              },
+              {
+                "left": {
+                  "from": "httpapi",
+                  "to": "mail",
+                  "label": "验证 / 重置密码",
+                  "collectionIndex": 9,
+                  "artifactIndex": 10
+                },
+                "right": {
+                  "from": "httpapi",
+                  "to": "webhook",
+                  "label": "事件 Webhook",
+                  "collectionIndex": 10,
+                  "artifactIndex": 11
+                },
+                "point": [
+                  530,
+                  427
+                ],
+                "sharedNode": "httpapi"
+              },
+              {
+                "left": {
+                  "from": "httpapi",
+                  "to": "mail",
+                  "label": "验证 / 重置密码",
+                  "collectionIndex": 9,
+                  "artifactIndex": 10
+                },
+                "right": {
+                  "from": "federation",
+                  "to": "note",
+                  "label": "远程对象 / 提及",
+                  "collectionIndex": 13,
+                  "artifactIndex": 14
+                },
+                "point": [
+                  525,
+                  368.38461538461536
+                ]
+              },
+              {
+                "left": {
+                  "from": "httpapi",
+                  "to": "webhook",
+                  "label": "事件 Webhook",
+                  "collectionIndex": 10,
+                  "artifactIndex": 11
+                },
+                "right": {
+                  "from": "federation",
+                  "to": "note",
+                  "label": "远程对象 / 提及",
+                  "collectionIndex": 13,
+                  "artifactIndex": 14
+                },
+                "point": [
+                  525,
+                  427
+                ]
+              },
+              {
+                "left": {
+                  "from": "deliver",
+                  "to": "redis",
+                  "label": "投递唤醒（可选）",
+                  "collectionIndex": 16,
+                  "artifactIndex": 17
+                },
+                "right": {
+                  "from": "webhook",
+                  "to": "postgres",
+                  "label": "webhooks 表",
+                  "collectionIndex": 19,
+                  "artifactIndex": 20
+                },
+                "point": [
+                  836,
+                  622
+                ]
+              },
+              {
+                "left": {
+                  "from": "streaming",
+                  "to": "redis",
+                  "label": "Pub/Sub（可选）",
+                  "collectionIndex": 21,
+                  "artifactIndex": 22
+                },
+                "right": {
+                  "from": "media",
+                  "to": "postgres",
+                  "label": "drive_files",
+                  "collectionIndex": 22,
+                  "artifactIndex": 23
+                },
+                "point": [
+                  796,
+                  384
+                ]
+              }
+            ],
+            "crowdedSides": [
+              {
+                "node": "httpapi",
+                "label": "httpapi",
+                "side": "right",
+                "relationships": 4,
+                "sidePx": 64,
+                "neededPx": 74
+              }
+            ],
+            "detours": [
+              {
+                "relationship": {
+                  "from": "httpapi",
+                  "to": "account",
+                  "label": "注册 / 登录 / TOTP",
+                  "collectionIndex": 5,
+                  "artifactIndex": 6
+                },
+                "bends": 4,
+                "stretch": 1.512
+              },
+              {
+                "relationship": {
+                  "from": "httpapi",
+                  "to": "webhook",
+                  "label": "事件 Webhook",
+                  "collectionIndex": 10,
+                  "artifactIndex": 11
+                },
+                "bends": 4,
+                "stretch": 1
+              },
+              {
+                "relationship": {
+                  "from": "streaming",
+                  "to": "redis",
+                  "label": "Pub/Sub（可选）",
+                  "collectionIndex": 21,
+                  "artifactIndex": 22
+                },
+                "bends": 5,
+                "stretch": 1.472
+              }
+            ]
+          },
+          "leadingSpace": {
+            "measured": true,
+            "emptyTopPx": 10,
+            "emptyTopRatio": 0.012,
+            "occupiedTop": 10,
+            "viewBoxTop": 0,
+            "canvasHeight": 812,
+            "typicalNodeHeight": 64,
+            "reviewSuggested": false
+          },
+          "desktopReadability": {
+            "budgetBasis": "legacy-930",
+            "readerContract": "declared-wide-v1",
+            "availableDiagramWidth": 930,
+            "actualBudgetPx": 930,
+            "limit": "legacy",
+            "requestedTargetPx": 7.5,
+            "requestedTargetMet": false,
+            "hardFloorPx": 6,
+            "hardFloorMet": true,
+            "minimumOwner": {
+              "kind": "node",
+              "id": "federation"
+            },
+            "minimumSourceTextPx": 7.3,
+            "minimumProjectedTextPx": 6.194343065693431,
+            "semanticTextCount": 59
+          },
+          "issues": []
+        },
+        "provenance": "current",
+        "deliveryReceiptId": "884acd1e-347b-4ae3-a693-4f13f8e635c7"
+      }
+    },
+    "browser-check": {
+      "status": "skipped",
+      "exitCode": 2,
+      "durationMs": 23,
+      "command": [
+        "/home/lainsaka/.nvm/versions/node/v24.22.1/bin/node",
+        "/home/lainsaka/.agents/skills/archify/bin/archify.mjs",
+        "browser-check",
+        "/home/lainsaka/文档/MilnFish/.worktrees/firefish-port/.archify/architecture-cinderfish-overall/cinderfish-overall.html",
+        "--json",
+        "--require-provenance",
+        "--out-dir",
+        "/home/lainsaka/文档/MilnFish/.worktrees/firefish-port/.archify/architecture-cinderfish-overall/review-20"
+      ],
+      "execution": "in-process",
+      "receipt": {
+        "schemaVersion": 1,
+        "ok": false,
+        "command": "browser-check",
+        "evidenceKind": "automated-browser",
+        "status": "skipped",
+        "visualReview": "not-requested",
+        "provenance": "current",
+        "deliveryReceiptId": "884acd1e-347b-4ae3-a693-4f13f8e635c7",
+        "artifact": {
+          "path": "/home/lainsaka/文档/MilnFish/.worktrees/firefish-port/.archify/architecture-cinderfish-overall/cinderfish-overall.html",
+          "sha256": "34096dda0edb4d6ee4e3e24e023721501b69fe0c380d492005a15d8e6dbd62c0",
+          "bytes": 880296
+        },
+        "state": {
+          "detail": "read",
+          "motion": "still"
+        },
+        "chrome": {
+          "status": "unavailable",
+          "executable": null
+        },
+        "diagnostics": [
+          {
+            "code": "viewer/chrome-unavailable",
+            "severity": "warning",
+            "message": "No supported browser found. Install Chrome/Chromium (or Microsoft Edge), or set ARCHIFY_CHROME to its executable path.",
+            "subject": {
+              "artifact": "/home/lainsaka/文档/MilnFish/.worktrees/firefish-port/.archify/architecture-cinderfish-overall/cinderfish-overall.html"
+            },
+            "evidence": {
+              "executable": null
+            },
+            "supportedFixes": [
+              "set ARCHIFY_CHROME to a Chrome/Chromium executable (or Microsoft Edge) and rerun browser-check"
+            ]
+          }
+        ],
+        "containment": {
+          "status": "skipped",
+          "policy": "fit-or-reader-declared-readable-vertical-scroll",
+          "viewports": []
+        },
+        "themeStates": {
+          "status": "skipped",
+          "viewports": []
+        },
+        "readability": {
+          "status": "skipped",
+          "minimumProjectedNodeTextPx": 6,
+          "viewports": []
+        },
+        "viewerChrome": {
+          "status": "skipped",
+          "viewports": []
+        },
+        "captures": {
+          "status": "not-requested",
+          "screenshots": [],
+          "contactSheet": null
+        },
+        "sidecars": {
+          "directory": "/home/lainsaka/文档/MilnFish/.worktrees/firefish-port/.archify/architecture-cinderfish-overall/review-20",
+          "receipt": "cinderfish-overall.browser-check.json",
+          "files": []
+        },
+        "error": "No supported browser found. Install Chrome/Chromium (or Microsoft Edge), or set ARCHIFY_CHROME to its executable path."
+      }
+    }
+  },
+  "browserCheck": {
+    "requested": true,
+    "ran": false
+  },
+  "diagnostics": [
+    {
+      "code": "viewer/chrome-unavailable",
+      "severity": "warning",
+      "message": "No supported browser found. Install Chrome/Chromium (or Microsoft Edge), or set ARCHIFY_CHROME to its executable path.",
+      "subject": {
+        "artifact": "/home/lainsaka/文档/MilnFish/.worktrees/firefish-port/.archify/architecture-cinderfish-overall/cinderfish-overall.html"
+      },
+      "evidence": {
+        "executable": null
+      },
+      "supportedFixes": [
+        "set ARCHIFY_CHROME to a Chrome/Chromium executable (or Microsoft Edge) and rerun browser-check"
+      ]
+    }
+  ],
+  "evidence": {
+    "receipt": "/home/lainsaka/文档/MilnFish/.worktrees/firefish-port/.archify/architecture-cinderfish-overall/review-20/cinderfish-overall.finalize.json",
+    "summaryReceipt": "/home/lainsaka/文档/MilnFish/.worktrees/firefish-port/.archify/architecture-cinderfish-overall/review-20/cinderfish-overall.finalize-summary.json",
+    "browserCheckReceipt": "/home/lainsaka/文档/MilnFish/.worktrees/firefish-port/.archify/architecture-cinderfish-overall/review-20/cinderfish-overall.browser-check.json"
+  },
+  "visualReview": "not-requested",
+  "failedStage": "browser-check",
+  "finishedAt": "2026-11-06T13:13:16.033Z",
+  "durationMs": 1032,
+  "update": {
+    "status": "current",
+    "installedVersion": "3.2.0",
+    "availableVersion": "3.2.0",
+    "releaseNotes": null,
+    "checkedAt": "2026-11-06T13:04:55.314Z",
+    "source": "cache",
+    "noticeRequired": false,
+    "noticeText": null
+  }
+}

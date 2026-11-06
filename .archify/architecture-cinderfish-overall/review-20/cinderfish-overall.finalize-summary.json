@@ -1,0 +1,67 @@
+{
+  "schemaVersion": 1,
+  "ok": false,
+  "command": "finalize",
+  "status": "skipped",
+  "type": "architecture",
+  "quality": "showcase",
+  "specification": {
+    "path": "/home/lainsaka/文档/MilnFish/.worktrees/firefish-port/.archify/architecture-cinderfish-overall/candidate.json",
+    "sha256": "b79abd2dc5f67a6b628c39248d323c5dc7df63ce613985e752f3aff8fe74ee5a",
+    "bytes": 10776
+  },
+  "artifact": {
+    "path": "/home/lainsaka/文档/MilnFish/.worktrees/firefish-port/.archify/architecture-cinderfish-overall/cinderfish-overall.html",
+    "sha256": "34096dda0edb4d6ee4e3e24e023721501b69fe0c380d492005a15d8e6dbd62c0",
+    "bytes": 880296
+  },
+  "gates": {
+    "validate": "pass",
+    "deliver": "pass",
+    "check": "pass",
+    "browser-check": "skipped"
+  },
+  "failedStage": "browser-check",
+  "diagnostics": [
+    {
+      "code": "viewer/chrome-unavailable",
+      "severity": "warning",
+      "message": "No supported browser found. Install Chrome/Chromium (or Microsoft Edge), or set ARCHIFY_CHROME to its executable path.",
+      "subject": {
+        "artifact": "/home/lainsaka/文档/MilnFish/.worktrees/firefish-port/.archify/architecture-cinderfish-overall/cinderfish-overall.html"
+      },
+      "evidence": {
+        "executable": null
+      },
+      "supportedFixes": [
+        "set ARCHIFY_CHROME to a Chrome/Chromium executable (or Microsoft Edge) and rerun browser-check"
+      ]
+    }
+  ],
+  "diagnosticSummary": {
+    "total": 1,
+    "shown": 1,
+    "truncated": false
+  },
+  "evidence": {
+    "receipt": "/home/lainsaka/文档/MilnFish/.worktrees/firefish-port/.archify/architecture-cinderfish-overall/review-20/cinderfish-overall.finalize.json",
+    "summaryReceipt": "/home/lainsaka/文档/MilnFish/.worktrees/firefish-port/.archify/architecture-cinderfish-overall/review-20/cinderfish-overall.finalize-summary.json",
+    "browserCheckReceipt": "/home/lainsaka/文档/MilnFish/.worktrees/firefish-port/.archify/architecture-cinderfish-overall/review-20/cinderfish-overall.browser-check.json"
+  },
+  "update": {
+    "status": "current",
+    "installedVersion": "3.2.0",
+    "availableVersion": "3.2.0",
+    "releaseNotes": null,
+    "checkedAt": "2026-11-06T13:04:55.314Z",
+    "source": "cache",
+    "noticeRequired": false,
+    "noticeText": null
+  },
+  "visualReview": "not-requested",
+  "durationMs": 1032,
+  "browserCheck": {
+    "requested": true,
+    "ran": false
+  }
+}
