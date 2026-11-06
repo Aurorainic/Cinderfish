@@ -5,10 +5,12 @@
 // widgets column resolves a name to a lazily loaded component through
 // `widgetComponent()`, so a widget is only downloaded when it is on screen.
 //
-// First wave: post-form, notifications, timeline, trends, memo, instance-cloud,
-// activity, photos, user-list, clock, digital-clock, server-info. Widgets whose
-// data has no endpoint (rss, rss-ticker, aiscript, job-queue, server-metric,
-// online-users, calendar/federation/unix-clock/slideshow/button) are not ported.
+// Ported: post-form, notifications, timeline, trends, memo, instance-cloud,
+// activity, photos, user-list, clock, digital-clock, server-info, calendar,
+// button, unix-clock, slideshow. Widgets whose data or runtime has no backing
+// here (rss, rss-ticker, aiscript, job-queue, server-metric, online-users,
+// federation) are not ported; `slideshow` and `button` keep their upstream
+// options except the folder picker and the AiScript program.
 import { defineAsyncComponent, reactive, type Component } from "vue";
 import { popup } from "@/os/state";
 import { t } from "@/i18n";
@@ -204,6 +206,8 @@ const loaders: WidgetLoader[] = [
 	{ name: "notifications", load: () => import("./notifications.vue") },
 	{ name: "timeline", load: () => import("./timeline.vue") },
 	{ name: "trends", load: () => import("./trends.vue") },
+	{ name: "button", load: () => import("./button.vue") },
+	{ name: "calendar", load: () => import("./calendar.vue") },
 	{ name: "clock", load: () => import("./clock.vue") },
 	{ name: "activity", load: () => import("./activity.vue") },
 	{ name: "photos", load: () => import("./photos.vue") },
@@ -212,6 +216,8 @@ const loaders: WidgetLoader[] = [
 	{ name: "postForm", load: () => import("./post-form.vue") },
 	{ name: "userList", load: () => import("./user-list.vue") },
 	{ name: "serverInfo", load: () => import("./server-info.vue") },
+	{ name: "unixClock", load: () => import("./unix-clock.vue") },
+	{ name: "slideshow", load: () => import("./slideshow.vue") },
 ];
 
 const components = new Map<string, Component>(

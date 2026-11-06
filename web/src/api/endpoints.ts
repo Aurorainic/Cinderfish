@@ -7,6 +7,8 @@
 
 import type {
 	AdminEmoji,
+	AuthorizedApp,
+	BlockingRecord,
 	AllowlistResponse,
 	DriveFile,
 	DriveFolder,
@@ -19,6 +21,7 @@ import type {
 	MetaDetailed,
 	MetaLite,
 	MiAuthTokenResponse,
+	MuteRecord,
 	Note,
 	NoteCreateResponse,
 	NoteDetailed,
@@ -45,6 +48,8 @@ export const ENDPOINTS = {
 	signin: "signin",
 	usernameAvailable: "username/available",
 	miAuthGenToken: "miauth/gen-token",
+	iApps: "i/apps",
+	iRevokeToken: "i/revoke-token",
 
 	// current user
 	i: "i",
@@ -69,6 +74,14 @@ export const ENDPOINTS = {
 	followingRequestsAccept: "following/requests/accept",
 	followingRequestsReject: "following/requests/reject",
 	followingRequestsCancel: "following/requests/cancel",
+
+	// mutes and blocks
+	muteCreate: "mute/create",
+	muteDelete: "mute/delete",
+	muteList: "mute/list",
+	blockingCreate: "blocking/create",
+	blockingDelete: "blocking/delete",
+	blockingList: "blocking/list",
 
 	// registry
 	registrySet: "i/registry/set",
@@ -145,6 +158,12 @@ export interface PaginationParams {
 	untilDate?: number;
 }
 
+export interface RelationListParams {
+	limit?: number;
+	sinceId?: string;
+	untilId?: string;
+}
+
 export interface TimelineParams extends PaginationParams {
 	withFiles?: boolean;
 	withRenotes?: boolean;
@@ -183,6 +202,7 @@ export interface IUpdateParams {
 	avatarId?: string | null;
 	followersVisibility?: "public" | "followers" | "private";
 	followingVisibility?: "public" | "followers" | "private";
+	mutedInstances?: string[] | null;
 }
 
 export interface UsersShowParams {
@@ -488,6 +508,28 @@ export interface EndpointMap {
 		req: { userId: string };
 		res: EmptyResponse;
 	};
+	[ENDPOINTS.iApps]: {
+		req: { sort?: "+createdAt" | "-createdAt" | "+lastUsedAt" | "-lastUsedAt" };
+		res: AuthorizedApp[];
+	};
+	[ENDPOINTS.iRevokeToken]: { req: { tokenId: string }; res: EmptyResponse };
+
+	[ENDPOINTS.muteCreate]: { req: { userId: string }; res: EmptyResponse };
+	[ENDPOINTS.muteDelete]: { req: { userId: string }; res: EmptyResponse };
+	[ENDPOINTS.muteList]: {
+		req: RelationListParams;
+		res: MuteRecord[];
+	};
+	[ENDPOINTS.blockingCreate]: { req: { userId: string }; res: UserDetailed };
+	[ENDPOINTS.blockingDelete]: {
+		req: { userId: string };
+		res: EmptyResponse;
+	};
+	[ENDPOINTS.blockingList]: {
+		req: RelationListParams;
+		res: BlockingRecord[];
+	};
+
 	[ENDPOINTS.adminFederationMode]: {
 		req: { mode: "public" | "allowlist" | "none" };
 		res: FederationModeResponse;

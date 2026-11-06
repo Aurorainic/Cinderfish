@@ -107,6 +107,24 @@ const menuDef = computed<MkSuperMenuGroup[]>(() => [
 				to: "/settings/security",
 				active: isActive("/settings/security"),
 			},
+			{
+				icon: "ph-mask-happy ph-bold ph-lg",
+				text: t("accessibility"),
+				to: "/settings/accessibility",
+				active: isActive("/settings/accessibility"),
+			},
+			{
+				icon: "ph-user-circle-minus ph-bold ph-lg",
+				text: t("muteAndBlock"),
+				to: "/settings/mute-block",
+				active: isActive("/settings/mute-block"),
+			},
+			{
+				icon: "ph-server ph-bold ph-lg",
+				text: t("instanceMute"),
+				to: "/settings/instance-mute",
+				active: isActive("/settings/instance-mute"),
+			},
 		],
 	},
 	{
@@ -182,6 +200,18 @@ const menuDef = computed<MkSuperMenuGroup[]>(() => [
 				text: t("registry"),
 				to: "/registry",
 				active: isActive("/registry"),
+			},
+			{
+				icon: "ph-devices ph-bold ph-lg",
+				text: t("accounts"),
+				to: "/settings/accounts",
+				active: isActive("/settings/accounts"),
+			},
+			{
+				icon: "ph-app-window ph-bold ph-lg",
+				text: t("apps"),
+				to: "/settings/apps",
+				active: isActive("/settings/apps"),
 			},
 			{
 				icon: "ph-dots-three-outline ph-bold ph-lg",

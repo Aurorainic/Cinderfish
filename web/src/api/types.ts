@@ -104,7 +104,7 @@ export interface MeDetailed extends UserDetailed {
 	unreadNotificationsCount: number;
 	mutedWords: unknown[];
 	hardMutedWords: unknown[];
-	mutedInstances: unknown[];
+	mutedInstances: string[];
 	mutingNotificationTypes: string[];
 	notificationRecieveConfig: Record<string, unknown>;
 	emailNotificationTypes: string[];
@@ -382,4 +382,34 @@ export interface NoteCreateResponse {
 
 export interface RefreshAccountResponse {
 	token: string;
+}
+
+/** One row of `mute/list`. */
+export interface MuteRecord {
+	id: string;
+	createdAt: string;
+	mutee: UserDetailed;
+}
+
+/** One row of `blocking/list`. */
+export interface BlockingRecord {
+	id: string;
+	createdAt: string;
+	blockee: UserDetailed;
+}
+
+/** A muted instance host, stored only in the local base store. */
+export interface MutedInstance {
+	host: string;
+}
+
+/** One third-party application authorized by `i/apps`. */
+export interface AuthorizedApp {
+	id: string;
+	name: string;
+	description: string;
+	iconUrl: string | null;
+	permission: string[];
+	createdAt: string;
+	lastUsedAt: string | null;
 }

@@ -1451,6 +1451,55 @@ CINDERFISH_TEST_DATABASE_URL=… go test -count=1 ./...   # 全绿
 - **未实装（首版范围外）**：chat/channels/lists/antennas/clips/groups/gallery/pages、剩余约 10 个 widget、
   其余 37 个 locale、实例级主题。
 
+## 12U. 批次：前端第五波——静音/屏蔽、令牌管理、无障碍、多账号与 widgets 补齐（2026-11-06）
+
+**工作方式**：本轮按用户要求「极速推进、只写代码、测试与走查留后」，所以没有并行分派，也没有浏览器
+走查；Lead 一次写完后端与前端，只做编译级检查。施工依据见
+`docs/research/2026-11-06-firefish-port-wave5-contract.md`。
+
+### 12U.1 落地清单
+
+| 层 | 文件 | 说明 |
+|----|------|------|
+| 关系存储 | `internal/account/relations.go`（新） | `Mute`/`Unmute`/`IsMuted`、`Block`/`Unblock`/`IsBlocked`、`Mutes`/`Blocks`（id 倒序 + sinceId/untilId） |
+| 关系端点 | `internal/httpapi/relations.go`（新）、`server.go`、`account.go` | `mute/create|delete|list`、`blocking/create|delete|list`；`users/show` 补 `isMuted`/`isBlocked`；屏蔽事务内清双向关注与待审请求 |
+| 时间线过滤 | `internal/note/timeline.go` | 排除被静音作者、双向屏蔽、被静音实例的主机 |
+| 实例静音 | `internal/account/profile.go`、`internal/httpapi/i_update.go`、`users_pack.go` | `mutedInstances` 存 `user_profiles.settings`，`i` 回读，最多 200 条并做主机校验 |
+| 令牌管理 | `internal/account/tokens.go`、`internal/httpapi/apps.go`（新）、`server.go` | `i/apps`（可排序）与 `i/revoke-token`（只能删自己的令牌） |
+| 设置页 | `SettingsMuteBlock.vue`、`SettingsInstanceMute.vue`、`SettingsApps.vue`、`SettingsAccounts.vue`、`SettingsAccessibility.vue` | 静音/屏蔽名单；实例静音；应用授权与撤销；多账号切换/移除/新增；6 个有消费方的无障碍开关 |
+| 接口层 | `web/src/api/endpoints.ts`、`types.ts` | 8 个新端点常量、参数/返回类型、`MeDetailed.mutedInstances: string[]` |
+| widgets | `web/src/widgets/button.vue`、`calendar.vue`、`unix-clock.vue`、`slideshow.vue`、`index.ts` | 4 个新 widget，loader 表 12 → 16 |
+| 导航 | `web/src/pages/SettingsIndex.vue` | 基础组加无障碍/静音与屏蔽/服务器静音；其它组加账号/应用 |
+
+### 12U.2 明确的取舍
+
+1. **不做状态栏设置页**：没有 `MkStatusbar` 组件与挂载点，做出来只是一个永不显示的列表。
+2. **不做自定义 KaTeX 宏页**：`katex` 不是依赖，`MkFormula` 已按纯文本降级。
+3. **不做 RSS / 服务器指标 / 在线用户 widget**：分别需要服务端代理与 Streaming `stats` 通道。
+4. **无障碍只接有消费方的键**：模糊效果、图片加载、图标集等键没有任何组件读取，不画开关，页尾说明原因。
+5. **button widget 不用 AiScript**：AiScript 不是依赖，改为打开 `url`，只允许 http(s)。
+6. **slideshow 不用文件夹选择器**：取网盘最新 24 张图片轮播，`folderId` 不提供。
+
+### 12U.3 检查记录（仅编译级）
+
+```
+gofmt -l internal/ cmd/            # 空
+go build ./...                     # exit 0
+cd web && pnpm exec vue-tsc --noEmit   # exit 0
+cd web && pnpm run check:port      # 398 文件，hardTotal 0
+```
+
+### 12U.4 未验证（续作必读）
+
+- 静音/屏蔽的**端到端行为**未在真实二进制上验证：时间线过滤 SQL、屏蔽清关注、`users/show` 标记、
+  设置页交互都只过编译。
+- `i/apps` / `i/revoke-token` 只验证编译；撤销后旧令牌是否 401、应用页列表是否即时变化未实测。
+- 多账号页的切换与新增登录未走查；`fetchMe` 失败时的占位行样式未看过。
+- 4 个新 widget 未在浏览器里渲染过；slideshow 的轮播、unix-clock 的毫秒闪烁、calendar 的进度条均未目视。
+- 实例静音的 `settings` JSONB 过滤条件（`?` 操作符）未在任何数据库上执行过；首次运行时要先确认
+  `user_profiles.settings` 没有该键时不会把时间线清空。
+- 无障碍页 6 个开关的实际样式与移动端换行未看。
+
 ## 13. 文档索引
 
 | 文档 | 内容 |
@@ -1481,8 +1530,17 @@ CINDERFISH_TEST_DATABASE_URL=… go test -count=1 ./...   # 全绿
 | `docs/research/2026-11-05-firefish-port-wave2-contract.md` | **第二波施工契约（模块映射、降级清单、写作用域、验收口径）——续作移植任务的模板，见 §12R** |
 | `docs/research/2026-11-05-firefish-port-wave3-contract.md` | **第三波施工契约（发帖链路、个人页、设置、内容页、壳层/widgets 的模块映射与 13 个写作用域），见 §12S** |
 | `docs/research/2026-11-06-firefish-port-wave4-contract.md` | **第四波施工契约（管理台、主题体系、注册表、本地设置、静态页的模块映射与 7 个写作用域），见 §12T** |
+| `docs/research/2026-11-06-firefish-port-wave5-contract.md` | **第五波施工契约（静音/屏蔽、令牌管理、实例静音、无障碍、多账号、4 个 widget 与明确不做的项），见 §12U** |
 
 ## 14. 已知的未验证项
+
+- **第五波只做了编译级检查（2026-11-06，见 §12U.3）**：静音/屏蔽的端到端行为、时间线的
+  `mutedInstances` JSONB 过滤、`i/apps` 撤销后的 401、多账号切换、4 个新 widget 的渲染、
+  无障碍页样式全部未验证；按用户要求留到确认后的走查轮。
+- **仍未移植的设置页**：邮箱、整合、安全（2FA）、导入导出、迁移、Webhook、插件、自定义 KaTeX、状态栏、
+  删除账号、应用授权以外的账号操作；对应后端端点不存在或前端缺少依赖（见第五波契约 §3.3）。
+- **仍缺的 widgets**：rss、rss-ticker、server-metric、online-users、federation、job-queue、aiscript、
+  以及 activity 的子图表；缺服务端代理、Streaming stats 通道或 AiScript 运行时。
 
 - **浏览器可视化走查（Task 8 波次）未做**：2026-10-31 的最终轮，内建浏览器返回 `BROWSER_USER_TAKEOVER`（用户接管面板），按工具契约当轮停止。因此 1440/1280/1100/840/720/600/380 的截图、`scrollWidth` 溢出实测与登录态视觉复核**都没有执行**；同一轮的后端 API 走查（未读数、通知类型、回复可见性、纯转贴反应、四条时间线）已用真实二进制完成，见 §11.15.7。本波次没有改 CSS 或 DOM 结构，风险低，但不能当作已验证。
 - **新前端骨架的浏览器验证已部分补上（2026-11-05，第二波）**：§12R 用无头 Chromium + CDP 对
