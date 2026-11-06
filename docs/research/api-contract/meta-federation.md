@@ -1173,3 +1173,10 @@ Cinderfish 没有 Misskey 的 `instances` 表，也没有在线的 nodeinfo 抓�
 
 **不发任何网络请求**，因此该端点不能被用来探测任意地址（SSRF 风险为 0）。代价是远端信息不会自动
 更新，/instance-info 页面也明确这样说明。
+
+## 2026-11-06 增补：federation/instances
+
+`POST /api/federation/instances`（需登录）接受 `{host?, limit?, offset?}`，返回
+`FederationInstance[]`，按收录用户数降序。数据按 `users.host` 聚合，帖子数来自 `notes.user_host`；
+没有 `instances` 表，所以软件字段与状态标志都是 `null`/`false`。`limit` 默认 30、上限 100。
+管理台联邦页用它列出「已收录实例」。

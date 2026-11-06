@@ -141,3 +141,69 @@ func normalizeHost(value string) string {
 	}
 	return host
 }
+
+// handleFederationInstances implements POST /api/federation/instances: the
+// remote hosts this instance already knows, aggregated from users/notes.
+// Cinderfish keeps no `instances` table, so software/registration fields stay
+// null; only the counters are meaningful.
+func (s *Server) handleFederationInstances(w http.ResponseWriter, r *http.Request) {
+	if s.pool == nil {
+		writeAPIError(w, &APIError{
+			Message: "Not available.", Code: "INTERNAL_ERROR",
+			ID: errIDInternal, Kind: "server", Status: http.StatusServiceUnavailable,
+		})
+		return
+	}
+	var body struct {
+		Host   string `json:"host"`
+		Limit  int    `json:"limit"`
+		Offset int    `json:"offset"`
+	}
+	if err := decodeOptionalJSON(r, &body); err != nil {
+		writeAPIError(w, err)
+		return
+	}
+	info, err := s.authenticate(r.Context(), r, bodyAsMap(r))
+	if err != nil || info == nil {
+		writeAuthenticationError(w)
+		return
+	}
+	limit := body.Limit
+	if limit <= 0 || limit > 100 {
+		limit = 30
+	}
+	if body.Offset < 0 {
+		body.Offset = 0
+	}
+	host := normalizeHost(body.Host)
+
+	rows, err := s.pool.Query(r.Context(), `
+SELECT u.host, count(DISTINCT u.id) AS users,
+       (SELECT count(*) FROM notes n WHERE n.user_host = u.host AND n.deleted_at IS NULL) AS notes
+FROM users u
+WHERE u.host IS NOT NULL AND ($1 = '' OR u.host = $1)
+GROUP BY u.host
+ORDER BY users DESC, u.host ASC
+LIMIT $2 OFFSET $3
+`, host, limit, body.Offset)
+	if err != nil {
+		writeInternalServerError(w)
+		return
+	}
+	defer rows.Close()
+
+	out := make([]instanceInfo, 0, limit)
+	for rows.Next() {
+		var item instanceInfo
+		if err := rows.Scan(&item.Host, &item.UsersCount, &item.NotesCount); err != nil {
+			writeInternalServerError(w)
+			return
+		}
+		out = append(out, item)
+	}
+	if err := rows.Err(); err != nil {
+		writeInternalServerError(w)
+		return
+	}
+	writeJSON(w, http.StatusOK, out)
+}
