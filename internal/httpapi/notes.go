@@ -532,6 +532,22 @@ func (s *Server) handleNotesReactionsCreate(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	// The note must be visible to the reactor, as notes/reactions' own list is.
+	// Without this a stranger could probe for a private note id and notify
+	// its author.
+	visible, err := s.notes.VisibleTo(r.Context(), n, info.User.ID)
+	if err != nil {
+		writeInternalServerError(w)
+		return
+	}
+	if !visible {
+		writeAPIError(w, &APIError{
+			Message: "No such note.", Code: "NO_SUCH_NOTE",
+			ID: errIDNoSuchNoteReaction, Kind: "client", Status: http.StatusNotFound,
+		})
+		return
+	}
+
 	// Misskey refuses reactions on a pure renote: the reaction belongs to
 	// the renoted note (core/ReactionService.ts L121-123).
 	if n.IsPureRenote() {

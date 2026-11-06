@@ -744,7 +744,7 @@ $ cd web && pnpm typecheck && pnpm build
 `TestNotificationHasNoBodyField`。上游比对：`NoteEntityService.isVisibleForMe`（L308-359）与
 `core/entities/NotificationEntityService.ts` 的「不可达则返回 null」语义。
 
-**已知遗留（本波次不做）**：`notes/reactions/create` 的读可见性仍未接线（表里保留该行）；`notes/delete` 仍借用
+**已知遗留（本波次不做）**：~~`notes/reactions/create` 的读可见性~~（2026-11-07 已接线并有用例，见 §12CT）；`notes/delete` 仍借用
 `notes/show` 的错误 id；提及被回复/引用吸收时不再发主通道 `mention` 事件（客户端会多收一条事件，不影响通知内容）。
 
 ### 11.16 Firefish 前端整体移植 Task 1：参考源码、许可证与能力矩阵（2026-11-01）
@@ -5192,3 +5192,33 @@ CINDERFISH_TEST_DATABASE_URL=... go test ./... -count=1         # 全绿
 - 「将所有通知标为已读」与两个禁用按钮（未读笔记/消息）没有在本轮点击。
 - 通知设置页在移动端断点下的排版。
 - 从时间线菜单进入编辑页后的保存流程（后端有 `TestNotesEditAndHistory`，界面只验证到入口）。
+
+## 12CT. 第八十一波：反应写入的可见性校验（2026-11-07）
+
+第十一波的遗留项：`notes/reactions/create` 只查笔记存在与是否纯转帖，没有检查调用者能否看见它。
+陌生人只要知道 id 就能给 `followers` / `specified` 笔记加反应，并向作者发通知（探测笔记存在性）。
+
+### 12CT.1 修复
+
+在纯转帖检查之前加 `s.notes.VisibleTo(ctx, n, info.User.ID)`；不可见时返回与其他未知笔记相同的
+404 `NO_SUCH_NOTE`（id 用反应端点自己的 `errIDNoSuchNoteReaction`），不泄露笔记是否存在。
+
+### 12CT.2 验证证据
+
+`TestReactionCreateRequiresVisibility`：
+
+- 陌生人给 `followers` 笔记与 `specified` 笔记加反应 → 404；
+- 成为关注者后可给 `followers` 笔记加反应 → 200；
+- `specified` 的被点名用户 → 200；作者给自己 → 200；
+- 公开笔记对任何登录用户 → 200。
+
+```
+gofmt -l internal/ cmd/                                        # 空
+go vet ./...                                                   # exit 0
+CINDERFISH_TEST_DATABASE_URL=... go test ./... -count=1         # 全绿
+```
+
+### 12CT.3 仍未验证
+
+- 远端反应（Like/EmojiReact）的入站可见性：入站路径按 AP 目标解析，没有“看不见的笔记”概念。
+- 反应删除（`notes/reactions/delete`）的可见性（删除自己的反应不需要看见笔记）。

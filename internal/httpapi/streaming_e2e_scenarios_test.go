@@ -183,8 +183,10 @@ func TestStreamingSubNoteVisibility(t *testing.T) {
 	sendFrame(t, conn, map[string]any{"type": "subNote", "body": map[string]any{"id": noteID}})
 	time.Sleep(100 * time.Millisecond)
 
+	// The author reacts to her own note, which the new visibility check
+	// allows even on a followers-only note; bob must still see nothing.
 	resp, _ := post(t, ts, "/api/notes/reactions/create", map[string]any{
-		"i": bobToken, "noteId": noteID, "reaction": "👀",
+		"i": aliceToken, "noteId": noteID, "reaction": "👀",
 	})
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("reaction: status %d", resp.StatusCode)
