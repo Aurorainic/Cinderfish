@@ -14,7 +14,9 @@ export type {
 	DriveFile,
 	MetaLite,
 	SigninResponse,
+	SigninStep,
 	SignupResponse,
+	TwoFactorRegistration,
 	UserDetailed,
 	UserLite,
 } from "../api/types";

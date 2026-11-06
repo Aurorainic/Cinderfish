@@ -21,7 +21,7 @@ import { me, setMe, updateMe } from "./me";
 import type {
 	MeDetailed,
 	ProfileUpdateRequest,
-	SigninResponse,
+	SigninStep,
 	SignupResponse,
 } from "./types";
 
@@ -29,6 +29,16 @@ export interface SignInResult {
 	account: MeDetailed;
 	token: string;
 }
+
+/**
+ * The password was accepted but the account has TOTP enabled: the caller
+ * must repeat `signIn` with the six-digit code from the authenticator app.
+ */
+export interface TwoFactorRequired {
+	twoFactorRequired: true;
+}
+
+export type SignInOutcome = SignInResult | TwoFactorRequired;
 
 /**
  * Hooks installed by the app shell (`main.ts`). Kept optional so the account
@@ -98,19 +108,26 @@ export async function login(
 }
 
 /**
- * Password sign-in (`POST /api/signin`). Cinderfish always answers
- * `{ finished: true, id, i }`; there is no TOTP/WebAuthn second step.
+ * Password sign-in (`POST /api/signin`). When the account has TOTP enabled
+ * and no `token` is supplied, the server answers an empty body and this
+ * function reports `twoFactorRequired`; the caller repeats the call with the
+ * six-digit code, which returns the normal `{ finished, id, i }` body.
  */
 export async function signIn(
 	username: string,
 	password: string,
+	token?: string,
 	options: LoginOptions = {},
-): Promise<SignInResult> {
-	const response = await accountApi<SigninResponse>(
-		"signin",
-		{ username, password },
-		null,
-	);
+): Promise<SignInOutcome> {
+	const params: { username: string; password: string; token?: string } = {
+		username,
+		password,
+	};
+	if (token != null && token !== "") params.token = token;
+	const response = await accountApi<SigninStep>("signin", params, null);
+	if (response.finished !== true) {
+		return { twoFactorRequired: true };
+	}
 	const account = await login(response.i, options);
 	return { account, token: response.i };
 }

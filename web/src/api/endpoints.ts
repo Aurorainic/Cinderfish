@@ -39,9 +39,10 @@ import type {
 	ObjectStorageInfo,
 	PingResponse,
 	RegistryDetail,
-	SigninResponse,
+	SigninStep,
 	SignupResponse,
 	TableStat,
+	TwoFactorRegistration,
 	UserNameAvailability,
 	UserDetailed,
 	UserLite,
@@ -59,6 +60,10 @@ export const ENDPOINTS = {
 	signin: "signin",
 	usernameAvailable: "username/available",
 	miAuthGenToken: "miauth/gen-token",
+	iTwoFactorRegister: "i/2fa/register",
+	iTwoFactorDone: "i/2fa/done",
+	iTwoFactorUnregister: "i/2fa/unregister",
+	iTwoFactorPasswordLess: "i/2fa/password-less",
 	iApps: "i/apps",
 	iExport: "i/export",
 	iWebhooksCreate: "i/webhooks/create",
@@ -254,6 +259,8 @@ export interface SignupParams {
 export interface SigninParams {
 	username: string;
 	password: string;
+	/** TOTP code, supplied only on the second step of a 2FA signin. */
+	token?: string;
 }
 
 export interface MiAuthGenTokenParams {
@@ -447,10 +454,26 @@ export interface EndpointMap {
 	[ENDPOINTS.ping]: { req: Record<string, never>; res: PingResponse };
 
 	[ENDPOINTS.signup]: { req: SignupParams; res: SignupResponse };
-	[ENDPOINTS.signin]: { req: SigninParams; res: SigninResponse };
+	[ENDPOINTS.signin]: { req: SigninParams; res: SigninStep };
 	[ENDPOINTS.usernameAvailable]: {
 		req: { username: string };
 		res: UserNameAvailability;
+	};
+	[ENDPOINTS.iTwoFactorRegister]: {
+		req: { password: string };
+		res: TwoFactorRegistration;
+	};
+	[ENDPOINTS.iTwoFactorDone]: {
+		req: { token: string };
+		res: Record<string, never>;
+	};
+	[ENDPOINTS.iTwoFactorUnregister]: {
+		req: { password: string };
+		res: Record<string, never>;
+	};
+	[ENDPOINTS.iTwoFactorPasswordLess]: {
+		req: { value: boolean };
+		res: Record<string, never>;
 	};
 	[ENDPOINTS.miAuthGenToken]: {
 		req: MiAuthGenTokenParams;

@@ -64,6 +64,9 @@ export interface UserDetailed extends UserLite {
 	publicReactions: boolean;
 	followersVisibility: FollowVisibility;
 	followingVisibility: FollowVisibility;
+	twoFactorEnabled: boolean;
+	usePasswordLessLogin: boolean;
+	securityKeys: boolean;
 	chatScope: string;
 	canChat: boolean;
 	roles: unknown[];
@@ -366,6 +369,20 @@ export interface SigninResponse {
 	finished: true;
 	id: string;
 	i: string;
+}
+
+/**
+ * Two-factor handshake: a signin with the right password but no `token`
+ * answers an empty body, and the client repeats the request with the code.
+ */
+export type SigninStep = SigninResponse | Record<string, never>;
+
+export interface TwoFactorRegistration {
+	qr: string;
+	url: string;
+	secret: string;
+	label: string;
+	issuer: string;
 }
 
 export interface MiAuthTokenResponse {

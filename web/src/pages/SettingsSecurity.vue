@@ -81,13 +81,104 @@
 
 			<section class="_formBlock">
 				<h2 class="sectionTitle">两步验证</h2>
-				<CfKeyValue class="kv">
-					<template #key>{{ t("securityKey") }}</template>
-					<template #value>{{ t("notSet") }}</template>
-				</CfKeyValue>
-				<CfInfo class="note">
-					两步验证与安全密钥（<code>i/2fa/*</code>、<code>i/security-keys/*</code>）
-					在本实例<strong>未提供</strong>；备份码余量字段存在但不可操作。
+				<template v-if="me.twoFactorEnabled">
+					<CfKeyValue class="kv">
+						<template #key>身份验证器应用</template>
+						<template #value><span class="badge">已启用</span></template>
+					</CfKeyValue>
+					<CfInfo class="note">
+						登录时需要在密码之后输入身份验证器应用生成的 6 位验证码。
+						停用需要再次确认当前密码。
+					</CfInfo>
+					<CfInput
+						v-if="confirmingDisable"
+						v-model="password"
+						class="field"
+						type="password"
+						autocomplete="current-password"
+					>
+						<template #label>{{ t("currentPassword") }}</template>
+					</CfInput>
+					<div class="row">
+						<CfButton
+							v-if="!confirmingDisable"
+							danger
+							@click="confirmingDisable = true"
+						>
+							停用两步验证
+						</CfButton>
+						<template v-else>
+							<CfButton danger :disabled="busy" @click="unregisterTotp()">
+								确认停用
+							</CfButton>
+							<CfButton :disabled="busy" @click="cancelDisable()">
+								取消
+							</CfButton>
+						</template>
+					</div>
+				</template>
+
+				<template v-else-if="registration == null">
+					<CfInfo class="note">
+						尚未启用两步验证。安装任意 TOTP 身份验证器应用（如 Aegis、1Password、
+						Google Authenticator）后，在下方向导中手动输入密钥即可完成绑定。
+					</CfInfo>
+					<CfInput
+						v-model="password"
+						class="field"
+						type="password"
+						autocomplete="current-password"
+					>
+						<template #label>{{ t("currentPassword") }}</template>
+					</CfInput>
+					<div class="row">
+						<CfButton
+							primary
+							:disabled="busy || password === ''"
+							@click="startRegistration()"
+						>
+							{{ t("_2fa.registerTOTP") }}
+						</CfButton>
+					</div>
+				</template>
+
+				<template v-else>
+					<CfInfo class="note">
+						{{ t("_2fa.step1", { a: "Aegis", b: "1Password" }) }}
+						{{ t("_2fa.step2Url") }}
+					</CfInfo>
+					<CfKeyValue class="kv" :copy="registration.secret">
+						<template #key>密钥（手动输入）</template>
+						<template #value>
+							<code class="_monospace secret">{{ registration.secret }}</code>
+						</template>
+					</CfKeyValue>
+					<CfKeyValue class="kv" :copy="registration.url">
+						<template #key>otpauth URL</template>
+						<template #value>
+							<code class="_monospace url">{{ registration.url }}</code>
+						</template>
+					</CfKeyValue>
+					<CfInput
+						v-model="code"
+						class="field"
+						autocomplete="one-time-code"
+						pattern="^[0-9]{6}$"
+						:spellcheck="false"
+					>
+						<template #label>{{ t("_2fa.token") }}</template>
+					</CfInput>
+					<CfInfo class="note">{{ t("_2fa.step3") }}</CfInfo>
+					<div class="row">
+						<CfButton primary :disabled="busy || code === ''" @click="finishRegistration()">
+							完成设置
+						</CfButton>
+						<CfButton :disabled="busy" @click="cancelRegistration()">取消</CfButton>
+					</div>
+				</template>
+
+				<CfInfo v-if="twoFactorError != null" warn class="note">
+					{{ twoFactorError }}
 				</CfInfo>
 			</section>
 		</template>
@@ -95,17 +186,18 @@
 </template>
 
 <script lang="ts" setup>
-// Firefish's security page: password change dialog, X2fa, `i/signin-history`
-// pagination and `i/regenerate-token`. None of the four endpoints exist in
-// Cinderfish (docs/research/2026-11-04-misskey-api-coverage.md), so this page
-// reports the session's real state (from `POST /api/i`) and marks every missing
-// capability as unavailable instead of rendering dead buttons that look live.
+// Firefish's security page: `X2fa` (TOTP registration and removal), the
+// password dialog, `i/signin-history` and `i/regenerate-token`. The port
+// implements the TOTP half; password change, signin history and token
+// regeneration have no endpoint yet and stay marked as unavailable instead of
+// rendering dead buttons.
 import { onMounted, ref } from "vue";
 import { me, updateMe } from "@/account";
-import type { MeDetailed } from "@/api/types";
+import type { MeDetailed, TwoFactorRegistration } from "@/api/types";
 import { api } from "@/api/client";
 import CfButton from "@/components/ui/CfButton.vue";
 import CfInfo from "@/components/ui/CfInfo.vue";
+import CfInput from "@/components/ui/CfInput.vue";
 import CfKeyValue from "@/components/ui/CfKeyValue.vue";
 import CfLoading from "@/components/ui/CfLoading.vue";
 import CfTime from "@/components/ui/CfTime.vue";
@@ -116,6 +208,13 @@ defineOptions({ name: "CfPageSettingsSecurity" });
 
 const loading = ref(true);
 const errorText = ref<string | null>(null);
+
+const password = ref("");
+const code = ref("");
+const registration = ref<TwoFactorRegistration | null>(null);
+const confirmingDisable = ref(false);
+const busy = ref(false);
+const twoFactorError = ref<string | null>(null);
 
 async function load(): Promise<void> {
 	loading.value = true;
@@ -131,6 +230,81 @@ async function load(): Promise<void> {
 	} finally {
 		loading.value = false;
 	}
+}
+
+function describeTwoFactorError(error: unknown, fallback: string): string {
+	return error instanceof Error && error.message !== ""
+		? error.message
+		: fallback;
+}
+
+async function startRegistration(): Promise<void> {
+	if (busy.value) return;
+	busy.value = true;
+	twoFactorError.value = null;
+	try {
+		registration.value = await api("i/2fa/register", {
+			password: password.value,
+		});
+		password.value = "";
+	} catch (error) {
+		twoFactorError.value = describeTwoFactorError(
+			error,
+			"无法开始两步验证设置，请检查当前密码。",
+		);
+	} finally {
+		busy.value = false;
+	}
+}
+
+async function finishRegistration(): Promise<void> {
+	if (busy.value) return;
+	busy.value = true;
+	twoFactorError.value = null;
+	try {
+		await api("i/2fa/done", { token: code.value.replace(/\s/g, "") });
+		registration.value = null;
+		code.value = "";
+		await load();
+	} catch (error) {
+		twoFactorError.value = describeTwoFactorError(
+			error,
+			"验证码未能通过校验，请重新输入。",
+		);
+	} finally {
+		busy.value = false;
+	}
+}
+
+function cancelRegistration(): void {
+	registration.value = null;
+	code.value = "";
+	twoFactorError.value = null;
+}
+
+async function unregisterTotp(): Promise<void> {
+	if (busy.value) return;
+	busy.value = true;
+	twoFactorError.value = null;
+	try {
+		await api("i/2fa/unregister", { password: password.value });
+		password.value = "";
+		confirmingDisable.value = false;
+		await load();
+	} catch (error) {
+		twoFactorError.value = describeTwoFactorError(
+			error,
+			"无法停用两步验证，请检查当前密码。",
+		);
+	} finally {
+		busy.value = false;
+	}
+}
+
+function cancelDisable(): void {
+	confirmingDisable.value = false;
+	password.value = "";
+	twoFactorError.value = null;
 }
 
 onMounted(() => {
@@ -189,6 +363,16 @@ definePageMetadata({ title: t("security"), icon: "ph-lock ph-bold ph-lg" });
 		code {
 			word-break: break-all;
 		}
+	}
+
+	.field {
+		margin-block-start: 12px;
+	}
+
+	.secret,
+	.url {
+		word-break: break-all;
+		user-select: all;
 	}
 }
 </style>

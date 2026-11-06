@@ -2358,6 +2358,52 @@ w19admin 删除，用户数回到 23；服务与临时文件停止。
 - `instancesCount` 与远程账号计数在非联邦实例上为 0，没有构造远端数据。
 - 统计在大量数据下的耗时没有测量。
 
+## 12AJ. 批次：两步验证（TOTP）（2026-11-06）
+
+**工作方式**：目标模式第二十波。按用户 2026-11-06 的指示，本轮**只写代码、不执行测试与走查**，
+验证集中在编译层（`gofmt`/`go vet`/`vue-tsc`/`pnpm build`），端到端与视觉验证留到统一阶段。
+施工依据 `docs/research/2026-11-06-firefish-port-wave20-contract.md`。
+
+### 12AJ.1 落地清单
+
+| 层 | 文件 | 说明 |
+|----|------|------|
+| 迁移 | `internal/db/db.go` | v14：`user_profiles` 增加 `two_factor_secret`、`two_factor_temp_secret`、`two_factor_enabled`、`use_password_less_login` |
+| TOTP | `internal/auth/totp.go`（新） | 20 字节 base32 密钥、HMAC-SHA1/6 位/30 秒、±1 步长、`otpauth://` URL |
+| 账号层 | `internal/account/two_factor.go`（新）、`profile.go` | `CheckPassword`、`GetTwoFactorState`、`Begin/Enable/DisableTwoFactor`；Profile 带出两个布尔 |
+| 端点 | `internal/httpapi/two_factor.go`（新）、`server.go` | `i/2fa/register|done|unregister|password-less` |
+| 登录 | `internal/httpapi/account.go` | 请求体收 `token`；启用 TOTP 且无码时返回 `200 {}`，错码 403 |
+| 打包 | `internal/httpapi/users_pack.go` | `twoFactorEnabled`、`usePasswordLessLogin`、`securityKeys` |
+| 前端类型 | `api/types.ts`、`endpoints.ts`、`account/types.ts` | `SigninStep`、`TwoFactorRegistration`、四个端点、`UserDetailed` 三字段 |
+| 登录流程 | `account/session.ts`、`transport.ts`、`CfSignin.vue`、`SettingsAccounts.vue` | 两步登录、验证码错误分类、添加账号的二次验证 |
+| 安全设置 | `pages/SettingsSecurity.vue` | 真实 TOTP 面板：密码确认 → 密钥/URL → 验证码启用；停用需再输密码 |
+| 测试 | — | 按指示本轮未写/未跑；既有测试未改动 |
+
+### 12AJ.2 有意的限制
+
+1. `i/2fa/register` 的 `qr` 恒为空串（不引二维码依赖），页面展示密钥与 `otpauth://` URL。
+2. 安全密钥/通行密钥未实现，`i/2fa/password-less` 恒报 `NO_SECURITY_KEY`，`securityKeys` 恒 false。
+3. 无备份码，`twoFactorBackupCodesStock` 仍为 `"none"`。
+4. 密钥明文存库（与 Firefish 相同）。
+5. 无登录失败限流（既有缺口）。
+
+### 12AJ.3 验证证据（编译层）
+
+```
+gofmt -l internal/ cmd/                 # 空
+go vet ./...                            # exit 0
+cd web && pnpm exec vue-tsc --noEmit    # exit 0
+cd web && pnpm run check:port           # 398 文件，hardTotal 0
+cd web && pnpm build                    # exit 0
+```
+
+### 12AJ.4 仍未验证
+
+- 注册 → 启用 → 登出 → 带码登录的端到端链路（含错码与空码两条分支）。
+- 设置页的密码确认、密钥展示、启用/停用交互与移动端布局。
+- 并发登录、时钟漂移 ±1 步长之外的行为、验证码重放（同一码在有效窗口内可重复使用，与 TOTP 规范一致）。
+- `go test`（含数据库用例）未执行，新增端点尚无自动化用例。
+
 ## 13. 文档索引
 
 | 文档 | 内容 |
@@ -2403,6 +2449,7 @@ w19admin 删除，用户数回到 23；服务与临时文件停止。
 | `docs/research/2026-11-06-firefish-port-wave17-contract.md` | **第十七波施工契约（公开 users 目录与发现页用户页签），见 §12AG** |
 | `docs/research/2026-11-06-firefish-port-wave18-contract.md` | **第十八波施工契约（对象存储只读页与投递队列概览），见 §12AH** |
 | `docs/research/2026-11-06-firefish-port-wave19-contract.md` | **第十九波施工契约（合规链接、serverRules、公共 stats 与关于页），见 §12AI** |
+| `docs/research/2026-11-06-firefish-port-wave20-contract.md` | **第二十波施工契约（TOTP 两步验证、登录协商与安全设置页），见 §12AJ** |
 
 ## 14. 已知的未验证项
 
@@ -2435,7 +2482,9 @@ w19admin 删除，用户数回到 23；服务与临时文件停止。
   手动重试与配置写入按设计未做。
 - **第十九波未测边角（2026-11-06，见 §12AI.4）**：规则/合规链接未进入注册流程、远端实例计数与
   大表统计耗时未验证。
-- **仍未移植的设置页**：邮箱、整合、安全（2FA）、导入导出、迁移、Webhook、插件、自定义 KaTeX、状态栏、
+- **第二十波未测（2026-11-06，见 §12AJ.4）**：按用户指示本轮只写代码，TOTP 端到端登录（空码/错码/
+  正确码）、设置页交互、移动端布局与数据库用例都未执行；`qr` 为空串、安全密钥与备份码按设计未做。
+- **仍未移植的设置页**：邮箱、整合、导入导出、迁移、Webhook、插件、自定义 KaTeX、状态栏、
   删除账号、应用授权以外的账号操作；对应后端端点不存在或前端缺少依赖（见第五波契约 §3.3）。
 - **仍缺的 widgets**：rss、rss-ticker、server-metric、online-users、federation、job-queue、aiscript、
   以及 activity 的子图表；缺服务端代理、Streaming stats 通道或 AiScript 运行时。

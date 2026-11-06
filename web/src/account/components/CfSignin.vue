@@ -25,7 +25,7 @@
 						pattern="^[a-zA-Z0-9_]+$"
 						autocomplete="username"
 						:spellcheck="false"
-						:disabled="signing"
+						:disabled="signing || needsToken"
 						autofocus
 						required
 					/>
@@ -33,7 +33,7 @@
 				</div>
 			</div>
 
-			<div class="field">
+			<div v-if="!needsToken" class="field">
 				<label class="label" for="cf-signin-password">{{ t("password") }}</label>
 				<div class="input">
 					<span class="prefix"><i class="ph-lock ph-bold ph-lg"></i></span>
@@ -49,19 +49,38 @@
 				</div>
 			</div>
 
+			<div v-else class="field">
+				<label class="label" for="cf-signin-token">{{ t("_2fa.token") }}</label>
+				<div class="input">
+					<span class="prefix"><i class="ph-poker-chip ph-bold ph-lg"></i></span>
+					<input
+						id="cf-signin-token"
+						v-model="token"
+						type="text"
+						name="token"
+						inputmode="numeric"
+						autocomplete="one-time-code"
+						pattern="^[0-9]{6}$"
+						:spellcheck="false"
+						:disabled="signing"
+						required
+					/>
+				</div>
+			</div>
+
 			<button
 				class="_button primary submit"
 				type="submit"
-				:disabled="signing || username === '' || password === ''"
+				:disabled="signing || username === '' || (needsToken ? token === '' : password === '')"
 			>
-				{{ signing ? t("loggingIn") : t("login") }}
+				{{ signing ? t("loggingIn") : needsToken ? t("twoStepAuthentication") : t("login") }}
 			</button>
 		</div>
 	</form>
 </template>
 
 <script setup lang="ts">
-import { computed, onUnmounted, ref, watch } from "vue";
+import { computed, nextTick, onUnmounted, ref, watch } from "vue";
 import { useLocale } from "../../i18n";
 import { accountApi, AccountApiError, classifySigninFailure } from "../transport";
 import { signIn } from "../session";
@@ -91,6 +110,8 @@ const emit = defineEmits<{
 
 const username = ref("");
 const password = ref("");
+const token = ref("");
+const needsToken = ref(false);
 const signing = ref(false);
 const errorText = ref<string | null>(null);
 const user = ref<UserDetailed | null>(null);
@@ -116,13 +137,20 @@ watch(username, (value) => {
 	}
 	if (value === "") {
 		user.value = null;
+		needsToken.value = false;
+		token.value = "";
 		return;
 	}
+	needsToken.value = false;
+	token.value = "";
 	if (typeof window === "undefined") return;
 	lookupTimer = window.setTimeout(() => {
 		accountApi<UserDetailed>("users/show", { username: value })
 			.then((result) => {
 				user.value = result;
+				// Firefish asks for the code up front when the account has
+				// TOTP enabled; users/show exposes that flag.
+				if (result.twoFactorEnabled) needsToken.value = true;
 			})
 			.catch(() => {
 				user.value = null;
@@ -142,6 +170,8 @@ function describeFailure(error: unknown): string {
 			return t("noSuchUser");
 		case "incorrect-password":
 			return t("incorrectPassword");
+		case "invalid-token":
+			return "验证码无效，请重新输入。";
 		case "suspended":
 			return `${t("yourAccountSuspendedTitle")} — ${t("yourAccountSuspendedDescription")}`;
 		case "rate-limited":
@@ -158,8 +188,19 @@ async function onSubmit(): Promise<void> {
 	signing.value = true;
 	errorText.value = null;
 	try {
-		const account = await signIn(username.value, password.value);
-		emit("login", account.account);
+		const outcome = await signIn(
+			username.value,
+			password.value,
+			needsToken.value ? token.value : undefined,
+		);
+		if ("twoFactorRequired" in outcome) {
+			needsToken.value = true;
+			token.value = "";
+			await nextTick();
+			document.getElementById("cf-signin-token")?.focus();
+			return;
+		}
+		emit("login", outcome.account);
 	} catch (error) {
 		errorText.value = describeFailure(error);
 	} finally {

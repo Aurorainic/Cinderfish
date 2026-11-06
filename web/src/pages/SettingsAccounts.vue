@@ -40,6 +40,17 @@
 					>
 						<template #label>密码</template>
 					</CfInput>
+					<CfInput
+						v-if="needsToken"
+						v-model="token"
+						class="field"
+						autocomplete="one-time-code"
+						pattern="^[0-9]{6}$"
+						:spellcheck="false"
+						required
+					>
+						<template #label>两步验证码</template>
+					</CfInput>
 					<CfInfo v-if="addError !== null" warn class="field">
 						{{ addError }}
 					</CfInfo>
@@ -150,6 +161,8 @@ const actionError = ref<string | null>(null);
 const addOpen = ref(false);
 const username = ref("");
 const password = ref("");
+const token = ref("");
+const needsToken = ref(false);
 const signingIn = ref(false);
 const addError = ref<string | null>(null);
 
@@ -221,9 +234,21 @@ async function addAccount(): Promise<void> {
 	signingIn.value = true;
 	addError.value = null;
 	try {
-		await signIn(username.value.trim().replace(/^@/, ""), password.value);
+		const outcome = await signIn(
+			username.value.trim().replace(/^@/, ""),
+			password.value,
+			needsToken.value ? token.value : undefined,
+		);
+		if ("twoFactorRequired" in outcome) {
+			needsToken.value = true;
+			token.value = "";
+			addError.value = "该账号已启用两步验证，请输入身份验证器应用中的 6 位验证码。";
+			return;
+		}
 		username.value = "";
 		password.value = "";
+		token.value = "";
+		needsToken.value = false;
 		addOpen.value = false;
 		await load();
 		location.reload();
@@ -239,6 +264,8 @@ function closeAdd(): void {
 	addOpen.value = false;
 	addError.value = null;
 	password.value = "";
+	token.value = "";
+	needsToken.value = false;
 }
 
 onMounted(() => {

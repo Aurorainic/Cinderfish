@@ -51,11 +51,13 @@ export const SIGNIN_ERROR_IDS = {
 	incorrectPassword: "932c904e-9460-45b7-9ce6-7ed33be7eb2c",
 	suspended: "e03a5f46-d309-4865-9b69-56282d94e1eb",
 	rateLimited: "22d05606-fbcf-421a-a2db-b32610dcfd1b",
+	invalidToken: "cdf1235b-ac71-46d4-a3a6-84ccce48df6f",
 } as const;
 
 export type SigninFailure =
 	| "no-such-user"
 	| "incorrect-password"
+	| "invalid-token"
 	| "suspended"
 	| "rate-limited"
 	| "unknown";
@@ -67,6 +69,8 @@ export function classifySigninFailure(error: unknown): SigninFailure {
 			return "no-such-user";
 		case SIGNIN_ERROR_IDS.incorrectPassword:
 			return "incorrect-password";
+		case SIGNIN_ERROR_IDS.invalidToken:
+			return "invalid-token";
 		case SIGNIN_ERROR_IDS.suspended:
 			return "suspended";
 		case SIGNIN_ERROR_IDS.rateLimited:
