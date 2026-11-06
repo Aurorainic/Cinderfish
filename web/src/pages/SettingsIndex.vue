@@ -167,6 +167,12 @@ const menuDef = computed<MkSuperMenuGroup[]>(() => [
 				active: isActive("/settings/sounds"),
 			},
 			{
+				icon: "ph-list-bullets ph-bold ph-lg",
+				text: "状态栏",
+				to: "/settings/statusbar",
+				active: isActive("/settings/statusbar"),
+			},
+			{
 				icon: "ph-columns ph-bold ph-lg",
 				text: t("deck"),
 				to: "/settings/deck",

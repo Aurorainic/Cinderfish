@@ -1,6 +1,6 @@
 <!-- Ported from firefish@b425f61:packages/client/src/ui/universal.vue (AGPL-3.0-only) -->
 <template>
-	<div class="dkgtipfy" :class="{ isMobile }">
+	<div class="dkgtipfy" :class="{ isMobile, hasStatusbar: statusbars.length > 0 }">
 		<XSidebar v-if="!isMobile" />
 
 		<main id="maincontent" class="contents">
@@ -10,6 +10,8 @@
 		<div v-if="isDesktop" class="widgets-container">
 			<MkWidgets />
 		</div>
+
+		<CfStatusbars v-if="statusbars.length > 0" class="statusbar" />
 
 		<nav v-if="isMobile" class="buttons">
 			<button
@@ -75,18 +77,21 @@
 // A bottom button bar replaces the navbar below 500px.
 //
 // DEGRADED (see the wave-3 contract §2):
-//   * `XStatusBars` has no Cinderfish port; the sticky header row is omitted.
+//   * the status bar is a fixed strip at the bottom (wave 50), only shown when
+//     the user configured at least one item.
 //   * Firefish's widgets *drawer* (for 500px–1090px) is dropped — the column is
 //     shown when there is room and hidden otherwise, so nothing is fabricated.
 //   * The right-click "open in window" context menu is left to `CfA`.
 import { computed, onUnmounted, ref, watch, type Ref } from "vue";
 import { useRoute } from "vue-router";
 import { me } from "@/account";
+import CfStatusbars from "@/components/statusbar/CfStatusbars.vue";
 import { useLocale } from "@/i18n";
 import CfA from "@/components/ui/CfA.vue";
 import MkNavbar from "@/components/MkNavbar.vue";
 import MkWidgets from "@/components/MkWidgets.vue";
 import { post } from "@/os/post";
+import { defaultStore } from "@/store";
 import XSidebar from "./XSidebar.vue";
 
 const DESKTOP_THRESHOLD = 1100;
@@ -108,6 +113,9 @@ function useMediaFlag(query: string): Ref<boolean> {
 }
 
 const isMobile = useMediaFlag(`(max-width: ${MOBILE_THRESHOLD}px)`);
+// Read straight from the store so adding the first item makes the bar appear
+// without a reload.
+const statusbars = computed(() => defaultStore.reactiveState.statusbars.value);
 const isDesktop = useMediaFlag(`(min-width: ${DESKTOP_THRESHOLD}px)`);
 
 const route = useRoute();
@@ -138,6 +146,18 @@ function openPost(): void {
 	min-block-size: 100vh;
 	box-sizing: border-box;
 	background: var(--bg);
+
+	> .statusbar {
+		position: fixed;
+		inset-inline: 0;
+		block-end: 0;
+		z-index: 90;
+	}
+
+	&.hasStatusbar > .contents {
+		/* Reserve room for the fixed strip so it never covers the last row. */
+		padding-block-end: 48px;
+	}
 
 	> .contents {
 		flex: 1;
