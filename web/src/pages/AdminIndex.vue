@@ -116,10 +116,22 @@ const menuDef = computed<MkSuperMenuGroup[]>(() => [
 				active: isActive("/admin/emojis"),
 			},
 			{
+				icon: "ph-tray ph-bold ph-lg",
+				text: "投递队列",
+				to: "/admin/queue",
+				active: isActive("/admin/queue"),
+			},
+			{
 				icon: "ph-database ph-bold ph-lg",
 				text: t("database"),
 				to: "/admin/database",
 				active: isActive("/admin/database"),
+			},
+			{
+				icon: "ph-cloud-arrow-up ph-bold ph-lg",
+				text: "对象存储",
+				to: "/admin/object-storage",
+				active: isActive("/admin/object-storage"),
 			},
 			{
 				icon: "ph-folder-open ph-bold ph-lg",

@@ -481,3 +481,34 @@ export interface AdminInstanceMeta {
 	registrationMode: "open" | "invite" | "admin";
 	blockedHosts: string[];
 }
+
+/** Read-only media configuration from `admin/object-storage`. */
+export interface ObjectStorageInfo {
+	backend: string;
+	localPath: string | null;
+	s3: {
+		endpointHost: string;
+		bucket: string;
+		region: string;
+		useSSL: boolean;
+		publicBaseUrl: string | null;
+		hasCredentials: boolean;
+	} | null;
+}
+
+export interface DeliverQueueEntry {
+	id: number;
+	host: string;
+	attempts: number;
+	nextAttemptAt: string;
+	lastError: string | null;
+}
+
+/** Health of the PostgreSQL delivery queue. */
+export interface DeliverQueueInfo {
+	pending: number;
+	dueNow: number;
+	failed: number;
+	oldestNextAt: string | null;
+	recent: DeliverQueueEntry[];
+}

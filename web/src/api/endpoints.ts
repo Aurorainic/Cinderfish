@@ -9,6 +9,7 @@ import type {
 	AbuseReport,
 	AdminDriveFile,
 	AdminInstanceMeta,
+	DeliverQueueInfo,
 	Announcement,
 	AdminEmoji,
 	AuthorizedApp,
@@ -34,6 +35,7 @@ import type {
 	NoteReaction,
 	Notification,
 	NoteVisibility,
+	ObjectStorageInfo,
 	PingResponse,
 	RegistryDetail,
 	SigninResponse,
@@ -140,6 +142,8 @@ export const ENDPOINTS = {
 	adminAbuseReports: "admin/abuse-user-reports",
 	adminMeta: "admin/meta",
 	adminUpdateMeta: "admin/update-meta",
+	adminObjectStorage: "admin/object-storage",
+	adminDeliverQueue: "admin/deliver-queue",
 	adminTableStats: "admin/get-table-stats",
 	adminIndexStats: "admin/get-index-stats",
 	adminResolveAbuseReport: "admin/resolve-abuse-user-report",
@@ -632,6 +636,15 @@ export interface EndpointMap {
 			registrationMode?: "open" | "invite" | "admin";
 		};
 		res: AdminInstanceMeta;
+	};
+
+	[ENDPOINTS.adminObjectStorage]: {
+		req: Record<string, never>;
+		res: ObjectStorageInfo;
+	};
+	[ENDPOINTS.adminDeliverQueue]: {
+		req: Record<string, never>;
+		res: DeliverQueueInfo;
 	};
 
 	[ENDPOINTS.adminTableStats]: {

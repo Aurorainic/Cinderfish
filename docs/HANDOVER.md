@@ -2247,6 +2247,60 @@ cd web && pnpm build                    # exit 0
 - 用户页签的「加载更多」没有分页到底后的空态截图（当前数据量只够翻一页）。
 - 未登录访客看到的目录没有走查（走查注入的是登录会话）。
 
+## 12AH. 批次：前端第十八波——运维可视化（2026-11-06）
+
+**工作方式**：目标模式第十八波，一轮完成两个只读运维端点、两个管理页、测试、真实二进制与浏览器
+走查、文档与提交。施工依据 `docs/research/2026-11-06-firefish-port-wave18-contract.md`。
+
+### 12AH.1 落地清单
+
+| 层 | 文件 | 说明 |
+|----|------|------|
+| 端点 | `internal/httpapi/admin_infra.go`（新）、`server.go` | `admin/object-storage`（只读、无密钥）、`admin/deliver-queue`（计数与最近 20 行） |
+| 对象存储页 | `web/src/pages/AdminObjectStorage.vue` | 只读卡片；本地路径或 S3 主机/桶/区域/HTTPS/公开 URL/凭据是否配置 |
+| 队列页 | `web/src/pages/AdminQueue.vue` | 待投递/已到期/超重试上限、最早时间、最近投递与最后错误、刷新 |
+| 菜单 | `AdminIndex.vue` | 管理组「投递队列」，内容组「对象存储」 |
+| 接口层 | `endpoints.ts`、`types.ts` | 两个端点与 `ObjectStorageInfo` / `DeliverQueueInfo` |
+| 测试 | `internal/httpapi/admin_infra_test.go`（新，2 个用例） | 只读配置不含密钥；空队列形状、匿名 401、非管理员 403 |
+
+### 12AH.2 有意的限制
+
+1. 两个端点都是 Cinderfish 自有路径，不是 Misskey 同名端点（Bull 面板与对象存储写接口都不存在）。
+2. 完全只读：没有改配置、重试、清空队列的按钮。
+3. 队列页最多显示最近 20 行；`failed` 只统计 `attempts >= 12` 的行。
+
+### 12AH.3 验证证据
+
+```
+gofmt -l internal/ cmd/                 # 空
+go vet ./...                            # exit 0
+CINDERFISH_TEST_DATABASE_URL=… go test -count=1 ./...   # 全绿（新增 2 个用例）
+cd web && pnpm exec vue-tsc --noEmit    # exit 0
+cd web && pnpm run check:port           # 398 文件，hardTotal 0
+cd web && pnpm build                    # exit 0
+```
+
+真实二进制 `:3991`（本地媒体 `/tmp/w18-media`，seed 一条 `deliver_queue` 行）：
+
+| 场景 | 结果 |
+|------|------|
+| `admin/object-storage` | `backend=local`、`localPath=/tmp/w18-media`、`s3=null`，无任何密钥字段 |
+| `admin/deliver-queue`（seed 后） | 显示 1 条：`w18-remote.example`、attempts 2、`connection refused` |
+| `/admin/object-storage` | 只读卡片显示本地路径与「修改需重启」说明 |
+| `/admin/queue` | 计数与最近行；走查期间后台 worker 继续重试，行最终到 attempts 12、错误换成联邦拒绝，`failed` 变为 1——页面如实反映 |
+| 管理菜单 | 「投递队列」「对象存储」都在 |
+| 移动端两页 | 无横向溢出、无 JS 异常 |
+
+无头 Helium 156。截图在 `/tmp/w18-shots`（不入库）。
+
+走查数据已清理：w18admin 与 seed 的队列行删除（用户 23、`deliver_queue` 0）；服务与临时文件停止。
+
+### 12AH.4 仍未验证
+
+- 队列的正确退避曲线与 worker 并发没有压测；只观察了一条行在走查期间被重试到上限。
+- S3 后端的页面展示只用单元测试检查；没有真实桶。
+- 手动重试/清空、S3 配置写入按设计未做。
+
 ## 13. 文档索引
 
 | 文档 | 内容 |
@@ -2290,6 +2344,7 @@ cd web && pnpm build                    # exit 0
 | `docs/research/2026-11-06-firefish-port-wave15-contract.md` | **第十五波施工契约（MiAuth check、fetched 标记与授权页），见 §12AE** |
 | `docs/research/2026-11-06-firefish-port-wave16-contract.md` | **第十六波施工契约（notes/mentions、unreadOnly 与通知页签），见 §12AF** |
 | `docs/research/2026-11-06-firefish-port-wave17-contract.md` | **第十七波施工契约（公开 users 目录与发现页用户页签），见 §12AG** |
+| `docs/research/2026-11-06-firefish-port-wave18-contract.md` | **第十八波施工契约（对象存储只读页与投递队列概览），见 §12AH** |
 
 ## 14. 已知的未验证项
 
@@ -2318,6 +2373,8 @@ cd web && pnpm build                    # exit 0
   与类型过滤组合未验证。
 - **第十七波未测边角（2026-11-06，见 §12AG.4）**：远程目录、hostname、`state=admin` 与未登录视角
   未走查；用户页签的 offset 分页已实测能从 20 增至 24。
+- **第十八波未测边角（2026-11-06，见 §12AH.4）**：退避曲线/并发压测、S3 真实桶展示未验证；
+  手动重试与配置写入按设计未做。
 - **仍未移植的设置页**：邮箱、整合、安全（2FA）、导入导出、迁移、Webhook、插件、自定义 KaTeX、状态栏、
   删除账号、应用授权以外的账号操作；对应后端端点不存在或前端缺少依赖（见第五波契约 §3.3）。
 - **仍缺的 widgets**：rss、rss-ticker、server-metric、online-users、federation、job-queue、aiscript、
