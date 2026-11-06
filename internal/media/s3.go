@@ -2,10 +2,14 @@ package media
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 
@@ -27,6 +31,9 @@ type S3Options struct {
 	Presign bool
 	// PresignTTL is how long a signed URL stays valid.
 	PresignTTL time.Duration
+	// CACertPath is a PEM bundle trusted for the endpoint, for deployments
+	// whose S3 gateway uses a private CA.
+	CACertPath string
 }
 
 // S3Storage stores files in an S3 compatible object store. It works with
@@ -46,10 +53,30 @@ func NewS3Storage(opts S3Options) (*S3Storage, error) {
 		opts.PresignTTL = 5 * time.Minute
 	}
 
+	var transport http.RoundTripper
+	if opts.CACertPath != "" {
+		pem, err := os.ReadFile(opts.CACertPath)
+		if err != nil {
+			return nil, fmt.Errorf("media: read s3 ca cert: %w", err)
+		}
+		pool := x509.NewCertPool()
+		if !pool.AppendCertsFromPEM(pem) {
+			return nil, fmt.Errorf("media: s3 ca cert %s contains no certificates", opts.CACertPath)
+		}
+		base, ok := http.DefaultTransport.(*http.Transport)
+		if !ok {
+			return nil, errors.New("media: default transport is not *http.Transport")
+		}
+		custom := base.Clone()
+		custom.TLSClientConfig = &tls.Config{RootCAs: pool}
+		transport = custom
+	}
+
 	client, err := minio.New(opts.Endpoint, &minio.Options{
-		Creds:  credentials.NewStaticV4(opts.AccessKey, opts.SecretKey, ""),
-		Secure: opts.UseSSL,
-		Region: opts.Region,
+		Creds:     credentials.NewStaticV4(opts.AccessKey, opts.SecretKey, ""),
+		Secure:    opts.UseSSL,
+		Region:    opts.Region,
+		Transport: transport,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("media: create s3 client: %w", err)

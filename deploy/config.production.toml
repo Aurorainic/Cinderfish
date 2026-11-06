@@ -31,3 +31,5 @@ access_key = ""
 secret_key = ""
 use_ssl = true
 public_base_url = ""
+# PEM file with a private CA for a self-hosted endpoint.
+ca_cert = ""

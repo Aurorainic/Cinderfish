@@ -82,6 +82,9 @@ type S3Settings struct {
 	SecretKey     string `toml:"secret_key"`
 	UseSSL        bool   `toml:"use_ssl"`
 	PublicBaseURL string `toml:"public_base_url"`
+	// CACert is a PEM file the S3 client trusts in addition to the system
+	// roots; self-hosted MinIO and private S3 gateways usually need it.
+	CACert string `toml:"ca_cert"`
 }
 
 func (c *Config) Addr() string {

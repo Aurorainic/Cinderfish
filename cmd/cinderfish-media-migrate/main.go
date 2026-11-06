@@ -139,5 +139,6 @@ func newS3(s config.S3Settings) (media.Storage, error) {
 		SecretKey:     s.SecretKey,
 		UseSSL:        s.UseSSL,
 		PublicBaseURL: s.PublicBaseURL,
+		CACertPath:    s.CACert,
 	})
 }

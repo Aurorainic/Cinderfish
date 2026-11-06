@@ -4717,8 +4717,9 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
   key `themes`）为权威，localStorage 只做按账号隔离的缓存，见 §12EW。
 - **i18n 只覆盖 zh-CN / ja-JP**，其余 37 个 locale 未生成；`yaml` devDependency 未装
   （重新生成 locale 前要先 `pnpm add -D yaml`）。
-- **S3 后端未做真实服务端验证**：2026-11-07 起已用 moto 与 s3rver 两个 S3 协议实现验证
-  上传/读取/删除/预签名（§12CI），并修掉预签名未接线的缺陷；仍未验证真实 AWS/R2/B2 与 TLS。
+- **S3 后端未做真实云服务验证**：2026-11-07 起已用 moto 与 s3rver 两个 S3 协议实现验证
+  上传/读取/删除/预签名（§12CI），TLS 与私有 CA 也已用自签 CA + HTTPS 端点验证（§12FG）；
+  仍未验证真实 AWS/R2/B2 账号（需要外部凭据）。
 - ~~**缩略图/WebP 生成未实现**~~：第四十六波实现了缩略图（≤512px，JPEG/PNG）；WebP 的**解码**
   于 2026-11-07 补上（§12EV：静图可生成预览，动图按解码失败跳过），但仍不生成 WebP 输出。
 - **前端没有真实第三方客户端联调**：页面已在构建产物上用浏览器走查；2026-11-07 起已用官方
@@ -6508,3 +6509,33 @@ Host。这一轮用 Go 的反向代理复现同一拓扑。
   全绿（真实 Redis 用例 + 重启用例，总耗时约 1.4 秒）。
 - 未设置 `CINDERFISH_TEST_REDIS_URL` 时前者跳过；没有 `redis-server` 时后者跳过，普通
   `go test ./...` 不受影响。
+
+## 12FG. 第一百四十三波：S3 的 TLS 与私有 CA（2026-11-07）
+
+自建 MinIO 或私有 S3 网关常用内部 CA 签发证书。此前 `NewS3Storage` 只接受系统根证书，这类部署连不上；
+§14 也把「S3 与 TLS」列为未验证。
+
+### 12FG.1 落地清单
+
+| 层 | 文件 | 内容 |
+|----|------|------|
+| 配置 | `internal/config/config.go` | `[media.s3] ca_cert`（PEM 路径） |
+| 客户端 | `internal/media/s3.go` | `CACertPath`：读 PEM → `x509.CertPool` → 克隆默认 transport 并设置 `TLSClientConfig.RootCAs` |
+| 接线 | `cmd/cinderfish/main.go`、`cmd/cinderfish-media-migrate/main.go` | 把 `ca_cert` 传给 `S3Options` |
+| 文档 | `config.example.toml`、`deploy/config.production.toml`、`docs/DEPLOY.md` | 字段说明与用法 |
+| 测试 | `internal/media/s3_tls_test.go`（新） | 自签 CA + HTTPS 迷你 S3（PUT/HEAD/GET/DELETE + location），验证 Put/Get/Delete 与「不带 CA 必须失败」 |
+
+### 12FG.2 有意的限制
+
+- 迷你 S3 只实现本客户端用到的 path-style 方法；没有分块上传、版本、ACL、vhost-style。
+- 没有验证真实 AWS/R2/B2（需要外部账号与凭据），也没有客户端证书/双向 TLS。
+- CA 文件在构造时读入；轮换 CA 需要重启进程。
+
+### 12FG.3 验证证据
+
+- `go vet ./...` 通过；`CINDERFISH_TEST_DATABASE_URL=… go test ./internal/media/ -run
+  TestS3StoragePrivateCA` 通过：
+  - 带 `ca_cert`：Put → Get 内容一致 → Delete → Get 返回 `ErrNotFound`；
+  - 不带 `ca_cert`：Put 以 TLS 错误失败（服务端日志出现 `bad certificate`，测试进程本身通过）；
+  - CA 文件不含证书：`NewS3Storage` 直接报错。
+- 全量 `go test ./...` 与前端三项检查见本轮提交前的运行记录。

@@ -57,3 +57,6 @@ secret_key = ""
 use_ssl = true
 # Base URL objects are served from; leave empty to use presigned GETs.
 public_base_url = ""
+# PEM file with a private CA for a self-hosted endpoint (MinIO behind an
+# internal CA). Leave empty to trust the system roots only.
+ca_cert = ""

@@ -173,6 +173,9 @@ server {
 - 留空：使用预签名 GET，桶可以保持私有（适合 MinIO、AWS S3）。预签名需要知道桶的 region：
   AWS 会自动查询，非 AWS 服务建议显式填写 `region`，否则生成 URL 前会先做一次区域发现请求。
 
+自建 MinIO 或私有 S3 网关常用内部 CA 签发证书时，把 CA 的 PEM 路径填到 `ca_cert`；该证书会被加入
+S3 客户端的信任根，`use_ssl = true` 即可正常工作。留空则只用系统根证书。
+
 迁移已有文件：
 
 ```bash

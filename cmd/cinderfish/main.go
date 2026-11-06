@@ -190,6 +190,7 @@ func openStorage(ctx context.Context, cfg *config.Config) (media.Storage, error)
 			SecretKey:     cfg.Media.S3.SecretKey,
 			UseSSL:        cfg.Media.S3.UseSSL,
 			PublicBaseURL: cfg.Media.S3.PublicBaseURL,
+			CACertPath:    cfg.Media.S3.CACert,
 			// With no public base URL the bucket is assumed private, so
 			// URLs are presigned; the config comment has promised that
 			// since the S3 backend landed.
