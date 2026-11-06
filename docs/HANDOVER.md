@@ -4496,7 +4496,7 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
   头注入清洗与拨号失败；`TestEmailVerificationAndResetFlow` 起一个本地 SMTP 服务并让服务器用真实
   配置发送：改邮箱 → 收到验证链接 → `verify-email` 204 → `emailVerified=true` → 重复使用同码 400
   → 请求重置 → 收到重置链接 → `reset-password` 204 → 旧密码 403、新密码 200（2026-11-07）。
-  仍未验证的：STARTTLS/隐式 TLS 与需要认证的 SMTP 服务端。
+  仍未验证的：公网 CA 与真实邮件服务商（STARTTLS/隐式 TLS 与 AUTH 已由 §12CP 的本地 CA 用例覆盖）。
 - **第三十九波已补验证（2026-11-06，见 §12BC.4）**：2026-11-07 用真实二进制 + 浏览器走查三页：
   `/settings/email` 渲染「电子邮件地址未设置」、填地址 → 密码对话框 → 保存后显示
   「已发送确认电子邮件」；`/verify-email/<code>` 在已登录状态下兑换成功（页面跳回首页，
@@ -5088,3 +5088,23 @@ CINDERFISH_TEST_DATABASE_URL=... go test ./... -count=1         # 全绿
 - 设置页安全区开关的交互（浏览器里只走查了登录提示）。
 - 移动端的两因素登录布局。
 - 备份码与安全密钥（按设计未做）。
+
+## 12CP. 第七十七波：SMTP 的 STARTTLS、隐式 TLS 与认证（2026-11-07）
+
+第三十八波只验证了 `TLS: none` 的本地中继。这一轮给 `internal/mail` 补了 TLS 用例：
+
+- 测试内生成一次性 CA 与 `127.0.0.1` 的服务器证书，通过 `SSL_CERT_FILE` 让 Go 的根证书池
+  信任它（不改系统信任库）。
+- `TestSMTPOverTLS/starttls`：服务器 EHLO 广告 `STARTTLS` 与 `AUTH PLAIN`，客户端升级后
+  用 PLAIN 认证并投递。
+- `TestSMTPOverTLS/implicit`：监听器从第一字节就是 TLS，广告 `AUTH PLAIN`，同样完成认证与投递。
+
+两条都断言 DATA 里有 `To:` 与正文。
+
+```
+gofmt -l internal/ cmd/                                        # 空
+go vet ./...                                                   # exit 0
+CINDERFISH_TEST_DATABASE_URL=... go test ./... -count=1         # 全绿
+```
+
+仍未验证：真实邮件服务商（Gmail/SES 等）的证书链与限流；`SSL_CERT_FILE` 只影响测试进程。
