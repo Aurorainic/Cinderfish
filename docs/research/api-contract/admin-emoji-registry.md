@@ -1033,3 +1033,36 @@ UserLite 部分也有简化：`name`/`avatarUrl` 只从 profile 行来，没有 
 | `hostname` | 上传者实例精确匹配 |
 
 返回 `DriveFile[]`，每条额外带 `user`（UserLite，上传者）。非管理员返回 403。
+
+## 2026-11-06 增补：实例公告
+
+迁移 v10 新增 `announcements` 表；`announcements` 与 `admin/announcements/*` 四个端点共用它。
+
+### POST /api/announcements（公开）
+
+| 参数 | 说明 |
+|------|------|
+| `limit` | 默认 10，上限 100 |
+| `untilId` | 公告 id 游标 |
+
+返回 `Announcement[]`，只含 `is_active = TRUE` 且未过期的行，id 倒序。`isRead` 恒为 false
+（没有已读跟踪）。
+
+### POST /api/admin/announcements/create（管理员）
+
+| 参数 | 校验 |
+|------|------|
+| `title` | 必填，≤256 字符（去首尾空白后非空） |
+| `text` | 必填，≤10000 字符 |
+| `imageUrl` | 可选，≤500 字符；仅 `http://`、`https://` 或 `/` 开头 |
+| `expiresAt` | 可选，Unix 毫秒，必须晚于当前时间 |
+
+返回创建的 `Announcement`。非管理员 403，未登录 401。
+
+### POST /api/admin/announcements/list（管理员）
+
+`limit` / `untilId`；返回全部公告（含已过期与停用），id 倒序。
+
+### POST /api/admin/announcements/delete（管理员）
+
+`{ id }`，返回 204；不存在的 id 也是 204（幂等）。

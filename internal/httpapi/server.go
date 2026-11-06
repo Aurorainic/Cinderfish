@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/Aurorainic/cinderfish/internal/account"
+	"github.com/Aurorainic/cinderfish/internal/announcement"
 	"github.com/Aurorainic/cinderfish/internal/config"
 	"github.com/Aurorainic/cinderfish/internal/federation"
 	"github.com/Aurorainic/cinderfish/internal/media"
@@ -39,6 +40,7 @@ type Server struct {
 	folders       *media.FolderService
 	emojis        *media.EmojiService
 	registry      *account.RegistryService
+	announcements *announcement.Service
 
 	storage media.Storage
 	drive   *media.DriveService
@@ -90,6 +92,7 @@ func NewServerWithDB(cfg *config.Config, pool *pgxpool.Pool) *Server {
 	s.folders = media.NewFolderService(pool)
 	s.emojis = media.NewEmojiService(pool)
 	s.registry = account.NewRegistryService(pool)
+	s.announcements = announcement.NewService(pool)
 	return s
 }
 
@@ -200,6 +203,12 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("POST /api/notifications", s.handleNotifications)
 	s.mux.HandleFunc("POST /api/i/notifications", s.handleNotifications)
 	s.mux.HandleFunc("POST /api/notifications/mark-all-as-read", s.handleNotificationsMarkAllAsRead)
+
+	// Instance announcements: public list plus the admin console.
+	s.mux.HandleFunc("POST /api/announcements", s.handleAnnouncements)
+	s.mux.HandleFunc("POST /api/admin/announcements/create", s.handleAdminAnnouncementsCreate)
+	s.mux.HandleFunc("POST /api/admin/announcements/list", s.handleAdminAnnouncementsList)
+	s.mux.HandleFunc("POST /api/admin/announcements/delete", s.handleAdminAnnouncementsDelete)
 
 	s.mux.HandleFunc("POST /api/drive/files/create", s.handleDriveFilesCreate)
 	s.mux.HandleFunc("POST /api/drive/folders", s.handleDriveFolders)

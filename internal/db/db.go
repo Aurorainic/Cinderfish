@@ -429,6 +429,23 @@ CREATE TABLE IF NOT EXISTS user_registry (
 );
 CREATE INDEX IF NOT EXISTS idx_user_registry_user ON user_registry (user_id, scope);
 `,
+
+	// v10: instance announcements. `expires_at` is nullable so most notices are
+	// permanent; the public list filters on is_active and the expiry.
+	10: `
+CREATE TABLE IF NOT EXISTS announcements (
+    id         TEXT PRIMARY KEY,
+    title      TEXT NOT NULL,
+    text       TEXT NOT NULL,
+    image_url  TEXT,
+    is_active  BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    expires_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS idx_announcements_created ON announcements (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_announcements_active ON announcements (is_active, expires_at);
+`,
 }
 
 // Migrate applies pending migrations in order and returns the version

@@ -15,26 +15,26 @@
 | 指标 | 数量 |
 |------|------|
 | Misskey 端点总数 | 440 |
-| Cinderfish 已注册路由 | 83 |
-| 其中 Misskey 同名路径 | 80 |
+| Cinderfish 已注册路由 | 87 |
+| 其中 Misskey 同名路径 | 84 |
 | 其中 Cinderfish 自有路径/别名 | 3（`notifications` 别名、`admin/federation/mode`、`admin/federation/allowlist`） |
-| 未实现（Misskey 同名） | 357 |
+| 未实现（Misskey 同名） | 353 |
 
 统计口径：`internal/httpapi/server.go` 里 `HandleFunc("METHOD /api/…")` 的去重路径；
 GET 与 POST 同名路径只算一个。
 
-## 2. 已实现（83 条注册路由）
+## 2. 已实现（87 条注册路由）
 
 ```
-admin/accounts/create       admin/emoji/add             admin/emoji/delete
-admin/emoji/list            admin/federation/allowlist* admin/federation/mode*
-blocking/create             blocking/delete            blocking/list
-admin/show-users            admin/drive/files           admin/suspend-user
-admin/unsuspend-user
-drive/files                 drive/files/create          drive/files/delete
-drive/files/show            drive/folders               drive/folders/create
-drive/folders/delete        drive/folders/show          drive/folders/update
-emojis                      following/create            following/delete
+admin/accounts/create       admin/announcements/create  admin/announcements/delete
+admin/announcements/list    admin/drive/files           admin/emoji/add
+admin/emoji/delete          admin/emoji/list            admin/federation/allowlist*
+admin/federation/mode*      admin/show-users            admin/suspend-user
+admin/unsuspend-user        announcements               blocking/create
+blocking/delete             blocking/list               drive/files
+drive/files/create          drive/files/delete          drive/files/show
+drive/folders               drive/folders/create        drive/folders/delete
+drive/folders/show          drive/folders/update        emojis                      following/create            following/delete
 following/requests/accept    following/requests/cancel   following/requests/list
 following/requests/reject    following/requests/sent     hashtags/trend
 i                           i/apps                      i/favorites
@@ -69,6 +69,8 @@ users/update
 `hashtags/trend`、`drive/folders*`、`emojis`、`admin/emoji/*`、`notes/polls/vote`、
 `following/requests/*`、`users/update`、`signin`、`signup`、`username/available`、
 `i/registry/scopes`，以及 `admin/federation/mode` 的 GET。
+
+2026-11-06 第八波新增：`announcements`、`admin/announcements/create|list|delete`（迁移 v10）。
 
 2026-11-06 第七波新增：`admin/drive/files`；`admin/show-users` 增加 sort/state/origin/username/hostname
 参数（不是新路由）。
