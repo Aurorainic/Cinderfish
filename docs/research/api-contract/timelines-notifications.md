@@ -696,3 +696,16 @@ Misskey Streaming API 的 WebSocket 入口。`internal/httpapi/streaming.go:45` 
 5. 实时：连 `/streaming?i=<token>`，`connect` `main`（pong:true）+ `hybridTimeline`（显式传 `withRenotes:true`）。
 6. 定时发心跳数据帧（<120s），否则连接会被服务端断开。
 7. 趋势：`POST /api/hashtags/trend`，按 7 天日桶绘制。
+
+## 2026-11-06 增补：通知未读过滤与提及
+
+### POST /api/i/notifications 的 `unreadOnly`
+
+新增可选 `unreadOnly: boolean`。为 true 时只返回 `is_read = FALSE` 的通知，与
+`includeTypes`/`excludeTypes` 可组合。
+
+### POST /api/notes/mentions
+
+需登录。参数：`following`（只保留关注者与自己）、`limit`、`sinceId`/`untilId`、`visibility`。
+返回 `Note[]`，匹配 `notes.mentions`（本地用户 id 数组）并套用可见性、静音、屏蔽与实例静音过滤。
+远端账号的提及不会进入该数组，因此不出现在此列表。

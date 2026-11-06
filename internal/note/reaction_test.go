@@ -91,7 +91,7 @@ func (f *notificationFixture) seed(t *testing.T, id, recipientID, notifType stri
 
 func (f *notificationFixture) list(t *testing.T, include, exclude []string) []*Notification {
 	t.Helper()
-	list, err := f.service().List(context.Background(), f.readerID, 20, "", "", include, exclude)
+	list, err := f.service().List(context.Background(), f.readerID, 20, "", "", include, exclude, false)
 	if err != nil {
 		t.Fatalf("List(include=%v, exclude=%v): %v", include, exclude, err)
 	}
@@ -183,7 +183,7 @@ func TestNotificationListSinceIdAscending(t *testing.T) {
 	f.seed(t, "04", f.readerID, "renote")
 
 	// sinceId alone: the page holds everything after it, oldest first.
-	got, err := f.service().List(context.Background(), f.readerID, 20, f.prefix+"-01", "", nil, nil)
+	got, err := f.service().List(context.Background(), f.readerID, 20, f.prefix+"-01", "", nil, nil, false)
 	if err != nil {
 		t.Fatalf("List(sinceId): %v", err)
 	}
@@ -192,7 +192,7 @@ func TestNotificationListSinceIdAscending(t *testing.T) {
 	}
 
 	// sinceId with untilId pages between the two cursors, newest first.
-	got, err = f.service().List(context.Background(), f.readerID, 20, f.prefix+"-01", f.prefix+"-04", nil, nil)
+	got, err = f.service().List(context.Background(), f.readerID, 20, f.prefix+"-01", f.prefix+"-04", nil, nil, false)
 	if err != nil {
 		t.Fatalf("List(sinceId,untilId): %v", err)
 	}

@@ -54,6 +54,7 @@ func (s *Server) handleNotifications(w http.ResponseWriter, r *http.Request) {
 		MarkAsRead   *bool    `json:"markAsRead"`
 		IncludeTypes []string `json:"includeTypes"`
 		ExcludeTypes []string `json:"excludeTypes"`
+		UnreadOnly   bool     `json:"unreadOnly"`
 	}
 	if err := decodeOptionalJSON(r, &body); err != nil {
 		writeAPIError(w, err)
@@ -68,7 +69,7 @@ func (s *Server) handleNotifications(w http.ResponseWriter, r *http.Request) {
 
 	notifications, err := s.notifications.List(
 		r.Context(), info.User.ID, body.Limit, body.SinceID, body.UntilID,
-		body.IncludeTypes, body.ExcludeTypes)
+		body.IncludeTypes, body.ExcludeTypes, body.UnreadOnly)
 	if err != nil {
 		writeAPIError(w, &APIError{
 			Message: "Could not load the notifications.", Code: "INTERNAL_ERROR",

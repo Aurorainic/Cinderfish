@@ -259,7 +259,7 @@ FROM notifications WHERE id = $1
 // includeTypes leaves the type unfiltered, while an empty non-nil slice
 // matches nothing, which is what Misskey returns for an explicitly empty
 // includeTypes.
-func (s *NotificationService) List(ctx context.Context, recipientID string, limit int, sinceID, untilID string, includeTypes, excludeTypes []string) ([]*Notification, error) {
+func (s *NotificationService) List(ctx context.Context, recipientID string, limit int, sinceID, untilID string, includeTypes, excludeTypes []string, unreadOnly bool) ([]*Notification, error) {
 	if limit <= 0 {
 		limit = 10
 	}
@@ -271,6 +271,9 @@ func (s *NotificationService) List(ctx context.Context, recipientID string, limi
 SELECT id, recipient_id, type, notifier_id, note_id, reaction, is_read, created_at
 FROM notifications WHERE recipient_id = $1`
 	args := []any{recipientID}
+	if unreadOnly {
+		query += " AND NOT is_read"
+	}
 
 	// Misskey's getNotifications filters with include-wins semantics
 	// (packages/backend/src/core/NotificationService.ts L302-306): a

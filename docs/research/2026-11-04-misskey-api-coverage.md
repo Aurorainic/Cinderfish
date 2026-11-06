@@ -15,15 +15,15 @@
 | 指标 | 数量 |
 |------|------|
 | Misskey 端点总数 | 440 |
-| Cinderfish 已注册路由 | 102 |
-| 其中 Misskey 同名路径 | 98 |
-| 其中 Cinderfish 自有路径/别名 | 3（`notifications` 别名、`admin/federation/mode`、`admin/federation/allowlist`） |
-| 未实现（Misskey 同名） | 339 |
+| Cinderfish 已注册路由 | 103 |
+| 其中 Misskey 同名路径 | 99 |
+| 其中 Cinderfish 自有路径/别名 | 4（`notifications` 别名、`admin/federation/mode`、`admin/federation/allowlist`、`miauth/{session}/check`） |
+| 未实现（Misskey 同名） | 341 |
 
 统计口径：`internal/httpapi/server.go` 里 `HandleFunc("METHOD /api/…")` 的去重路径；
 GET 与 POST 同名路径只算一个。
 
-## 2. 已实现（102 条注册路由）
+## 2. 已实现（103 条注册路由）
 
 ```
 admin/accounts/create       admin/announcements/create  admin/announcements/delete
@@ -53,7 +53,8 @@ mute/delete                 mute/list
 miauth/gen-token            miauth/{session}/check*            notes/children              notes/conversation
 notes/create                notes/delete                notes/favorites/create
 notes/favorites/delete      notes/global-timeline       notes/hybrid-timeline
-notes/local-timeline        notes/polls/vote            notes/reactions
+notes/local-timeline        notes/mentions              notes/polls/vote
+notes/reactions
 notes/reactions/create      notes/reactions/delete      notes/renotes
 notes/search                notes/search-by-tag
 notes/replies               notes/show                  notes/timeline
@@ -76,6 +77,9 @@ users/update
 `hashtags/trend`、`drive/folders*`、`emojis`、`admin/emoji/*`、`notes/polls/vote`、
 `following/requests/*`、`users/update`、`signin`、`signup`、`username/available`、
 `i/registry/scopes`，以及 `admin/federation/mode` 的 GET。
+
+2026-11-06 第十六波新增：`notes/mentions`；`i/notifications` 增加 `unreadOnly` 参数（不是新路由）。
+台账计数按「440 − 同名已实现」重新对齐（此前累计漂移）。
 
 2026-11-06 第十五波新增：`miauth/{session}/check`（Misskey 在 api/index.ts 里实现，不在 endpoints
 目录，故不计入「Misskey 同名端点」分子）；迁移 v13 增加 `access_tokens.fetched`。

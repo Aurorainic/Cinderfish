@@ -203,6 +203,7 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("POST /api/notes/replies", s.handleNotesReplies)
 	s.mux.HandleFunc("POST /api/notes/conversation", s.handleNotesConversation)
 	s.mux.HandleFunc("POST /api/notes/children", s.handleNotesChildren)
+	s.mux.HandleFunc("POST /api/notes/mentions", s.handleNotesMentions)
 	s.mux.HandleFunc("POST /api/notes/search", s.handleNotesSearch)
 	s.mux.HandleFunc("POST /api/notes/search-by-tag", s.handleNotesSearchByTag)
 	s.mux.HandleFunc("POST /api/notes/renotes", s.handleNotesRenotes)
