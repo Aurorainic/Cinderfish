@@ -75,28 +75,91 @@
 
 			<section class="_formBlock">
 				<h2 class="sectionTitle">{{ t("other") }}</h2>
-				<ul class="unavailableList">
-					<li v-for="item in unavailableItems" :key="item.title" class="item">
-						<div class="row">
-							<span class="name">{{ item.title }}</span>
-							<span class="badge">{{ t("unavailable") }}</span>
-						</div>
-						<p v-if="item.description != null" class="description">
-							{{ item.description }}
-						</p>
-					</li>
-				</ul>
+
+				<CfSwitch
+					:model-value="me.isLocked"
+					:disabled="saving"
+					class="_formBlock"
+					@update:model-value="onSwitch('isLocked', $event)"
+				>
+					{{ t("makeFollowManuallyApprove") }}
+					<template #caption>{{ t("lockedAccountInfo") }}</template>
+				</CfSwitch>
+
+				<CfSwitch
+					:model-value="me.autoAcceptFollowed"
+					:disabled="saving"
+					class="_formBlock"
+					@update:model-value="onSwitch('autoAcceptFollowed', $event)"
+				>
+					{{ t("autoAcceptFollowed") }}
+				</CfSwitch>
+
+				<CfSwitch
+					:model-value="me.publicReactions"
+					:disabled="saving"
+					class="_formBlock"
+					@update:model-value="onSwitch('publicReactions', $event)"
+				>
+					{{ t("makeReactionsPublic") }}
+					<template #caption>{{
+						t("makeReactionsPublicDescription")
+					}}</template>
+				</CfSwitch>
+
+				<CfSwitch
+					:model-value="me.hideOnlineStatus"
+					:disabled="saving"
+					class="_formBlock"
+					@update:model-value="onSwitch('hideOnlineStatus', $event)"
+				>
+					{{ t("hideOnlineStatus") }}
+					<template #caption>{{ t("hideOnlineStatusDescription") }}</template>
+				</CfSwitch>
+
+				<CfSwitch
+					:model-value="me.noCrawle"
+					:disabled="saving"
+					class="_formBlock"
+					@update:model-value="onSwitch('noCrawle', $event)"
+				>
+					{{ t("noCrawle") }}
+					<template #caption>{{ t("noCrawleDescription") }}</template>
+				</CfSwitch>
+
+				<CfSwitch
+					:model-value="me.preventAiLearning"
+					:disabled="saving"
+					class="_formBlock"
+					@update:model-value="onSwitch('preventAiLearning', $event)"
+				>
+					{{ t("preventAiLearning") }}
+					<template #caption>{{ t("preventAiLearningDescription") }}</template>
+				</CfSwitch>
+
+				<CfSwitch
+					:model-value="me.isExplorable"
+					:disabled="saving"
+					class="_formBlock"
+					@update:model-value="onSwitch('isExplorable', $event)"
+				>
+					{{ t("makeExplorable") }}
+					<template #caption>{{ t("makeExplorableDescription") }}</template>
+				</CfSwitch>
+
+				<CfInfo v-if="switchError != null" warn class="error">
+					{{ switchError }}
+				</CfInfo>
 			</section>
 		</template>
 	</div>
 </template>
 
 <script lang="ts" setup>
-// Firefish's privacy page writes eight profile switches through `i/update`.
-// Cinderfish only stores two of them (followersVisibility / followingVisibility,
-// docs/research/api-contract/auth-users.md §POST /api/i/update); the rest are
-// silently ignored by the backend and read back as constants, so they are listed
-// as unavailable instead of being rendered as dead switches.
+// Firefish's privacy page writes its switches through `i/update`, and every one
+// of them is stored now (docs/research/api-contract/auth-users.md §POST
+// /api/i/update). `isLocked` lives in users.is_locked, so the ActivityPub inbox
+// honours manual follower approval as well.
 import { computed, ref, watch } from "vue";
 import type { FollowVisibility, NoteVisibility } from "@/api/types";
 import { me, updateProfile } from "@/account";
@@ -165,35 +228,32 @@ watch(me, (account) => {
 	followingVisibility.value = currentVisibility(account?.followingVisibility);
 });
 
-interface UnavailableItem {
-	title: string;
-	description?: string;
-}
+const switchError = ref<string | null>(null);
 
-const unavailableItems = computed<UnavailableItem[]>(() => [
-	{
-		title: t("makeFollowManuallyApprove"),
-		description: t("lockedAccountInfo"),
-	},
-	{ title: t("autoAcceptFollowed") },
-	{
-		title: t("makeReactionsPublic"),
-		description: t("makeReactionsPublicDescription"),
-	},
-	{
-		title: t("hideOnlineStatus"),
-		description: t("hideOnlineStatusDescription"),
-	},
-	{ title: t("noCrawle"), description: t("noCrawleDescription") },
-	{
-		title: t("preventAiLearning"),
-		description: t("preventAiLearningDescription"),
-	},
-	{
-		title: t("makeExplorable"),
-		description: t("makeExplorableDescription"),
-	},
-]);
+/** Boolean profile switches, saved one at a time as they are toggled. */
+type SwitchKey =
+	| "isLocked"
+	| "autoAcceptFollowed"
+	| "publicReactions"
+	| "hideOnlineStatus"
+	| "noCrawle"
+	| "preventAiLearning"
+	| "isExplorable";
+
+async function onSwitch(key: SwitchKey, value: boolean | null): Promise<void> {
+	if (saving.value || value == null) return;
+	saving.value = true;
+	saved.value = false;
+	switchError.value = null;
+	try {
+		await updateProfile({ [key]: value });
+		saved.value = true;
+	} catch (error) {
+		switchError.value = error instanceof Error ? error.message : String(error);
+	} finally {
+		saving.value = false;
+	}
+}
 
 async function save(): Promise<void> {
 	if (saving.value || me.value == null) return;

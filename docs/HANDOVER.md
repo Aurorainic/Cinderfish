@@ -3378,6 +3378,45 @@ cd web && pnpm build                    # exit 0
 - 删除文件时缩略图对象是否真的消失。
 - `go test` 与浏览器走查未执行。
 
+## 12BK. 批次：锁推生效与关注通知（2026-11-06）
+
+**工作方式**：目标模式第四十七波，继续只写代码、验证到编译层。施工依据
+`docs/research/2026-11-06-firefish-port-wave47-contract.md`。
+
+### 12BK.1 落地清单
+
+| 层 | 文件 | 说明 |
+|----|------|------|
+| 锁推 | `internal/httpapi/following.go`、`internal/federation/store.go` | `LocalUserLocked`；本地目标按锁推分流成待审请求 |
+| 通知 | `internal/httpapi/following.go`、`internal/federation/inbox.go` | `Server.createNotification`；入站两条路径写通知；`Inbox.OnNotification`/`OnFollow` 接线 |
+| 资料 | `internal/account/profile.go`、`internal/httpapi/i_update.go`、`users_pack.go` | `Profile.IsLocked`（标量子查询）、`SetLocked`、`i/update {isLocked}`、`isLocked` 真值打包 |
+| 前端 | `pages/SettingsPrivacy.vue`、`account/types.ts` | 七个真实开关；`ProfileUpdateRequest.isLocked` |
+| 文档 | `auth-users.md`、`following-relations.md` | 三条旧结论更新 |
+
+### 12BK.2 有意的限制
+
+1. 无 `followRequestAccepted` 通知。
+2. 接受请求不清理此前的待审通知。
+3. 锁推变更不主动重发 actor 文档，远端缓存需自行刷新。
+4. 未新增测试。
+
+### 12BK.3 验证证据（编译层）
+
+```
+gofmt -l internal/ cmd/                 # 空
+go vet ./...                            # exit 0
+cd web && pnpm exec vue-tsc --noEmit    # exit 0
+cd web && pnpm run check:port           # hardTotal 0（400 文件）
+cd web && pnpm build                    # exit 0
+```
+
+### 12BK.4 仍未验证
+
+- 锁推账号被关注 → 待审 → 接受/拒绝的完整链路。
+- 三类通知行的落库与 Streaming 推送。
+- 隐私页七个开关的保存与回读。
+- `go test` 与浏览器走查未执行。
+
 ## 13. 文档索引
 
 | 文档 | 内容 |
@@ -3450,6 +3489,7 @@ cd web && pnpm build                    # exit 0
 | `docs/research/2026-11-06-firefish-port-wave44-contract.md` | **第四十四波施工契约（实例 CSS 与邮件设置页），见 §12BH** |
 | `docs/research/2026-11-06-firefish-port-wave45-contract.md` | **第四十五波施工契约（管理台文件详情），见 §12BI** |
 | `docs/research/2026-11-06-firefish-port-wave46-contract.md` | **第四十六波施工契约（缩略图管道），见 §12BJ** |
+| `docs/research/2026-11-06-firefish-port-wave47-contract.md` | **第四十七波施工契约（锁推生效与关注通知），见 §12BK** |
 
 ## 14. 已知的未验证项
 
@@ -3515,6 +3555,7 @@ cd web && pnpm build                    # exit 0
 - **第四十四波未测（2026-11-06，见 §12BH.4）**：实例 CSS 链路与邮件状态页只有编译层证据。
 - **第四十五波未测（2026-11-06，见 §12BI.4）**：文件详情的四类预览与 `user: null` 分支未走查。
 - **第四十六波未测（2026-11-06，见 §12BJ.4）**：缩略图生成与删除只有编译层证据。
+- **第四十七波未测（2026-11-06，见 §12BK.4）**：锁推与关注通知只有编译层证据。
 - **仍未移植的设置页**：邮箱、整合、导入导出、迁移、Webhook、插件、自定义 KaTeX、状态栏、
   删除账号、应用授权以外的账号操作；对应后端端点不存在或前端缺少依赖（见第五波契约 §3.3）。
 - **仍缺的 widgets**：rss、rss-ticker、server-metric、online-users、federation、job-queue、aiscript、

@@ -29,6 +29,9 @@ type Inbox struct {
 	OnFollow      func(ctx context.Context, followerID, followeeID string)
 	OnUnfollow    func(ctx context.Context, followerID, followeeID string)
 	OnReaction    func(ctx context.Context, noteID, userID, reaction string)
+	// OnNotification fires after a stored notification so the host can push
+	// it to an open Streaming client.
+	OnNotification func(ctx context.Context, notificationID, recipientID string)
 }
 
 // NewInbox returns an inbox over the given dependencies.
@@ -115,10 +118,20 @@ func (i *Inbox) follow(ctx context.Context, actor *RemoteUser, activity Object) 
 		if err := i.store.FollowRequest(ctx, activity.Ref("id"), actor.ID, target.id); err != nil {
 			return "", err
 		}
+		if id, err := i.store.Notification(ctx, target.id, "receiveFollowRequest", actor.ID, ""); err != nil {
+			return "", err
+		} else if i.OnNotification != nil {
+			i.OnNotification(ctx, id, target.id)
+		}
 		return "ok: follow request queued", nil
 	}
 	if err := i.store.Follow(ctx, activity.Ref("id"), actor.ID, target.id); err != nil {
 		return "", err
+	}
+	if id, err := i.store.Notification(ctx, target.id, "follow", actor.ID, ""); err != nil {
+		return "", err
+	} else if i.OnNotification != nil {
+		i.OnNotification(ctx, id, target.id)
 	}
 	if i.OnFollow != nil {
 		i.OnFollow(ctx, actor.ID, target.id)

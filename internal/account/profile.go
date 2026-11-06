@@ -56,6 +56,10 @@ type Profile struct {
 	// only meaningful when Email is non-empty.
 	Email         string
 	EmailVerified bool
+	// IsLocked means new followers need manual approval. It lives in
+	// users.is_locked (the same column a remote actor's locked flag uses), so
+	// the federation code and the profile agree.
+	IsLocked bool
 }
 
 // ProfileField is one row of Misskey's "fields" (profile metadata) list.
@@ -79,13 +83,14 @@ func (s *Service) AttachDrive(drive *media.DriveService) {
 func (s *Service) GetProfile(ctx context.Context, userID string) (*Profile, error) {
 	var name, description, avatarURL, followersVis, followingVis, email *string
 	var settings []byte
-	var twoFactorEnabled, usePasswordLessLogin, emailVerified bool
+	var twoFactorEnabled, usePasswordLessLogin, emailVerified, isLocked bool
 	err := s.pool.QueryRow(ctx, `
 SELECT name, description, avatar_url, followers_visibility, following_visibility, settings,
-       two_factor_enabled, use_password_less_login, email, email_verified
+       two_factor_enabled, use_password_less_login, email, email_verified,
+       COALESCE((SELECT is_locked FROM users WHERE id = $1), FALSE)
 FROM user_profiles WHERE user_id = $1
 `, userID).Scan(&name, &description, &avatarURL, &followersVis, &followingVis, &settings,
-		&twoFactorEnabled, &usePasswordLessLogin, &email, &emailVerified)
+		&twoFactorEnabled, &usePasswordLessLogin, &email, &emailVerified, &isLocked)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return &Profile{}, nil
 	}
@@ -142,6 +147,7 @@ FROM user_profiles WHERE user_id = $1
 		InjectFeaturedNote:   stored.InjectFeaturedNote,
 		Email:                derefString(email),
 		EmailVerified:        emailVerified,
+		IsLocked:             isLocked,
 	}, nil
 }
 
@@ -250,6 +256,15 @@ ON CONFLICT (user_id) DO UPDATE SET settings = user_profiles.settings || EXCLUDE
 `, userID, payload)
 	if err != nil {
 		return fmt.Errorf("account: update muted instances: %w", err)
+	}
+	return nil
+}
+
+// SetLocked switches manual follower approval on or off. The flag lives in
+// users.is_locked so the ActivityPub inbox and the API agree on it.
+func (s *Service) SetLocked(ctx context.Context, userID string, locked bool) error {
+	if _, err := s.pool.Exec(ctx, `UPDATE users SET is_locked = $2 WHERE id = $1`, userID, locked); err != nil {
+		return fmt.Errorf("account: set locked: %w", err)
 	}
 	return nil
 }

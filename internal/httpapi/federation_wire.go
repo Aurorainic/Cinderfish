@@ -50,6 +50,12 @@ func (s *Server) AttachFederation() {
 	})
 
 	s.federationInbox = federation.NewInbox(s.federationStore, s.fedRenderer, s.federationClient, s.federationPolicy)
+	s.federationInbox.OnFollow = func(ctx context.Context, followerID, followeeID string) {
+		s.publishFollowEvent(followerID, followeeID)
+	}
+	s.federationInbox.OnNotification = func(_ context.Context, notificationID, recipientID string) {
+		s.publishNotificationCreated(notificationID, recipientID)
+	}
 	s.federationInbox.OnNoteCreated = func(ctx context.Context, noteID, userID string) {
 		// Remote notes land in the global timeline; publishing the
 		// streaming event keeps open clients in step with it.

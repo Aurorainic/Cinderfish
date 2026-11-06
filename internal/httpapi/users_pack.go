@@ -54,7 +54,7 @@ func packUserDetailed(u *account.User, createdAt time.Time, isMe bool, prof *acc
 	packed["lastFetchedAt"] = nil
 	packed["bannerUrl"] = nil
 	packed["bannerBlurhash"] = nil
-	packed["isLocked"] = false
+	packed["isLocked"] = prof != nil && prof.IsLocked
 	packed["isModerator"] = u.IsAdmin
 	packed["isAdmin"] = u.IsAdmin
 	packed["isSilenced"] = false

@@ -92,6 +92,9 @@ func (s *Server) handleIUpdate(w http.ResponseWriter, r *http.Request) {
 		CarefulBot         *bool `json:"carefulBot"`
 		AutoAcceptFollowed *bool `json:"autoAcceptFollowed"`
 		InjectFeaturedNote *bool `json:"injectFeaturedNote"`
+		// Manual follower approval. Stored in users.is_locked, the same column
+		// the inbox reads for an inbound Follow.
+		IsLocked *bool `json:"isLocked"`
 		// Notification types the user does not want to see.
 		MutingNotificationTypes json.RawMessage `json:"mutingNotificationTypes"`
 	}
@@ -193,6 +196,13 @@ func (s *Server) handleIUpdate(w http.ResponseWriter, r *http.Request) {
 	if err := s.accounts.UpdateVisibility(r.Context(), info.User.ID, body.FollowersVisibility.asUpdatePointer(), body.FollowingVisibility.asUpdatePointer()); err != nil {
 		writeInternalServerError(w)
 		return
+	}
+
+	if body.IsLocked != nil {
+		if err := s.accounts.SetLocked(r.Context(), info.User.ID, *body.IsLocked); err != nil {
+			writeInternalServerError(w)
+			return
+		}
 	}
 
 	if err := s.accounts.UpdateProfile(r.Context(), info.User.ID, body.Name.asUpdatePointer(), body.Description.asUpdatePointer(), body.AvatarID.asUpdatePointer()); err != nil {

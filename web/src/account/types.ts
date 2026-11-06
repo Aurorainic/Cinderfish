@@ -63,6 +63,8 @@ export interface ProfileUpdateRequest {
 	carefulBot?: boolean;
 	autoAcceptFollowed?: boolean;
 	injectFeaturedNote?: boolean;
+	/** Manual follower approval; stored in users.is_locked. */
+	isLocked?: boolean;
 	/** Notification types the account does not want to see. */
 	mutingNotificationTypes?: string[];
 }

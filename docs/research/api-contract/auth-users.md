@@ -167,7 +167,7 @@ token 解析（`internal/account/tokens.go:88`）：
 | `lastFetchedAt` | null | 恒为 `null` |
 | `bannerUrl` | null | 恒为 `null`，即使数据库有 `user_profiles.banner_url` 也不读（`internal/account/profile.go:41`） |
 | `bannerBlurhash` | null | 恒为 `null` |
-| `isLocked` | boolean | 恒为 `false`（无视 `users.is_locked`） |
+| `isLocked` | boolean | `users.is_locked`（第四十七波起读取真值；`i/update` 可写） |
 | `isModerator` | boolean | **等于 `is_admin`**（无独立 moderator 角色） |
 | `isAdmin` | boolean | `users.is_admin` |
 | `isSilenced` | boolean | 恒为 `false` |
@@ -681,8 +681,9 @@ token 解析（`internal/account/tokens.go:88`）：
 | `fields` | array \| null | 否 | 最多 16 条 `{name,value}`；name ≤ 255、value ≤ 1024；空 name 丢弃 | `settings.fields` |
 | `mutingNotificationTypes` | array \| null | 否 | 只接受本后端产生的 5 类通知，最多 5 项 | `settings.mutingNotificationTypes` |
 | `noCrawle` / `preventAiLearning` / `isExplorable` / `hideOnlineStatus` / `publicReactions` / `alwaysMarkNsfw` / `autoSensitive` / `carefulBot` / `autoAcceptFollowed` / `injectFeaturedNote` | boolean | 否 | 无 | `settings.<字段名>`，读回时 `isExplorable` 缺省为 `true` |
+| `isLocked` | boolean | 否 | 无 | `users.is_locked`（不是 settings）；锁推后新关注进入待审 |
 
-**被静默忽略的字段**（Firefish 的设置页会发）：`bannerId`、`followedMessage`、`isBot`、`isCat`、`speakAsCat`、`isLocked`、`requireSigninToViewContents`、`mutedWords`、`notificationRecieveConfig`、`emailNotificationTypes`、`alsoKnownAs`、`avatarDecorations`、`chatScope`、`pinnedPageId` 等。它们不会报错，也不会保存。`mutedInstances` 单独处理（见 §`i/update` 的 `mutedInstances`）。
+**被静默忽略的字段**（Firefish 的设置页会发）：`bannerId`、`followedMessage`、`isBot`、`isCat`、`speakAsCat`、`requireSigninToViewContents`、`mutedWords`、`notificationRecieveConfig`、`emailNotificationTypes`、`alsoKnownAs`、`avatarDecorations`、`chatScope`、`pinnedPageId` 等。它们不会报错，也不会保存。`mutedInstances` 单独处理（见 §`i/update` 的 `mutedInstances`）。
 
 ### 响应 200
 
@@ -705,7 +706,7 @@ token 解析（`internal/account/tokens.go:88`）：
 
 - 支持 name、description、avatarId、两个 visibility，以及 location/birthday/lang/fields 与 10 个布尔开关；Misskey 的其余 30+ 个参数仍然无效。
 - 没有 `bannerId`：横幅完全不可设置，`bannerUrl` 恒为 `null`。
-- `isLocked`（锁推）、关注审批、`isBot`/`isCat` 与发言猫语仍无写入路径。
+- `isBot`/`isCat` 与发言猫语仍无写入路径（`isLocked` 自第四十七波起可写）。
 - 没有邮箱修改与 `i/update-email`；改密见 `i/change-password`（第二十一波）。
 - `avatarId` 回读问题：设置成功后响应里的 `avatarId` 仍是 `null`，Firefish 头像裁剪后 `me.avatarId = i.avatarId` 会拿到 `null`（`packages/client/src/pages/settings/profile.vue:254`），但 `avatarUrl` 是正确的，头像显示不受影响。
 
@@ -1147,7 +1148,7 @@ OAuth 2.0 授权码端点（仅 PKCE `S256`）。认证：**需要登录**，且
 | `UserDetailed.bannerUrl` / `.bannerBlurhash` | 恒 `null` |
 | `UserDetailed.fields` / `.verifiedLinks` | 恒 `[]` |
 | `UserDetailed.location` / `.birthday` / `.lang` | 恒 `null` |
-| `UserDetailed.isLocked` | 恒 `false`（忽略 `users.is_locked`） |
+| `UserDetailed.isLocked` | `users.is_locked`（第四十七波起读取真值） |
 | `UserLite.isBot` / `.isCat` | 恒 `false` |
 | `UserLite.onlineStatus` | 恒 `"unknown"` |
 | `UserLite.instance` | 恒 `null` |

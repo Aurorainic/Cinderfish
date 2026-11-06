@@ -68,10 +68,27 @@ func (s *Server) handleFollowingCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if target.Host == nil {
+		// A locked local account queues the request instead of accepting it,
+		// matching what the inbox does for a remote follower.
+		locked, err := s.federationStore.LocalUserLocked(r.Context(), target.ID)
+		if err != nil {
+			writeInternalServerError(w)
+			return
+		}
+		if locked {
+			if err := s.federationStore.FollowRequest(r.Context(), "", info.User.ID, target.ID); err != nil {
+				writeInternalServerError(w)
+				return
+			}
+			s.createNotification(r.Context(), target.ID, "receiveFollowRequest", info.User.ID, "")
+			writeJSON(w, http.StatusOK, packUserLite(target, s.cfg.Domain, nil))
+			return
+		}
 		if err := s.federationStore.Follow(r.Context(), "", info.User.ID, target.ID); err != nil {
 			writeInternalServerError(w)
 			return
 		}
+		s.createNotification(r.Context(), target.ID, "follow", info.User.ID, "")
 		s.publishFollowEvent(info.User.ID, target.ID)
 	} else {
 		s.sendRemoteFollow(r.Context(), info.User.ID, target.ID, *target.Host)
@@ -210,4 +227,26 @@ func (s *Server) sendRemoteUndoFollow(ctx context.Context, meID, targetID, host 
 // resolveRemoteActor loads a stored remote actor.
 func (s *Server) resolveRemoteActor(ctx context.Context, userID string) (*federation.RemoteUser, error) {
 	return s.federationStore.UserByID(ctx, userID)
+}
+
+// createNotification records one notification row and pushes it to the
+// recipient's Streaming main channel, tolerating a missing notification
+// service (API-only deployments). Follow events have no note, so noteID is
+// empty and stored as NULL.
+func (s *Server) createNotification(ctx context.Context, recipientID, kind, notifierID, noteID string) {
+	if s.notifications == nil {
+		return
+	}
+	var notePtr, notifierPtr *string
+	if noteID != "" {
+		notePtr = &noteID
+	}
+	if notifierID != "" {
+		notifierPtr = &notifierID
+	}
+	id, created, err := s.notifications.CreateForLocal(ctx, recipientID, kind, notifierPtr, notePtr, nil)
+	if err != nil || !created {
+		return
+	}
+	s.publishNotificationCreated(id, recipientID)
 }

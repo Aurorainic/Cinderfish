@@ -148,6 +148,21 @@ func (s *Store) LocalUserByID(ctx context.Context, id string) (*localActor, erro
 	return &localActor{id: id, locked: locked}, nil
 }
 
+// LocalUserLocked reports whether a local account requires manual approval of
+// new followers. An unknown id reports false so a caller that just looked the
+// user up does not have to distinguish the two failures.
+func (s *Store) LocalUserLocked(ctx context.Context, id string) (bool, error) {
+	var locked bool
+	err := s.pool.QueryRow(ctx, "SELECT is_locked FROM users WHERE id = $1 AND host IS NULL", id).Scan(&locked)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("federation: local user lock state: %w", err)
+	}
+	return locked, nil
+}
+
 // LocalUserOfAPID maps a note id or actor id belonging to this instance
 // to the local user that owns it.
 func (s *Store) LocalUserOfAPID(ctx context.Context, apID, baseURL string) (string, error) {

@@ -247,7 +247,9 @@
   5. 成功后写一条 `follow_requests` 行（`internal/httpapi/following.go:179`），于是该请求立刻出现在 `following/requests/sent` 里，并且可以 `cancel`。
   - 对端 `Accept` 到达时，`inbox.accept` 会插入 `followings` 并删掉这条待审行（`internal/federation/inbox.go:152`）。
 - **远端目标不会区分对端是否锁定账号**：一律先发 `Follow` 再记待审行；也**不检查自己是否被对方 block**（`blocks` 表在关注路径上完全未被读取）。
-- **不发关注通知**：`i/notifications` 不会产生 `follow` / `followRequestAccepted` 类型的通知（`internal/note` 的通知服务没有这两种类型）。前端若要提示「有人关注你」，只能用 Streaming 的 `follow` 事件（且只对本地发起的关注有效）。
+- **关注通知自第四十七波起落库**：本地关注与被接受的入站关注产生 `follow` 行，锁推账号产生
+  `receiveFollowRequest` 行，并推 Streaming 通知事件。仍不产生 `followRequestAccepted`
+  （Misskey 也没有这个类型）；远端请求方感知接受结果依旧靠对端 `Accept` 或 `followed` 事件。
 
 ### 已知限制
 
@@ -441,7 +443,8 @@
 
 ### 已知限制
 
-- 不产生 `followRequestAccepted` 通知，本地请求方**唯一**的感知途径是 Streaming 的 `followed` 事件（若在线）或下次 `users/show` 的 `isFollowing`。
+- 不产生 `followRequestAccepted` 通知（第四十七波只加了 `follow` 与 `receiveFollowRequest`），
+  本地请求方的感知途径仍是 Streaming 的 `followed` 事件或下次 `users/show` 的 `isFollowing`。
 - 批准后响应不返回新的关注对象或计数，前端需自行刷新 `users/followers`。
 
 ## POST /api/following/requests/reject
@@ -562,7 +565,7 @@
 另外相关但不在 `following/*` 命名空间、同样未实现的能力：
 
 - `users/relation` / `users/relations`：查看关系状态只能靠 `users/show`（带 token 时填充 `isFollowing`、`isFollowed`、`hasPendingFollowRequestFromYou`、`hasPendingFollowRequestToYou`，`internal/httpapi/account.go:276`），且 `users/show` 一次只能查一个用户。
-- 关注通知（`follow` / `followRequestAccepted` 类型）：未实现，`i/notifications` 不会返回这两种类型。
+- 关注通知：`follow` 与 `receiveFollowRequest` 已实现（第四十七波）；`followRequestAccepted` 未实现。
 - 「待审请求」红点：`i` 的 `hasPendingReceivedFollowRequest` 恒为 `false`。
 
 ### 语义缺口汇总
