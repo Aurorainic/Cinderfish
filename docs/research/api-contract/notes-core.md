@@ -927,6 +927,7 @@
 | `notes/delete` 删他人笔记 | `ACCESS_DENIED` | `NO_SUCH_NOTE` |
 | `notes/edit` 可编辑字段 | 正文、CW、可见性、附件、投票、回复/转发目标 | 只有正文、CW、可见性、localOnly；附件与投票不变 |
 | `notes/edit` 副作用 | Streaming `updated` + ActivityPub `Update` | 只改本地行并记录历史 |
+| `Note.updatedAt` | 有（编辑后非空） | 有：`notes.updated_at`，未编辑为 `null` |
 | `notes/history` | Misskey 固定版本无此端点 | Cinderfish 自有，仅作者可读 |
 | `notes/reactions/create` 重复回应 | `ALREADY_REACTED` | 幂等，返回 `{}` |
 | `notes/reactions/delete` 参数与失败 | 仅 `noteId`；无回应抛 `NOT_REACTED`；204 | 可选 `reaction`；恒 200 `{}` |

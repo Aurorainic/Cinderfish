@@ -42,6 +42,7 @@ func packNote(n *note.Note, pc notePackContext) map[string]any {
 	packed := map[string]any{
 		"id":             n.ID,
 		"createdAt":      n.CreatedAt.UTC().Format(time.RFC3339Nano),
+		"updatedAt":      nilOrTime(n.UpdatedAt),
 		"userId":         n.UserID,
 		"user":           pc.Author,
 		"text":           n.Text,
@@ -201,4 +202,12 @@ func totalVotes(counts map[int]int) int {
 		total += n
 	}
 	return total
+}
+
+// nilOrTime renders an optional timestamp as RFC3339Nano, or JSON null.
+func nilOrTime(t *time.Time) any {
+	if t == nil {
+		return nil
+	}
+	return t.UTC().Format(time.RFC3339Nano)
 }

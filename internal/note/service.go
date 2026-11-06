@@ -62,6 +62,7 @@ type Note struct {
 	IsSensitive        bool
 	ReactionAcceptance *string
 	CreatedAt          time.Time
+	UpdatedAt          *time.Time
 	DeletedAt          *time.Time
 }
 
@@ -432,7 +433,7 @@ SELECT n.id, n.user_id, n.user_host, n.visibility, n.local_only, n.cw, n.text, n
        n.reply_id, n.reply_user_id, n.renote_id, n.renote_user_id, n.renote_user_host,
        n.name, n.url, n.uri, n.tags, n.mentions, n.emojis,
        n.renote_count, n.replies_count, n.clipped_count, n.is_sensitive, n.reaction_acceptance,
-       n.created_at, n.deleted_at
+       n.created_at, n.updated_at, n.deleted_at
 FROM notes n`
 
 func scanNote(row pgx.Row) (*Note, error) {
@@ -442,7 +443,7 @@ func scanNote(row pgx.Row) (*Note, error) {
 		&n.FileIDs, &n.PollID, &n.ReplyID, &n.ReplyUserID, &n.RenoteID, &n.RenoteUserID, &n.RenoteUserHost,
 		&n.Name, &n.URL, &n.URI, &tags, &mentions, &emojis,
 		&n.RenoteCount, &n.RepliesCount, &n.ClippedCount, &n.IsSensitive, &n.ReactionAcceptance,
-		&n.CreatedAt, &n.DeletedAt)
+		&n.CreatedAt, &n.UpdatedAt, &n.DeletedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrNotFound
 	}
