@@ -123,6 +123,7 @@ func (s *Server) handleSignin(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Username string `json:"username"`
 		Password string `json:"password"`
+		Token    string `json:"token"`
 	}
 	if err := decodeOptionalJSON(r, &body); err != nil {
 		writeAPIError(w, err)
@@ -153,6 +154,25 @@ func (s *Server) handleSignin(w http.ResponseWriter, r *http.Request) {
 	if user.IsSuspended {
 		writeIDError(w, http.StatusForbidden, errIDUserSuspended)
 		return
+	}
+
+	// With TOTP enabled the password only proves the first factor. A
+	// request without a code gets an empty success body, which is how
+	// Firefish's dialog learns to show its code field; the dialog then
+	// repeats the request with `token`.
+	if state, err := s.accounts.GetTwoFactorState(r.Context(), user.ID); err != nil {
+		writeAPIError(w, internalError("Could not read the two-factor state."))
+		return
+	} else if state.Enabled {
+		if body.Token == "" {
+			writeJSON(w, http.StatusOK, map[string]any{})
+			return
+		}
+		if !auth.ValidateTOTP(state.Secret, body.Token) {
+			_ = s.accounts.RecordSignin(r.Context(), user.ID, clientIP(r), false)
+			writeIDError(w, http.StatusForbidden, errIDInvalidTOTP)
+			return
+		}
 	}
 
 	_ = s.accounts.RecordSignin(r.Context(), user.ID, clientIP(r), true)

@@ -127,6 +127,10 @@ func (s *Server) registerRoutes() {
 	// Misskey keeps users/update as the canonical spelling and i/update as
 	// its alias; both write the same fields.
 	s.mux.HandleFunc("POST /api/users/update", s.handleIUpdate)
+	s.mux.HandleFunc("POST /api/i/2fa/register", s.handleI2FARegister)
+	s.mux.HandleFunc("POST /api/i/2fa/done", s.handleI2FADone)
+	s.mux.HandleFunc("POST /api/i/2fa/unregister", s.handleI2FAUnregister)
+	s.mux.HandleFunc("POST /api/i/2fa/password-less", s.handleI2FAPasswordLess)
 	s.mux.HandleFunc("POST /api/i/pin", s.handleIPin)
 	s.mux.HandleFunc("POST /api/i/unpin", s.handleIUnpin)
 	s.mux.HandleFunc("POST /api/users", s.handleUsers)

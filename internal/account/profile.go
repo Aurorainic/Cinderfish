@@ -27,6 +27,11 @@ type Profile struct {
 	// wants to see. It lives in `user_profiles.settings` so it does not
 	// need a migration of its own.
 	MutedInstances []string
+	// TwoFactorEnabled reports whether TOTP is active for this account.
+	// UsePasswordLessLogin is stored for schema parity but no security key
+	// can be registered yet, so it always reads false.
+	TwoFactorEnabled     bool
+	UsePasswordLessLogin bool
 }
 
 // ErrNoSuchAvatarFile is returned when an avatar file id does not name
@@ -44,10 +49,13 @@ func (s *Service) AttachDrive(drive *media.DriveService) {
 func (s *Service) GetProfile(ctx context.Context, userID string) (*Profile, error) {
 	var name, description, avatarURL, followersVis, followingVis *string
 	var settings []byte
+	var twoFactorEnabled, usePasswordLessLogin bool
 	err := s.pool.QueryRow(ctx, `
-SELECT name, description, avatar_url, followers_visibility, following_visibility, settings
+SELECT name, description, avatar_url, followers_visibility, following_visibility, settings,
+       two_factor_enabled, use_password_less_login
 FROM user_profiles WHERE user_id = $1
-`, userID).Scan(&name, &description, &avatarURL, &followersVis, &followingVis, &settings)
+`, userID).Scan(&name, &description, &avatarURL, &followersVis, &followingVis, &settings,
+		&twoFactorEnabled, &usePasswordLessLogin)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return &Profile{}, nil
 	}
@@ -61,12 +69,14 @@ FROM user_profiles WHERE user_id = $1
 		_ = json.Unmarshal(settings, &stored)
 	}
 	return &Profile{
-		Name:                derefString(name),
-		Description:         derefString(description),
-		AvatarURL:           derefString(avatarURL),
-		FollowersVisibility: derefString(followersVis),
-		FollowingVisibility: derefString(followingVis),
-		MutedInstances:      stored.MutedInstances,
+		Name:                 derefString(name),
+		Description:          derefString(description),
+		AvatarURL:            derefString(avatarURL),
+		FollowersVisibility:  derefString(followersVis),
+		FollowingVisibility:  derefString(followingVis),
+		MutedInstances:       stored.MutedInstances,
+		TwoFactorEnabled:     twoFactorEnabled,
+		UsePasswordLessLogin: usePasswordLessLogin,
 	}, nil
 }
 

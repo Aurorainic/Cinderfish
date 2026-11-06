@@ -484,6 +484,16 @@ CREATE INDEX IF NOT EXISTS idx_webhooks_user ON webhooks (user_id, created_at DE
 	13: `
 ALTER TABLE access_tokens ADD COLUMN IF NOT EXISTS fetched BOOLEAN NOT NULL DEFAULT FALSE;
 `,
+
+	// v14: TOTP two-factor auth. `two_factor_temp_secret` holds the pending
+	// secret between i/2fa/register and i/2fa/done; `two_factor_enabled` gates
+	// the second step of signin.
+	14: `
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS two_factor_secret TEXT;
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS two_factor_temp_secret TEXT;
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS two_factor_enabled BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS use_password_less_login BOOLEAN NOT NULL DEFAULT FALSE;
+`,
 }
 
 // Migrate applies pending migrations in order and returns the version

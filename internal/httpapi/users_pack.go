@@ -59,6 +59,12 @@ func packUserDetailed(u *account.User, createdAt time.Time, isMe bool, prof *acc
 	packed["isAdmin"] = u.IsAdmin
 	packed["isSilenced"] = false
 	packed["isSuspended"] = u.IsSuspended
+	// The signin dialog reads twoFactorEnabled from users/show before it
+	// decides to ask for a TOTP code, so the detailed pack carries it for
+	// every user, as Firefish does.
+	packed["twoFactorEnabled"] = prof != nil && prof.TwoFactorEnabled
+	packed["usePasswordLessLogin"] = prof != nil && prof.UsePasswordLessLogin
+	packed["securityKeys"] = false
 	var description any
 	if prof != nil && prof.Description != "" {
 		description = prof.Description

@@ -13,7 +13,11 @@
 | 方法 | 路径 | 认证 | Handler | 说明 |
 |------|------|------|---------|------|
 | POST | `/api/signup` | 匿名 | `internal/httpapi/account.go:37` | 注册；成功返回 `MeDetailed` + `token` |
-| POST | `/api/signin` | 匿名 | `internal/httpapi/account.go:120` | 密码登录；成功返回 `finished`/`id`/`i` |
+| POST | `/api/signin` | 匿名 | `internal/httpapi/account.go:114` | 密码登录；启用 TOTP 时先返回空响应，带 `token` 再来一次 |
+| POST | `/api/i/2fa/register` | 需登录 | `internal/httpapi/two_factor.go:22` | 校验密码后生成临时 TOTP 密钥 |
+| POST | `/api/i/2fa/done` | 需登录 | `internal/httpapi/two_factor.go:70` | 用 6 位码确认并启用 TOTP |
+| POST | `/api/i/2fa/unregister` | 需登录 | `internal/httpapi/two_factor.go:117` | 校验密码后停用 TOTP |
+| POST | `/api/i/2fa/password-less` | 需登录 | `internal/httpapi/two_factor.go:150` | 无安全密钥，`value:true` 恒返回 `NO_SECURITY_KEY` |
 | POST | `/api/username/available` | 匿名 | `internal/httpapi/account.go:174` | 用户名是否可注册 |
 | POST | `/api/miauth/gen-token` | 需登录 | `internal/httpapi/account.go:290` | 为 MiAuth 会话签发 32 字符 token |
 | POST | `/api/i` | 需登录 | `internal/httpapi/account.go:200` | 当前用户 `MeDetailed` |
@@ -174,6 +178,9 @@ token 解析（`internal/account/tokens.go:88`）：
 | `publicReactions` | boolean | 恒为 `false` |
 | `followersVisibility` | string | `"public"` / `"followers"` / `"private"`；无资料行或空值读作 `"public"`（`internal/httpapi/users_pack.go:98`） |
 | `followingVisibility` | string | 同上 |
+| `twoFactorEnabled` | boolean | `user_profiles.two_factor_enabled`；登录框据此决定是否显示验证码输入框 |
+| `usePasswordLessLogin` | boolean | `user_profiles.use_password_less_login`；安全密钥未实现，始终为 `false` |
+| `securityKeys` | boolean | 恒为 `false`（没有可注册的安全密钥） |
 | `chatScope` | string | 恒为 `"followers"` |
 | `canChat` | boolean | 恒为 `false` |
 | `roles` | array | 恒为 `[]`（无角色系统） |
@@ -380,8 +387,20 @@ token 解析（`internal/account/tokens.go:88`）：
 |------|------|------|------|
 | `username` | string | 是 | 大小写不敏感匹配**本地**账号；为空时直接 400 |
 | `password` | string | 是 | bcrypt 比对；不校验长度 |
+| `token` | string | 否 | TOTP 六位码；只在账号已启用两步验证时需要 |
 
-`token`（TOTP）、`signature`/`credentialId`/`challengeId`（WebAuthn）、captcha 之类字段在 Firefish 的登录组件里会发，但这里**全部忽略**。副作用：成功时写一行 `signins`（`ip`, `success = true`），失败不写（`internal/account/service.go:276`）。
+`signature`/`credentialId`/`challengeId`（WebAuthn）、captcha 之类字段仍然忽略（安全密钥未实现）。
+
+### 两步验证协商
+
+账号未启用 TOTP 时行为不变：一次请求直接返回 token。启用后：
+
+1. 只带 `username`/`password` 的请求校验密码，成功时返回 **`200` + 空对象 `{}`**（Firefish 的
+   `MkSignin` 就是靠这个空响应切到验证码输入框）；
+2. 客户端带上 `token` 重发，验证码正确才签发 token；错误时 403 且 `error.id` 为
+   `cdf1235b-ac71-46d4-a3a6-84ccce48df6f`。
+
+中间状态（第 1 步成功）**不写** `signins` 行；验证码错误会写一行 `success=false`。
 
 ### 响应 200
 
@@ -391,7 +410,7 @@ token 解析（`internal/account/tokens.go:88`）：
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
-| `finished` | boolean | 恒为 `true`（没有中间步骤） |
+| `finished` | boolean | 恒为 `true`；两步验证的中间响应是 `{}`，没有这个字段 |
 | `id` | string | 用户 id |
 | `i` | string | `users.token`（16 字符）。**不会**新建 `access_tokens` 记录 |
 
@@ -406,6 +425,7 @@ token 解析（`internal/account/tokens.go:88`）：
 | 400 | `6cc579cc-885d-43d8-95c2-b8c7fc963280` | `username` 为空 |
 | 404 | `6cc579cc-885d-43d8-95c2-b8c7fc963280` | 用户不存在 |
 | 403 | `932c904e-9460-45b7-9ce6-7ed33be7eb2c` | 密码错误 |
+| 403 | `cdf1235b-ac71-46d4-a3a6-84ccce48df6f` | 两步验证码错误或过期 |
 | 403 | `e03a5f46-d309-4865-9b69-56282d94e1eb` | 账号已被暂停 |
 
 **B. 服务级失败**——完整信封（`message`/`code`/`id`/`kind` 齐全）：
@@ -420,12 +440,68 @@ token 解析（`internal/account/tokens.go:88`）：
 
 ### 与 Misskey 的差异 / 已知缺口
 
-- 无两步验证：Misskey 新版登录是分步的（先返回 `{"finished":false,"next":"password"}` 之类，再校验 TOTP），此处永远一次性返回 `finished:true`。Firefish 的 `MkSignin` 依赖 `user.twoFactorEnabled` 判断是否显示 TOTP 输入框，而 `UserDetailed`/`MeDetailed` **不返回 `twoFactorEnabled`**，所以它会走普通分支，行为正确。
+- 支持 TOTP 两步验证（迁移 v14）。与 Misskey 新版的分步协议不同，这里沿用 Firefish 的实现：
+  缺 `token` 时返回空 `{}`，而不是 `{"finished":false,...}`；Firefish 客户端行为正确。
 - 无登录失败次数限制（Misskey 有 `TOO_MANY_AUTHENTICATION_FAILURES`）。
-- 无 passkey/WebAuthn、无 `passwordLessLogin`。
+- 无 passkey/WebAuthn 与 `passwordLessLogin`；`i/2fa/password-less` 恒报 `NO_SECURITY_KEY`。
+- 无两步验证备份码（`twoFactorBackupCodesStock` 恒为 `"none"`）。
 - 与 Misskey 不同的是 HTTP 状态码（Misskey 侧多用 400）；只按 `error.id` 分支的客户端不受影响。
 
-代码位置：`internal/httpapi/account.go:120`、`internal/account/service.go:261`。
+代码位置：`internal/httpapi/account.go:114`、`internal/account/service.go:261`、
+`internal/auth/totp.go`。
+
+---
+
+## POST /api/i/2fa/register
+
+开始 TOTP 绑定。认证：**需登录**。
+
+### 请求字段
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `password` | string | 是 | 当前密码；错误时 403 + id-only 信封 `932c904e…` |
+
+### 响应 200
+
+```json
+{
+  "qr": "",
+  "url": "otpauth://totp/example.com:alice?secret=…&issuer=example.com&algorithm=SHA1&digits=6&period=30",
+  "secret": "<base32>",
+  "label": "alice",
+  "issuer": "example.com"
+}
+```
+
+`qr` 恒为空串：生成二维码需要图像编码依赖，前端改为展示 `secret` 与 `url` 供手动录入。
+密钥写入 `user_profiles.two_factor_temp_secret`，覆盖上一次未完成的注册；此时**尚未启用**。
+
+## POST /api/i/2fa/done
+
+确认并启用 TOTP。认证：**需登录**。
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `token` | string | 是 | 6 位验证码；比较时忽略空格，接受 ±1 个 30 秒步长 |
+
+成功返回 `204`。错误：
+
+| HTTP | `code` | 触发条件 |
+|------|--------|----------|
+| 400 | `TWO_FACTOR_NOT_STARTED` | 没有待确认的临时密钥 |
+| 400 | `TOTP_TOKEN_INVALID` | 验证码不匹配 |
+
+## POST /api/i/2fa/unregister
+
+停用 TOTP。认证：**需登录**；请求体只要 `password`，错误密码同样是 403 + `932c904e…`。
+成功清空两个密钥列、`two_factor_enabled` 与 `use_password_less_login`，返回 `204`。
+
+## POST /api/i/2fa/password-less
+
+认证：**需登录**；请求体 `{"value": boolean}`。安全密钥未实现，`value:true` 恒返回
+`400 NO_SECURITY_KEY`（id `f9c54d7f-d4c2-4d3c-9a8f-a70daac86512`），`value:false` 返回 `204`。
+设置页的开关因此保持禁用。
 
 ---
 

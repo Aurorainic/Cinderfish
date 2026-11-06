@@ -15,15 +15,15 @@
 | 指标 | 数量 |
 |------|------|
 | Misskey 端点总数 | 440 |
-| Cinderfish 已注册路由 | 107 |
-| 其中 Misskey 同名路径 | 101 |
+| Cinderfish 已注册路由 | 111 |
+| 其中 Misskey 同名路径 | 105 |
 | 其中 Cinderfish 自有路径/别名 | 6（`notifications` 别名、`admin/federation/mode`、`admin/federation/allowlist`、`miauth/{session}/check`、`admin/object-storage`、`admin/deliver-queue`） |
-| 未实现（Misskey 同名） | 340 |
+| 未实现（Misskey 同名） | 335 |
 
 统计口径：`internal/httpapi/server.go` 里 `HandleFunc("METHOD /api/…")` 的去重路径；
 GET 与 POST 同名路径只算一个。
 
-## 2. 已实现（107 条注册路由）
+## 2. 已实现（111 条注册路由）
 
 ```
 admin/accounts/create       admin/announcements/create  admin/announcements/delete
@@ -43,6 +43,8 @@ following/requests/accept    following/requests/cancel   following/requests/list
 following/requests/reject    following/requests/sent     hashtags/trend
 i                           i/apps                      i/delete-account
 i/export                    i/favorites
+i/2fa/done                  i/2fa/password-less         i/2fa/register
+i/2fa/unregister
 i/notifications             i/pin                       i/registry/clear
 i/registry/get              i/registry/get-all          i/registry/get-detail
 i/registry/keys             i/registry/remove           i/registry/scopes
@@ -82,6 +84,10 @@ users/update
 
 2026-11-06 第十九波新增：`stats`（公开计数）；`admin/update-meta` 增加六个合规 URL 与
 `serverRules`（不是新路由）。
+
+2026-11-06 第二十波新增：`i/2fa/{register,done,unregister,password-less}`（迁移 v14）。
+只实现 TOTP：`password-less` 在没有安全密钥时会返回 `NO_SECURITY_KEY`，与 Firefish 一致；
+`i/2fa/register-key|key-done|remove-key|update-key` 仍未实现。
 
 2026-11-06 第十八波新增：`admin/object-storage`、`admin/deliver-queue`（Cinderfish 自有、只读）。
 
@@ -123,7 +129,7 @@ note/reply/renote 事件）。
 
 | 命名空间 | 缺口 | 说明 |
 |----------|------|------|
-| `i/*` | 50 | 账号设置、2FA、导出/导入、注册表、应用授权等 |
+| `i/*` | 46 | 账号设置、导入、应用授权等 |
 | `users/*` | 28 | 列表、搜索、反应、推荐、关注请求、更新资料字段 |
 | `notes/*` | 24 | 会话/子帖、提及、投票、收藏、搜索、翻译、草稿 |
 | `chat/*` | 25 | 私聊（首版可选） |
