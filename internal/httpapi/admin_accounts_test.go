@@ -25,6 +25,10 @@ func adminTestServer(t *testing.T, mode string) (*httptest.Server, *httpapi.Serv
 		Media: config.Media{Backend: "local"},
 	}
 	srv := httpapi.NewServerWithDB(cfg, pool)
+	// The binary always attaches the federation surface, even with federation
+	// mode "none": handlers such as following/create use the store for local
+	// rows too. Test servers must mirror that.
+	srv.AttachFederation()
 	storage, err := media.NewLocalStorage(t.TempDir(), "/media")
 	if err != nil {
 		t.Fatalf("local storage: %v", err)

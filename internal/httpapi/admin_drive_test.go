@@ -178,3 +178,52 @@ VALUES ('w63remotefile', 'w63remote', 'r.txt', 'text/plain', 1, 'r', 'r/key', 'l
 		t.Errorf("bounded cursor files = %d, want 0", len(got))
 	}
 }
+
+// TestAdminShowUsersSorts covers the four sort modes, which had no data until
+// now. The follower counts make the direction observable; createdAt follows
+// insertion order (bootstrap admin first, then the two signups).
+func TestAdminShowUsersSorts(t *testing.T) {
+	ts, _ := adminTestServer(t, "open")
+	_, alice := post(t, ts, "/api/signup", map[string]any{"username": "alice", "password": "password123"})
+	aliceID, _ := alice["id"].(string)
+	_, bob := post(t, ts, "/api/signup", map[string]any{"username": "bob", "password": "password123"})
+	bobToken, _ := bob["token"].(string)
+	if resp, body := postWithToken(t, ts, "/api/following/create", bobToken, map[string]any{"userId": aliceID}); resp.StatusCode != http.StatusOK {
+		t.Fatalf("follow: %d %v", resp.StatusCode, body)
+	}
+
+	usernames := func(params map[string]any) []string {
+		resp, raw := postRawWithToken(t, ts, "/api/admin/show-users", "admintoken000000", params)
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("show-users %v: %d %v", params, resp.StatusCode, raw)
+		}
+		arr, _ := raw.([]any)
+		out := make([]string, 0, len(arr))
+		for _, item := range arr {
+			user, _ := item.(map[string]any)
+			name, _ := user["username"].(string)
+			out = append(out, name)
+		}
+		return out
+	}
+
+	// Most followers first: alice has one, the rest none.
+	got := usernames(map[string]any{"sort": "+follower"})
+	if len(got) < 3 || got[0] != "alice" {
+		t.Errorf("+follower = %v, want alice first", got)
+	}
+	// Fewest followers first: alice is last.
+	got = usernames(map[string]any{"sort": "-follower"})
+	if len(got) < 3 || got[len(got)-1] != "alice" {
+		t.Errorf("-follower = %v, want alice last", got)
+	}
+	// Newest first, then oldest first.
+	got = usernames(map[string]any{"sort": "+createdAt"})
+	if len(got) < 3 || got[0] != "bob" || got[len(got)-1] != "root" {
+		t.Errorf("+createdAt = %v, want bob first and root last", got)
+	}
+	got = usernames(map[string]any{"sort": "-createdAt"})
+	if len(got) < 3 || got[0] != "root" || got[len(got)-1] != "bob" {
+		t.Errorf("-createdAt = %v, want root first and bob last", got)
+	}
+}
