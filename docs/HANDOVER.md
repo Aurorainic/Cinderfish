@@ -4675,7 +4675,7 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
 ### 12CC.4 仍未验证
 
 - ~~2FA 完成登录未跑通~~：已在后续补测中跑通（见上）。
-- 同一轮里，账号登出后重新登录的 UI 路径没有单独测。
+- ~~同一轮里，账号登出后重新登录的 UI 路径没有单独测。~~ 2026-11-07 已走查，见 §12EX。
 - 无头环境在冷启动时偶发「页面已挂载但 shell 异步组件尚未渲染」的空白期，等待逻辑已改为
   `#app` 有内容后再交互；真实用户不受影响。
 - **仍未移植的设置页**：邮箱、整合、导入导出、迁移、Webhook、插件、自定义 KaTeX、状态栏、
@@ -6196,3 +6196,29 @@ localStorage，而且缓存键不区分账号。
   - 在管理页点「卸载」→ 确认框 → 卡片清空、显示「还没有安装任何主题」，registry 返回 `[]`，
     缓存为 `[]`。
 - 截图：`/tmp/w132-shots/installed.png`、`alice-manage-after-clear.png`、`bob-manage.png`（不入库）。
+
+## 12EX. 第一百三十四波：登出与重新登录的界面路径（2026-11-07）
+
+第六十四波留下的「账号登出后重新登录的 UI 路径没有单独测」。这一波在真实二进制上用无头浏览器
+跑完整条路径。
+
+### 12EX.1 走查结果
+
+| 步骤 | 结果 |
+|------|------|
+| 登录态首页 | `localStorage.account` 与 `cinderfish.token` 有效，导航壳渲染 |
+| 账号菜单 → 登出 | 「登出」项出现并被点击；两项 localStorage 被清空（`null`） |
+| 登出后的页面 | 回到欢迎页，自动出现登录按钮，点开后是 `#cf-signin-username` / `#cf-signin-password` 表单 |
+| 填表提交 | 用户名/密码通过原生 setter + `input` 写入；提交按钮在 Vue 更新后由禁用变为可用 |
+| 登录成功 | `localStorage.account` 重新写入、导航壳回来、路径 `/`，`POST /api/i` 返回 `w134bob` |
+
+走查脚本第一次点击提交时按钮仍处于 `disabled`（Vue 尚未重渲染），等按钮可用后再点即成功——
+这是脚本时序，不是应用缺陷。
+
+### 12EX.2 验证证据
+
+- 无头浏览器（1400×900，Helium/CDP）：`menuOpened/logoutVisible/logoutClicked=true`；
+  登出后 `{account:null, token:null}`；登录后 `{account:true, hasNav:true}`，
+  `api/i` 的用户名为 `w134bob`。
+- 截图：`/tmp/w134-shots/after-relogin.png`（不入库）。
+- 没有改代码，因此不需要重跑 Go/前端检查；走查完成后已停服务并删除 `w134*` 用户。
