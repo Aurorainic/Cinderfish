@@ -3515,7 +3515,7 @@ cd web && pnpm build                                           # exit 0
 
 ## 12BK. 批次：锁推生效与关注通知（2026-11-06）
 
-**工作方式**：目标模式第四十七波，继续只写代码、验证到编译层。施工依据
+**工作方式**：目标模式第四十七波，先只写代码验证到编译层，2026-11-07 补齐端到端用例与浏览器走查。施工依据
 `docs/research/2026-11-06-firefish-port-wave47-contract.md`。
 
 ### 12BK.1 落地清单
@@ -3533,7 +3533,7 @@ cd web && pnpm build                                           # exit 0
 1. 无 `followRequestAccepted` 通知。
 2. 接受请求不清理此前的待审通知。
 3. 锁推变更不主动重发 actor 文档，远端缓存需自行刷新。
-4. 未新增测试。
+4. 测试见 §12BK.4（`TestLockedFollowRequestFlow`）。
 
 ### 12BK.3 验证证据（编译层）
 
@@ -3545,12 +3545,45 @@ cd web && pnpm run check:port           # hardTotal 0（400 文件）
 cd web && pnpm build                    # exit 0
 ```
 
-### 12BK.4 仍未验证
+### 12BK.4 补验证（2026-11-07）
 
-- 锁推账号被关注 → 待审 → 接受/拒绝的完整链路。
-- 三类通知行的落库与 Streaming 推送。
-- 隐私页七个开关的保存与回读。
-- `go test` 与浏览器走查未执行。
+`internal/httpapi/locked_follow_test.go` 的 `TestLockedFollowRequestFlow` 从
+`following/create` 出发（此前所有请求用例都直接插 `follow_requests` 行）：
+
+- `i/update {isLocked:true}` 后 `users/show` 回读 `isLocked: true`；
+- bob 关注 → 200，但 followers/following 都为空，alice 的 `requests/list` 与 bob 的
+  `requests/sent` 各有一条；alice 收到 `receiveFollowRequest` 通知且**没有** `follow` 通知；
+- 请求等待期间再次关注 → 400 `ALREADY_FOLLOWING`；
+- carol 关注未锁定的 bob → bob 立即收到 `follow` 通知；
+- accept 后请求消失、followers 出现 bob、计数为 1；
+- 解锁后 dave 关注 → 直接成为关注，alice 收到 `follow` 通知。
+
+真实二进制 + Helium 走查（`w47alice`、`w47bob`）：
+
+1. 隐私设置页打开「关注请求需要批准」，`users/show.isLocked` 变 true；
+2. bob 在 alice 主页点关注按钮，按钮从「关注请求」变为「关注请求待批准」；
+3. bob 的「已发出」页列出 alice；
+4. alice 的「关注请求」页列出 bob，点「接受」后出现「没有待批准的关注申请」；
+5. alice 的通知页显示「w47bob 您有新的关注请求」；
+6. `users/show` 的 `followersCount` 变为 1。
+
+已知限制照旧：接受请求后那条「新的关注请求」通知仍然留在列表里（限制 2），走查截图可见。
+
+```
+gofmt -l internal/ cmd/                                        # 空
+go vet ./...                                                   # exit 0
+CINDERFISH_TEST_DATABASE_URL=... go test ./... -count=1         # 全绿
+cd web && pnpm exec vue-tsc --noEmit                           # exit 0
+cd web && pnpm run check:port                                  # hardTotal 0
+cd web && pnpm build                                           # exit 0
+```
+
+### 12BK.5 仍未验证
+
+- 远程关注者的锁推路径（入站 Follow 被转成请求）只由 `internal/federation` 的既有用例覆盖，
+  没有第二实例的端到端走查。
+- 「已发出」页的取消（`requests/cancel`）没有验证关注者一侧的回执。
+- 隐私页其余六个开关的界面回读（本次只操作了锁推开关）。
 
 ## 12BL. 批次：邮件通知（2026-11-06）
 
@@ -3695,7 +3728,7 @@ cd web && pnpm build                    # exit 0
 | 44 | 实例级自定义 CSS + 邮件状态页 | 用例 + 浏览器走查（§12BH.4） |
 | 45 | `admin/drive/show-file` + 管理台文件详情 | 用例 + 浏览器走查（§12BI.4） |
 | 46 | 缩略图生成管道（`thumbnailUrl` 不再恒 null） | 单测 + 真实上传 + 界面（§12BJ.4） |
-| 47 | 锁推生效 + 关注类通知落库 + 隐私页七个真开关 | 编译层 |
+| 47 | 锁推生效 + 关注类通知落库 + 隐私页七个真开关 | 用例 + 浏览器走查（§12BK.4） |
 | 48 | 邮件通知（四类触发 + 公告群发） | 编译层 |
 | 49 | 六个无后端管理页转说明页 | 编译层 |
 | 50 | 状态栏（federation 类型） | 编译层 |
@@ -4432,7 +4465,9 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
 - **第四十六波已补验证（2026-11-07，见 §12BJ.4）**：缩略图生成/跳过/删除与 `/media` 的
   Content-Type 都有用例；真实 PNG/JPEG 上传得到 512 长边缩略图并在 `/my/drive` 实际加载。
   顺带修复原图直链回 `octet-stream` 的缺口。仍未验证的：透明通道、历史文件补生成、大图内存峰值。
-- **第四十七波未测（2026-11-06，见 §12BK.4）**：锁推与关注通知只有编译层证据。
+- **第四十七波已补验证（2026-11-07，见 §12BK.4）**：锁推的「关注 → 待审 → 接受」从
+  `following/create` 到界面全链路走查通过；`receiveFollowRequest` 与 `follow` 两类通知落库并在
+  通知页渲染。仍未验证的：远程关注者的锁推入站路径、取消请求的回执、其余六个隐私开关的界面回读。
 - **第四十八波未测（2026-11-06，见 §12BL.4）**：邮件通知与公告群发只有编译层证据。
 - **第四十九波未测（2026-11-06，见 §12BM.4）**：六个说明页与菜单分组未走查。
 - **第五十波未测（2026-11-06，见 §12BN.4）**：状态栏的渲染与交互未走查。

@@ -49,7 +49,7 @@ Streaming 通知事件）；入站两条走 `Store.Notification`，并新增 `In
    或下次 `users/show` 得到结果。
 2. 接受请求时不删除之前的 `receiveFollowRequest` 通知，历史保留。
 3. 锁推变更立即影响下一次关注判断，但没有向远端重发 actor 文档；远端缓存要等它自己刷新。
-4. 未新增测试。
+4. 测试于 2026-11-07 补：`TestLockedFollowRequestFlow`（HANDOVER §12BK.4）。
 
 ## 5. 验收
 
@@ -61,4 +61,5 @@ cd web && pnpm run check:port           # hardTotal 0
 cd web && pnpm build                    # exit 0
 ```
 
-台账不变（137/130/310，没有新增路由）。未执行 `go test`、数据库测试与浏览器走查。
+台账不变（137/130/310，没有新增路由）。浏览器走查于 2026-11-07 补齐
+（`TestLockedFollowRequestFlow` 与隐私页/关注按钮/请求页/通知页走查，见 HANDOVER §12BK.4）。
