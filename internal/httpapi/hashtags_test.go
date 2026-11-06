@@ -143,3 +143,63 @@ func TestHashtagsUsersIsEmpty(t *testing.T) {
 		t.Errorf("hashtags/users = %v, want none", list)
 	}
 }
+
+// TestHashtagsListSortModes covers every sort enum: the mentioned* variants
+// order by their own counter, and the attached* variants fall back to the
+// matching mentioned* count because profile tags are not modelled.
+func TestHashtagsListSortModes(t *testing.T) {
+	f := newFederationServer(t, "public")
+	aliceToken, _ := f.registerUser(t, "alice")
+	bobToken, _ := f.registerUser(t, "bob")
+
+	createNote(t, f.ts, aliceToken, map[string]any{"text": "#local first"})
+	createNote(t, f.ts, bobToken, map[string]any{"text": "#local again"})
+	createNote(t, f.ts, aliceToken, map[string]any{"text": "#mixed local"})
+
+	if _, err := f.pool.Exec(context.Background(), `
+INSERT INTO users (id, username, username_lower, password_hash, host)
+VALUES ('hremote1', 'r1', 'r1', 'x', 'remote.example'),
+       ('hremote2', 'r2', 'r2', 'x', 'remote.example')`); err != nil {
+		t.Fatalf("insert remote users: %v", err)
+	}
+	if _, err := f.pool.Exec(context.Background(), `
+INSERT INTO notes (id, user_id, user_host, visibility, text, tags)
+VALUES ('hnote1', 'hremote1', 'remote.example', 'public', 'remote only', '["remote"]'::jsonb),
+       ('hnote2', 'hremote2', 'remote.example', 'public', 'mixed remote', '["mixed"]'::jsonb)`); err != nil {
+		t.Fatalf("insert remote notes: %v", err)
+	}
+
+	order := func(sort string) []string {
+		t.Helper()
+		list := postListWithToken(t, f.ts, "/api/hashtags/list", "", map[string]any{"sort": sort})
+		out := make([]string, 0, len(list))
+		for _, item := range list {
+			m, _ := item.(map[string]any)
+			tag, _ := m["tag"].(string)
+			out = append(out, tag)
+		}
+		return out
+	}
+	assertOrder := func(sort string, want []string) {
+		t.Helper()
+		got := order(sort)
+		if len(got) != len(want) {
+			t.Fatalf("%s = %v, want %v", sort, got, want)
+		}
+		for i := range want {
+			if got[i] != want[i] {
+				t.Fatalf("%s = %v, want %v", sort, got, want)
+			}
+		}
+	}
+
+	assertOrder("+mentionedUsers", []string{"local", "mixed", "remote"})
+	assertOrder("-mentionedUsers", []string{"remote", "local", "mixed"})
+	assertOrder("+mentionedLocalUsers", []string{"local", "mixed", "remote"})
+	assertOrder("+mentionedRemoteUsers", []string{"mixed", "remote", "local"})
+	assertOrder("-mentionedRemoteUsers", []string{"local", "mixed", "remote"})
+	// attached* has no data and falls back to the mentioned counters.
+	assertOrder("+attachedUsers", []string{"local", "mixed", "remote"})
+	assertOrder("+attachedLocalUsers", []string{"local", "mixed", "remote"})
+	assertOrder("+attachedRemoteUsers", []string{"mixed", "remote", "local"})
+}

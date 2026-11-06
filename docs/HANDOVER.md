@@ -4084,8 +4084,8 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
 ### 12BU.4 仍未验证
 
 - 「移除关注者」菜单项**没有浏览器走查**：出现条件（`isFollowed`）、确认对话框、置位回写都只过了编译。
-- `following/list` 的 `sinceDate`/`untilDate` 参数没有实现（台账里未列，但 Misskey 的 paramDef 有）：
-  只支持 id 游标。
+- `following/list` 的 `sinceDate`/`untilDate` 参数当时没有实现：只支持 id 游标
+  （2026-11-07 第六十七波已补，见 §12CF）。
 - 远端关注者在 `following/invalidate` 之后不会收到任何协议信号，只有本地状态改变。
 
 ## 12BV. 第五十七波：接线 notify / withReplies（2026-11-06）
@@ -4249,7 +4249,7 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
 ### 12BZ.4 仍未验证
 
 - 标签页的新统计**没有浏览器走查**：404 时隐藏、切换标签、窄屏排版都只过了编译。
-- `hashtags/list` 的 12 个排序枚举只验证了 `+/-mentionedUsers` 两个。
+- `hashtags/list` 的 12 个排序枚举当时只验证了 `+/-mentionedUsers` 两个（2026-11-07 第六十七波补齐，见 §12CF）。
 - 大表下聚合查询的耗时没有测。
 
 ## 12CA. 第六十二波：users/relation 与频繁回复用户（2026-11-06）
@@ -4550,8 +4550,8 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
   `/authorize_interaction` 链接未实测。
 - **第五十五波部分补验证（2026-11-07 对账 §12CB）**：`Auth.vue` 已在 `/auth/<token>` 走查。
   仍未验证的：真实第三方客户端没跑过这条授权流程；`app/show` 返回 secret 的所有者分支没有用例。
-- **第五十六波部分补验证（2026-11-07 对账 §12CC）**：「移除关注者」菜单、确认框与行删除已走查。
-  仍未验证的：`following/list` 没有 `sinceDate`/`untilDate`。
+- **第五十六波已补验证（2026-11-07，见 §12CC/§12CF）**：「移除关注者」菜单、确认框与行删除已走查；
+  `following/list` 与 `users/following|followers` 的 `sinceDate`/`untilDate` 已实现并有用例。
 - **第五十七波部分补验证（2026-11-07 对账 §12CB）**：`follow` 与 `note` 两类通知在通知页渲染已走查。
   仍未验证的：远端导入触发通知无双实例用例；`homeTimeline` 的 WS 过滤只有单元断言。
 - **第五十八波仍未验证**：没有对真实 Misskey/Firefish 验证 `EmojiReact`；远端自定义表情未解析；
@@ -4560,8 +4560,8 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
   「标记已处理」按钮已走查。仍未验证的：远端举报没有对真实实例验证；重复举报与笔记级目标的展示。
 - **第六十波部分补验证（2026-11-07 对账 §12CB）**：三个说明页与 `SignupComplete` 的结构与文案
   已走查。仍未验证的：「24 个占位页全部在范围外」未经逐页复核。
-- **第六十一波部分补验证（2026-11-07 对账 §12CB）**：`/tags/<tag>` 的「被 N 人提到」与笔记列表
-  已走查。仍未验证的：`hashtags/list` 只验证了两个排序；大表聚合耗时未测。
+- **第六十一波已补验证（2026-11-07，见 §12CB/§12CF）**：`/tags/<tag>` 的「被 N 人提到」与笔记列表
+  已走查；`hashtags/list` 的 12 个排序枚举全部有用例。仍未验证的：大表聚合耗时。
 - **第六十二波仍未验证**：两个端点没有前端调用方，没有对应走查。
 
 ## 12CB. 第六十三波：真实二进制与浏览器走查（2026-11-06）
@@ -4752,3 +4752,38 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
 - 与真实 Misskey / Firefish 实例互投投票（全部证据来自本实现的双实例）。
 - 多选投票在界面上的多勾选交互（只验证了单选）。
 - `Question` 的入站 `Update` 与远端投票关闭后的展示。
+
+## 12CF. 第六十七波：follow 日期游标与 hashtags 全排序（2026-11-07）
+
+第五十六与第六十一波留下的两个小缺口：`following/list`（以及 `users/following|followers`）
+只支持 id 游标；`hashtags/list` 只按 mentionedUsers 排序，其它枚举没有接上。
+
+### 12CF.1 落地清单
+
+| 层 | 文件 | 内容 |
+|----|------|------|
+| 账号查询 | `internal/account/follows.go` | `FollowQuery{Limit, SinceID, UntilID, SinceDate, UntilDate}`；SQL 追加 `created_at >= / <=` |
+| 端点 | `internal/httpapi/following_settings.go`、`users.go` | 两个端点解析 `sinceDate`/`untilDate`（毫秒）并传入 `FollowQuery` |
+| 标签排序 | `internal/httpapi/hashtags.go` | 按枚举选列：mentionedUsers/LocalUsers/RemoteUsers 各自计数；attached* 回退到对应 mentioned*；前缀用 `TrimLeft("+-")` |
+
+### 12CF.2 有意的限制
+
+- attached* 仍无数据（没有资料页标签模型），只是排序回退，计数恒为 0。
+- 日期过滤与 id 游标可以同时给，语义是交集；Misskey 只按 `sinceId && !untilId` 决定升序，这里保持一致。
+- 没有对超大 `followings` 表加复合索引（当前按锚点列已有索引）。
+
+### 12CF.3 验证证据
+
+- `gofmt -l internal/ cmd/` 无输出；`go vet ./...` 通过；`CINDERFISH_TEST_DATABASE_URL=… go test ./...` 全绿。
+- `TestFollowListDateCursors`：三条关注中把 bob 回填 2 小时；`sinceDate=1h` 只剩 carol/dave，
+  `untilDate=1h` 只剩 bob，`[3h,1h]` 窗口只剩 bob；`users/following` 与 `users/followers` 同样生效。
+- `TestHashtagsListSortModes`：local=2（2 本地用户）、mixed=2（1 本地 + 1 远端）、remote=1（远端），
+  逐条断言 mentionedUsers/LocalUsers/RemoteUsers 的升降序、并列按标签名、attached* 的三档回退。
+- 写测试时发现 sort 前缀只裁了 `+`，`-mentionedRemoteUsers` 会落到默认 users 列；改为
+  `strings.TrimLeft(sort, "+-")` 后
+  通过——这是本波新写排序逻辑里的缺陷，被用例当场抓住。
+
+### 12CF.4 仍未验证
+
+- 大表（万级标签/关注）下的聚合与分页耗时。
+- 日期边界（恰好等于 createdAt 的毫秒）没有单独断言，只有窗口两侧的用例。

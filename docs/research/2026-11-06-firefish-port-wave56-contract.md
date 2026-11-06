@@ -75,3 +75,6 @@ id 照抄 Misskey 源码。
   `notification` 过滤、`update-all` 清空、非关注关系 400 `NOT_FOLLOWING`
 - `TestFollowingInvalidate`：移除关注者后 `HasFollowing` 为假，再次移除 400
 - `vue-tsc --noEmit`、`check:port`（hardTotal 0、missingKeys 0）、`pnpm build` 全绿
+
+2026-11-07 补：`following/list` 与 `users/following|followers` 原先缺 `sinceDate`/`untilDate`，
+第六十七波补上（`account.FollowQuery`），用例 `TestFollowListDateCursors`，见 HANDOVER §12CF。

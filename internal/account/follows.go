@@ -52,22 +52,33 @@ SELECT EXISTS (SELECT 1 FROM followings WHERE follower_id = $1 AND followee_id =
 	return follows, nil
 }
 
+// FollowQuery pages one side of the followings table. SinceID/UntilID are
+// follow-row cursors; SinceDate/UntilDate bound created_at.
+type FollowQuery struct {
+	Limit     int
+	SinceID   string
+	UntilID   string
+	SinceDate *time.Time
+	UntilDate *time.Time
+}
+
 // Followers returns the users who follow userID, newest follow first
 // unless a sinceId is given without untilId.
-func (s *Service) Followers(ctx context.Context, userID string, limit int, sinceID, untilID string) ([]*Follow, error) {
-	return s.listFollows(ctx, "followee_id", "follower_id", userID, limit, sinceID, untilID)
+func (s *Service) Followers(ctx context.Context, userID string, q FollowQuery) ([]*Follow, error) {
+	return s.listFollows(ctx, "followee_id", "follower_id", userID, q)
 }
 
 // Following returns the users userID follows, newest follow first
 // unless a sinceId is given without untilId.
-func (s *Service) Following(ctx context.Context, userID string, limit int, sinceID, untilID string) ([]*Follow, error) {
-	return s.listFollows(ctx, "follower_id", "followee_id", userID, limit, sinceID, untilID)
+func (s *Service) Following(ctx context.Context, userID string, q FollowQuery) ([]*Follow, error) {
+	return s.listFollows(ctx, "follower_id", "followee_id", userID, q)
 }
 
 // listFollows pages one side of the followings table. anchor is the
 // column holding userID, other the column naming the user each page
 // carries; both are fixed identifiers, never request input.
-func (s *Service) listFollows(ctx context.Context, anchor, other, userID string, limit int, sinceID, untilID string) ([]*Follow, error) {
+func (s *Service) listFollows(ctx context.Context, anchor, other, userID string, q FollowQuery) ([]*Follow, error) {
+	limit := q.Limit
 	if limit <= 0 {
 		limit = 10
 	}
@@ -75,39 +86,47 @@ func (s *Service) listFollows(ctx context.Context, anchor, other, userID string,
 		limit = 100
 	}
 
-	var q strings.Builder
-	q.WriteString(`
+	var sql strings.Builder
+	sql.WriteString(`
 SELECT f.id, f.created_at, COALESCE(f.notify, ''), f.with_replies,
        u.id, u.username, u.username_lower, u.host, COALESCE(u.password_hash, ''), COALESCE(u.token, ''),
        u.is_admin, u.is_suspended, u.created_at
 FROM followings f
 JOIN users u ON u.id = f.`)
-	q.WriteString(other)
-	q.WriteString(`
+	sql.WriteString(other)
+	sql.WriteString(`
 WHERE f.`)
-	q.WriteString(anchor)
-	q.WriteString(` = $1`)
+	sql.WriteString(anchor)
+	sql.WriteString(` = $1`)
 
 	args := []any{userID}
-	if sinceID != "" {
-		args = append(args, sinceID)
-		fmt.Fprintf(&q, " AND f.id > $%d", len(args))
+	if q.SinceID != "" {
+		args = append(args, q.SinceID)
+		fmt.Fprintf(&sql, " AND f.id > $%d", len(args))
 	}
-	if untilID != "" {
-		args = append(args, untilID)
-		fmt.Fprintf(&q, " AND f.id < $%d", len(args))
+	if q.UntilID != "" {
+		args = append(args, q.UntilID)
+		fmt.Fprintf(&sql, " AND f.id < $%d", len(args))
+	}
+	if q.SinceDate != nil {
+		args = append(args, *q.SinceDate)
+		fmt.Fprintf(&sql, " AND f.created_at >= $%d", len(args))
+	}
+	if q.UntilDate != nil {
+		args = append(args, *q.UntilDate)
+		fmt.Fprintf(&sql, " AND f.created_at <= $%d", len(args))
 	}
 	// The cursor is the follow row's id, as in Misskey's
 	// makePaginationQuery (packages/backend/src/core/QueryService.ts
 	// L54-62): a sinceId without untilId pages upward in ascending order,
 	// everything else is newest first.
 	order := "DESC"
-	if sinceID != "" && untilID == "" {
+	if q.SinceID != "" && q.UntilID == "" {
 		order = "ASC"
 	}
-	q.WriteString(" ORDER BY f.id " + order + " LIMIT " + strconv.Itoa(limit))
+	sql.WriteString(" ORDER BY f.id " + order + " LIMIT " + strconv.Itoa(limit))
 
-	rows, err := s.pool.Query(ctx, q.String(), args...)
+	rows, err := s.pool.Query(ctx, sql.String(), args...)
 	if err != nil {
 		return nil, fmt.Errorf("account: list follows: %w", err)
 	}

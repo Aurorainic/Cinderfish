@@ -84,12 +84,14 @@
 
 补充两个端点外行为：
 
-- 未注册的路径（例如 `POST /api/following/list`）命中兜底 handler，返回 404 + `NO_SUCH_ENDPOINT`（`internal/httpapi/server.go:327`），message 形如 `No such endpoint: POST /api/following/list`。
+- 未注册的路径（例如 `POST /api/nonexistent`）命中兜底 handler，返回 404 + `NO_SUCH_ENDPOINT`（`internal/httpapi/server.go:327`），message 形如 `No such endpoint: POST /api/nonexistent`。`following/list` 自第五十六波起已注册，不再是反例。
 - 已注册路径用了错误方法（例如 `GET /api/following/create`）时，因为 `server.go:223` 注册了无方法的兜底模式 `/`，请求同样落到 `notFoundHandler`，返回 **404 + `NO_SUCH_ENDPOINT`**（不是 405、也不是纯文本）。已用最小 `ServeMux` 复现验证：`GET /api/following/create` → 404 JSON，`NO_SUCH_ENDPOINT`。前端可以统一按 JSON 信封处理。
 
 ### 分页游标语义
 
-适用于 `following/requests/list` 与 `following/requests/sent`（`internal/httpapi/following_requests.go:27`、`internal/federation/store.go:373`）。
+适用于 `following/requests/list` 与 `following/requests/sent`（`internal/httpapi/following_requests.go:27`、
+`internal/federation/store.go:373`）。2026-11-07 第六十七波起，同样的日期语义也用于
+`following/list` 与 `users/following|followers`（`internal/account/follows.go` 的 `FollowQuery`）。
 
 | 参数 | 类型 | 默认 | 说明 |
 |------|------|------|------|

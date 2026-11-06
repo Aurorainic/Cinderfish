@@ -33,8 +33,10 @@ WHERE n.deleted_at IS NULL AND lower(tag) = $1
 
 - `normalizeHashtag` 与 Misskey 的 `normalizeTag` 一致：去 `#` / `＃`、trim、小写
 - `hashtags/show` 计数为 0 时返回 404 `NO_SUCH_HASHTAG`（id 照抄）
-- `hashtags/list` 支持 `limit` 与 `+/-mentionedUsers` 排序；`attached*` 计数恒为 0，
-  因此 `attached*Only` 过滤直接返回空数组，`attached*` 排序退化为按提及人数排序（页面保持稳定）
+- `hashtags/list` 支持 `limit` 与全部 12 个排序枚举（2026-11-07 第六十七波补齐）：
+  `mentionedUsers/LocalUsers/RemoteUsers` 按各自计数排；`attached*` 计数恒为 0，
+  因此 `attached*Only` 过滤直接返回空数组，`attached*` 排序回退到对应的 mentioned* 计数
+  （页面保持稳定）。
 - `hashtags/users` 解析参数后返回 `[]`：上游列的是资料标签，Cinderfish 不存这个数据
 
 前端 `web/src/pages/Tag.vue` 头部改用 `hashtags/show`，并显示「全部时间」而不是「最近 7 天」。

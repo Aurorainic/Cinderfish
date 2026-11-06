@@ -31,6 +31,8 @@ func (s *Server) handleFollowingList(w http.ResponseWriter, r *http.Request) {
 		Limit        int    `json:"limit"`
 		SinceID      string `json:"sinceId"`
 		UntilID      string `json:"untilId"`
+		SinceDate    *int64 `json:"sinceDate"`
+		UntilDate    *int64 `json:"untilDate"`
 	}
 	if err := decodeOptionalJSON(r, &body); err != nil {
 		writeAPIError(w, err)
@@ -41,7 +43,16 @@ func (s *Server) handleFollowingList(w http.ResponseWriter, r *http.Request) {
 		writeAuthenticationError(w)
 		return
 	}
-	list, err := s.accounts.Following(r.Context(), info.User.ID, body.Limit, body.SinceID, body.UntilID)
+	query := account.FollowQuery{Limit: body.Limit, SinceID: body.SinceID, UntilID: body.UntilID}
+	if body.SinceDate != nil {
+		t := time.UnixMilli(*body.SinceDate)
+		query.SinceDate = &t
+	}
+	if body.UntilDate != nil {
+		t := time.UnixMilli(*body.UntilDate)
+		query.UntilDate = &t
+	}
+	list, err := s.accounts.Following(r.Context(), info.User.ID, query)
 	if err != nil {
 		writeInternalServerError(w)
 		return

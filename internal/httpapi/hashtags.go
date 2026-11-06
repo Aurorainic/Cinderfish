@@ -197,6 +197,17 @@ func (s *Server) handleHashtagsList(w http.ResponseWriter, r *http.Request) {
 	if !desc {
 		order = "ASC"
 	}
+	// The sort enum names four counters; attached* has no data, so those
+	// modes fall back to the matching mentioned* count.
+	column := "users"
+	switch strings.TrimLeft(body.Sort, "+-") {
+	case "mentionedLocalUsers", "attachedLocalUsers":
+		column = "local_users"
+	case "mentionedRemoteUsers", "attachedRemoteUsers":
+		column = "remote_users"
+	case "mentionedUsers", "attachedUsers":
+		column = "users"
+	}
 
 	rows, err := s.pool.Query(r.Context(), `
 SELECT lower(tag) AS tag,
@@ -206,7 +217,7 @@ SELECT lower(tag) AS tag,
 FROM notes n, jsonb_array_elements_text(n.tags) AS tag
 WHERE n.deleted_at IS NULL
 GROUP BY lower(tag)
-ORDER BY users `+order+`, tag ASC
+ORDER BY `+column+` `+order+`, tag ASC
 LIMIT `+strconv.Itoa(limit))
 	if err != nil {
 		writeInternalServerError(w)

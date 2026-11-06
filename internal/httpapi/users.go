@@ -93,10 +93,12 @@ func (s *Server) handleUsersNotes(w http.ResponseWriter, r *http.Request) {
 // followListRequest is the parameter set shared by users/followers and
 // users/following.
 type followListRequest struct {
-	UserID  string `json:"userId"`
-	Limit   int    `json:"limit"`
-	SinceID string `json:"sinceId"`
-	UntilID string `json:"untilId"`
+	UserID    string `json:"userId"`
+	Limit     int    `json:"limit"`
+	SinceID   string `json:"sinceId"`
+	UntilID   string `json:"untilId"`
+	SinceDate *int64 `json:"sinceDate"`
+	UntilDate *int64 `json:"untilDate"`
 }
 
 // handleUsersFollowers implements POST /api/users/followers: the users
@@ -182,10 +184,19 @@ func (s *Server) serveFollowList(w http.ResponseWriter, r *http.Request, followe
 	}
 
 	var list []*account.Follow
+	query := account.FollowQuery{Limit: body.Limit, SinceID: body.SinceID, UntilID: body.UntilID}
+	if body.SinceDate != nil {
+		t := time.UnixMilli(*body.SinceDate)
+		query.SinceDate = &t
+	}
+	if body.UntilDate != nil {
+		t := time.UnixMilli(*body.UntilDate)
+		query.UntilDate = &t
+	}
 	if followers {
-		list, err = s.accounts.Followers(r.Context(), target.ID, body.Limit, body.SinceID, body.UntilID)
+		list, err = s.accounts.Followers(r.Context(), target.ID, query)
 	} else {
-		list, err = s.accounts.Following(r.Context(), target.ID, body.Limit, body.SinceID, body.UntilID)
+		list, err = s.accounts.Following(r.Context(), target.ID, query)
 	}
 	if err != nil {
 		writeInternalServerError(w)
