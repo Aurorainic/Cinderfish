@@ -168,6 +168,8 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("POST /api/users/search", s.handleUsersSearch)
 	s.mux.HandleFunc("POST /api/users/report-abuse", s.handleReportAbuse)
 	s.mux.HandleFunc("POST /api/users/notes", s.handleUsersNotes)
+	s.mux.HandleFunc("POST /api/users/relation", s.handleUsersRelation)
+	s.mux.HandleFunc("POST /api/users/get-frequently-replied-users", s.handleUsersFrequentlyReplied)
 	s.mux.HandleFunc("POST /api/users/stats", s.handleUsersStats)
 	s.mux.HandleFunc("POST /api/users/followers", s.handleUsersFollowers)
 	s.mux.HandleFunc("POST /api/users/following", s.handleUsersFollowing)

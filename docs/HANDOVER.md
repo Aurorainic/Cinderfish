@@ -1,12 +1,12 @@
 # Cinderfish 交接说明
 
-- 最后更新：2026-11-06（目标模式第五十一至六十一波：账号迁移、KaTeX 宏页与集成说明页、
+- 最后更新：2026-11-06（目标模式第五十一至六十二波：账号迁移、KaTeX 宏页与集成说明页、
   OAuth 交互式同意页、`ap/show` 与远程互动页、第三方应用授权全流程（`app/*` 与 `auth/session/*`，
   schema v20）、关注关系设置与其消费方（schema v21）、入站反应修复与 `EmojiReact`、入站 `Flag`、
-  范围内占位页清零（24 个剩余占位页全部在首版范围外）、hashtags 三端点。
-  恢复目标模式时先补了 §12BO.3 的验证债，
+  范围内占位页清零（24 个剩余占位页全部在首版范围外）、hashtags 三端点、`users/relation`
+  与频繁回复用户。恢复目标模式时先补了 §12BO.3 的验证债，
   `go test ./...`（含数据库）已全绿，
-  详见 §12BP–§12BZ。浏览器走查仍待用户手动确认后执行）
+  详见 §12BP–§12CA。浏览器走查仍待用户手动确认后执行）
 - 项目名 **Cinderfish**（2026-10-28 定名，Go module `github.com/Aurorainic/cinderfish`）
 - 仓库：当前目录 `/home/lainsaka/文档/MilnFish`，分支 `main`；远程 `origin` 为
   `https://github.com/Aurorainic/Cinderfish.git`（GitHub 仓库已更名，本地目录改名待办）
@@ -4028,6 +4028,37 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
 - `hashtags/list` 的 12 个排序枚举只验证了 `+/-mentionedUsers` 两个。
 - 大表下聚合查询的耗时没有测。
 
+## 12CA. 第六十二波：users/relation 与频繁回复用户（2026-11-06）
+
+契约见 `docs/research/2026-11-06-firefish-port-wave62-contract.md`。
+
+### 12CA.1 落地清单
+
+| 层 | 内容 |
+|----|------|
+| 端点 | `users/relation`（单值或批量 id，返回关注/待审/屏蔽/静音标志）、`users/get-frequently-replied-users`（`{user, weight}[]`） |
+| 实现 | 标志复用既有查询；频繁回复按 `reply_user_id` 分组计数，weight 降序、id 升序 |
+| 台账 | 156 路由 / 148 同名 / 292 未实现 |
+
+### 12CA.2 有意的限制
+
+- `isRenoteMuted` 恒为 false（没有 renote-mute 表）。
+- `users/relation` 只返回调用者自己的关系，没有额外的可见性检查。
+- 频繁回复统计不按单条笔记可见性过滤。
+
+### 12CA.3 验证证据
+
+- `gofmt -l internal/ cmd/` 无输出；`go vet ./...` 通过。
+- `CINDERFISH_TEST_DATABASE_URL=… go test ./...` 全绿，含 `TestUsersRelation`
+  （双向关注、静音、批量同序）与 `TestUsersFrequentlyReplied`（权重 2/1 排序）。
+- 本波只改后端，前端三件套沿用第六十一波的通过结果。
+
+### 12CA.4 仍未验证
+
+- 没有前端调用方接入这两个端点（用户页目前用 `users/show` 自带的 `isFollowing` 等字段），
+  所以没有对应的界面走查。
+- 批量 `users/relation` 的上限没有压测；Misskey 的 paramDef 也没有给数组长度上限。
+
 
 
 
@@ -4118,6 +4149,7 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
 | `docs/research/2026-11-06-firefish-port-wave59-contract.md` | **第五十九波施工契约（入站 Flag），见 §12BX** |
 | `docs/research/2026-11-06-firefish-port-wave60-contract.md` | **第六十波施工契约（范围内占位页清零），见 §12BY** |
 | `docs/research/2026-11-06-firefish-port-wave61-contract.md` | **第六十一波施工契约（hashtags 三端点），见 §12BZ** |
+| `docs/research/2026-11-06-firefish-port-wave62-contract.md` | **第六十二波施工契约（users/relation 与频繁回复），见 §12CA** |
 
 ## 14. 已知的未验证项
 
@@ -4209,6 +4241,7 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
   逐页复核。
 - **第六十一波未测（2026-11-06，见 §12BZ.4）**：标签页统计未走查；`hashtags/list` 只验证了两个
   排序；大表聚合耗时未测。
+- **第六十二波未测（2026-11-06，见 §12CA.4）**：两个端点没有前端调用方，没有对应走查。
 - **仍未移植的设置页**：邮箱、整合、导入导出、迁移、Webhook、插件、自定义 KaTeX、状态栏、
   删除账号、应用授权以外的账号操作；对应后端端点不存在或前端缺少依赖（见第五波契约 §3.3）。
 - **仍缺的 widgets**：rss、rss-ticker、server-metric、online-users、federation、job-queue、aiscript、

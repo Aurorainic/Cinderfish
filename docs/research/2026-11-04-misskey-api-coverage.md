@@ -15,15 +15,15 @@
 | 指标 | 数量 |
 |------|------|
 | Misskey 端点总数 | 440 |
-| Cinderfish 已注册路由 | 154 |
-| 其中 Misskey 同名路径 | 146 |
+| Cinderfish 已注册路由 | 156 |
+| 其中 Misskey 同名路径 | 148 |
 | 其中 Cinderfish 自有路径/别名 | 8（`notifications` 别名、`admin/federation/mode`、`admin/federation/allowlist`、`miauth/{session}/check`、`admin/object-storage`、`admin/deliver-queue`、`notes/history`、`oauth/authorize`（同意页调用）） |
-| 未实现（Misskey 同名） | 294 |
+| 未实现（Misskey 同名） | 292 |
 
 统计口径：`internal/httpapi/server.go` 里 `HandleFunc("METHOD /api/…")` 的去重路径；
 GET 与 POST 同名路径只算一个。
 
-## 2. 已实现（154 条注册路由）
+## 2. 已实现（156 条注册路由）
 
 ```
 admin/accounts/create       admin/announcements/create  admin/announcements/delete
@@ -85,8 +85,8 @@ username/available          users/followers             users/following
 verify-email
 users                       users/notes                 users/report-abuse
 users/stats
-users/search
-users/show
+users/relation              users/search                users/show
+users/get-frequently-replied-users
 users/update
 ```
 
