@@ -4462,7 +4462,8 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
   远端对 Update 的处理（设计上只做尽力投递）。
 - **第二十五波的部分边角（2026-11-06，见 §12AO.4）**：文件编辑已由 `TestDriveFilesUpdate` 覆盖
   （2026-11-07）：改名/备注/敏感标记/移动文件夹一次完成并回读，`folderId: null` 移回根目录，
-  他人文件 404、未知文件 404、未知文件夹 400、空文件名 400。仍未验证的：**拖拽移动**的界面交互。
+  他人文件 404、未知文件 404、未知文件夹 400、空文件名 400。**拖拽移动**的界面交互已于
+  2026-11-07 走查（§12DH：拖文件到文件夹后 `drive/files/show` 的 `folderId` 改变）。
 - **第二十六波已补验证（2026-11-06，见 §12AP.4）**：`TestHiddenTags` 覆盖保存与回读
   （trim、去 `#`、小写、去重）、趋势不再包含隐藏标签、`hashtags/show` 仍可回答、超长标签 400、
   清空后标签回到趋势（2026-11-07）。
@@ -5520,3 +5521,20 @@ CINDERFISH_TEST_DATABASE_URL=... go test ./... -count=1         # 全绿
 
 - 账号切换：前端没有多账号切换入口（localStorage 支持多账号，UI 只有单账号），按现状记录。
 - Widget 配置的保存值在刷新后的回读（`updateProps` 走 store 的 300ms 防抖保存）。
+
+## 12DH. 第九十五波：拖拽移动文件到文件夹（2026-11-07）
+
+第二十五波留下的唯一界面项。准备：
+
+- 账号 `w96a` 上传一张 PNG，`drive/folders/create` 建「拖拽目标」文件夹；
+- 浏览器登录后打开 `/my/drive`，等文件夹与文件都出现。
+
+在页面里构造 `DataTransfer`，写入 `mk_drive_file`（`{"id":<file>}`），对文件夹元素依次派发
+`dragover` 与 `drop`：
+
+- 组件调用 `drive/files/update {fileId, folderId}`；
+- 1.5 秒后 `drive/files/show` 的 `folderId` 等于目标文件夹 id；
+- 根目录刷新后不再显示该文件，文件夹内可见。
+
+仍未验证：拖拽文件夹到另一个文件夹（`moveFolderInto` 的实现路径相同，但没有单独走查）、
+触屏设备上的替代交互。
