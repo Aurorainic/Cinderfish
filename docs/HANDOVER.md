@@ -4392,8 +4392,8 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
   `admin/show-users` 的四种 sort 也在 2026-11-07 由 `TestAdminShowUsersSorts` 覆盖
   （+/-follower、+/-createdAt；`state=silenced` 仍在实现层面为空集，没有数据可造）。
 - **第八波的部分边角（2026-11-06，见 §12X.4）**：`untilId` 多页与 `limit` 上限已由
-  `TestAnnouncementsPagination` 覆盖（2026-11-07，含 100 条上限）。仍未构造数据的：公告图片渲染、
-  浏览器内的过期隐藏；已读跟踪与首页横幅按设计未做。
+  `TestAnnouncementsPagination` 覆盖（2026-11-07，含 100 条上限）。公告图片渲染与过期隐藏已于
+  2026-11-07 走查（§12DF：带图公告显示图片，过期公告不出现）；已读跟踪与首页横幅按设计未做。
 - **第十波的部分边角（2026-11-06，见 §12Z.4）**：远端举报已由 `TestInboundFlagCreatesReport`
   覆盖（第五十九波），分页游标与 `state` 过滤已由 `TestAbuseReportPagination` 覆盖（2026-11-07）。
   仍未验证的：toast 文案、转发（forward）；通知与自动处置按设计未做。
@@ -5476,3 +5476,19 @@ gofmt -l internal/ cmd/                                        # 空
 go vet ./...                                                   # exit 0
 CINDERFISH_TEST_DATABASE_URL=... go test ./... -count=1         # 全绿
 ```
+
+## 12DF. 第九十三波：公告图片与过期隐藏（2026-11-07）
+
+第八波留下的两个界面项。管理员创建两条公告：
+
+- A：标题「UI 公告 A」、`imageUrl` 指向本实例静态图；
+- B：先创建（`expiresAt` 在未来，端点不接受已过期时间），再用 SQL 把 `expires_at` 改成过去。
+
+未登录打开 `/announcements`：
+
+- A 的标题、正文与图片都渲染（`<img>` 指向 `badges/info.svg`）；
+- B 不出现；
+- 页面提示「打开本页会把已显示的公告标记为已读」，与已读端点的行为一致。
+
+截图 `/tmp/w93-shots/announcements.png`。仍未验证：首页横幅样式的公告（按设计未做）、
+已读强调线在移动端的显示。
