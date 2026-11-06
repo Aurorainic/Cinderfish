@@ -4268,7 +4268,12 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
   指定字段、`imageUrl`/`expiresAt` 传 null 清空、`isActive=false` 从公共列表隐藏但保留在管理列表、
   过期时间在后/在前两种可见性、空标题/超长正文/非法图片协议 400 与非管理员拒绝（2026-11-07）。
   注意该端点成功时返回 **204**（无响应体），客户端需重新拉列表确认。
-- **第三十八波未测（2026-11-06，见 §12BB.4）**：SMTP 真投递与验证/重置端到端未执行，只有编译层证据。
+- **第三十八波已补验证（2026-11-06，见 §12BB.4）**：`internal/mail` 的
+  `TestSMTPSenderDelivers`/`TestSMTPDialFailure`/`TestLogSenderWithoutHost` 覆盖真实 SMTP 协议、
+  头注入清洗与拨号失败；`TestEmailVerificationAndResetFlow` 起一个本地 SMTP 服务并让服务器用真实
+  配置发送：改邮箱 → 收到验证链接 → `verify-email` 204 → `emailVerified=true` → 重复使用同码 400
+  → 请求重置 → 收到重置链接 → `reset-password` 204 → 旧密码 403、新密码 200（2026-11-07）。
+  仍未验证的：STARTTLS/隐式 TLS 与需要认证的 SMTP 服务端。
 - **第三十九波未测（2026-11-06，见 §12BC.4）**：邮箱三页只有编译层证据，渲染与完整链路未走查。
 - **第四十波未测（2026-11-06，见 §12BD.4）**：出站投递与取消转贴只有编译层证据；真实双实例投递未验证。
 - **第四十一波未测（2026-11-06，见 §12BE.4）**：编辑的 Update 双向都只有编译层证据。
