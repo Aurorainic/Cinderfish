@@ -642,6 +642,21 @@ export interface UserNotesChart {
 	};
 }
 
+/** `fetch-rss`: the subset of a parsed feed the RSS widgets render. */
+export interface FetchRssItem {
+	title: string;
+	link: string;
+	pubDate: string;
+	guid: string;
+}
+
+export interface FetchRssFeed {
+	title: string;
+	link: string;
+	description: string;
+	items: FetchRssItem[];
+}
+
 /** `server-info`: machine load for the server-metric widget. */
 export interface ServerInfo {
 	machine: string;

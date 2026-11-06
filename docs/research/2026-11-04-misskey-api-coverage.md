@@ -15,15 +15,15 @@
 | 指标 | 数量 |
 |------|------|
 | Misskey 端点总数 | 440 |
-| Cinderfish 已注册路由 | 159 |
-| 其中 Misskey 同名路径 | 151 |
+| Cinderfish 已注册路由 | 160 |
+| 其中 Misskey 同名路径 | 152 |
 | 其中 Cinderfish 自有路径/别名 | 8（`notifications` 别名、`admin/federation/mode`、`admin/federation/allowlist`、`miauth/{session}/check`、`admin/object-storage`、`admin/deliver-queue`、`notes/history`、`oauth/authorize`（同意页调用）） |
-| 未实现（Misskey 同名） | 289 |
+| 未实现（Misskey 同名） | 288 |
 
 统计口径：`internal/httpapi/server.go` 里 `HandleFunc("METHOD /api/…")` 的去重路径；
 GET 与 POST 同名路径只算一个。
 
-## 2. 已实现（159 条注册路由）
+## 2. 已实现（160 条注册路由）
 
 ```
 admin/accounts/create       admin/announcements/create  admin/announcements/delete
@@ -47,7 +47,7 @@ charts/user/notes           drive                       drive/folders           
 drive/folders/delete        drive/folders/show          drive/folders/update
 email-address/available     emojis                      federation/instances
 federation/show-instance
-get-online-users-count      following/create
+fetch-rss                   get-online-users-count      following/create
 server-info                 following/delete            following/delete
 following/invalidate        following/list              following/update
 following/update-all
@@ -94,7 +94,7 @@ i/registry/scopes*
 notes/history*
 ```
 
-2026-11-07 复核：从 `internal/httpapi/server.go` 提取的去重路径共 159 条，与本节一致；
+2026-11-07 复核：从 `internal/httpapi/server.go` 提取的去重路径共 160 条，与本节一致；
 此前漏列了 `admin/drive/files`、`i/registry/scopes`、`notes/history`。`i/registry/scopes` 与
 `notes/history` 是 Cinderfish 自有路径（Misskey 对应的是 `i/registry/scopes-with-domain`，
 且没有 `notes/history`）。

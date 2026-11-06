@@ -4683,8 +4683,8 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
 - **仍缺的 widgets（2026-11-07 更新）**：online-users、federation、instance-cloud 与 activity 的
   30 天子图表已补上（§12EY/§12EZ，后两者分别依赖 `federation/instances` 与新增的
   `charts/user/notes`；不画 `charts/instance` 的请求图）；job-queue 也已补上（§12FA，改为轮询
-  `admin/deliver-queue`），server-metric 见 §12FB（新增 `server-info`）。仍缺 rss、rss-ticker
-  （需服务端 RSS 抓取代理）与 aiscript（运行时按契约 drop）。
+  `admin/deliver-queue`），server-metric 见 §12FB（新增 `server-info`），rss 与 rss-ticker 见 §12FC
+  （新增 `fetch-rss`）。唯一未移植的是 aiscript，运行时按契约 drop。
 
 - ~~**浏览器可视化走查（Task 8 波次）未做**~~：2026-10-31 的那一轮确实没能执行，但后续波次已用
   无头 Chromium/CDP 与真实二进制覆盖了登录态视觉复核与溢出实测：§12CB（1440 与 390，42 张截图）、
@@ -6368,3 +6368,42 @@ Firefish 的 server-metric widget 订阅 `serverStats` Streaming 频道画 CPU/�
 - 无头浏览器添加 serverMetric widget 后显示：CPU 2.3%·16 核·AMD Ryzen 7 6800H、内存 51.8%
   （7.7/14.8 GiB）、磁盘 36.6%（2.7/7.4 GiB）、负载 1.16/1.32/1.14。截图
   `/tmp/w138-shots/server-metric.png`（不入库）。
+
+## 12FC. 第一百三十九波：fetch-rss 与两个 RSS widget（2026-11-07）
+
+最后两个可移植的 widget 依赖 Firefish 的 `GET /api/fetch-rss?url=`：浏览器不能跨域读订阅源，
+所以抓取与解析都在服务端。本轮补上端点并按原型移植 `rss` 与 `rss-ticker`。
+
+### 12FC.1 落地清单
+
+| 层 | 文件 | 内容 |
+|----|------|------|
+| 端点 | `internal/httpapi/rss.go`（新） | `GET/POST /api/fetch-rss`：5 秒超时、1 MiB 上限、`checkFetchTarget` 守卫初始 URL 与每一跳重定向、解析 RSS 2.0 与 Atom |
+| 响应 | 同上 | `{title, link, description, items:[{title, link, pubDate, guid}]}`，覆盖 rss-parser 里客户端实际使用的字段 |
+| 客户端 | `web/src/api/{types,endpoints}.ts` | `FetchRssFeed` 与 `fetchRss`（走 `apiGet` 拼查询串） |
+| widget | `web/src/widgets/rss.vue`（新） | 列表，高度可配，60 秒刷新 |
+| widget | `web/src/widgets/rss-ticker.vue`（新） | 滚动条，可配随机顺序/刷新间隔/时长/反向/透明 |
+| 组件 | `web/src/components/MkMarquee.vue`（新） | CSS 动画滚动（复制一份内容消除接缝），`prefers-reduced-motion` 时停止 |
+| 注册 | `web/src/widgets/index.ts` | 选择器加 `rss`、`rssTicker`（21 项） |
+
+### 12FC.2 有意的限制
+
+- 解析只取标题、链接、日期与 GUID；没有 `content`/`contentSnippet`/媒体扩展（客户端只用前两者）。
+- Atom 的 `<link rel="self">` 会与 RSS 的 `<link>` 混淆：`encoding/xml` 按本地名匹配，因此链接字段
+  收成列表并取第一个非空值（Cloudflare 的订阅源正好覆盖这个坑）。
+- 没有按 URL 缓存（Firefish 的 `cacheSec: 180`）；widget 自己 60 秒刷新一次，个人实例可接受。
+- 私网/回环/非 http(s) 一律拒绝；解析结果不落库。
+
+### 12FC.3 验证证据
+
+- `gofmt`/`go vet`/含数据库的全量 `go test ./...` 全绿；`vue-tsc --noEmit`、`check:port`
+  （hardTotal 0）、`pnpm build` 全绿。
+- `TestParseFeed`：RSS 2.0（含 `atom:link` self 与两个 item）、Atom（published/updated、alternate
+  link）、空订阅源、HTML 与纯文本拒绝。
+- `TestFetchRSSRejectsUnsafeTargets`：回环、localhost、ftp、file、空 URL 均 400；GET 别名的查询串
+  也走同一守卫。
+- 真实二进制：`GET /api/fetch-rss?url=https://blog.cloudflare.com/rss/` 返回 200，`title=Cloudflare
+  Blog`、`link=https://blog.cloudflare.com/`、20 条 item。
+- 无头浏览器：添加 rss widget 并在设置框填入订阅地址后显示 20 条标题（首条
+  "The post-quantum future of web privacy"）；添加 rssTicker 后滚动内容 40 个链接（两份拷贝用于
+  无缝循环），计算样式 `animationName=mk-marquee-…`。截图 `/tmp/w139-shots/rss-widgets.png`（不入库）。
