@@ -342,12 +342,17 @@ func (s *NotificationService) MarkAllRead(ctx context.Context, recipientID strin
 	return nil
 }
 
-// UnreadCount returns the number of unread notifications.
-func (s *NotificationService) UnreadCount(ctx context.Context, recipientID string) (int, error) {
+// UnreadCount returns the number of unread notifications, ignoring the
+// given muted types.
+func (s *NotificationService) UnreadCount(ctx context.Context, recipientID string, excludeTypes []string) (int, error) {
+	query := `SELECT count(*) FROM notifications WHERE recipient_id = $1 AND is_read = FALSE`
+	args := []any{recipientID}
+	if len(excludeTypes) > 0 {
+		args = append(args, excludeTypes)
+		query += fmt.Sprintf(" AND NOT (type = ANY($%d))", len(args))
+	}
 	var n int
-	if err := s.pool.QueryRow(ctx,
-		`SELECT count(*) FROM notifications WHERE recipient_id = $1 AND is_read = FALSE`,
-		recipientID).Scan(&n); err != nil {
+	if err := s.pool.QueryRow(ctx, query, args...).Scan(&n); err != nil {
 		return 0, fmt.Errorf("note: unread count: %w", err)
 	}
 	return n, nil

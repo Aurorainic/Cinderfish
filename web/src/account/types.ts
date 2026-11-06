@@ -63,6 +63,8 @@ export interface ProfileUpdateRequest {
 	carefulBot?: boolean;
 	autoAcceptFollowed?: boolean;
 	injectFeaturedNote?: boolean;
+	/** Notification types the account does not want to see. */
+	mutingNotificationTypes?: string[];
 }
 
 /** Stored credential entry for the account switcher. */

@@ -16,19 +16,23 @@
 			</div>
 			<template v-else>
 				<p class="desc">{{ t("notificationSettingDesc") }}</p>
-				<div v-if="mutedTypes.length === 0" class="empty">
-					当前没有屏蔽任何通知类型，全部通知都会显示。
-				</div>
-				<ul v-else class="types">
-					<li v-for="type in mutedTypes" :key="type" class="type">
-						{{ typeLabel(type) }}
+				<ul class="types">
+					<li v-for="type in knownTypes" :key="type" class="type">
+						<CfSwitch
+							:model-value="!mutedTypes.includes(type)"
+							:disabled="savingType"
+							@update:model-value="(value: boolean) => setTypeEnabled(type, value)"
+						>
+							{{ typeLabel(type) }}
+						</CfSwitch>
 					</li>
 				</ul>
-				<CfInfo class="note">
-					通知类型由服务端的 <code>mutingNotificationTypes</code> 决定，通知列表会据此过滤。
-					修改它需要 <code>i/update</code> 接受该字段，后端目前只接受
-					name / description / avatarId / followersVisibility / followingVisibility，
-					所以这里只读显示，修改功能<strong>未提供</strong>。
+				<CfInfo v-if="typeError != null" class="note" warn>
+					{{ typeError }}
+				</CfInfo>
+				<CfInfo v-else class="note">
+					关闭某一类通知后，服务端不再在 <code>notifications</code> 列表中返回它，
+					未读角标也不再计入。设置写入 <code>i/update { mutingNotificationTypes }</code>。
 				</CfInfo>
 			</template>
 		</section>
@@ -92,7 +96,7 @@
 //     so the type list is shown read-only instead of being written silently.
 // The push-notification block is dropped entirely: `sw/*` is not implemented.
 import { computed, onMounted, ref } from "vue";
-import { me, updateMe } from "@/account";
+import { me, updateMe, updateProfile } from "@/account";
 import type { MeDetailed, NotificationType } from "@/api/types";
 import { api } from "@/api/client";
 import CfButton from "@/components/ui/CfButton.vue";
@@ -119,8 +123,33 @@ const loading = ref(true);
 const loadErrorText = ref<string | null>(null);
 const actionErrorText = ref<string | null>(null);
 const marking = ref(false);
+const savingType = ref(false);
+const typeError = ref<string | null>(null);
 
 const mutedTypes = computed<string[]>(() => me.value?.mutingNotificationTypes ?? []);
+
+async function setTypeEnabled(
+	type: NotificationType,
+	enabled: boolean,
+): Promise<void> {
+	if (savingType.value) return;
+	savingType.value = true;
+	typeError.value = null;
+	const muted = new Set(mutedTypes.value);
+	if (enabled) muted.delete(type);
+	else muted.add(type);
+	const next = knownTypes.filter((candidate) => muted.has(candidate));
+	try {
+		await updateProfile({ mutingNotificationTypes: next });
+	} catch (error) {
+		typeError.value =
+			error instanceof Error && error.message !== ""
+				? error.message
+				: t("somethingHappened");
+	} finally {
+		savingType.value = false;
+	}
+}
 
 const foldNotification = computed<boolean>({
 	get: () => defaultStore.reactiveState.foldNotification.value,

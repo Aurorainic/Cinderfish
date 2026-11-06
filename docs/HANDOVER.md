@@ -2483,6 +2483,44 @@ cd web && pnpm build                    # exit 0
 - 推荐笔记开关的写入与时间线表现（时间线本身还没有插入推荐笔记的逻辑）。
 - `go test` 与浏览器走查未执行。
 
+## 12AM. 批次：通知类型静音（2026-11-06）
+
+**工作方式**：目标模式第二十三波，继续只写代码、验证到编译层。施工依据
+`docs/research/2026-11-06-firefish-port-wave23-contract.md`。
+
+### 12AM.1 落地清单
+
+| 层 | 文件 | 说明 |
+|----|------|------|
+| 账号层 | `internal/account/profile.go`、`profile_details.go` | `MutedNotificationTypes` 存入 `settings.mutingNotificationTypes` |
+| 端点 | `internal/httpapi/i_update.go` | 接受并校验 `mutingNotificationTypes`（只允许 5 类） |
+| 过滤 | `internal/httpapi/notifications.go`、`internal/note/reaction.go` | 列表并入 excludeTypes；`UnreadCount` 增加排除参数 |
+| 打包 | `internal/httpapi/users_pack.go` | `MeDetailed.mutingNotificationTypes` 回读真实值 |
+| 前端 | `account/types.ts`、`pages/SettingsNotifications.vue` | 5 个逐类开关，切换即保存 |
+
+### 12AM.2 有意的限制
+
+1. 只支持本后端产生的 5 类通知，未知类型返回 400。
+2. 静音只影响列表与未读计数，不阻止通知写入。
+3. `notificationRecieveConfig` 与邮件通知类型未实现。
+
+### 12AM.3 验证证据（编译层）
+
+```
+gofmt -l internal/ cmd/                 # 空
+go vet ./...                            # exit 0
+cd web && pnpm exec vue-tsc --noEmit    # exit 0
+cd web && pnpm run check:port           # hardTotal 0
+cd web && pnpm build                    # exit 0
+```
+
+### 12AM.4 仍未验证
+
+- 静音某一类后 `notifications` 列表与 `unreadNotificationsCount` 的同步下降。
+- 非法类型与重复项的 400/去重分支。
+- 设置页开关的失败回滚与移动端布局。
+- `go test` 与浏览器走查未执行。
+
 ## 13. 文档索引
 
 | 文档 | 内容 |
@@ -2531,6 +2569,7 @@ cd web && pnpm build                    # exit 0
 | `docs/research/2026-11-06-firefish-port-wave20-contract.md` | **第二十波施工契约（TOTP 两步验证、登录协商与安全设置页），见 §12AJ** |
 | `docs/research/2026-11-06-firefish-port-wave21-contract.md` | **第二十一波施工契约（改密、令牌重生成与登录历史），见 §12AK** |
 | `docs/research/2026-11-06-firefish-port-wave22-contract.md` | **第二十二波施工契约（资料扩展字段与推荐笔记开关），见 §12AL** |
+| `docs/research/2026-11-06-firefish-port-wave23-contract.md` | **第二十三波施工契约（通知类型静音与未读过滤），见 §12AM** |
 
 ## 14. 已知的未验证项
 
@@ -2569,6 +2608,8 @@ cd web && pnpm build                    # exit 0
   端到端与分页未走查；`i/*` 缺口从 46 降到 43。
 - **第二十二波未测（2026-11-06，见 §12AL.4）**：资料扩展字段与推荐笔记开关只过了编译层，
   保存/回读、非法值分支与时间线表现未验证。
+- **第二十三波未测（2026-11-06，见 §12AM.4）**：通知静音只过了编译层，列表与未读计数的联动、
+  非法类型分支与设置页交互未验证。
 - **仍未移植的设置页**：邮箱、整合、导入导出、迁移、Webhook、插件、自定义 KaTeX、状态栏、
   删除账号、应用授权以外的账号操作；对应后端端点不存在或前端缺少依赖（见第五波契约 §3.3）。
 - **仍缺的 widgets**：rss、rss-ticker、server-metric、online-users、federation、job-queue、aiscript、
