@@ -357,3 +357,8 @@ SELECT COALESCE(sum(size), 0), count(*) FROM drive_files WHERE user_id = $1
 	}
 	return bytes, files, nil
 }
+
+// MaxSize returns the configured per-file upload limit.
+func (s *DriveService) MaxSize() int64 {
+	return s.maxSize
+}

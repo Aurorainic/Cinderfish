@@ -15,15 +15,15 @@
 | 指标 | 数量 |
 |------|------|
 | Misskey 端点总数 | 440 |
-| Cinderfish 已注册路由 | 122 |
-| 其中 Misskey 同名路径 | 115 |
+| Cinderfish 已注册路由 | 123 |
+| 其中 Misskey 同名路径 | 116 |
 | 其中 Cinderfish 自有路径/别名 | 7（`notifications` 别名、`admin/federation/mode`、`admin/federation/allowlist`、`miauth/{session}/check`、`admin/object-storage`、`admin/deliver-queue`、`notes/history`） |
-| 未实现（Misskey 同名） | 325 |
+| 未实现（Misskey 同名） | 324 |
 
 统计口径：`internal/httpapi/server.go` 里 `HandleFunc("METHOD /api/…")` 的去重路径；
 GET 与 POST 同名路径只算一个。
 
-## 2. 已实现（122 条注册路由）
+## 2. 已实现（123 条注册路由）
 
 ```
 admin/accounts/create       admin/announcements/create  admin/announcements/delete
@@ -37,6 +37,7 @@ admin/federation/mode*      admin/show-users            admin/suspend-user
 admin/unsuspend-user        announcements               blocking/create
 blocking/delete             blocking/list               drive/files
 drive/files/create          drive/files/delete          drive/files/show
+drive/files/upload-from-url
 drive/files/update
 drive                       drive/folders               drive/folders/create
 drive/folders/delete        drive/folders/show          drive/folders/update
@@ -89,6 +90,8 @@ users/update
 
 2026-11-06 第十九波新增：`stats`（公开计数）；`admin/update-meta` 增加六个合规 URL 与
 `serverRules`（不是新路由）。
+
+2026-11-06 第三十五波新增：`drive/files/upload-from-url`（仅 http(s)，拒绝私有/环回目标与重定向，30 秒超时）。
 
 2026-11-06 第三十四波新增：`notes/state`（收藏/置顶状态；线程静音恒 false）。
 
@@ -156,7 +159,7 @@ note/reply/renote 事件）。
 | `users/*` | 28 | 列表、搜索、反应、推荐、关注请求、更新资料字段 |
 | `notes/*` | 22 | 会话/子帖、提及、投票、收藏、搜索、翻译、草稿 |
 | `chat/*` | 25 | 私聊（首版可选） |
-| `drive/*` | 14 | URL 上传、去重、批量移动 |
+| `drive/*` | 13 | 去重、批量移动 |
 | `channels/*` | 16 | 频道（首版可选） |
 | `charts/*` | 12 | 统计图表（可用 SQL 聚合实现） |
 | `clips/*` | 11 | 剪贴（首版可选） |

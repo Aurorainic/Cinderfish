@@ -660,3 +660,19 @@ Cinderfish 没有实例配额，`capacity` 恒为 `0`，客户端应读作“无
     `drive` 列为“故意缺席”（`internal/streaming/channel_main.go:13`）。上传/删除后需要自己刷新列表。
 24. `POST /api/drive/files/create` 只接受 `Authorization` 头，表单 `i` 无效——这是与 Misskey 客户端习惯
     最容易踩的差异。
+
+## 2026-11-06 增补：drive/files/upload-from-url
+
+`POST /api/drive/files/upload-from-url`（需登录）请求
+`{url, folderId?, name?}`，服务端下载后按普通上传保存，返回 `DriveFile`。
+
+安全限制：
+
+- 仅 `http`/`https`；
+- 解析目标主机，任一地址为环回/私有/链路本地/未指定地址即拒绝；
+- 最多 5 次重定向，每一跳重新做同样的地址检查；
+- 30 秒超时，响应体按单文件上限（默认 20 MiB）截断，超出返回 `FILE_TOO_LARGE`；
+- 远端非 2xx 返回 `FETCH_FAILED`（400）。
+
+文件名优先取 `name`，否则取 URL 路径末段，再经 `media.SanitizeName`。`folderId` 必须是自己的
+文件夹（`NO_SUCH_FOLDER`）。

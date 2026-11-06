@@ -252,6 +252,7 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("POST /api/admin/resolve-abuse-user-report", s.handleAdminResolveAbuseReport)
 
 	s.mux.HandleFunc("POST /api/drive/files/create", s.handleDriveFilesCreate)
+	s.mux.HandleFunc("POST /api/drive/files/upload-from-url", s.handleDriveFilesUploadFromURL)
 	s.mux.HandleFunc("POST /api/drive/folders", s.handleDriveFolders)
 	s.mux.HandleFunc("POST /api/drive/folders/create", s.handleDriveFoldersCreate)
 	s.mux.HandleFunc("POST /api/drive/folders/show", s.handleDriveFoldersShow)
