@@ -534,6 +534,12 @@ export interface AdminInstanceMeta {
 	hiddenTags: string[];
 }
 
+export interface DriveUsage {
+	capacity: number;
+	usage: number;
+	filesCount: number;
+}
+
 /** One row of `federation/show-instance`. */
 export interface FederationInstance {
 	host: string;

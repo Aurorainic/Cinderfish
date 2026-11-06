@@ -16,6 +16,7 @@ import type {
 	BlockingRecord,
 	AllowlistResponse,
 	DriveFile,
+	DriveUsage,
 	DriveFolder,
 	EmojiSimple,
 	FederationInstance,
@@ -171,6 +172,7 @@ export const ENDPOINTS = {
 	notificationsMarkAllAsRead: "notifications/mark-all-as-read",
 
 	// drive
+	drive: "drive",
 	driveFiles: "drive/files",
 	driveFilesCreate: "drive/files/create",
 	driveFilesShow: "drive/files/show",
@@ -762,6 +764,7 @@ export interface EndpointMap {
 		res: EmptyResponse;
 	};
 
+	[ENDPOINTS.drive]: { req: Record<string, never>; res: DriveUsage };
 	[ENDPOINTS.driveFiles]: { req: DriveFilesParams; res: DriveFile[] };
 	[ENDPOINTS.driveFilesCreate]: {
 		req: { folderId?: string | null };

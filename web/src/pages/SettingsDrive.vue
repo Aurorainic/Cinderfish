@@ -12,23 +12,27 @@
 				</CfButton>
 			</div>
 			<template v-else>
-				<div v-if="fileCount === 0" class="empty">{{ t("emptyDrive") }}</div>
-				<CfKeyValue v-else class="kv">
+				<CfKeyValue class="kv">
+					<template #key>{{ t("capacity") }}</template>
+					<template #value>
+						{{
+							capacity === 0
+								? "未设置配额（无限制）"
+								: bytes(capacity, 1)
+						}}
+					</template>
+				</CfKeyValue>
+				<CfKeyValue class="kv">
 					<template #key>{{ t("inUse") }}</template>
 					<template #value>{{ bytes(usedBytes, 1) }}</template>
 				</CfKeyValue>
 				<CfKeyValue class="kv">
 					<template #key>{{ t("driveFilesCount") }}</template>
-					<template #value>
-						{{ truncated ? `≥ ${fileCount}` : fileCount }}
-					</template>
+					<template #value>{{ fileCount }}</template>
 				</CfKeyValue>
 				<CfInfo class="note">
-					容量与配额来自 <code>drive</code> 端点，本实例<strong>未提供</strong>，
-					所以没有容量条；上面的用量是按 <code>drive/files</code> 逐页汇总的真实大小。
-					<template v-if="truncated">
-						文件过多，只统计了前 {{ scannedPages * 100 }} 个。
-					</template>
+					数据来自 <code>drive</code> 端点。容量为 0 表示本实例没有配置配额，
+					上传只受单文件大小限制。
 				</CfInfo>
 			</template>
 		</section>
@@ -67,16 +71,24 @@
 			<h2 class="sectionTitle">{{ t("drive") }}</h2>
 			<div class="kvRow">
 				<span class="kvKey">{{ t("alwaysMarkSensitive") }}</span>
-				<span class="kvValue">{{ me?.alwaysMarkNsfw ? t("yes") : t("no") }}</span>
+				<CfSwitch
+					:model-value="me?.alwaysMarkNsfw ?? false"
+					@update:model-value="saveDefaultSensitive"
+				/>
 			</div>
 			<div class="kvRow">
 				<span class="kvKey">{{ t("enableAutoSensitive") }}</span>
-				<span class="kvValue">{{ me?.autoSensitive ? t("yes") : t("no") }}</span>
+				<CfSwitch
+					:model-value="me?.autoSensitive ?? false"
+					@update:model-value="saveAutoSensitive"
+				/>
 			</div>
-			<CfInfo class="note">
-				这两项由 <code>i/update</code> 写入，但后端只接受 name / description / avatarId /
-				followersVisibility / followingVisibility，所以这里只读显示，修改<strong>未提供</strong>。
-				网盘统计图表（<code>MkChart</code> / chart.js）同样未提供。
+			<CfInfo v-if="profileErrorText != null" class="note" warn>
+				{{ profileErrorText }}
+			</CfInfo>
+			<CfInfo v-else class="note">
+				这两项由 <code>i/update</code> 写入个人资料；网盘统计图表
+				（<code>MkChart</code> / chart.js）仍未提供。
 			</CfInfo>
 		</section>
 
@@ -108,14 +120,14 @@
 // Firefish reads `drive` for capacity/usage and shows an MkChart histogram, then
 // lets the user pick a default upload folder and toggles the profile's NSFW
 // flags. Cinderfish's contract (docs/research/api-contract/drive-media.md):
-//   * no `drive` endpoint → capacity/quota is unavailable; usage is summed from
-//     `drive/files` pages instead of being fabricated;
+//   * `drive` answers capacity/usage/count; capacity 0 means this instance has
+//     no quota configured (the UI says so instead of drawing a fake meter);
 //   * no chart library → the per-user-drive histogram is dropped;
-//   * `i/update` ignores `alwaysMarkNsfw` / `autoSensitive` → read-only display;
+//   * `i/update` writes `alwaysMarkNsfw` / `autoSensitive`; both are real switches;
 //   * `drive/folders/show` exists, so the configured folder can be resolved to a
 //     name, and the folder picker reuses the wave-2 `MkDrive` in select mode.
 import { computed, onMounted, ref } from "vue";
-import { me } from "@/account";
+import { me, updateProfile } from "@/account";
 import type { DriveFile, DriveFolder } from "@/api/types";
 import { api } from "@/api/client";
 import MkDrive from "@/components/MkDrive.vue";
@@ -132,15 +144,12 @@ import { defaultStore } from "@/store";
 
 defineOptions({ name: "CfPageSettingsDrive" });
 
-const MAX_PAGES = 10;
-const PAGE_SIZE = 100;
-
 const loading = ref(true);
 const errorText = ref<string | null>(null);
+const capacity = ref(0);
 const usedBytes = ref(0);
 const fileCount = ref(0);
-const scannedPages = ref(0);
-const truncated = ref(false);
+const profileErrorText = ref<string | null>(null);
 
 const folderLoading = ref(false);
 const folderName = ref<string | null>(null);
@@ -167,29 +176,34 @@ async function loadUsage(): Promise<void> {
 	errorText.value = null;
 	usedBytes.value = 0;
 	fileCount.value = 0;
-	scannedPages.value = 0;
-	truncated.value = false;
-
+	capacity.value = 0;
 	try {
-		let untilId: string | undefined;
-		for (let page = 0; page < MAX_PAGES; page++) {
-			const files = await api("drive/files", {
-				limit: PAGE_SIZE,
-				...(untilId == null ? {} : { untilId }),
-			});
-			scannedPages.value = page + 1;
-			if (files.length === 0) break;
-			usedBytes.value += files.reduce((sum, file) => sum + file.size, 0);
-			fileCount.value += files.length;
-			if (files.length < PAGE_SIZE) break;
-			untilId = files[files.length - 1]?.id;
-			if (page === MAX_PAGES - 1) truncated.value = true;
-			if (untilId == null) break;
-		}
+		const usage = await api("drive");
+		capacity.value = usage.capacity;
+		usedBytes.value = usage.usage;
+		fileCount.value = usage.filesCount;
 	} catch (error) {
 		errorText.value = describe(error);
 	} finally {
 		loading.value = false;
+	}
+}
+
+async function saveDefaultSensitive(value: boolean): Promise<void> {
+	profileErrorText.value = null;
+	try {
+		await updateProfile({ alwaysMarkNsfw: value });
+	} catch (error) {
+		profileErrorText.value = describe(error);
+	}
+}
+
+async function saveAutoSensitive(value: boolean): Promise<void> {
+	profileErrorText.value = null;
+	try {
+		await updateProfile({ autoSensitive: value });
+	} catch (error) {
+		profileErrorText.value = describe(error);
 	}
 }
 

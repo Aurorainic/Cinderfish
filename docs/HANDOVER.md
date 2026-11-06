@@ -2673,6 +2673,42 @@ cd web && pnpm build                    # exit 0
 - 页面路由替换与移动端布局。
 - `go test` 与浏览器走查未执行。
 
+## 12AR. 批次：网盘用量端点（2026-11-06）
+
+**工作方式**：目标模式第二十八波，继续只写代码、验证到编译层。施工依据
+`docs/research/2026-11-06-firefish-port-wave28-contract.md`。
+
+### 12AR.1 落地清单
+
+| 层 | 文件 | 说明 |
+|----|------|------|
+| 媒体层 | `internal/media/drive.go` | `Usage`：`sum(size)` 与行数 |
+| 端点 | `internal/httpapi/drive_usage.go`（新）、`server.go` | `drive` 返回 `{capacity:0, usage, filesCount}` |
+| 前端 | `api/types.ts`、`endpoints.ts`、`pages/SettingsDrive.vue` | 一次请求显示容量/用量/文件数；两个敏感偏好改为真实开关 |
+| 文档 | `drive-media.md`、台账 | `drive` 小节与计数（119/112/328） |
+
+### 12AR.2 有意的限制
+
+1. 无实例配额，`capacity` 恒 0。
+2. 无按天统计图表。
+3. `filesCount` 是额外字段。
+
+### 12AR.3 验证证据（编译层）
+
+```
+gofmt -l internal/ cmd/                 # 空
+go vet ./...                            # exit 0
+cd web && pnpm exec vue-tsc --noEmit    # exit 0
+cd web && pnpm run check:port           # hardTotal 0
+cd web && pnpm build                    # exit 0
+```
+
+### 12AR.4 仍未验证
+
+- 用量/文件数与 `drive/files` 实际行数的一致性。
+- 容量 0 的展示与两个敏感开关的保存/回读。
+- `go test` 与浏览器走查未执行。
+
 ## 13. 文档索引
 
 | 文档 | 内容 |
@@ -2726,6 +2762,7 @@ cd web && pnpm build                    # exit 0
 | `docs/research/2026-11-06-firefish-port-wave25-contract.md` | **第二十五波施工契约（云盘文件重命名/描述/敏感/移动），见 §12AO** |
 | `docs/research/2026-11-06-firefish-port-wave26-contract.md` | **第二十六波施工契约（隐藏话题标签与趋势过滤），见 §12AP** |
 | `docs/research/2026-11-06-firefish-port-wave27-contract.md` | **第二十七波施工契约（实例信息页与 show-instance），见 §12AQ** |
+| `docs/research/2026-11-06-firefish-port-wave28-contract.md` | **第二十八波施工契约（网盘用量端点与设置页接线），见 §12AR** |
 
 ## 14. 已知的未验证项
 
@@ -2772,6 +2809,7 @@ cd web && pnpm build                    # exit 0
   错误分支未验证。
 - **第二十六波未测（2026-11-06，见 §12AP.4）**：隐藏标签只过了编译层，保存/回读与趋势过滤未验证。
 - **第二十七波未测（2026-11-06，见 §12AQ.4）**：实例信息只过了编译层，本地/远端/未知主机与 401 分支未验证。
+- **第二十八波未测（2026-11-06，见 §12AR.4）**：网盘用量只过了编译层，数值一致性、容量 0 展示与两个敏感开关未验证。
 - **仍未移植的设置页**：邮箱、整合、导入导出、迁移、Webhook、插件、自定义 KaTeX、状态栏、
   删除账号、应用授权以外的账号操作；对应后端端点不存在或前端缺少依赖（见第五波契约 §3.3）。
 - **仍缺的 widgets**：rss、rss-ticker、server-metric、online-users、federation、job-queue、aiscript、
