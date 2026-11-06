@@ -4821,7 +4821,7 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
 
 ### 12CF.4 仍未验证
 
-- 大表（万级标签/关注）下的聚合与分页耗时。
+- ~~大表（万级标签/关注）下的聚合与分页耗时。~~ 2026-11-07 在 10k 关注 + 10k 标签上测过，见 §12ET。
 - 日期边界已由 §12EO 的 `TestFollowListDateBoundary` 覆盖（>= / <= 均包含相等毫秒）。
 
 ## 12CG. 第六十八波：官方 misskey-js 客户端联调（2026-11-07）
@@ -6060,3 +6060,29 @@ username_lower LIKE 'iperfu%'`，再 `ANALYZE notes`；临时服务已停止。
   「Note contains too many mentions. / 9f466dab-c856-48cd-9e65-ff90ff750580 / 好」，
   `users/notes` 对该用户返回 0 条；截图 `/tmp/w128-shots/too-many-mentions.png`（不入库）。
   前端显示的是 `cause.message` 与 `cause.errorId`，不显示 `code` 字段。
+
+## 12ET. 第一百三十波：万级关注与标签的聚合耗时（2026-11-07）
+
+第六十七波留下「大表（万级标签/关注）下的聚合与分页耗时」未测。这一波在真实二进制上补上。
+
+**构造**：`cinderfish_test` 里插入 10000 个 `host=remote.example` 的用户与 alice 对它们的 10000 条
+`followings`，再插入 10000 条 alice 的公开笔记、每条带一个不同的标签；`ANALYZE` 后用登录令牌
+各请求 5 次取 min/median/max。
+
+| 请求 | min | median | max |
+|------|-----|--------|-----|
+| `following/list {limit:100}` | 6.7 ms | 7.1 ms | 15.8 ms |
+| `users/following {limit:100}` | 6.2 ms | 6.9 ms | 7.4 ms |
+| `hashtags/list {limit:100}` | 35.2 ms | 35.5 ms | 67.8 ms |
+| `hashtags/list {sort:"-mentionedUsers"}` | 34.9 ms | 35.7 ms | 35.9 ms |
+| `hashtags/trend` | 46.2 ms | 46.5 ms | 47.5 ms |
+| `hashtags/search {query:"w129tag999"}` | 8.1 ms | 8.3 ms | 9.8 ms |
+| `hashtags/search {query:"", limit:30}` | 14.6 ms | 15.6 ms | 15.7 ms |
+| `hashtags/show {tag:"w129tag9999"}` | 8.1 ms | 8.2 ms | 8.7 ms |
+
+结论：关注分页走 `followings(follower_id, followee_id)` 的前缀索引后排序 10k 行约 7 ms；两个 hashtag
+聚合端点要 `jsonb_array_elements_text` 展开全部笔记的标签再分组，约 35–47 ms。后者随笔记总数线性
+增长（10k 笔记 ≈ 35 ms），个人实例可以接受；如果单实例笔记数到十万级，应考虑像 Misskey 一样维护
+一张 `hashtags` 计数表，而不是每次展开。没有做并发压力测试。
+
+测量数据已清理（删除 `w129%` 用户及其级联的 followings/notes，重新 `ANALYZE`），临时服务已停止。
