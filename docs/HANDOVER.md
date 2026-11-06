@@ -5887,3 +5887,15 @@ CINDERFISH_TEST_DATABASE_URL=... go test ./... -count=1         # 全绿
 为 true，但同一元素的 `animationName` 仍报告原动画名；CSS 里的
 `@media (prefers-reduced-motion:reduce){.track{animation:none}}` 已确认在构建产物中且位于
 基础规则之后。无头 Chromium 下无法确认视觉效果，按「尚未确认」记录，不写成已验证。
+
+## 12EJ. 第一百二十波：真实音视频播放（2026-11-07）
+
+用 ffmpeg 生成 2 秒 VP9 `video.webm` 与 Opus `audio.ogg`，上传后发一条带两个附件的笔记。
+笔记页里：
+
+- `<audio>` 的 `readyState=4`、`duration≈1.99`、无解码错误；
+- `<video preload="none">` 初始 `readyState=0`（符合 `preload="none"`），调用 `play()` 后
+  `readyState=4`、`duration=2`、`currentTime` 前进到约 1.8 秒、`160×120`、无错误；
+- 截图 `/tmp/w120-shots/media-playback.png`。
+
+仍未验证：H.264/AAC 等专有编解码格式（开源 Chromium 未必支持，产品上依赖浏览器）；大文件缓冲。
