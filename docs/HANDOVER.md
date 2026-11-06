@@ -4672,8 +4672,8 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
 - **前端没有真实第三方客户端联调**：页面已在构建产物上用浏览器走查；2026-11-07 起已用官方
   `misskey-js`（2026.10.2-alpha.0）连过本实例（见 §12CG），仍未用 Misskey Web 前端整站连接。
 - **Redis 只对 miniredis 验证过**：单元测试仍用 miniredis；2026-11-07 起已用真实 `redis-server`
-  （8.0.5，端口 6390，无认证）跑过双进程 Streaming 中继（§12CH）。仍未验证：认证、网络闪断、
-  持久化配置与 `w69:deliver` 投递唤醒。
+  （8.0.5）跑过双进程 Streaming 中继（§12CH）、`requirepass` 认证与 Redis 重启后的自动重订阅
+  （§12CQ）。仍未验证：网络丢包/长时间断开、持久化配置与 `w78:deliver` 投递唤醒。
 - **Streaming 未做真实 Misskey 客户端联调**：已用自写 WebSocket 客户端验证；2026-11-07 起
   也用 `misskey-js` 的 `Stream` 验证了 `localTimeline` 与 `main` 频道（§12CG）。仍未用 Misskey Web 整站连接。
 - **联邦没有任何第三方联调**：只跑了本实现的双实例测试（真签名、真 HTTP、真库），没有对 Mastodon / GoToSocial / 真实 Misskey 实例互通。这是 M5 之后最该补的验证。
@@ -5108,3 +5108,23 @@ CINDERFISH_TEST_DATABASE_URL=... go test ./... -count=1         # 全绿
 ```
 
 仍未验证：真实邮件服务商（Gmail/SES 等）的证书链与限流；`SSL_CERT_FILE` 只影响测试进程。
+
+## 12CQ. 第七十八波：Redis 认证与重连（2026-11-07）
+
+第六十九波（§12CH）用无认证的 Redis 验证了跨进程中继。这一轮补两件事：
+
+### 12CQ.1 环境与用例
+
+- `redis-server --port 6391 --requirepass secret --save '' --appendonly no`；
+- 两个真实二进制（3994/3995）共用测试库，`url = "redis://:secret@127.0.0.1:6391/0"`、
+  `prefix = "w78"`；启动后 `PUBSUB NUMSUB w78:stream` 为 2，说明密码认证通过且订阅成功。
+- `misskey-js` 连 B 的 `/streaming`，A 的 API 发帖 → B 收到 `note` 事件（认证 + 中继）。
+- 随后 `redis-cli shutdown nosave` 杀掉 Redis，1.2 秒后原参数重启；4 秒后在 A 再发一帖，
+  **同一条 WebSocket 连接**仍收到第二个 `note` 事件。说明 `ListenRedis` 在错误后重建了
+  PubSub 订阅，不需要重启实例。
+
+### 12CQ.2 仍未验证
+
+- 长时间断网（超过当前重试间隔的连续失败）与消息丢失窗口。
+- Redis ACL 用户（非 `requirepass`）与 TLS。
+- `w78:deliver` 投递唤醒：两个实例都是 `federation_mode = "none"`，没有产生投递。
