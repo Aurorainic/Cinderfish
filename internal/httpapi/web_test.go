@@ -52,6 +52,18 @@ func TestWebServesRoot(t *testing.T) {
 	}
 }
 
+func TestWebMissingAssetIsNotFound(t *testing.T) {
+	srv, _ := webServer(t)
+	rec := httptest.NewRecorder()
+	srv.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/assets/index-stale.js", nil))
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("missing asset status = %d, want 404", rec.Code)
+	}
+	if strings.Contains(rec.Body.String(), "cinderfish-shell") {
+		t.Error("missing asset was answered with index.html")
+	}
+}
+
 func TestWebFallsBackToIndexForClientRoutes(t *testing.T) {
 	srv, _ := webServer(t)
 	// Deep links that the client owns: the settings children and the admin

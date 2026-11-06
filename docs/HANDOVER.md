@@ -4303,8 +4303,14 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
 
 ### 12CC.2 修复
 
-`web/src/components/MkMention.vue`：`host === ""` 时不渲染 `@host` 片段。空的 host 表示本地账号，
-原先只有 `host !== localHost` 的判断会让它渲染成一个孤立的 `@`。
+1. `web/src/components/MkMention.vue`：`host === ""` 时不渲染 `@host` 片段。空的 host 表示本地账号，
+   原先只有 `host !== localHost` 的判断会让它渲染成一个孤立的 `@`。
+2. `internal/httpapi/web.go`：`/assets/*` 缺文件时返回 404，不再回落到 `index.html`。
+   回落会把 HTML 当作 JavaScript 交给浏览器（MIME 错误），也让旧 `index.html` 引用已删除的 chunk
+   时表现为白屏。新增用例 `TestWebMissingAssetIsNotFound`。
+3. 2FA 协议本身复核：`POST /api/signin`（password + TOTP）→ 200 `{finished:true,i:…}`，
+   说明「密码 + 验证码」两步在服务端是通的；无头环境里没能把 UI 的第二步点通（表单状态在
+   自动化输入下不稳定），因此 UI 完成态仍记为未验证。
 
 ### 12CC.3 验证证据
 
@@ -4316,8 +4322,10 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
 
 ### 12CC.4 仍未验证
 
-- 2FA **完成**登录（输入验证码后进入时间线）未在无头环境跑通；后端 `signin` + TOTP 由测试覆盖。
+- 2FA **完成**登录（输入验证码后进入时间线）未在无头环境跑通；服务端两步协议已用 curl 验证。
 - 同一轮里，账号登出后重新登录的 UI 路径没有单独测。
+- 无头环境在冷启动时偶发「页面已挂载但 shell 异步组件尚未渲染」的空白期，等待逻辑已改为
+  `#app` 有内容后再交互；真实用户不受影响。
 - **仍未移植的设置页**：邮箱、整合、导入导出、迁移、Webhook、插件、自定义 KaTeX、状态栏、
   删除账号、应用授权以外的账号操作；对应后端端点不存在或前端缺少依赖（见第五波契约 §3.3）。
 - **仍缺的 widgets**：rss、rss-ticker、server-metric、online-users、federation、job-queue、aiscript、

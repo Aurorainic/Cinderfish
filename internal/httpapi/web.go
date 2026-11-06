@@ -68,6 +68,14 @@ func (s *staticSite) serve(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	// A missing asset is a real 404: answering index.html would hand the
+	// browser HTML where it asked for JavaScript, and a stale index.html that
+	// references a pruned chunk would then fail with a MIME error instead of a
+	// plain not-found. Client routes still fall through to the shell below.
+	if strings.HasPrefix(r.URL.Path, "/assets/") {
+		http.NotFound(w, r)
+		return
+	}
 	// Read index.html per request: it is a few hundred bytes, and a
 	// rebuild then goes live without restarting the server.
 	index, err := os.ReadFile(filepath.Join(s.root, "index.html"))
