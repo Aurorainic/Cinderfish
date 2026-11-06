@@ -88,7 +88,15 @@ users/stats
 users/relation              users/search                users/show
 users/get-frequently-replied-users
 users/update
+admin/drive/files
+i/registry/scopes*
+notes/history*
 ```
+
+2026-11-07 复核：从 `internal/httpapi/server.go` 提取的去重路径共 156 条，与本节一致；
+此前漏列了 `admin/drive/files`、`i/registry/scopes`、`notes/history`。`i/registry/scopes` 与
+`notes/history` 是 Cinderfish 自有路径（Misskey 对应的是 `i/registry/scopes-with-domain`，
+且没有 `notes/history`）。
 
 `*` 为 Cinderfish 自有路径/别名：`notifications` 是 `i/notifications` 的兼容别名
 （Misskey 客户端读 `i/notifications`）；`admin/federation/mode` 与
