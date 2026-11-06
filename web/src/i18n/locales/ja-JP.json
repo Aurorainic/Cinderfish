@@ -1837,5 +1837,6 @@
 	"removeMember": "メンバーを削除",
 	"removeQuote": "引用を削除",
 	"removeRecipient": "宛先を削除",
-	"_notification.newNote": "新しいノートを投稿しました"
+	"_notification.newNote": "新しいノートを投稿しました",
+	"allTime": "全期間"
 }

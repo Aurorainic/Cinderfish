@@ -7,12 +7,10 @@
 		<MkSpacer :content-max="800" :margin-min="16" :margin-max="32">
 			<div class="header">
 				<span class="tag">#{{ tag }}</span>
-				<span v-if="trend != null" class="stat">{{
-					t("nUsersMentioned", { n: trend.usersCount })
+				<span v-if="stat != null" class="stat">{{
+					t("nUsersMentioned", { n: stat.mentionedUsersCount })
 				}}</span>
-				<span v-if="trend != null" class="stat period">{{
-					t("recentNDays", { n: 7 })
-				}}</span>
+				<span v-if="stat != null" class="stat period">{{ t("allTime") }}</span>
 			</div>
 
 			<CfLoading v-if="fetching && items.length === 0" />
@@ -48,7 +46,7 @@
 import { computed, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import { api } from "@/api/client";
-import type { HashtagTrend, NoteDetailed } from "@/api/types";
+import type { Hashtag, NoteDetailed } from "@/api/types";
 import CfButton from "@/components/ui/CfButton.vue";
 import CfDateSeparatedList from "@/components/ui/CfDateSeparatedList.vue";
 import CfInfo from "@/components/ui/CfInfo.vue";
@@ -79,18 +77,16 @@ const { items, fetching, moreFetching, hasMore, error, reload, loadMore } =
 		immediate: false,
 	});
 
-const trend = ref<HashtagTrend | null>(null);
+const stat = ref<Hashtag | null>(null);
 
-async function fetchTrend(): Promise<void> {
-	trend.value = null;
+async function fetchStat(): Promise<void> {
+	stat.value = null;
 	try {
-		const trends = await api("hashtags/trend", {});
-		const needle = tag.value.toLowerCase();
-		trend.value = trends.find((entry) => entry.tag === needle) ?? null;
+		stat.value = await api("hashtags/show", { tag: tag.value });
 	} catch {
-		// The trend block is supplementary: a failure here leaves the note list
-		// working and simply hides the statistic.
-		trend.value = null;
+		// The statistic is supplementary: a failure here (including the 404 for
+		// a tag that exists in the URL but has no note) leaves the list working.
+		stat.value = null;
 	}
 }
 
@@ -98,7 +94,7 @@ watch(
 	tag,
 	() => {
 		void reload();
-		void fetchTrend();
+		void fetchStat();
 	},
 	{ immediate: true },
 );

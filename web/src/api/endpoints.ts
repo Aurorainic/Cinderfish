@@ -23,6 +23,7 @@ import type {
 	FederationModeResponse,
 	FollowRequest,
 	Following,
+	Hashtag,
 	HashtagTrend,
 	ImportSummary,
 	IndexStat,
@@ -180,6 +181,9 @@ export const ENDPOINTS = {
 	notesPollsVote: "notes/polls/vote",
 	hashtagsTrend: "hashtags/trend",
 	hashtagsSearch: "hashtags/search",
+	hashtagsShow: "hashtags/show",
+	hashtagsList: "hashtags/list",
+	hashtagsUsers: "hashtags/users",
 
 	// timelines
 	notesTimeline: "notes/timeline",
@@ -768,6 +772,21 @@ export interface EndpointMap {
 	[ENDPOINTS.notesPollsVote]: {
 		req: { noteId: string; choice: number };
 		res: EmptyResponse;
+	};
+	[ENDPOINTS.hashtagsShow]: { req: { tag: string }; res: Hashtag };
+	[ENDPOINTS.hashtagsList]: {
+		req: {
+			sort?: string;
+			limit?: number;
+			attachedToUserOnly?: boolean;
+			attachedToLocalUserOnly?: boolean;
+			attachedToRemoteUserOnly?: boolean;
+		};
+		res: Hashtag[];
+	};
+	[ENDPOINTS.hashtagsUsers]: {
+		req: { tag: string; sort?: string; limit?: number; offset?: number };
+		res: UserDetailed[];
 	};
 	[ENDPOINTS.hashtagsTrend]: { req: Record<string, never>; res: HashtagTrend[] };
 	[ENDPOINTS.hashtagsSearch]: {

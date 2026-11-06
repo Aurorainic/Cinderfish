@@ -219,6 +219,16 @@ export interface Notification {
 	reaction: string | null;
 }
 
+export interface Hashtag {
+	tag: string;
+	mentionedUsersCount: number;
+	mentionedLocalUsersCount: number;
+	mentionedRemoteUsersCount: number;
+	attachedUsersCount: number;
+	attachedLocalUsersCount: number;
+	attachedRemoteUsersCount: number;
+}
+
 export interface Following {
 	id: string;
 	createdAt: string;

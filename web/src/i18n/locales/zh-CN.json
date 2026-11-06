@@ -1842,5 +1842,6 @@
 	"removeQuote": "移除引用",
 	"removeRecipient": "移除接收者",
 	"removeMember": "移除成员",
-	"_notification.newNote": "发布了新笔记"
+	"_notification.newNote": "发布了新笔记",
+	"allTime": "全部时间"
 }
