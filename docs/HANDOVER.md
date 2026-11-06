@@ -4562,8 +4562,8 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
   已修为 `inset-block-end`。仍未验证的：移动端/Deck/Zen、多条目叠加、减少动画偏好。
 - **第五十一波部分补验证（2026-11-07 对账 §12CB/§12CC）**：迁移页表单、本地目标拒绝、`MkMoved`
   横幅（含本地目标的 `MkMention` 多余 `@` 修复）都已走查；`i/move` 的双实例投递已于
-  2026-11-07 补齐（§12DI：beta 收到 Move 并把远端副本标记为已迁移）。仍未验证的：
-  跨实例「关注者改关」的端到端、`users/show` 的 `userIds` 批量参数没有前端调用方。
+  2026-11-07 补齐（§12DI）；跨实例「关注者改关」由 §12EN 覆盖（本地关注者被迁移到新远端账号并
+  排队 Follow）。仍未验证的：`users/show` 的 `userIds` 批量参数没有前端调用方。
 - **第五十二至五十三波部分补验证（2026-11-07 对账 §12CB）**：KaTeX 宏页的保存/解析、`/oauth/authorize`
   同意页与授权码落库、`/auth/<token>` 应用名与权限都已走查。仍未验证的：没有真实第三方客户端跑完整 OAuth 登录
   （`GET /oauth/authorize` 无凭据且无前端构建时的 401 分支已在 §12CK 补用例）。
@@ -5932,3 +5932,23 @@ CINDERFISH_TEST_DATABASE_URL=... go test ./... -count=1         # 全绿
 
 这不是逐像素目视评审，但能证明每个调色板都被加载、解析并应用到 CSS 变量。
 仍未验证：各调色板的对比度/可读性人工评审。
+
+## 12EN. 第一百二十四波：入站 Move 迁移本地关注者（2026-11-07）
+
+`TestInboundMoveMigratesLocalFollowers`：
+
+1. alpha 先用 `ap/show` 认识 beta 的 bob 与 dave（得到带 host 的远端行）；
+2. 本地 alice 的关注行指向远端 bob；
+3. beta 的 dave 把 bob 列进 `alsoKnownAs`；
+4. bob 发签名 Move 到 alpha（actor=object=bob，target=dave）；
+5. 结果：alice→bob 的 following 消失；`following/requests/sent` 出现到 dave 的待审请求；
+   `deliver_queue` 有发往 `beta.example` 的 `Follow`。
+
+共享库里之所以先 `ap/show`，是为了拿到带 host 的远端行，否则 beta 的本地行会被当成「本地目标」
+直接插入关注关系。生产库中 alpha 关注的本来就是远端行。
+
+```
+gofmt -l internal/ cmd/                                        # 空
+go vet ./...                                                   # exit 0
+CINDERFISH_TEST_DATABASE_URL=... go test ./... -count=1         # 全绿
+```
