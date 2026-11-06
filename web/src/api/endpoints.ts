@@ -75,6 +75,7 @@ export const ENDPOINTS = {
 	registryGet: "i/registry/get",
 	registryGetDetail: "i/registry/get-detail",
 	registryKeys: "i/registry/keys",
+	registryScopes: "i/registry/scopes",
 	registryGetAll: "i/registry/get-all",
 	registryRemove: "i/registry/remove",
 	registryClear: "i/registry/clear",
@@ -374,6 +375,7 @@ export interface EndpointMap {
 		res: RegistryDetail;
 	};
 	[ENDPOINTS.registryKeys]: { req: RegistryGetParams; res: string[] };
+	[ENDPOINTS.registryScopes]: { req: { domain?: string | null }; res: string[][] };
 	[ENDPOINTS.registryGetAll]: {
 		req: RegistryGetParams;
 		res: Record<string, unknown>;

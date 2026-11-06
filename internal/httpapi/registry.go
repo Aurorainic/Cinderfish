@@ -183,6 +183,25 @@ func (s *Server) handleRegistryRemove(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, struct{}{})
 }
 
+// handleRegistryScopes implements POST /api/i/registry/scopes: the distinct
+// scopes the caller has written to, as string[][].
+func (s *Server) handleRegistryScopes(w http.ResponseWriter, r *http.Request) {
+	if !s.requireRegistry(w) {
+		return
+	}
+	var body registryRequest
+	userID, ok := s.registryAuth(w, r, &body)
+	if !ok {
+		return
+	}
+	scopes, err := s.registry.Scopes(r.Context(), userID)
+	if err != nil {
+		writeInternalServerError(w)
+		return
+	}
+	writeJSON(w, http.StatusOK, scopes)
+}
+
 // handleRegistryClear implements POST /api/i/registry/clear.
 func (s *Server) handleRegistryClear(w http.ResponseWriter, r *http.Request) {
 	if !s.requireRegistry(w) {

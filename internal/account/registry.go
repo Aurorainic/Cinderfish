@@ -147,6 +147,29 @@ SELECT key, value FROM user_registry WHERE user_id = $1 AND domain = '' AND scop
 	return out, rows.Err()
 }
 
+// Scopes lists the distinct scopes the user has written to, the shape
+// i/registry/scopes answers with. Each scope is already normalised (sorted,
+// deduped) because Set stores it that way.
+func (s *RegistryService) Scopes(ctx context.Context, userID string) ([][]string, error) {
+	rows, err := s.pool.Query(ctx, `
+SELECT DISTINCT scope FROM user_registry WHERE user_id = $1 AND domain = '' ORDER BY scope
+	`, userID)
+	if err != nil {
+		return nil, fmt.Errorf("account: registry scopes: %w", err)
+	}
+	defer rows.Close()
+
+	out := [][]string{}
+	for rows.Next() {
+		var scope []string
+		if err := rows.Scan(&scope); err != nil {
+			return nil, fmt.Errorf("account: scan registry scope: %w", err)
+		}
+		out = append(out, scope)
+	}
+	return out, rows.Err()
+}
+
 // Remove deletes one key. Removing a missing key is not an error.
 func (s *RegistryService) Remove(ctx context.Context, userID, key string, scope []string) error {
 	if _, err := s.pool.Exec(ctx, `

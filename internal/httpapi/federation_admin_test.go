@@ -2,9 +2,33 @@ package httpapi_test
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 )
+
+// getAPIWithToken issues a GET with a bearer token and decodes a JSON object.
+func getAPIWithToken(t *testing.T, ts *httptest.Server, path, token string) (*http.Response, map[string]any) {
+	t.Helper()
+	req, err := http.NewRequest(http.MethodGet, ts.URL+path, nil)
+	if err != nil {
+		t.Fatalf("new request: %v", err)
+	}
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+	resp, err := ts.Client().Do(req)
+	if err != nil {
+		t.Fatalf("do request: %v", err)
+	}
+	t.Cleanup(func() { resp.Body.Close() })
+	var decoded map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&decoded); err != nil {
+		t.Fatalf("decode %s response: %v", path, err)
+	}
+	return resp, decoded
+}
 
 // promoteAdmin flips the admin flag directly, since the project has no
 // admin-invite endpoint yet.
@@ -33,6 +57,13 @@ func TestAdminCanSwitchFederationMode(t *testing.T) {
 	resp, out = postWithToken(t, f.ts, "/api/admin/federation/mode", token, map[string]any{"mode": "none"})
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("switch mode: %d %v", resp.StatusCode, out)
+	}
+	// GET reports the live switch, not the startup configuration.
+	if resp, out := getAPIWithToken(t, f.ts, "/api/admin/federation/mode", token); resp.StatusCode != http.StatusOK || out["mode"] != "none" {
+		t.Errorf("get mode = %d %v, want 200 {mode:none}", resp.StatusCode, out)
+	}
+	if resp, _ := getAPIWithToken(t, f.ts, "/api/admin/federation/mode", otherToken); resp.StatusCode != http.StatusForbidden {
+		t.Errorf("non-admin get mode = %d, want 403", resp.StatusCode)
 	}
 	if resp2, _ := f.get(t, "/users/"+id, "application/activity+json"); resp2.StatusCode != http.StatusForbidden {
 		t.Errorf("actor after switching to none: status %d, want 403", resp2.StatusCode)

@@ -48,6 +48,15 @@ func TestRegistryRoundTrip(t *testing.T) {
 	if len(keys) != 1 || keys[0] != "colors" {
 		t.Errorf("keys = %v, want [colors]", keys)
 	}
+	// scopes reports the distinct scope it was written under, normalised.
+	scopes := postListWithToken(t, ts, "/api/i/registry/scopes", token, map[string]any{})
+	if len(scopes) != 1 {
+		t.Fatalf("scopes = %v, want one", scopes)
+	}
+	first, _ := scopes[0].([]any)
+	if len(first) != 2 || first[0] != "client" || first[1] != "theme" {
+		t.Errorf("scopes[0] = %v, want [client theme]", scopes[0])
+	}
 	_, all := post(t, ts, "/api/i/registry/get-all", map[string]any{"i": token, "scope": scope})
 	if v, _ := all["colors"].(map[string]any); v["accent"] != "#86b300" {
 		t.Errorf("get-all = %v", all)
@@ -79,6 +88,9 @@ func TestRegistryRoundTrip(t *testing.T) {
 	}
 	if keys := postListWithToken(t, ts, "/api/i/registry/keys", token, map[string]any{"scope": scope}); len(keys) != 0 {
 		t.Errorf("keys after clear = %v, want none", keys)
+	}
+	if scopes := postListWithToken(t, ts, "/api/i/registry/scopes", token, map[string]any{}); len(scopes) != 0 {
+		t.Errorf("scopes after clear = %v, want none", scopes)
 	}
 }
 

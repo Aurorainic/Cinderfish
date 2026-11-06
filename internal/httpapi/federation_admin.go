@@ -46,10 +46,15 @@ ON CONFLICT (key) DO NOTHING
 	return nil
 }
 
-// handleAdminFederationMode is POST /api/admin/federation/mode. It
-// switches the mode at runtime; the change applies to the next request.
+// handleAdminFederationMode is GET/POST /api/admin/federation/mode. GET
+// reports the live mode (the instance_meta row, not the startup config);
+// POST switches it at runtime and applies to the next request.
 func (s *Server) handleAdminFederationMode(w http.ResponseWriter, r *http.Request) {
 	if !s.requireAdmin(w, r) {
+		return
+	}
+	if r.Method == http.MethodGet {
+		writeJSON(w, http.StatusOK, map[string]any{"mode": s.liveFederationMode(r.Context())})
 		return
 	}
 	var body struct {
@@ -72,6 +77,25 @@ ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
 	}
 	log.Printf("httpapi: federation mode switched to %s", body.Mode)
 	writeJSON(w, http.StatusOK, map[string]any{"mode": body.Mode})
+}
+
+// liveFederationMode reads the runtime switch from instance_meta.
+// ApplyFederationConfig seeds that row from configuration, so a missing row
+// means the startup configuration is still the truth.
+func (s *Server) liveFederationMode(ctx context.Context) string {
+	if s.pool != nil {
+		var mode string
+		err := s.pool.QueryRow(ctx, `
+SELECT value #>> '{}' FROM instance_meta WHERE key = 'federationMode'
+	`).Scan(&mode)
+		if err == nil && mode != "" {
+			return mode
+		}
+	}
+	if s.cfg.FederationMode == "" {
+		return "none"
+	}
+	return s.cfg.FederationMode
 }
 
 // handleAdminAllowlist lists the allowlist, adds a host, or removes one,

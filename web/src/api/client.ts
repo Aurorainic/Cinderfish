@@ -28,6 +28,7 @@ export const pendingApiRequestsCount = ref(0);
 export const GET_ENDPOINTS: ReadonlySet<string> = new Set([
   "ping",
   "admin/federation/allowlist",
+  "admin/federation/mode",
 ]);
 
 let explicitToken: string | null = null;
