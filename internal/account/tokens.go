@@ -168,22 +168,25 @@ type App struct {
 // user's own session are not access_tokens rows, so they never appear here
 // and cannot be revoked through this endpoint.
 func (t *TokenService) Apps(ctx context.Context, userID, sort string) ([]*App, error) {
-	order := "id ASC"
+	order := "t.id ASC"
 	switch sort {
 	case "+createdAt":
-		order = "created_at DESC"
+		order = "t.created_at DESC"
 	case "-createdAt":
-		order = "created_at ASC"
+		order = "t.created_at ASC"
 	case "+lastUsedAt":
-		order = "last_used_at DESC NULLS LAST"
+		order = "t.last_used_at DESC NULLS LAST"
 	case "-lastUsedAt":
-		order = "last_used_at ASC NULLS LAST"
+		order = "t.last_used_at ASC NULLS LAST"
 	}
 
 	rows, err := t.pool.Query(ctx, `
-SELECT id, COALESCE(name, ''), COALESCE(description, ''), COALESCE(icon_url, ''),
-       scopes, created_at, last_used_at
-FROM access_tokens WHERE user_id = $1 ORDER BY `+order, userID)
+SELECT t.id, COALESCE(t.name, a.name, ''), COALESCE(t.description, a.description, ''),
+       COALESCE(t.icon_url, ''),
+       CASE WHEN a.id IS NOT NULL THEN a.permission ELSE t.scopes END,
+       t.created_at, t.last_used_at
+FROM access_tokens t LEFT JOIN apps a ON a.id = t.app_id
+WHERE t.user_id = $1 ORDER BY `+order, userID)
 	if err != nil {
 		return nil, fmt.Errorf("account: list apps: %w", err)
 	}

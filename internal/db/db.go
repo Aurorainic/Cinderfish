@@ -562,6 +562,38 @@ ALTER TABLE users
 CREATE INDEX IF NOT EXISTS idx_users_moved_to_uri ON users (moved_to_uri)
     WHERE moved_to_uri IS NOT NULL;
 `,
+
+	// v20: application registration and auth sessions. An app owns a secret
+	// its client uses to poll a session; the session is the one-time approval
+	// link the user opens. Access tokens issued through a session point at the
+	// app so i/apps can report the app's permissions.
+	20: `
+CREATE TABLE IF NOT EXISTS apps (
+    id           TEXT PRIMARY KEY,
+    user_id      TEXT REFERENCES users (id) ON DELETE CASCADE,
+    name         TEXT NOT NULL,
+    description  TEXT NOT NULL DEFAULT '',
+    permission   JSONB NOT NULL DEFAULT '[]'::jsonb,
+    callback_url TEXT,
+    secret       TEXT NOT NULL UNIQUE,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_apps_user ON apps (user_id);
+
+CREATE TABLE IF NOT EXISTS auth_sessions (
+    id         TEXT PRIMARY KEY,
+    app_id     TEXT NOT NULL REFERENCES apps (id) ON DELETE CASCADE,
+    token      TEXT NOT NULL UNIQUE,
+    user_id    TEXT REFERENCES users (id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_auth_sessions_app ON auth_sessions (app_id);
+CREATE INDEX IF NOT EXISTS idx_auth_sessions_user ON auth_sessions (user_id);
+
+ALTER TABLE access_tokens
+    ADD COLUMN IF NOT EXISTS app_id TEXT REFERENCES apps (id) ON DELETE CASCADE;
+CREATE INDEX IF NOT EXISTS idx_access_tokens_app ON access_tokens (app_id, user_id);
+`,
 }
 
 // Migrate applies pending migrations in order and returns the version

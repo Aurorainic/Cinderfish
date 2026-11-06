@@ -174,6 +174,15 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("POST /api/miauth/gen-token", s.handleMiAuthGenToken)
 	s.mux.HandleFunc("POST /api/miauth/{session}/check", s.handleMiAuthCheck)
 	s.mux.HandleFunc("POST /api/i/apps", s.handleApps)
+	// Application registration and the legacy authorization session flow:
+	// an app exchanges its secret for an approval link, the user approves it,
+	// and the app polls for the token.
+	s.mux.HandleFunc("POST /api/app/create", s.handleAppCreate)
+	s.mux.HandleFunc("POST /api/app/show", s.handleAppShow)
+	s.mux.HandleFunc("POST /api/auth/session/generate", s.handleAuthSessionGenerate)
+	s.mux.HandleFunc("POST /api/auth/session/show", s.handleAuthSessionShow)
+	s.mux.HandleFunc("POST /api/auth/session/userkey", s.handleAuthSessionUserKey)
+	s.mux.HandleFunc("POST /api/auth/accept", s.handleAuthAccept)
 	s.mux.HandleFunc("POST /api/i/revoke-token", s.handleRevokeToken)
 	s.mux.HandleFunc("POST /api/i/export", s.handleIExport)
 	s.mux.HandleFunc("POST /api/i/import", s.handleIImport)
