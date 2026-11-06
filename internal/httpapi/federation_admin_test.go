@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/Aurorainic/cinderfish/internal/federation"
 )
 
 // getAPIWithToken issues a GET with a bearer token and decodes a JSON object.
@@ -126,5 +128,70 @@ func TestAllowlistGatesFederation(t *testing.T) {
 	}
 	if hosts, _ := out["hosts"].([]any); len(hosts) != 0 {
 		t.Errorf("hosts after removal = %v", hosts)
+	}
+}
+
+// TestAllowlistGatesInboundInbox closes the loop the policy test leaves open:
+// in allowlist mode an inbound activity from an unlisted host cannot even be
+// verified, and listing the host lets the same Follow through.
+func TestAllowlistGatesInboundInbox(t *testing.T) {
+	a := newInstance(t, "alpha")
+	b := newInstance(t, "beta")
+	routeTo(t, a, b)
+	routeTo(t, b, a)
+
+	// Flip alpha to allowlist after startup; the policy reads the live meta.
+	if _, err := a.srv.TestPool().Exec(context.Background(), `
+INSERT INTO instance_meta (key, value) VALUES ('federationMode', to_jsonb('allowlist'::text))
+ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`); err != nil {
+		t.Fatalf("seed allowlist mode: %v", err)
+	}
+
+	adminToken, aliceID := a.signup(t, "alphaalice")
+	if _, err := a.srv.TestPool().Exec(context.Background(),
+		"UPDATE users SET is_admin = TRUE WHERE id = $1", aliceID); err != nil {
+		t.Fatalf("promote: %v", err)
+	}
+	_, bobID := b.signup(t, "betabob")
+
+	_, _, aliceActor := actorInfo(t, a, aliceID)
+	keyID, _, bobActor := actorInfo(t, b, bobID)
+	kp, err := b.srv.FederationLocalKey(context.Background(), bobID)
+	if err != nil {
+		t.Fatalf("beta key: %v", err)
+	}
+	priv, err := federation.ParsePrivateKeyPEM(kp.PrivatePEM)
+	if err != nil {
+		t.Fatalf("parse beta key: %v", err)
+	}
+
+	follow := federation.Object{
+		"@context": federation.Context,
+		"id":       bobActor + "#follows/1",
+		"type":     "Follow",
+		"actor":    bobActor,
+		"object":   aliceActor,
+	}
+	// Unlisted host: the signature cannot be verified, so the activity is
+	// refused before it reaches the dispatcher.
+	if resp, body := postSigned(t, a.ts, "/inbox", follow, keyID, priv); resp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("inbound from unlisted host = %d %s, want 401", resp.StatusCode, body)
+	}
+	if a.srv.HasFollowingByActorURI(context.Background(), bobActor, aliceID) {
+		t.Fatal("unlisted follow was recorded")
+	}
+
+	// Listing the host changes the answer for the same activity.
+	resp, out := postWithToken(t, a.ts, "/api/admin/federation/allowlist", adminToken,
+		map[string]any{"host": "beta.example"})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("allow host: %d %v", resp.StatusCode, out)
+	}
+	follow["id"] = bobActor + "#follows/2"
+	if resp, body := postSigned(t, a.ts, "/inbox", follow, keyID, priv); resp.StatusCode != http.StatusAccepted {
+		t.Fatalf("inbound after allowlisting = %d %s, want 202", resp.StatusCode, body)
+	}
+	if !a.srv.HasFollowingByActorURI(context.Background(), bobActor, aliceID) {
+		t.Error("allowed follow was not recorded")
 	}
 }
