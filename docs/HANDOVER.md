@@ -4403,8 +4403,9 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
   连接失败 → `1`），未产生的事件类型由 `TestWebhookIgnoresUnproducedEvents` 覆盖
   （订阅 follow 的 webhook 在关注发生时收不到投递）。投递**按设计不重试**，一条事件一个独立请求；
   仍未验证的：编辑页内删除。
-- **第十二波未测边角（2026-11-06，见 §12AB.4）**：reltuples 估算与实际行数的偏差、大 schema 渲染性能
-  未验证；vacuum 与索引维护按设计未做。
+- **第十二波边角（2026-11-07，见 §12DU）**：`admin/get-table-stats` 的计数来自 `pg_class.reltuples`，
+  未 `ANALYZE` 前实测为 20001、实际 23001，`ANALYZE notes` 后为 23001——与 PostgreSQL 语义一致；
+  大 schema 渲染性能、vacuum 与索引维护仍未验证/按设计未做。
 - **第十三波的部分边角（2026-11-06，见 §12AC.4）**：邀请码注册已由
   `TestSignupWithInviteCode` 覆盖（有效码建号、单次使用、失败后释放），账户层另有
   `TestRegisterInviteMode` 的释放断言。注册页界面已于 2026-11-07 走查（§12CV：填表 → 提交 →
@@ -4436,7 +4437,7 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
 - **第十九波的部分边角（2026-11-06，见 §12AI.4）**：规则与合规链接现在进入注册流程（2026-11-07）：
   `CfSignup` 在管理员配置了 `tosUrl` / `serverRules` 时显示「注册即表示你同意 本实例的服务条款与
   实例规则」，浏览器实测两个链接（外链 `_blank`、规则链到 `/about`）、移动端无溢出；清空配置后
-  该行消失。仍未验证的：远端实例计数与大表统计耗时。
+  该行消失。2 万条笔记下的 `admin/get-table-stats` 与 `federation/instances` 耗时已达（§12DU）。
 - **第二十波已补验证（2026-11-07，见 §12CO）**：TOTP 的注册/启用/登录/注销与 `NO_SECURITY_KEY`
   都已有 HTTP 用例，浏览器的两步验证登录也在 §12CC 跑通；`/settings/security` 的 390 宽布局
   已由 §12DB 覆盖；2FA 设置区的启用/停用交互已于 2026-11-07 走查（§12DD），两步验证登录在
@@ -4583,7 +4584,7 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
   已走查。「24 个占位页全部在范围外」已于 2026-11-07 逐页复核（§12CZ）：25 个含 `TODO: port`
   的文件中，`SettingsIndex.vue` 只是注释，其余 24 个全部属于首版范围外功能。
 - **第六十一波已补验证（2026-11-07，见 §12CB/§12CF）**：`/tags/<tag>` 的「被 N 人提到」与笔记列表
-  已走查；`hashtags/list` 的 12 个排序枚举全部有用例。仍未验证的：大表聚合耗时。
+  已走查；`hashtags/list` 的 12 个排序枚举全部有用例。2 万条笔记下的耗时已在 §12DU 实测。
 - **第六十二波仍未验证**：两个端点没有前端调用方，没有对应走查。
 
 ## 12CB. 第六十三波：真实二进制与浏览器走查（2026-11-06）
@@ -5720,3 +5721,23 @@ CINDERFISH_TEST_DATABASE_URL=... go test ./... -count=1         # 全绿
 
 「移除」按钮未点击（会删除本地凭据，不影响服务端）；仍未验证：账号失效（token 被撤销）时
 页面的 unavailable 分支。
+
+## 12DU. 第一百零七波：两万条笔记下的查询耗时与 reltuples（2026-11-07）
+
+测试库插入 50 个本地账号与 20000 条公开笔记（每条 1–2 个标签，覆盖 100 个标签），
+真实二进制上每个端点跑 11 次（丢第一次），单位毫秒：
+
+| 端点 | min | median | max |
+|------|-----|--------|-----|
+| `hashtags/list`（limit 20） | 44.1 | 45.1 | 48.2 |
+| `hashtags/search`（limit 20） | 15.8 | 16.8 | 18.1 |
+| `notes/local-timeline`（limit 20） | 4.2 | 4.9 | 5.7 |
+| `notes/featured`（limit 20） | 64.4 | 66.9 | 69.3 |
+| `federation/instances` | 0.3 | 0.4 | 0.6 |
+| `admin/get-table-stats` | 2.5 | 3.1 | 4.5 |
+
+`reltuples` 行为：再插 3000 条但未 `ANALYZE` 时，`admin/get-table-stats` 的 notes 计数仍是
+20001（实际 23001）；`ANALYZE notes` 后变为 23001。这是 PostgreSQL 的估算语义，不是计数缺陷。
+数据已清理，未进入提交。
+
+仍未验证：更大规模（十万级）与并发下的耗时；SQL 慢查询日志与索引调优。
