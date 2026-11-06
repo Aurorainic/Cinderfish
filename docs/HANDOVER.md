@@ -4419,7 +4419,8 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
 - **第十四波的部分边角（2026-11-06，见 §12AD.4）**：与 allowlist 的组合已由
   `TestAllowlistGatesInboundInbox` 覆盖（2026-11-07）：未列出的主机连签名都无法验证（401），
   列出后同一 Follow 得到 202 并落库；签名拒绝本身有 `TestInboxRejects*` 三件套。
-  子域匹配的**运维体验**（真实反代下的配置）仍未验证。
+  反代拓扑已由 `TestInboxBehindReverseProxy` 覆盖（2026-11-07，§12FD）：保留 Host 的反向代理下
+  入站 Follow 仍是 202 并落库，Host 与签名不一致时 401。真实 Caddy + 公网 TLS 的部署仍未实测。
 - **第十五波的部分边角（2026-11-06，见 §12AE.4）**：MiAuth 的未登录衔接与回调已在
   2026-11-07 走查（`/miauth/<session>` 未登录时内嵌登录 → 登录后出现「查看账号信息」授权页 →
   接受后跳到 `https://…/cb?session=<session>`，`access_tokens` 出现 session 绑定的令牌）。
@@ -6407,3 +6408,31 @@ Firefish 的 server-metric widget 订阅 `serverStats` Streaming 频道画 CPU/�
 - 无头浏览器：添加 rss widget 并在设置框填入订阅地址后显示 20 条标题（首条
   "The post-quantum future of web privacy"）；添加 rssTicker 后滚动内容 40 个链接（两份拷贝用于
   无缝循环），计算样式 `animationName=mk-marquee-…`。截图 `/tmp/w139-shots/rss-widgets.png`（不入库）。
+
+## 12FD. 第一百四十波：反向代理下的入站签名（2026-11-07）
+
+§14 说「子域匹配的运维体验（真实反代下的配置）」未验证。`deploy/Caddyfile` 的拓扑是 Caddy 终止
+TLS、把 `Host` 原样转发给 `127.0.0.1:3000`；inbox 的签名校验用 `r.Host` 作为 `(request-target)` 的
+Host。这一轮用 Go 的反向代理复现同一拓扑。
+
+### 12FD.1 用例
+
+`TestInboxBehindReverseProxy`：
+
+1. alpha 与 beta 两个实例，alpha 的 alice 向 beta 的 bob 发 Follow；
+2. beta 前面挂 `httputil.NewSingleHostReverseProxy`，客户端请求代理、`Host: beta.example`；
+3. 签名按 `beta.example` 生成 → inbox 返回 202，beta 落下 Follow，Accept 回程也通过 alpha 验证；
+4. 同一请求改从 `other.example` 发出（签名仍按 `beta.example`）→ 401，证明 Host 被绑定在签名里。
+
+### 12FD.2 有意的限制
+
+- 这是行为等价的代理，不是真实 Caddy：没有 TLS 终止、HTTP/2、`encode`/`header` 指令或真实 DNS。
+- 只覆盖入站 inbox；出站投递经反代（以及 `X-Forwarded-*`）没有单独用例，因为出站按 actor 的绝对
+  URL 直连，不经过本实例的反代。
+- 公网 CA、证书续期、CDN 行为仍需真实部署环境。
+
+### 12FD.3 验证证据
+
+- `CINDERFISH_TEST_DATABASE_URL=… go test ./internal/httpapi/ -run TestInboxBehindReverseProxy`
+  通过；日志显示 `inbox Follow … ok`、`inbox Accept … ok`，以及唯一的
+  `signature does not verify`（Host 不匹配的负例）。
