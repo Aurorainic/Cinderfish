@@ -4,7 +4,7 @@
 
 **证据口径**：所有请求字段、响应字段、错误码、HTTP 状态码都从本仓库代码读出（引用 `internal/...:行号`），不以 Misskey 官方文档为准；与 Misskey 的差异处会单独标注。核对过的上游参考为 `tmp/refcheck/misskey`（`c05e844`）与 `tmp/refcheck/firefish`（`02c31e0`），仅用于"差异"小节，不用于推断本实现行为。
 
-覆盖端点：`signup`、`signin`、`username/available`、`miauth/gen-token`、`i`、`i/update`（含 `users/update` 别名）、`users/show`、`users/notes`、`users/followers`、`users/following`、`i/pin`、`i/unpin`，以及 OAuth 的三个端点。个人资料打包（`UserLite` / `UserDetailed` / `MeDetailed`）与 `users/notes` 用到的 `Note` 打包也在此文档化。
+覆盖端点：`signup`、`signin`、`username/available`、`miauth/gen-token`、`i`、`i/update`（含 `users/update` 别名）、`i/2fa/*`、`i/change-password`、`i/regenerate-token`、`i/signin-history`、`users/show`、`users/notes`、`users/followers`、`users/following`、`i/pin`、`i/unpin`，以及 OAuth 的三个端点。个人资料打包（`UserLite` / `UserDetailed` / `MeDetailed`）与 `users/notes` 用到的 `Note` 打包也在此文档化。
 
 ---
 
@@ -18,6 +18,9 @@
 | POST | `/api/i/2fa/done` | 需登录 | `internal/httpapi/two_factor.go:70` | 用 6 位码确认并启用 TOTP |
 | POST | `/api/i/2fa/unregister` | 需登录 | `internal/httpapi/two_factor.go:117` | 校验密码后停用 TOTP |
 | POST | `/api/i/2fa/password-less` | 需登录 | `internal/httpapi/two_factor.go:150` | 无安全密钥，`value:true` 恒返回 `NO_SECURITY_KEY` |
+| POST | `/api/i/change-password` | 需登录 | `internal/httpapi/security.go:18` | 校验当前密码后换新密码；成功 204 |
+| POST | `/api/i/regenerate-token` | 需登录 | `internal/httpapi/security.go:57` | 校验密码后换 16 字符原生 token |
+| POST | `/api/i/signin-history` | 需登录 | `internal/httpapi/security.go:95` | 登录历史，id 游标分页 |
 | POST | `/api/username/available` | 匿名 | `internal/httpapi/account.go:174` | 用户名是否可注册 |
 | POST | `/api/miauth/gen-token` | 需登录 | `internal/httpapi/account.go:290` | 为 MiAuth 会话签发 32 字符 token |
 | POST | `/api/i` | 需登录 | `internal/httpapi/account.go:200` | 当前用户 `MeDetailed` |
@@ -502,6 +505,32 @@ token 解析（`internal/account/tokens.go:88`）：
 认证：**需登录**；请求体 `{"value": boolean}`。安全密钥未实现，`value:true` 恒返回
 `400 NO_SECURITY_KEY`（id `f9c54d7f-d4c2-4d3c-9a8f-a70daac86512`），`value:false` 返回 `204`。
 设置页的开关因此保持禁用。
+
+## POST /api/i/change-password
+
+认证：**需登录**。请求体 `{currentPassword, newPassword}`，`newPassword` 不能为空（空值 400
+`INVALID_PARAM`）。当前密码错误返回 403 + id-only 信封 `932c904e…`；成功返回 `204`。
+只替换 `users.password_hash`，不吊销既有 token。
+
+## POST /api/i/regenerate-token
+
+认证：**需登录**。请求体 `{password}`，密码错误同样是 403 + `932c904e…`。成功时把
+`users.token` 换成新的 16 字符 token，返回 `{"token":"<new>"}`。
+
+> 与 Misskey 的差异：Misskey 返回空响应并靠 Streaming 的 `myTokenRegenerated` 通知客户端；
+> 这里额外回传新 token，让浏览器能立刻替换 localStorage 里的凭据。多出的字段对 Misskey
+> 客户端无影响。
+
+## POST /api/i/signin-history
+
+认证：**需登录**。请求体可带 `limit`（1–100，默认 10）、`sinceId`、`untilId`；按 `signins.id`
+降序返回：
+
+```json
+[{ "id": "…", "createdAt": "…", "ip": "127.0.0.1", "headers": {}, "success": true }]
+```
+
+`headers` 恒为 `{}`（表里不存请求头）；`success` 区分成功与失败尝试。
 
 ---
 
