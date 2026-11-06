@@ -495,3 +495,72 @@ func TestNotificationHasNoBodyField(t *testing.T) {
 		}
 	}
 }
+
+// TestNotificationTypeMuting covers mutingNotificationTypes: the muted kind
+// disappears from the list and the unread count, an explicit includeTypes still
+// wins, and the setting validates its values.
+func TestNotificationTypeMuting(t *testing.T) {
+	ts, tokenA := seedTwoNotificationTypes(t)
+
+	// Before muting both kinds are visible.
+	all := fetchNotifications(t, ts, tokenA, map[string]any{"markAsRead": false})
+	if got := len(all); got != 2 {
+		t.Fatalf("notifications before muting = %d, want 2", got)
+	}
+	_, me := post(t, ts, "/api/i", map[string]any{"i": tokenA})
+	if me["unreadNotificationsCount"] != float64(2) {
+		t.Fatalf("unread before muting = %v, want 2", me["unreadNotificationsCount"])
+	}
+
+	// Mute reactions.
+	resp, updated := post(t, ts, "/api/i/update", map[string]any{
+		"i": tokenA, "mutingNotificationTypes": []string{"reaction"},
+	})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("i/update muting = %d %v", resp.StatusCode, updated)
+	}
+	if muted, _ := updated["mutingNotificationTypes"].([]any); len(muted) != 1 || muted[0] != "reaction" {
+		t.Errorf("mutingNotificationTypes = %v", updated["mutingNotificationTypes"])
+	}
+
+	visible := fetchNotifications(t, ts, tokenA, map[string]any{"markAsRead": false})
+	if got, want := notificationTypesOf(visible), []string{"mention"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("list after muting = %v, want %v", got, want)
+	}
+	_, me = post(t, ts, "/api/i", map[string]any{"i": tokenA})
+	if me["unreadNotificationsCount"] != float64(1) {
+		t.Errorf("unread after muting = %v, want 1", me["unreadNotificationsCount"])
+	}
+
+	// An explicit includeTypes still returns the muted kind.
+	included := fetchNotifications(t, ts, tokenA, map[string]any{
+		"markAsRead": false, "includeTypes": []string{"reaction"},
+	})
+	if got, want := notificationTypesOf(included), []string{"reaction"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("includeTypes after muting = %v, want %v", got, want)
+	}
+
+	// Unknown types are refused; duplicates are collapsed; clearing works.
+	if resp, _ := post(t, ts, "/api/i/update", map[string]any{
+		"i": tokenA, "mutingNotificationTypes": []string{"carrier-pigeon"},
+	}); resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("unknown type status = %d, want 400", resp.StatusCode)
+	}
+	resp, deduped := post(t, ts, "/api/i/update", map[string]any{
+		"i": tokenA, "mutingNotificationTypes": []string{"reaction", "reaction", "reply"},
+	})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("dedupe update = %d %v", resp.StatusCode, deduped)
+	}
+	if muted, _ := deduped["mutingNotificationTypes"].([]any); len(muted) != 2 {
+		t.Errorf("deduped types = %v, want two", deduped["mutingNotificationTypes"])
+	}
+	resp, cleared := post(t, ts, "/api/i/update", map[string]any{"i": tokenA, "mutingNotificationTypes": nil})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("clear muting = %d %v", resp.StatusCode, cleared)
+	}
+	// The packer renders an empty list as [] rather than null.
+	if muted, _ := cleared["mutingNotificationTypes"].([]any); len(muted) != 0 {
+		t.Errorf("cleared muting = %v, want an empty list", cleared["mutingNotificationTypes"])
+	}
+}

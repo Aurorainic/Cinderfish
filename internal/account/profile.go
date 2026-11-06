@@ -117,6 +117,7 @@ FROM user_profiles WHERE user_id = $1
 		CarefulBot               bool           `json:"carefulBot"`
 		AutoAcceptFollowed       bool           `json:"autoAcceptFollowed"`
 		InjectFeaturedNote       bool           `json:"injectFeaturedNote"`
+		MutingNotificationTypes  []string       `json:"mutingNotificationTypes"`
 		EmailNotificationTypes   []string       `json:"emailNotificationTypes"`
 		ReceiveAnnouncementEmail bool           `json:"receiveAnnouncementEmail"`
 	}
@@ -151,6 +152,7 @@ FROM user_profiles WHERE user_id = $1
 		CarefulBot:               stored.CarefulBot,
 		AutoAcceptFollowed:       stored.AutoAcceptFollowed,
 		InjectFeaturedNote:       stored.InjectFeaturedNote,
+		MutedNotificationTypes:   stored.MutingNotificationTypes,
 		Email:                    derefString(email),
 		EmailVerified:            emailVerified,
 		IsLocked:                 isLocked,
