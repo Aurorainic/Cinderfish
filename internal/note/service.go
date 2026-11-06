@@ -15,6 +15,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -36,24 +37,27 @@ const MaxTextLength = 3000
 
 // Note is a stored note.
 type Note struct {
-	ID                 string
-	UserID             string
-	UserHost           *string
-	Visibility         string
-	LocalOnly          bool
-	CW                 *string
-	Text               *string
-	PollID             *string
-	ReplyID            *string
-	ReplyUserID        *string
-	RenoteID           *string
-	RenoteUserID       *string
-	RenoteUserHost     *string
-	Name               *string
-	URL                *string
-	URI                *string
-	Tags               []string
-	Mentions           []string
+	ID             string
+	UserID         string
+	UserHost       *string
+	Visibility     string
+	LocalOnly      bool
+	CW             *string
+	Text           *string
+	PollID         *string
+	ReplyID        *string
+	ReplyUserID    *string
+	RenoteID       *string
+	RenoteUserID   *string
+	RenoteUserHost *string
+	Name           *string
+	URL            *string
+	URI            *string
+	Tags           []string
+	Mentions       []string
+	// RemoteMentions holds user@host acct strings for mentioned remote
+	// accounts; Mentions stays the local user ids.
+	RemoteMentions     []string
 	Emojis             []string
 	FileIDs            []string
 	RenoteCount        int
@@ -247,14 +251,16 @@ func (s *Service) Create(ctx context.Context, p CreateParams) (*Note, error) {
 		renoteUserHost = target.UserHost
 	}
 
-	// Resolve the local users the text mentions. Remote mentions are
-	// kept for federation addressing but do not enter mentions[], which
-	// holds local user ids the way Misskey's column does.
+	// Resolve the users the text mentions. Local ones go into mentions[] as
+	// ids, the way Misskey's column works; remote ones are kept as user@host in
+	// remote_mentions so rendering and delivery can resolve them.
 	mentions := []string{}
+	remoteMentions := []string{}
 	if p.Text != nil {
 		for _, m := range ParseMentions(*p.Text) {
 			mention := m
 			if mention.Host != "" {
+				remoteMentions = appendUnique(remoteMentions, strings.ToLower(mention.Username+"@"+mention.Host))
 				continue
 			}
 			var id string
@@ -292,6 +298,7 @@ SELECT id FROM users WHERE username_lower = lower($1) AND host IS NULL
 		RenoteUserHost: renoteUserHost,
 		Tags:           tags,
 		Mentions:       mentions,
+		RemoteMentions: remoteMentions,
 		Emojis:         []string{},
 		CreatedAt:      now,
 	}
@@ -299,13 +306,13 @@ SELECT id FROM users WHERE username_lower = lower($1) AND host IS NULL
 	if _, err := tx.Exec(ctx, `
 INSERT INTO notes (id, user_id, visibility, local_only, cw, text, file_ids,
                    reply_id, reply_user_id, renote_id, renote_user_id, renote_user_host,
-                   tags, mentions, emojis, created_at)
+                   tags, mentions, remote_mentions, emojis, created_at)
 VALUES ($1,$2,$3,$4,$5,$6,
         COALESCE($7::text[], '{}'::text[]),
-        $8,$9,$10,$11,$12,$13,$14,$15,$16)
+        $8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
 `, n.ID, n.UserID, n.Visibility, n.LocalOnly, n.CW, n.Text, n.FileIDs,
 		n.ReplyID, n.ReplyUserID, n.RenoteID, n.RenoteUserID, n.RenoteUserHost,
-		mustJSON(n.Tags), mustJSON(n.Mentions), mustJSON(n.Emojis), n.CreatedAt); err != nil {
+		mustJSON(n.Tags), mustJSON(n.Mentions), mustJSON(n.RemoteMentions), mustJSON(n.Emojis), n.CreatedAt); err != nil {
 		return nil, fmt.Errorf("note: insert: %w", err)
 	}
 
@@ -431,17 +438,17 @@ const noteSelect = `
 SELECT n.id, n.user_id, n.user_host, n.visibility, n.local_only, n.cw, n.text, n.file_ids,
        (SELECT id FROM polls WHERE polls.id = n.id) AS poll_id,
        n.reply_id, n.reply_user_id, n.renote_id, n.renote_user_id, n.renote_user_host,
-       n.name, n.url, n.uri, n.tags, n.mentions, n.emojis,
+       n.name, n.url, n.uri, n.tags, n.mentions, n.remote_mentions, n.emojis,
        n.renote_count, n.replies_count, n.clipped_count, n.is_sensitive, n.reaction_acceptance,
        n.created_at, n.updated_at, n.deleted_at
 FROM notes n`
 
 func scanNote(row pgx.Row) (*Note, error) {
 	var n Note
-	var tags, mentions, emojis []byte
+	var tags, mentions, remoteMentions, emojis []byte
 	err := row.Scan(&n.ID, &n.UserID, &n.UserHost, &n.Visibility, &n.LocalOnly, &n.CW, &n.Text,
 		&n.FileIDs, &n.PollID, &n.ReplyID, &n.ReplyUserID, &n.RenoteID, &n.RenoteUserID, &n.RenoteUserHost,
-		&n.Name, &n.URL, &n.URI, &tags, &mentions, &emojis,
+		&n.Name, &n.URL, &n.URI, &tags, &mentions, &remoteMentions, &emojis,
 		&n.RenoteCount, &n.RepliesCount, &n.ClippedCount, &n.IsSensitive, &n.ReactionAcceptance,
 		&n.CreatedAt, &n.UpdatedAt, &n.DeletedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -452,11 +459,22 @@ func scanNote(row pgx.Row) (*Note, error) {
 	}
 	n.Tags = decodeStrings(tags)
 	n.Mentions = decodeStrings(mentions)
+	n.RemoteMentions = decodeStrings(remoteMentions)
 	n.Emojis = decodeStrings(emojis)
 	if n.FileIDs == nil {
 		n.FileIDs = []string{}
 	}
 	return &n, nil
+}
+
+// appendUnique appends s when absent.
+func appendUnique(list []string, s string) []string {
+	for _, v := range list {
+		if v == s {
+			return list
+		}
+	}
+	return append(list, s)
 }
 
 // VisibleUserIDs returns the users a specified-visibility note is

@@ -193,6 +193,23 @@ func (s *Server) deliveryInboxes(ctx context.Context, n *note.Note) []string {
 			targets = append(targets, inboxes...)
 		}
 	}
+	// Remote mentions are stored as acct strings; each one needs its actor
+	// resolved to an inbox, which also gives the peer the Mention tag it uses
+	// to notify the account.
+	for _, acct := range n.RemoteMentions {
+		user, err := s.resolveRemoteMention(ctx, acct)
+		if err != nil || user == nil {
+			log.Printf("httpapi: resolve mention %s for delivery: %v", acct, err)
+			continue
+		}
+		inbox := user.SharedInbox
+		if inbox == "" {
+			inbox = user.Inbox
+		}
+		if inbox != "" {
+			targets = append(targets, inbox)
+		}
+	}
 	if n.Visibility == "specified" {
 		audience := s.notes.VisibleUserIDs(ctx, n.ID)
 		if inboxes, err := s.federationStore.MentionedInboxes(ctx, audience); err == nil {

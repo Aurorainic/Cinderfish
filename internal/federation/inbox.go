@@ -300,21 +300,35 @@ func (i *Inbox) create(ctx context.Context, actor *RemoteUser, activity Object) 
 
 // notifyForNote notifies local users the note replies to or mentions.
 func (i *Inbox) notifyForNote(ctx context.Context, actor *RemoteUser, note Object, storedID string) error {
-	var targets []string
+	// One notification per local user, typed by the strongest reason: a
+	// Mention beats a reply, matching the local fan-out in
+	// notifyNoteCreated. A "@user" in the body used to be filed as a reply.
+	reasons := map[string]string{}
+	var order []string
+	push := func(userID, reason string) {
+		if existing, seen := reasons[userID]; seen {
+			if reason == "mention" && existing != "mention" {
+				reasons[userID] = reason
+			}
+			return
+		}
+		reasons[userID] = reason
+		order = append(order, userID)
+	}
 	if replyTo := note.Ref("inReplyTo"); replyTo != "" {
 		if u, err := i.localUserByAPID(ctx, replyTo); err == nil {
-			targets = append(targets, u)
+			push(u, "reply")
 		}
 	}
 	for _, tag := range note.Objects("tag") {
 		if tag.IsType("Mention") {
 			if u, err := i.localUserByAPID(ctx, tag.Ref("href")); err == nil {
-				targets = append(targets, u)
+				push(u, "mention")
 			}
 		}
 	}
-	for _, userID := range targets {
-		if _, err := i.store.Notification(ctx, userID, "reply", actor.ID, storedID); err != nil {
+	for _, userID := range order {
+		if _, err := i.store.Notification(ctx, userID, reasons[userID], actor.ID, storedID); err != nil {
 			return err
 		}
 	}

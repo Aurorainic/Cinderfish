@@ -1,6 +1,6 @@
 # Cinderfish 交接说明
 
-- 最后更新：2026-11-06（目标模式第五十一至六十三波：账号迁移、KaTeX 宏页与集成说明页、
+- 最后更新：2026-11-07（目标模式第五十一至六十四波：账号迁移、KaTeX 宏页与集成说明页、
   OAuth 交互式同意页、`ap/show` 与远程互动页、第三方应用授权全流程（`app/*` 与 `auth/session/*`，
   schema v20）、关注关系设置与其消费方（schema v21）、入站反应修复与 `EmojiReact`、入站 `Flag`、
   范围内占位页清零（24 个剩余占位页全部在首版范围外）、hashtags 三端点、`users/relation`
@@ -4191,8 +4191,10 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
   2026-11-07 走查（`/miauth/<session>` 未登录时内嵌登录 → 登录后出现「查看账号信息」授权页 →
   接受后跳到 `https://…/cb?session=<session>`，`access_tokens` 出现 session 绑定的令牌）。
   OAuth 同意页见 §12CB。拒绝回执与 scope 强制按设计未做。
-- **第十六波未测边角（2026-11-06，见 §12AF.4）**：远端提及、流式推送下的未读实时插入、directNotes
-  与类型过滤组合未验证。
+- **第十六波的部分边角（2026-11-06，见 §12AF.4）**：远端提及已由
+  `TestRemoteMentionIsDeliveredAndNotifies` 覆盖（2026-11-07，见 §12CD）：本地笔记 @ 远端账号会
+  解析成 Mention 标签、经投递队列送到对端并产生 `mention` 通知（顺带修掉了入站提及被写成
+  `reply` 的缺陷）。仍未验证的：流式推送下的未读实时插入、directNotes 与类型过滤组合。
 - **第十七波未测边角（2026-11-06，见 §12AG.4）**：远程目录、hostname、`state=admin` 与未登录视角
   未走查；用户页签的 offset 分页已实测能从 20 增至 24。
 - **第十八波未测边角（2026-11-06，见 §12AH.4）**：退避曲线/并发压测、S3 真实桶展示未验证；
@@ -4377,3 +4379,34 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
   点击路径、Streaming 实时插入、偏好导入/重置、其余 25 个调色板的目视检查；管理台其余 20+ 页、设置页
   约 18 页、widgets 约 10 个、37 个 locale 仍未移植；chat/channels/lists/antennas/clips/groups/gallery/pages
   仍按首版范围不做，导航已不再指向它们。
+
+## 12CD. 第六十五波：远端 @提及（2026-11-07）
+
+契约见 `docs/research/2026-11-07-firefish-port-wave65-contract.md`。
+
+### 12CD.1 落地清单
+
+| 层 | 内容 |
+|----|------|
+| 迁移 | v22：`notes.remote_mentions`（acct 字符串，创建与编辑都写） |
+| 渲染 | `renderNote` 解析远端提及 → `MentionRefs`（进 `to`/`cc` 与 `tag: Mention`）；先查 `users`（`Store.UserByHandle`），再 WebFinger + Actor 抓取 |
+| 投递 | `deliveryInboxes` 追加每个远端提及 actor 的 inbox，解析失败只记日志 |
+| 入站 | `notifyForNote` 按最强理由定类型（mention 优先于 reply），修掉「提及被记成 reply」 |
+| 台账 | 无新增端点（156 / 148 / 292 不变） |
+
+### 12CD.2 有意的限制
+
+- 解析放在渲染与投递时，发帖请求不做网络调用；失败只记日志，笔记照常发布。
+- 纯文本 `@user@host` 没有 Mention 标签时对端不会通知（与 Misskey 一致）。
+
+### 12CD.3 验证证据
+
+- `gofmt -l internal/ cmd/` 无输出；`go vet ./...` 通过；`CINDERFISH_TEST_DATABASE_URL=… go test ./...` 全绿。
+- `TestRemoteMentionIsDeliveredAndNotifies`：双实例 + 真实投递 worker。beta 的 bob 发
+  「hello @alphaalice@alpha.example」，alpha 落库远端副本，alice 收到 `mention` 通知，
+  发起者是 betabob。修复前该用例在「对端收不到笔记」处失败。
+
+### 12CD.4 仍未验证
+
+- 真实跨实例（不同软件）的提及互认没有验证。
+- 大文本里大量提及的解析开销没有测。

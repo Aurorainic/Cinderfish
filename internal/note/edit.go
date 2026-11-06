@@ -75,10 +75,12 @@ func (s *Service) Edit(ctx context.Context, userID, noteID string, p EditParams)
 
 	tags := []string{}
 	mentions := []string{}
+	remoteMentions := []string{}
 	if text != nil {
 		tags = ExtractHashtags(*text)
 		for _, m := range ParseMentions(*text) {
 			if m.Host != "" {
+				remoteMentions = appendUnique(remoteMentions, strings.ToLower(m.Username+"@"+m.Host))
 				continue
 			}
 			var id string
@@ -99,9 +101,9 @@ SELECT id FROM users WHERE username_lower = lower($1) AND host IS NULL
 	if _, err := tx.Exec(ctx, `
 UPDATE notes
 SET text = $2, cw = $3, visibility = $4, local_only = $5,
-    tags = $6, mentions = $7, emojis = '[]'::jsonb, updated_at = now()
+    tags = $6, mentions = $7, remote_mentions = $8, emojis = '[]'::jsonb, updated_at = now()
 WHERE id = $1 AND deleted_at IS NULL
-`, noteID, text, cw, visibility, localOnly, tags, mentions); err != nil {
+`, noteID, text, cw, visibility, localOnly, tags, mentions, remoteMentions); err != nil {
 		return nil, fmt.Errorf("note: update note: %w", err)
 	}
 

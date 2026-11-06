@@ -302,6 +302,22 @@ ON CONFLICT (user_id) DO NOTHING
 	return kp, nil
 }
 
+// UserByHandle loads a remote user by username and host, the form a mention
+// carries before it is resolved to an actor URI.
+func (s *Store) UserByHandle(ctx context.Context, username, host string) (*RemoteUser, error) {
+	var id string
+	err := s.pool.QueryRow(ctx, `
+SELECT id FROM users WHERE username_lower = lower($1) AND host = $2
+`, username, host).Scan(&id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, ErrRemoteNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("federation: find user by handle: %w", err)
+	}
+	return s.UserByID(ctx, id)
+}
+
 // NoteExists reports whether a note with this AP id is already stored.
 func (s *Store) NoteExists(ctx context.Context, apID string) (bool, error) {
 	var n int

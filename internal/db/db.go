@@ -604,6 +604,15 @@ ALTER TABLE followings
     ADD COLUMN IF NOT EXISTS notify TEXT,
     ADD COLUMN IF NOT EXISTS with_replies BOOLEAN NOT NULL DEFAULT TRUE;
 `,
+
+	// v22: remote @-mentions. mentions[] holds local user ids; a mention of an
+	// account on another instance is kept as user@host so rendering and
+	// delivery can resolve it later (Misskey resolves remote mentions when the
+	// note is rendered and delivered).
+	22: `
+ALTER TABLE notes
+    ADD COLUMN IF NOT EXISTS remote_mentions JSONB NOT NULL DEFAULT '[]'::jsonb;
+`,
 }
 
 // Migrate applies pending migrations in order and returns the version

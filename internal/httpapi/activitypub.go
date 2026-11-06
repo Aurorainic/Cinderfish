@@ -563,7 +563,49 @@ func (s *Server) renderNote(ctx context.Context, n *note.Note) (federation.Objec
 	for _, id := range n.Mentions {
 		data.MentionRefs = append(data.MentionRefs, s.fedRenderer.ActorRef(id))
 	}
+	// Remote mentions are stored as acct strings; resolving them here puts
+	// them in to/cc and the tag list, which is what makes the target instance
+	// notify its user.
+	for _, acct := range n.RemoteMentions {
+		if user, err := s.resolveRemoteMention(ctx, acct); err == nil && user.URI != "" {
+			data.MentionRefs = appendUniqueString(data.MentionRefs, user.URI)
+		} else if err != nil {
+			log.Printf("httpapi: resolve remote mention %s: %v", acct, err)
+		}
+	}
 	return s.fedRenderer.RenderNote(data), nil
+}
+
+// resolveRemoteMention turns a user@host mention into a stored actor, reusing
+// the local row when the account was seen before so a repeated delivery does
+// not hit WebFinger again.
+func (s *Server) resolveRemoteMention(ctx context.Context, acct string) (*federation.RemoteUser, error) {
+	user, host, ok := federation.SplitAcct(acct)
+	if !ok {
+		return nil, federation.ErrRemoteNotFound
+	}
+	if s.cfg != nil && strings.EqualFold(host, s.cfg.Domain) {
+		return nil, federation.ErrRemoteNotFound
+	}
+	if s.federationStore != nil {
+		if u, err := s.federationStore.UserByHandle(ctx, user, host); err == nil {
+			return u, nil
+		}
+	}
+	if s.federationInbox == nil {
+		return nil, federation.ErrRemoteNotFound
+	}
+	return s.federationInbox.ResolveAcct(ctx, user, host)
+}
+
+// appendUniqueString appends v when absent.
+func appendUniqueString(list []string, v string) []string {
+	for _, existing := range list {
+		if existing == v {
+			return list
+		}
+	}
+	return append(list, v)
 }
 
 // renderNoteActivity wraps a note in its Create activity.
