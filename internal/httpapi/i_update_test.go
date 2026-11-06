@@ -314,3 +314,49 @@ func TestIUpdateProfileDetails(t *testing.T) {
 		t.Errorf("injectFeaturedNote after clear = %v", cleared["injectFeaturedNote"])
 	}
 }
+
+// TestIUpdateMutedInstances covers validation and normalisation of the
+// instance-mute list: lowercasing, trimming, de-duplication, the 200 cap and
+// clearing with null.
+func TestIUpdateMutedInstances(t *testing.T) {
+	ts := newTestServer(t, "open")
+	_, signup := post(t, ts, "/api/signup", map[string]any{"username": uniqueName(t), "password": "hunter2"})
+	token, _ := signup["token"].(string)
+
+	resp, out := postWithToken(t, ts, "/api/i/update", token, map[string]any{
+		"mutedInstances": []string{"Example.COM", " example.com ", " spaced ", ""},
+	})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("update = %d %v", resp.StatusCode, out)
+	}
+	_, me := postWithToken(t, ts, "/api/i", token, map[string]any{})
+	got, _ := me["mutedInstances"].([]any)
+	if len(got) != 2 || got[0] != "example.com" || got[1] != "spaced" {
+		t.Errorf("mutedInstances = %v, want [example.com spaced]", me["mutedInstances"])
+	}
+
+	// A slash is not a host.
+	if resp, out := postWithToken(t, ts, "/api/i/update", token, map[string]any{
+		"mutedInstances": []string{"bad/host"},
+	}); resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("bad host = %d %v, want 400", resp.StatusCode, out)
+	}
+
+	// The cap is 200 entries.
+	many := make([]string, 201)
+	for i := range many {
+		many[i] = "host" + string(rune('a'+i%26)) + string(rune('0'+i/26%10)) + ".example"
+	}
+	if resp, _ := postWithToken(t, ts, "/api/i/update", token, map[string]any{"mutedInstances": many}); resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("201 hosts = %d, want 400", resp.StatusCode)
+	}
+
+	// null clears the list.
+	if resp, out := postWithToken(t, ts, "/api/i/update", token, map[string]any{"mutedInstances": nil}); resp.StatusCode != http.StatusOK {
+		t.Fatalf("clear = %d %v", resp.StatusCode, out)
+	}
+	_, me = postWithToken(t, ts, "/api/i", token, map[string]any{})
+	if got, _ := me["mutedInstances"].([]any); len(got) != 0 {
+		t.Errorf("mutedInstances after clear = %v, want []", me["mutedInstances"])
+	}
+}

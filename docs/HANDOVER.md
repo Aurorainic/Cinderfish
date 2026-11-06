@@ -4383,8 +4383,8 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
 
 - **第五波的 API 与页面渲染已验证（2026-11-06，见 §12U.3）**：静音/屏蔽/实例静音/令牌撤销都做了
   真实二进制回读，五个设置页与四个 widget 在桌面/移动无头浏览器里走查过。应用撤销与 widget
-  配置弹窗已于 2026-11-07 走查（§12DG）；账号切换也已在 `/settings/accounts` 验证（§12DS）。
-  仍未验证的是实例静音非法输入，见 §12U.4。
+  配置弹窗已于 2026-11-07 走查（§12DG）；账号切换也已在 `/settings/accounts` 验证（§12DS）；
+  实例静音列表的校验与规范化由 §12EB 的用例覆盖。
 - ~~**第六波的搜索过滤组合未全测**~~：2026-11-07 补了 `TestNotesSearchFilters`，覆盖
   `offset`、`userId`、`host`（空 / 非空）与 `withFiles`（`notes/search` 与 `notes/search-by-tag`）。
   仍然没有构造数据的：远端作者的搜索结果；`ILIKE '%…%'` 的性能没有压测。
@@ -5805,3 +5805,18 @@ Deck 在 390 宽退化为「主列」单列，1400 宽显示主列 + 侧栏，�
 
 仍未验证：重定向到私网地址的拒绝（httpbin/httpbingo 对 loopback 目标直接 403，
 公开重定向服务无法构造；同一守卫的直连分支已有用例）。
+
+## 12EB. 第一百一十三波：实例静音列表的校验（2026-11-07）
+
+`TestIUpdateMutedInstances`（`i/update { mutedInstances }`）：
+
+- 大小写、首尾空格、重复项与空串被规范化/去掉，`i` 回读 `[example.com spaced]`；
+- 含 `/` 的条目返回 400 `INVALID_PARAM`；
+- 201 条（上限 200）返回 400；
+- `null` 清空列表，回读为 `[]`。
+
+```
+gofmt -l internal/ cmd/                                        # 空
+go vet ./...                                                   # exit 0
+CINDERFISH_TEST_DATABASE_URL=... go test ./... -count=1         # 全绿
+```
