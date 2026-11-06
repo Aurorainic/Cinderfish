@@ -101,6 +101,8 @@ export const ENDPOINTS = {
 	usersUpdate: "users/update",
 	iPin: "i/pin",
 	iUnpin: "i/unpin",
+	iKnownAs: "i/known-as",
+	iMove: "i/move",
 	iFavorites: "i/favorites",
 	iNotifications: "i/notifications",
 
@@ -558,6 +560,8 @@ export interface EndpointMap {
 	[ENDPOINTS.usersUpdate]: { req: IUpdateParams; res: MeDetailed };
 	[ENDPOINTS.iPin]: { req: NoteIdParams; res: MeDetailed };
 	[ENDPOINTS.iUnpin]: { req: NoteIdParams; res: MeDetailed };
+	[ENDPOINTS.iKnownAs]: { req: { alsoKnownAs: string[] }; res: MeDetailed };
+	[ENDPOINTS.iMove]: { req: { moveToAccount: string }; res: MeDetailed };
 	[ENDPOINTS.iFavorites]: {
 		req: PaginationParams;
 		res: NoteFavorite[];

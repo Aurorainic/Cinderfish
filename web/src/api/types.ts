@@ -36,13 +36,15 @@ export interface UserLite {
 	onlineStatus: string;
 	badgeRoles: unknown[];
 	instance: null;
+	/** The account this one migrated to; only detail endpoints fill it. */
+	movedToUri: UserLite | null;
+	/** Actor URIs this account declares as aliases of itself. */
+	alsoKnownAs: string[] | null;
 }
 
 export interface UserDetailed extends UserLite {
 	url: string;
 	uri: string;
-	movedTo: null;
-	alsoKnownAs: null;
 	createdAt: string;
 	updatedAt: null;
 	lastFetchedAt: null;

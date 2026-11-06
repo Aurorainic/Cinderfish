@@ -1,9 +1,8 @@
 # Cinderfish 交接说明
 
-- 最后更新：2026-11-06（目标模式第三十七至五十波：公告编辑、邮件与邮箱验证、出站投递修复、
-  编辑 Update、按作者签名、四个兼容端点、实例 CSS、管理台文件详情、缩略图、锁推与关注通知、
-  邮件通知、管理页说明化、状态栏；**目标已按用户要求暂停，暂停点见 §12BO**。注意：自第十九波起
-  未执行 `go test` 与浏览器走查，恢复工作后第一件事是补验证，见 §12BO.3）
+- 最后更新：2026-11-06（目标模式第五十一波：账号迁移 `i/move`/`i/known-as`、入站 `Move`、
+  `migration` v19、`SettingsMigration` 真页面与 `MkMoved` 横幅；恢复目标模式时先补了 §12BO.3 的
+  验证债，`go test ./...`（含数据库）已全绿，详见 §12BP。浏览器走查仍待用户手动确认后执行）
 - 项目名 **Cinderfish**（2026-10-28 定名，Go module `github.com/Aurorainic/cinderfish`）
 - 仓库：当前目录 `/home/lainsaka/文档/MilnFish`，分支 `main`；远程 `origin` 为
   `https://github.com/Aurorainic/Cinderfish.git`（GitHub 仓库已更名，本地目录改名待办）
@@ -3629,6 +3628,68 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
 文件（新增一节 §12BP …，并把未验证项写进去）。若用户要求先执行测试/浏览器走查，先把
 §12BO.3 的验证欠账补完再开新波。
 
+## 12BP. 第五十一波：账号迁移（2026-11-06）
+
+用户恢复目标模式后先补验证债，再开这一波。契约见
+`docs/research/2026-11-06-firefish-port-wave51-contract.md`。
+
+### 12BP.0 验证债（恢复后的第一件事）
+
+- `go vet ./...` 通过。
+- `go test ./...` 通过；带 `CINDERFISH_TEST_DATABASE_URL` 的数据库测试**只挂一条**：
+  `TestHashtagsTrend`（`trends = [], want two tags`）。根因：未配置 `hiddenTags` 时 nil 切片被当作
+  `NULL` 传给 Postgres，`lower(tag) <> ALL(NULL)` 对每行都是 NULL，整张表被过滤掉。修法：函数内把
+  nil 归一成空切片，并显式 `$3::text[]`。提交 `a74b55d`。
+- 前端 `vue-tsc --noEmit`、`check:port`（hardTotal 0）、`pnpm build` 全绿。
+- 结论：§12BO.3 列出的「自第十九波起未跑测试」欠账，在**单元/数据库测试层面已补完**；
+  真实二进制手工走查与无头浏览器走查仍按用户要求留到后续。
+
+### 12BP.1 落地清单
+
+| 层 | 内容 | 文件 |
+|----|------|------|
+| 迁移 | v19：`users.moved_to_uri`、`users.also_known_as`（jsonb）+ 部分索引 | `internal/db/db.go` |
+| 账号 | `User.MovedToURI` / `AlsoKnownAs`、统一投影常量、`GetByURI`、`SetKnownAs`、`MarkMoved` | `internal/account/service.go`、`migration.go` |
+| 联邦 | `RenderPerson` 输出 `movedTo` / `alsoKnownAs`；`RenderMove`；入站 `Move`（校验目标别名 → 标记 → `OnMoved` 回调）；`ResolveAcct` / `FetchActor`；`Store.MarkMoved`、`LocalFollowerIDs` | `internal/federation/{render,inbox,store}.go` |
+| 端点 | `POST /api/i/known-as`、`POST /api/i/move`、`users/show` 的 `userIds` 与 URI 回退 | `internal/httpapi/migration.go`、`account.go` |
+| 打包 | Lite 带 `alsoKnownAs`；详细用户按 URI 反查 `movedToUri` | `internal/httpapi/users_pack.go` |
+| 前端 | `SettingsMigration` 真页面、`MkMoved` 横幅、迁移菜单项、类型与端点表 | `web/src/pages/SettingsMigration.vue`、`web/src/components/MkMoved.vue`、`web/src/components/user/UserHome.vue`、`web/src/pages/SettingsIndex.vue`、`web/src/api/{types,endpoints}.ts` |
+
+台账更新：**139 条已注册路由 / 132 条 Misskey 同名 / 308 条未实现**，Tier 1 缺口仍为 0。
+
+### 12BP.2 有意的限制
+
+- 迁移页按别名逐个调 `users/show`，没用上游的批量 `userIds`（后端支持批量，但批量响应会改变
+  端点返回类型；逐个调用在 10 条上限下没有实际代价）。
+- 只迁移 `followings` 里 `host IS NULL` 的关注者；远端关注者由对端实例自己处理。
+- `movedToUri` 只在详情端点填充，列表（UserLite）保持 `null`，避免列表查询的 N+1。
+- 入站 `Move` 不验证 `object` 指向的账号是否本地存在（上游也不验证），只验证目标别名。
+
+### 12BP.3 验证证据
+
+- `gofmt -l internal/ cmd/` 无输出。
+- `go vet ./...` 通过。
+- `CINDERFISH_TEST_DATABASE_URL=… go test ./...` 全绿，含新增 4 条用例：
+  - `TestIKnownAsLocalAlias`：别名落库、Actor 文档与 `users/show` 都带 `alsoKnownAs`、自指别名被拒
+  - `TestIMoveRefusesLocalAndAdminTarget`：本地目标 `NOT_REMOTE`、管理员 `NOT_ADMIN_FORBIDDEN`
+  - `TestTwoInstanceMove`：无别名被拒 → 目标设置别名 → 迁移成功（`movedToUri.username=betabob`）→
+    Actor 文档出现 `movedTo` → 二次迁移 `ALREADY_MOVED`
+  - `TestInboundMove`：目标未声明别名时 `skip` 且不落库；声明后接受，`moved_to_uri` 等于目标 URI
+- 前端：`vue-tsc --noEmit` 通过、`check:port` hardTotal 0（404 文件）、`pnpm build` 成功。
+
+### 12BP.4 仍未验证
+
+- 迁移页与横幅**没有走查**：表单禁用态、确认对话框、别名回显、已迁移账号的只读状态都只过了编译。
+- `i/move` 的**真实双实例投递**没有起真实二进制验证：投递队列只验证到「入队」，没有验证对端收到
+  `Move` 后展示；测试里的两实例共用同一个数据库，`LocalFollowerIDs` 的实例边界没有被真正区分。
+- 远端关注者不会收到「改关新账号」的 `Follow`（设计如此），但因此**没有测试覆盖**跨实例的关注者迁移。
+- 锁定账号（`manuallyApprovesFollowers`）作为目标时的 `Follow` 请求链路未验证。
+- `users/show` 的 `userIds` 批量参数没有前端调用方，只有后端支持。
+- 占位页现状（2026-11-06 复核，§12BO.1 的 19/15 拆分是估算）：**33 个**，其中首版范围外 24 个，
+  范围内剩 9 个：`Auth`、`OAuth`、`AuthorizeInteraction`、`SignupComplete`、`SettingsIntegration`、
+  `SettingsPlugin`、`SettingsPluginInstall`、`SettingsCustomKatexMacro`、`EmptyPage`。
+
+
 ## 13. 文档索引
 
 | 文档 | 内容 |
@@ -3705,6 +3766,7 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
 | `docs/research/2026-11-06-firefish-port-wave48-contract.md` | **第四十八波施工契约（邮件通知），见 §12BL** |
 | `docs/research/2026-11-06-firefish-port-wave49-contract.md` | **第四十九波施工契约（无后端管理页转说明页），见 §12BM** |
 | `docs/research/2026-11-06-firefish-port-wave50-contract.md` | **第五十波施工契约（状态栏），见 §12BN** |
+| `docs/research/2026-11-06-firefish-port-wave51-contract.md` | **第五十一波施工契约（账号迁移），见 §12BP** |
 
 ## 14. 已知的未验证项
 
@@ -3774,6 +3836,9 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
 - **第四十八波未测（2026-11-06，见 §12BL.4）**：邮件通知与公告群发只有编译层证据。
 - **第四十九波未测（2026-11-06，见 §12BM.4）**：六个说明页与菜单分组未走查。
 - **第五十波未测（2026-11-06，见 §12BN.4）**：状态栏的渲染与交互未走查。
+- **第五十一波未测（2026-11-06，见 §12BP.4）**：迁移页表单与 `MkMoved` 横幅只过编译；`i/move` 的
+  真实双实例投递只验证到入队；跨实例的「关注者改关」没有端到端用例；`users/show` 的 `userIds`
+  批量参数没有前端调用方。
 - **仍未移植的设置页**：邮箱、整合、导入导出、迁移、Webhook、插件、自定义 KaTeX、状态栏、
   删除账号、应用授权以外的账号操作；对应后端端点不存在或前端缺少依赖（见第五波契约 §3.3）。
 - **仍缺的 widgets**：rss、rss-ticker、server-metric、online-users、federation、job-queue、aiscript、

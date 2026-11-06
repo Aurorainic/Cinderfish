@@ -6,7 +6,7 @@
 				<div v-if="!narrow || !hasChild" class="nav">
 					<MkSuperMenu :def="menuDef" :grid="narrow" />
 					<CfInfo class="missing">
-						菜单只列出已有页面与端点的设置。邮箱、插件、导入、迁移等仍缺后端端点，未列入。
+						菜单只列出已有页面与端点的设置。插件与 KaTeX 自定义宏仍缺运行时，未列入。
 					</CfInfo>
 				</div>
 				<section v-if="!(narrow && !hasChild)" class="main">
@@ -218,6 +218,12 @@ const menuDef = computed<MkSuperMenuGroup[]>(() => [
 				text: t("importAndExport"),
 				to: "/settings/import-export",
 				active: isActive("/settings/import-export"),
+			},
+			{
+				icon: "ph-airplane-takeoff ph-bold ph-lg",
+				text: t("migration"),
+				to: "/settings/migration",
+				active: isActive("/settings/migration"),
 			},
 			{
 				icon: "ph-devices ph-bold ph-lg",

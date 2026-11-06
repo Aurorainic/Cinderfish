@@ -4,6 +4,12 @@
 		<div ref="rootEl" class="ftskorzw" :class="{ wide: !narrow }">
 			<div class="main">
 				<div class="profile">
+					<MkMoved
+						v-if="user.movedToUri"
+						class="moved"
+						:host="user.movedToUri.host ?? ''"
+						:acct="user.movedToUri.username"
+					/>
 					<div :key="user.id" class="card _block">
 						<div class="banner-container">
 							<div class="banner"></div>
@@ -202,14 +208,15 @@
 //   * no location / birthday rows and no "their local time": both fields are
 //     always null and `city-timezones` is not a dependency;
 //   * no `patrons` badge: the endpoint does not exist;
-//   * no moved-to / remote-caution link target: `movedTo` is always null and
-//     `url` is an empty string — the remote caution is a plain CfInfo;
+//   * no remote-caution link target: `url` is an empty string, so the caution
+//     is a plain CfInfo;
 //   * the sidebar chart is dropped; it needs `charts/user/notes`.
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import type { EmojiSimple, UserDetailed } from "@/api/types";
 import { me } from "@/account";
 import CfInfo from "@/components/ui/CfInfo.vue";
 import MkFollowButton from "@/components/MkFollowButton.vue";
+import MkMoved from "@/components/MkMoved.vue";
 import MkNote from "@/components/MkNote.vue";
 import MkNumber from "@/components/MkNumber.vue";
 import UserNotes from "@/components/user/UserNotes.vue";
