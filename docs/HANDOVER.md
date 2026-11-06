@@ -4383,8 +4383,8 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
 
 - **第五波的 API 与页面渲染已验证（2026-11-06，见 §12U.3）**：静音/屏蔽/实例静音/令牌撤销都做了
   真实二进制回读，五个设置页与四个 widget 在桌面/移动无头浏览器里走查过。应用撤销与 widget
-  配置弹窗已于 2026-11-07 走查（§12DG）；仍未验证的是账号切换（前端没有多账号切换入口）
-  与实例静音非法输入，见 §12U.4。
+  配置弹窗已于 2026-11-07 走查（§12DG）；账号切换也已在 `/settings/accounts` 验证（§12DS）。
+  仍未验证的是实例静音非法输入，见 §12U.4。
 - ~~**第六波的搜索过滤组合未全测**~~：2026-11-07 补了 `TestNotesSearchFilters`，覆盖
   `offset`、`userId`、`host`（空 / 非空）与 `withFiles`（`notes/search` 与 `notes/search-by-tag`）。
   仍然没有构造数据的：远端作者的搜索结果；`ILIKE '%…%'` 的性能没有压测。
@@ -5524,7 +5524,7 @@ CINDERFISH_TEST_DATABASE_URL=... go test ./... -count=1         # 全绿
 
 ### 12DG.3 仍未验证
 
-- 账号切换：前端没有多账号切换入口（localStorage 支持多账号，UI 只有单账号），按现状记录。
+- 账号切换：`/settings/accounts` 有切换/移除入口，已在 §12DS 验证（此前误记为「没有入口」）。
 - Widget 配置的保存值在刷新后的回读（`updateProps` 走 store 的 300ms 防抖保存）。
 
 ## 12DH. 第九十五波：拖拽移动文件到文件夹（2026-11-07）
@@ -5695,5 +5695,28 @@ CINDERFISH_TEST_DATABASE_URL=... go test ./... -count=1         # 全绿
 只有第一个生效（其余点击发生在 `saving` 窗口内，被页面正确忽略），串行后全部通过——是脚本
 时序，不是缺陷。
 
-仍未验证：窄屏（320px）下的这一页、`followersVisibility`/`followingVisibility` 两个下拉的
-界面回读（后端已有用例）。
+窄屏（320px）下的这一页与其它六页已由 §12DR 测量；仍未验证：`followersVisibility`/
+`followingVisibility` 两个下拉的界面回读（后端已有用例）。
+
+## 12DR. 第一百零五波：320px 窄屏复核（2026-11-07）
+
+沿用 §12DB 的方法，视口改成 320×640，测量七个已登录路由：
+`/`、`/settings/privacy`、`/settings/security`、`/settings/notifications`、`/explore`、
+`/my/drive`、`/notes/<id>`。结果全部 `scrollWidth - clientWidth = 0`，无未捕获异常。
+截图在 `/tmp/w105-shots`。
+
+仍未验证：更窄的 280px、平板宽度、Deck 列布局在窄屏的行为（Deck 自身按桌面设计）。
+
+## 12DS. 第一百零六波：多账号切换（2026-11-07）
+
+第五波把「切换账号」列为未走查，第十二波甚至记成「前端没有入口」。实际上
+`/settings/accounts` 存在（`SettingsAccounts.vue`），这一轮验证：
+
+1. `localStorage.accounts` 放入两个账号（A 为当前），打开 `/settings/accounts`：
+   两条记录都出现，A 标「当前」；
+2. 点 B 的「切换」；
+3. `localStorage.account` 与 `cinderfish.token` 变为 B 的值，`accounts` 保留两条；
+4. 用当前 token 调 `i` 返回 `w106b`。
+
+「移除」按钮未点击（会删除本地凭据，不影响服务端）；仍未验证：账号失效（token 被撤销）时
+页面的 unavailable 分支。
