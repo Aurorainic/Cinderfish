@@ -6616,3 +6616,41 @@ Host。这一轮用 Go 的反向代理复现同一拓扑。
   - 打开 `/@w145alice/activity` → `.activity .chart .bar` 为 30 根（1 根非零），
     计数「2 帖子 / 0 关注中 / 0 关注者」，页面不再出现「后端尚未提供」。
 - 截图：`/tmp/w145-shots/reply-and-activity.png`（不入库）。
+
+## 12FJ. 第一百四十六波：users/reactions 与主页回应页签（2026-11-07）
+
+`UserReactions.vue` 一直显示「该页签依赖 users/reactions 接口，后端尚未提供」。这一轮补上端点与页面，
+并顺带修正一个默认值错误。
+
+### 12FJ.1 落地清单
+
+| 层 | 文件 | 内容 |
+|----|------|------|
+| 查询 | `internal/note/reaction.go` | `List` 与新的 `ListByUser` 共用 `query(column, value, q)`；游标/日期过滤一致 |
+| 端点 | `internal/httpapi/users_reactions.go`（新） | `POST /api/users/reactions`：本地账号、`publicReactions` 可见性、note 过滤不可见、包装 `{id,createdAt,type,user,note}` |
+| 默认值 | `internal/account/profile.go`、`internal/httpapi/users_pack.go` | `publicReactions` 缺省为 **true**（与 Misskey 一致）；此前缺省为 false，等于默认隐藏所有人的回应 |
+| 前端 | `web/src/components/user/UserReactions.vue` | 拉取 20 条/页，`untilId` 加载更多；`REACTIONS_NOT_PUBLIC` 与 `IS_REMOTE_USER` 都有对应文案 |
+| 类型 | `web/src/api/{types,endpoints}.ts` | `NoteReactionWithNote` 与 `usersReactions` |
+| 台账 | `docs/research/2026-11-04-misskey-api-coverage.md` | 160 → 161 路由、152 → 153 同名、288 → 287 未实现 |
+
+### 12FJ.2 有意的限制
+
+- 远端账号直接返回 `IS_REMOTE_USER`（与 Misskey 相同：本实例不保存远端用户的全部回应）。
+- `publicReactions=false` 时只有本人可见；被屏蔽/静音过滤沿用 Misskey 的可见性检查，但没有单独的
+  blocked-by 提前返回。
+- 每页 20 条、`untilId` 游标；没有 `sinceDate/untilDate` 的界面入口（端点支持）。
+- `user` 字段是 `UserLite`；`note` 用现有的 `packNote`。
+
+### 12FJ.3 验证证据
+
+- `go vet ./...`、含数据库的全量 `go test ./...` 全绿；`vue-tsc --noEmit`、`check:port`
+  （hardTotal 0）、`pnpm build` 全绿。
+- `TestUsersReactions`：alice 对 owner 的帖回应后，匿名 `users/reactions` 返回 1 条
+  （`type=👍`、`note.id` 正确、`user.id=alice`、`createdAt` 非空）；`users/show` 的
+  `publicReactions` 默认为 true；`i/update {publicReactions:false}` 后匿名 403
+  `REACTIONS_NOT_PUBLIC`、本人仍 200；未知用户 404、远端用户 400 `IS_REMOTE_USER`；
+  owner 自己的列表为空。
+- 真实二进制：alice 回应 🎉 后 `users/reactions` 返回该回应与笔记。
+- 无头浏览器（1400×900）：打开 `/@w146alice/reactions`，页面出现 1 条记录，
+  显示 🎉、`w146owner`、笔记正文与回应计数，不显示「后端尚未提供」。
+  截图 `/tmp/w146-shots/reactions-tab.png`（不入库）。

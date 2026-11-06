@@ -72,6 +72,18 @@ DELETE FROM note_reactions WHERE note_id = $1 AND user_id = $2 AND emoji = $3
 // List returns the reactions on a note, newest first, optionally filtered to
 // one reaction type. It backs Misskey's notes/reactions ("who reacted").
 func (s *ReactionService) List(ctx context.Context, noteID string, q ReactionQuery) ([]*Reaction, error) {
+	return s.query(ctx, "note_id", noteID, q)
+}
+
+// ListByUser returns the reactions one account made, newest first. It backs
+// users/reactions (the profile's reaction tab).
+func (s *ReactionService) ListByUser(ctx context.Context, userID string, q ReactionQuery) ([]*Reaction, error) {
+	return s.query(ctx, "user_id", userID, q)
+}
+
+// query pages a reaction column. The column is a fixed identifier, never
+// request input.
+func (s *ReactionService) query(ctx context.Context, column, value string, q ReactionQuery) ([]*Reaction, error) {
 	if q.Limit <= 0 {
 		q.Limit = 10
 	}
@@ -81,8 +93,8 @@ func (s *ReactionService) List(ctx context.Context, noteID string, q ReactionQue
 
 	var conds []string
 	var args []any
-	args = append(args, noteID)
-	conds = append(conds, fmt.Sprintf("note_id = $%d", len(args)))
+	args = append(args, value)
+	conds = append(conds, fmt.Sprintf(column+" = $%d", len(args)))
 	if q.Type != "" {
 		args = append(args, q.Type)
 		conds = append(conds, fmt.Sprintf("emoji = $%d", len(args)))

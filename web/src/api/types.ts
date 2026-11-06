@@ -258,6 +258,11 @@ export interface NoteReaction {
 	user: UserLite;
 }
 
+/** `users/reactions`: a reaction together with the note it belongs to. */
+export interface NoteReactionWithNote extends NoteReaction {
+	note: Note;
+}
+
 export interface EmojiSimple {
 	name: string;
 	category: string | null;

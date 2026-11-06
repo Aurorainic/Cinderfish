@@ -130,7 +130,7 @@ func packUserDetailed(u *account.User, createdAt time.Time, isMe bool, prof *acc
 	packed["birthday"] = nil
 	packed["lang"] = nil
 	packed["fields"] = []any{}
-	packed["publicReactions"] = false
+	packed["publicReactions"] = true
 	if prof != nil {
 		packed["location"] = nilIfEmpty(prof.Location)
 		packed["birthday"] = nilIfEmpty(prof.Birthday)

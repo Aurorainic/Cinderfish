@@ -192,6 +192,7 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("POST /api/users/relation", s.handleUsersRelation)
 	s.mux.HandleFunc("POST /api/users/get-frequently-replied-users", s.handleUsersFrequentlyReplied)
 	s.mux.HandleFunc("POST /api/users/stats", s.handleUsersStats)
+	s.mux.HandleFunc("POST /api/users/reactions", s.handleUsersReactions)
 	s.mux.HandleFunc("POST /api/users/followers", s.handleUsersFollowers)
 	s.mux.HandleFunc("POST /api/users/following", s.handleUsersFollowing)
 	s.mux.HandleFunc("POST /api/miauth/gen-token", s.handleMiAuthGenToken)

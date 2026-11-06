@@ -111,7 +111,7 @@ FROM user_profiles WHERE user_id = $1
 		PreventAiLearning        bool           `json:"preventAiLearning"`
 		IsExplorable             *bool          `json:"isExplorable"`
 		HideOnlineStatus         bool           `json:"hideOnlineStatus"`
-		PublicReactions          bool           `json:"publicReactions"`
+		PublicReactions          *bool          `json:"publicReactions"`
 		AlwaysMarkNsfw           bool           `json:"alwaysMarkNsfw"`
 		AutoSensitive            bool           `json:"autoSensitive"`
 		CarefulBot               bool           `json:"carefulBot"`
@@ -146,7 +146,7 @@ FROM user_profiles WHERE user_id = $1
 		PreventAiLearning:        stored.PreventAiLearning,
 		IsExplorable:             isExplorable,
 		HideOnlineStatus:         stored.HideOnlineStatus,
-		PublicReactions:          stored.PublicReactions,
+		PublicReactions:          publicReactions(stored.PublicReactions),
 		AlwaysMarkNsfw:           stored.AlwaysMarkNsfw,
 		AutoSensitive:            stored.AutoSensitive,
 		CarefulBot:               stored.CarefulBot,
@@ -303,4 +303,13 @@ ORDER BY user_id
 		out = append(out, email)
 	}
 	return out, rows.Err()
+}
+
+// publicReactions defaults to true, matching Misskey's profile settings. An
+// absent key means the account never changed the switch, not that it opted out.
+func publicReactions(stored *bool) bool {
+	if stored == nil {
+		return true
+	}
+	return *stored
 }
