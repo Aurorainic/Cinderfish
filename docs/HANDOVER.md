@@ -1456,8 +1456,8 @@ CINDERFISH_TEST_DATABASE_URL=… go test -count=1 ./...   # 全绿
   软过滤，没有服务器侧词表；自定义 CSS 按账号存进 base store 并即时注入。
 - **静态页**：远程账号不能从 `/authorize-follow` 关注（没有 `ap/show`），只提示到对方实例操作；
   `notes/history` 不存在，历史页只说明；`ErrorPage.vue` 目前未被路由使用。
-- **未走查**：登录/注册表单的真实交互（仍用注入 localStorage 的方式进入）、emoji 新增的浏览器文件上传
-  点击路径（新增由 API 验证、列表由 UI 验证）、通知的 Streaming 实时插入、偏好导入与重置、主题的
+- **已补/未走查**：登录/注册表单（§12CV/§12DK）、emoji 新增的文件上传（§12EE）与通知的 Streaming
+  实时插入（§12CW）均已补验证；仍未走查的是偏好导入与重置、主题的
   26 个调色板的 Nord 浅/深两版已在 §12DX 实际切换；图片上传与引用/转贴发帖已由 §12EC 走查。
 - **未实装（首版范围外）**：chat/channels/lists/antennas/clips/groups/gallery/pages、剩余约 10 个 widget、
   其余 37 个 locale、实例级主题。
@@ -5846,3 +5846,12 @@ CINDERFISH_TEST_DATABASE_URL=... go test ./... -count=1         # 全绿
 - 页面无异常。
 
 仍未验证：点击「切换」到失效账号时的错误提示（按钮本来就被禁用，正常界面到不了）。
+
+## 12EE. 第一百一十六波：管理台新增表情的文件上传（2026-11-07）
+
+`/admin/emojis` →「添加表情」→ 填名称 →「选择图片」→ 弹出菜单选「本地上传」。
+选择文件走的是动态创建的 input（挂在 `window.__cinderfish_input_ref__`）：脚本给它设置
+`DataTransfer.files` 并派发 `change`，附件列表出现 `w116-emoji.png`，点「添加」后
+`admin/emoji/list` 里出现 `w116emoji2`。
+
+仍未验证：从网盘选择文件的分支、别名与类别字段的输入。
