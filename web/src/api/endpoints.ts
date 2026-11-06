@@ -37,6 +37,7 @@ import type {
 	NoteCreateResponse,
 	NoteDetailed,
 	UserNotesChart,
+	ServerInfo,
 	NoteEditEntry,
 	NoteEditResponse,
 	NoteFavorite,
@@ -240,6 +241,7 @@ export const ENDPOINTS = {
 	federationShowInstance: "federation/show-instance",
 	federationInstances: "federation/instances",
 	chartsUserNotes: "charts/user/notes",
+	serverInfo: "server-info",
 	adminFederationMode: "admin/federation/mode",
 	adminFederationAllowlist: "admin/federation/allowlist",
 } as const;
@@ -1056,6 +1058,11 @@ export interface EndpointMap {
 	[ENDPOINTS.federationInstances]: {
 		req: { host?: string | null; limit?: number; offset?: number };
 		res: FederationInstance[];
+	};
+
+	[ENDPOINTS.serverInfo]: {
+		req: Record<string, never>;
+		res: ServerInfo;
 	};
 
 	[ENDPOINTS.chartsUserNotes]: {

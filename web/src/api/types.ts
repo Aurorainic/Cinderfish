@@ -642,6 +642,15 @@ export interface UserNotesChart {
 	};
 }
 
+/** `server-info`: machine load for the server-metric widget. */
+export interface ServerInfo {
+	machine: string;
+	cpu: { model: string; cores: number; usage: number; known: boolean };
+	mem: { total: number; used: number; known: boolean };
+	fs: { total: number; used: number; known: boolean };
+	load: { one: number; five: number; fifteen: number; known: boolean };
+}
+
 /** Counters from `stats`. */
 export interface InstanceStats {
 	usersCount: number;

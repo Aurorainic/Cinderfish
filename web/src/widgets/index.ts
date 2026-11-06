@@ -7,9 +7,9 @@
 //
 // Ported: post-form, notifications, timeline, trends, memo, instance-cloud,
 // activity, photos, user-list, clock, digital-clock, server-info, calendar,
-// button, unix-clock, slideshow, online-users, federation, job-queue. Widgets
-// whose data or runtime has no backing here (rss, rss-ticker, aiscript,
-// server-metric) are not ported; `slideshow` and `button` keep their upstream
+// button, unix-clock, slideshow, online-users, federation, job-queue,
+// server-metric. Widgets whose data or runtime has no backing here (rss,
+// rss-ticker, aiscript) are not ported; `slideshow` and `button` keep their upstream
 // options except the folder picker and the AiScript program.
 import { defineAsyncComponent, reactive, type Component } from "vue";
 import { popup } from "@/os/state";
@@ -200,7 +200,7 @@ interface WidgetLoader {
 	load: () => Promise<{ default: Component }>;
 }
 
-/** Picker order follows Firefish's `widgets` array, filtered to the 19 ports. */
+/** Picker order follows Firefish's `widgets` array, filtered to the 20 ports. */
 const loaders: WidgetLoader[] = [
 	{ name: "memo", load: () => import("./memo.vue") },
 	{ name: "notifications", load: () => import("./notifications.vue") },
@@ -221,6 +221,7 @@ const loaders: WidgetLoader[] = [
 	{ name: "onlineUsers", load: () => import("./online-users.vue") },
 	{ name: "federation", load: () => import("./federation.vue") },
 	{ name: "jobQueue", load: () => import("./job-queue.vue") },
+	{ name: "serverMetric", load: () => import("./server-metric.vue") },
 ];
 
 const components = new Map<string, Component>(

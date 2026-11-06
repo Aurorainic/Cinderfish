@@ -4683,8 +4683,8 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
 - **仍缺的 widgets（2026-11-07 更新）**：online-users、federation、instance-cloud 与 activity 的
   30 天子图表已补上（§12EY/§12EZ，后两者分别依赖 `federation/instances` 与新增的
   `charts/user/notes`；不画 `charts/instance` 的请求图）；job-queue 也已补上（§12FA，改为轮询
-  `admin/deliver-queue`）。仍缺 rss、rss-ticker（需服务端 RSS 抓取代理）、server-metric（需系统
-  指标端点）、aiscript（运行时按契约 drop）。
+  `admin/deliver-queue`），server-metric 见 §12FB（新增 `server-info`）。仍缺 rss、rss-ticker
+  （需服务端 RSS 抓取代理）与 aiscript（运行时按契约 drop）。
 
 - ~~**浏览器可视化走查（Task 8 波次）未做**~~：2026-10-31 的那一轮确实没能执行，但后续波次已用
   无头 Chromium/CDP 与真实二进制覆盖了登录态视觉复核与溢出实测：§12CB（1440 与 390，42 张截图）、
@@ -6331,3 +6331,40 @@ Firefish 的 job-queue widget 订阅 `queueStats` Streaming 频道，展示 inbo
   `FORBIDDEN`。无头浏览器添加 jobQueue widget 后显示「待投递 1 / 到期可投 0 / 已放弃 0」与
   `remote.example` 最近条目（投递 worker 已把该行重新排期，所以 dueNow 回落为 0）。截图
   `/tmp/w137-shots/job-queue.png`（不入库）。
+
+## 12FB. 第一百三十八波：server-info 与 server-metric widget（2026-11-07）
+
+Firefish 的 server-metric widget 订阅 `serverStats` Streaming 频道画 CPU/内存/磁盘曲线，并用
+`server-info` 取总量。Cinderfish 没有该频道，也没有 `server-info`；本轮补上端点，widget 改为轮询，
+用同一条数据画条形指标。
+
+### 12FB.1 落地清单
+
+| 层 | 文件 | 内容 |
+|----|------|------|
+| 指标 | `internal/httpapi/serverinfo_linux.go`（新） | `/proc/stat`（总/空闲 jiffies）、`/proc/meminfo`（total/available）、`/proc/cpuinfo`（型号）、`/proc/loadavg`、`statfs`（媒体目录或工作目录） |
+| 回退 | `internal/httpapi/serverinfo_other.go`（新） | 非 Linux 全部返回 `ok=false`，端点的 `known` 字段如实反映 |
+| 端点 | `internal/httpapi/serverinfo.go`（新） | `POST/GET /api/server-info`：机器名、CPU 型号/核数/使用率、内存、磁盘、load；需登录 |
+| 采样 | 同上 | 后台每 2 秒读一次 `/proc/stat` 计算使用率，请求不阻塞 |
+| 客户端 | `web/src/api/{types,endpoints}.ts` | `ServerInfo` 类型与 `serverInfo` 端点 |
+| widget | `web/src/widgets/server-metric.vue`（新） | 5 秒轮询，CPU/内存/磁盘条形 + load 三项；401 显示「登录后可见」 |
+
+### 12FB.2 有意的限制
+
+- 只有 Linux 有真实数据；其它平台 `known=false`，widget 显示「当前平台无法读取全部指标」。
+- 与 Firefish 的差异：`server-info` 需要登录（上游在私有模式下也要求凭据），不暴露给匿名访客。
+- 没有网络吞吐曲线（Firefish 的 net 图），也没有每核 CPU、进程数、Meilisearch 面板。
+- CPU 使用率是整机口径、2 秒采样一次，不是每请求的瞬时值。
+- 磁盘取配置的本地媒体目录所在文件系统；S3 部署回退到工作目录。
+
+### 12FB.3 验证证据
+
+- `gofmt`/`go vet`/含数据库的全量 `go test ./...` 全绿；`vue-tsc --noEmit`、`check:port`
+  （hardTotal 0）、`pnpm build` 全绿。
+- `TestServerInfo`：匿名 401；登录后 200，`cpu.cores` 等于 `runtime.NumCPU()`，usage 在 0–100；
+  Linux 下 `mem/fs/load` 均 `known=true` 且总量为正、机器名为主机名；GET 别名 200。
+- 真实二进制：匿名 401；登录后返回 `machine=anduinos-laptop`、16 核、内存 15.9 GB、磁盘 7.95 GB、
+  load 1.53/1.41/1.15；3 秒后 CPU 使用率从 0 变为 5.2%（后台采样生效）。
+- 无头浏览器添加 serverMetric widget 后显示：CPU 2.3%·16 核·AMD Ryzen 7 6800H、内存 51.8%
+  （7.7/14.8 GiB）、磁盘 36.6%（2.7/7.4 GiB）、负载 1.16/1.32/1.14。截图
+  `/tmp/w138-shots/server-metric.png`（不入库）。
