@@ -2740,6 +2740,43 @@ cd web && pnpm build                    # exit 0
 - 页面在桌面/移动端的布局、外链点击与返回按钮。
 - 未执行浏览器走查。
 
+## 12AT. 批次：账号导入（2026-11-06）
+
+**工作方式**：目标模式第三十波，继续只写代码、验证到编译层。施工依据
+`docs/research/2026-11-06-firefish-port-wave30-contract.md`。
+
+### 12AT.1 落地清单
+
+| 层 | 文件 | 说明 |
+|----|------|------|
+| 端点 | `internal/httpapi/account_import.go`（新）、`server.go` | `i/import`：读云盘 JSON，事务内恢复笔记/关注/收藏，返回计数 |
+| 前端类型 | `api/types.ts`、`endpoints.ts` | `ImportSummary`、`i/import` |
+| 页面 | `pages/SettingsImportExport.vue` | 文件选择 → 上传 → 导入 → 展示导入/跳过计数 |
+| 文档 | `auth-users.md`、台账 | 端小节与计数（120/113/327） |
+
+### 12AT.2 有意的限制
+
+1. 只接受 `cinderfish-account-export@1`，不支持 Misskey zip。
+2. 不导入文件字节，附件 id 可能悬空。
+3. 不导入通知、注册表、私信；无限流。
+
+### 12AT.3 验证证据（编译层）
+
+```
+gofmt -l internal/ cmd/                 # 空
+go vet ./...                            # exit 0
+cd web && pnpm exec vue-tsc --noEmit    # exit 0
+cd web && pnpm run check:port           # hardTotal 0
+cd web && pnpm build                    # exit 0
+```
+
+### 12AT.4 仍未验证
+
+- 导出文件重新导入后的笔记/关注/收藏数量与内容。
+- 冲突跳过、目标缺失、回复/转发目标不存在时的置空行为。
+- 非法格式与超大文件的 400 分支。
+- `go test` 与浏览器走查未执行。
+
 ## 13. 文档索引
 
 | 文档 | 内容 |
@@ -2795,6 +2832,7 @@ cd web && pnpm build                    # exit 0
 | `docs/research/2026-11-06-firefish-port-wave27-contract.md` | **第二十七波施工契约（实例信息页与 show-instance），见 §12AQ** |
 | `docs/research/2026-11-06-firefish-port-wave28-contract.md` | **第二十八波施工契约（网盘用量端点与设置页接线），见 §12AR** |
 | `docs/research/2026-11-06-firefish-port-wave29-contract.md` | **第二十九波施工契约（关于页），见 §12AS** |
+| `docs/research/2026-11-06-firefish-port-wave30-contract.md` | **第三十波施工契约（账号导入），见 §12AT** |
 
 ## 14. 已知的未验证项
 
@@ -2843,6 +2881,7 @@ cd web && pnpm build                    # exit 0
 - **第二十七波未测（2026-11-06，见 §12AQ.4）**：实例信息只过了编译层，本地/远端/未知主机与 401 分支未验证。
 - **第二十八波未测（2026-11-06，见 §12AR.4）**：网盘用量只过了编译层，数值一致性、容量 0 展示与两个敏感开关未验证。
 - **第二十九波未测（2026-11-06，见 §12AS.4）**：关于页只过了编译层，布局与外链未走查。
+- **第三十波未测（2026-11-06，见 §12AT.4）**：账号导入只过了编译层，导出→导入往返、冲突与非法格式未验证。
 - **仍未移植的设置页**：邮箱、整合、导入导出、迁移、Webhook、插件、自定义 KaTeX、状态栏、
   删除账号、应用授权以外的账号操作；对应后端端点不存在或前端缺少依赖（见第五波契约 §3.3）。
 - **仍缺的 widgets**：rss、rss-ticker、server-metric、online-users、federation、job-queue、aiscript、

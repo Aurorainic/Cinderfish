@@ -24,6 +24,7 @@ import type {
 	FollowRequest,
 	Following,
 	HashtagTrend,
+	ImportSummary,
 	IndexStat,
 	InstanceStats,
 	MeDetailed,
@@ -74,6 +75,7 @@ export const ENDPOINTS = {
 	iSigninHistory: "i/signin-history",
 	iApps: "i/apps",
 	iExport: "i/export",
+	iImport: "i/import",
 	iWebhooksCreate: "i/webhooks/create",
 	iWebhooksList: "i/webhooks/list",
 	iWebhooksShow: "i/webhooks/show",
@@ -839,6 +841,7 @@ export interface EndpointMap {
 
 	// Answered with a file body through apiDownload(); the entry keeps
 	// EndpointName exhaustive so api("i/export") still type-checks.
+	[ENDPOINTS.iImport]: { req: { fileId: string }; res: ImportSummary };
 	[ENDPOINTS.iExport]: { req: Record<string, never>; res: EmptyResponse };
 	[ENDPOINTS.iDeleteAccount]: {
 		req: { password: string };

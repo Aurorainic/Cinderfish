@@ -390,6 +390,16 @@ export interface TwoFactorRegistration {
 	issuer: string;
 }
 
+/** Result of `i/import`. */
+export interface ImportSummary {
+	notes: number;
+	followings: number;
+	favorites: number;
+	skipped: number;
+	skippedFollowings: number;
+	skippedFavorites: number;
+}
+
 /** One row of `i/signin-history`. */
 export interface SigninHistoryEntry {
 	id: string;
