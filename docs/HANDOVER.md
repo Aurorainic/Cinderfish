@@ -1375,8 +1375,8 @@ CINDERFISH_TEST_DATABASE_URL=… CINDERFISH_TEST_REDIS_URL=… go test -count=1 
 - **deck**：列拖拽排序改为菜单上下移；widgets 列复用全局 `MkWidgets`，没有独立的列内列表编辑。
 - **媒体**：仍无缩略图/blurhash/PhotoSwipe/媒体代理；图片直接用 `file.url`，视频音频用原生控件。
 - **通知摘要**与 Firefish 一致，保留正文里的 MFM 原文（`get-note-summary` 只取 `text`/`cw`）。
-- **未走查**：图片上传的浏览器交互（上传脚本此前由 API 验证）、投票提交、引用/转贴按钮点击后的
-  实际发帖、关注按钮点击、设置页除 profile/navbar/deck 外的保存动作、通知的流式实时插入。
+- **已补/未走查**：图片上传、投票提交、引用发帖、关注按钮、设置页保存与通知流式插入均已补验证
+  （§12CE/§12CL/§12CW/§12EC 等）；仍未走查的是拖拽排序（改为上/下移按钮后的界面）。
 - `i/registry/*` 已被 deck 列与设置页使用；`notes/edit`、`i/change-password`、2FA、注销、改邮箱
   在后端不存在，页面按「未开放」显示。
 
@@ -1458,7 +1458,7 @@ CINDERFISH_TEST_DATABASE_URL=… go test -count=1 ./...   # 全绿
   `notes/history` 不存在，历史页只说明；`ErrorPage.vue` 目前未被路由使用。
 - **未走查**：登录/注册表单的真实交互（仍用注入 localStorage 的方式进入）、emoji 新增的浏览器文件上传
   点击路径（新增由 API 验证、列表由 UI 验证）、通知的 Streaming 实时插入、偏好导入与重置、主题的
-  26 个调色板的 Nord 浅/深两版已在 §12DX 实际切换；图片上传/投票/引用与转贴发帖仍沿用第三波状态。
+  26 个调色板的 Nord 浅/深两版已在 §12DX 实际切换；图片上传与引用/转贴发帖已由 §12EC 走查。
 - **未实装（首版范围外）**：chat/channels/lists/antennas/clips/groups/gallery/pages、剩余约 10 个 widget、
   其余 37 个 locale、实例级主题。
 
@@ -5820,3 +5820,18 @@ gofmt -l internal/ cmd/                                        # 空
 go vet ./...                                                   # exit 0
 CINDERFISH_TEST_DATABASE_URL=... go test ./... -count=1         # 全绿
 ```
+
+## 12EC. 第一百一十四波：发帖图片上传与引用按钮（2026-11-07）
+
+第五波/第三波遗留的两个「未走查」动作，在 1400 宽桌面壳下：
+
+1. 点侧栏「帖子」打开 composer；
+2. 构造带 `File`（1×1 PNG）的 DataTransfer，向 composer 派发 `dragover`/`drop`：
+   附件列表出现 `ui-photo.png`，发帖后 `notes/local-timeline` 里该笔记的 `fileIds` 长度为 1；
+3. 在该笔记的卡片上点引用按钮（`.ph-quotes`）：composer 以引用模式打开；
+4. 输入「quoted note」并发布，时间线里出现的新笔记 `renoteId` 等于被引用笔记的 id。
+
+说明：无头脚本在 800×600 下走的是移动壳（没有侧栏「帖子」按钮），切到 1400 宽后正常；
+不是响应式缺陷。
+
+仍未验证：从剪贴板粘贴图片、附件超过 16 个时的上限提示。
