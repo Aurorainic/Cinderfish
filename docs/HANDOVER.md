@@ -5724,8 +5724,8 @@ CINDERFISH_TEST_DATABASE_URL=... go test ./... -count=1         # 全绿
 3. `localStorage.account` 与 `cinderfish.token` 变为 B 的值，`accounts` 保留两条；
 4. 用当前 token 调 `i` 返回 `w106b`。
 
-「移除」按钮未点击（会删除本地凭据，不影响服务端）；仍未验证：账号失效（token 被撤销）时
-页面的 unavailable 分支。
+「移除」按钮未点击（会删除本地凭据，不影响服务端）。账号失效分支已由 §12ED 覆盖：
+无效 token 的条目显示 `unknown @unknown`、切换按钮禁用、移除可用。
 
 ## 12DU. 第一百零七波：两万条笔记下的查询耗时与 reltuples（2026-11-07）
 
@@ -5835,3 +5835,14 @@ CINDERFISH_TEST_DATABASE_URL=... go test ./... -count=1         # 全绿
 不是响应式缺陷。
 
 仍未验证：从剪贴板粘贴图片、附件超过 16 个时的上限提示。
+
+## 12ED. 第一百一十五波：失效账号的 entry（2026-11-07）
+
+`localStorage.accounts` 放入当前账号与一个伪造 token（`deadbeefdeadbeef`），打开
+`/settings/accounts`：
+
+- 当前账号标「当前」，移除按钮禁用；
+- 失效条目显示 `unknown @unknown`，切换按钮 `disabled`，移除按钮可用；
+- 页面无异常。
+
+仍未验证：点击「切换」到失效账号时的错误提示（按钮本来就被禁用，正常界面到不了）。
