@@ -16,6 +16,7 @@ import (
 	"github.com/Aurorainic/cinderfish/internal/announcement"
 	"github.com/Aurorainic/cinderfish/internal/config"
 	"github.com/Aurorainic/cinderfish/internal/federation"
+	"github.com/Aurorainic/cinderfish/internal/mail"
 	"github.com/Aurorainic/cinderfish/internal/media"
 	"github.com/Aurorainic/cinderfish/internal/note"
 	"github.com/Aurorainic/cinderfish/internal/report"
@@ -49,6 +50,10 @@ type Server struct {
 	storage media.Storage
 	drive   *media.DriveService
 
+	// mail delivers verification and password reset links. It is never nil:
+	// an instance without SMTP configured logs messages instead.
+	mail mail.Sender
+
 	// web serves the built Vue frontend. It is nil when no build is
 	// present, so API-only deployments and tests still work.
 	web *staticSite
@@ -73,6 +78,16 @@ type Server struct {
 // endpoints that do not need persistence.
 func NewServer(cfg *config.Config) *Server {
 	s := &Server{cfg: cfg, startedAt: time.Now(), streamBus: streaming.NewBus()}
+	if cfg != nil {
+		s.mail = mail.New(mail.Settings{
+			Host:     cfg.Mail.Host,
+			Port:     cfg.Mail.Port,
+			Username: cfg.Mail.Username,
+			Password: cfg.Mail.Password,
+			From:     cfg.Mail.From,
+			TLS:      cfg.Mail.TLS,
+		})
+	}
 	if site, err := newStaticSite(cfg.WebDir); err == nil {
 		s.web = site
 	}
@@ -123,6 +138,12 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("POST /api/signin", s.handleSignin)
 	s.mux.HandleFunc("POST /api/username/available", s.handleUsernameAvailable)
 	s.mux.HandleFunc("POST /api/i", s.handleI)
+	s.mux.HandleFunc("POST /api/email-address/available", s.handleEmailAddressAvailable)
+	s.mux.HandleFunc("POST /api/request-reset-password", s.handleRequestResetPassword)
+	s.mux.HandleFunc("POST /api/reset-password", s.handleResetPassword)
+	s.mux.HandleFunc("POST /api/verify-email", s.handleVerifyEmail)
+	s.mux.HandleFunc("POST /api/i/email-verification", s.handleIEmailVerification)
+	s.mux.HandleFunc("POST /api/i/update-email", s.handleIUpdateEmail)
 	s.mux.HandleFunc("POST /api/i/change-password", s.handleIChangePassword)
 	s.mux.HandleFunc("POST /api/i/regenerate-token", s.handleIRegenerateToken)
 	s.mux.HandleFunc("POST /api/i/signin-history", s.handleISigninHistory)

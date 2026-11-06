@@ -526,6 +526,28 @@ CREATE TABLE IF NOT EXISTS announcement_reads (
     PRIMARY KEY (user_id, announcement_id)
 );
 `,
+
+	// v18: email verification and password reset links. One row per issued
+	// link; the code is the URL token, so it must stay unique and unguessable.
+	// Consumption is a conditional UPDATE, which makes replay impossible.
+	18: `
+ALTER TABLE user_profiles
+    ADD COLUMN IF NOT EXISTS email_verified BOOLEAN NOT NULL DEFAULT FALSE;
+
+CREATE TABLE IF NOT EXISTS email_challenges (
+    id         TEXT PRIMARY KEY,
+    user_id    TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    purpose    TEXT NOT NULL,
+    email      TEXT NOT NULL,
+    code       TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    expires_at TIMESTAMPTZ NOT NULL,
+    used_at    TIMESTAMPTZ
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_email_challenges_code ON email_challenges (code);
+CREATE INDEX IF NOT EXISTS idx_email_challenges_user
+    ON email_challenges (user_id, purpose, created_at DESC);
+`,
 }
 
 // Migrate applies pending migrations in order and returns the version

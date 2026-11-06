@@ -3030,6 +3030,48 @@ cd web && pnpm build                    # exit 0
 - 404 `NO_SUCH_ANNOUNCEMENT` 与 403 分支。
 - `go test` 与浏览器走查未执行。
 
+## 12BB. 批次：邮件发送与邮箱验证（2026-11-06）
+
+**工作方式**：目标模式第三十八波，继续只写代码、验证到编译层。施工依据
+`docs/research/2026-11-06-firefish-port-wave38-contract.md`。
+
+### 12BB.1 落地清单
+
+| 层 | 文件 | 说明 |
+|----|------|------|
+| 配置 | `internal/config/config.go`、`config.example.toml` | `[mail]` 段与环境变量；host 空即日志模式；from 按域名推导 |
+| 发信 | `internal/mail/mail.go` | `Sender`、`SMTPSender`（starttls/tls/none）、`LogSender`；头部注入清理 |
+| 迁移 | `internal/db/db.go` | v18：`email_challenges` + `user_profiles.email_verified`；AGENTS schema 18；测试库 TRUNCATE |
+| 服务层 | `internal/account/email.go` | 校验/占用/写入/发码/消费/节流；`ResetPassword` |
+| 打包 | `internal/account/profile.go`、`httpapi/users_pack.go` | `MeDetailed.email`、`emailVerified` 读真值 |
+| 端点 | `internal/httpapi/email.go`、`server.go` | 6 个路由：available/update-email/email-verification/verify-email/request-reset/reset |
+| 文档 | `auth-users.md`、台账 | 邮箱小节 + 契约（131/124/316） |
+
+### 12BB.2 有意的限制
+
+1. 注册不收邮箱，`emailRequiredForSignup` 仍为 false。
+2. 邮件正文固定中文纯文本，无 HTML/多语言模板。
+3. 只有「同账号同用途 60 秒」节流，没有按 IP 配额。
+4. 重置密码不吊销已签发 token（与 `i/change-password` 一致）。
+5. `i/update-email` 发信失败时保留新地址并返回 500。
+
+### 12BB.3 验证证据（编译层）
+
+```
+gofmt -l internal/ cmd/                 # 空
+go vet ./...                            # exit 0（含测试文件编译）
+```
+
+本波未改前端，`vue-tsc`/`check:port`/`pnpm build` 不适用。
+
+### 12BB.4 仍未验证
+
+- SMTP 真投递（三种 TLS 模式、AUTH、超时）从未对真实服务器执行。
+- 验证链接、重置链接的端到端（点开链接 → 标记/改密）。
+- 边界：他人链接、地址变更后旧链接、过期链接、重放、60 秒节流。
+- `MeDetailed.email` 在原生 token 与 OAuth token 两种请求下的差异。
+- `go test`（含数据库）与浏览器走查未执行。
+
 ## 13. 文档索引
 
 | 文档 | 内容 |
@@ -3093,6 +3135,7 @@ cd web && pnpm build                    # exit 0
 | `docs/research/2026-11-06-firefish-port-wave35-contract.md` | **第三十五波施工契约（从 URL 上传），见 §12AY** |
 | `docs/research/2026-11-06-firefish-port-wave36-contract.md` | **第三十六波施工契约（公告已读状态），见 §12AZ** |
 | `docs/research/2026-11-06-firefish-port-wave37-contract.md` | **第三十七波施工契约（公告编辑），见 §12BA** |
+| `docs/research/2026-11-06-firefish-port-wave38-contract.md` | **第三十八波施工契约（邮件与邮箱验证），见 §12BB** |
 
 ## 14. 已知的未验证项
 
@@ -3149,6 +3192,7 @@ cd web && pnpm build                    # exit 0
 - **第三十五波未测（2026-11-06，见 §12AY.4）**：从 URL 上传只过了编译层，SSRF 拒绝与下载分支未验证。
 - **第三十六波未测（2026-11-06，见 §12AZ.4）**：公告已读只过了编译层，写入/回读与角标联动未验证。
 - **第三十七波未测（2026-11-06，见 §12BA.4）**：公告编辑只过了编译层，保存回读与清空语义未验证。
+- **第三十八波未测（2026-11-06，见 §12BB.4）**：SMTP 真投递与验证/重置端到端未执行，只有编译层证据。
 - **仍未移植的设置页**：邮箱、整合、导入导出、迁移、Webhook、插件、自定义 KaTeX、状态栏、
   删除账号、应用授权以外的账号操作；对应后端端点不存在或前端缺少依赖（见第五波契约 §3.3）。
 - **仍缺的 widgets**：rss、rss-ticker、server-metric、online-users、federation、job-queue、aiscript、

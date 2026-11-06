@@ -22,6 +22,19 @@ federation_mode = "none"
 # API-only.
 web_dir = "./web/dist"
 
+# Outbound email: verification links, password resets. With no host set the
+# server prints the message to the log instead of delivering it, so a fresh
+# instance can be set up by copying the link out of the log.
+[mail]
+host = ""
+port = 587
+username = ""
+password = ""
+# Defaults to no-reply@<domain> when empty.
+from = ""
+# starttls (587) | tls (465, implicit TLS) | none (local relay only)
+tls = "starttls"
+
 # Optional Redis: PostgreSQL stays the source of truth. Redis pub/sub
 # carries Streaming events and delivery wakeups between processes of one
 # instance.

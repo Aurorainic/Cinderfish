@@ -180,8 +180,12 @@ func packMeDetailed(u *account.User, createdAt time.Time, includeSecrets bool, p
 	packed["policies"] = map[string]any{}
 
 	if includeSecrets {
-		packed["email"] = nil
-		packed["emailVerified"] = false
+		if prof != nil && prof.Email != "" {
+			packed["email"] = prof.Email
+		} else {
+			packed["email"] = nil
+		}
+		packed["emailVerified"] = prof != nil && prof.EmailVerified
 		packed["securityKeysList"] = []any{}
 	}
 	return packed

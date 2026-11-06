@@ -4,7 +4,7 @@
 
 **证据口径**：所有请求字段、响应字段、错误码、HTTP 状态码都从本仓库代码读出（引用 `internal/...:行号`），不以 Misskey 官方文档为准；与 Misskey 的差异处会单独标注。核对过的上游参考为 `tmp/refcheck/misskey`（`c05e844`）与 `tmp/refcheck/firefish`（`02c31e0`），仅用于"差异"小节，不用于推断本实现行为。
 
-覆盖端点：`signup`、`signin`、`username/available`、`miauth/gen-token`、`i`、`i/update`（含 `users/update` 别名）、`i/2fa/*`、`i/change-password`、`i/regenerate-token`、`i/signin-history`、`users/show`、`users/notes`、`users/followers`、`users/following`、`i/pin`、`i/unpin`，以及 OAuth 的三个端点。个人资料打包（`UserLite` / `UserDetailed` / `MeDetailed`）与 `users/notes` 用到的 `Note` 打包也在此文档化。
+覆盖端点：`signup`、`signin`、`username/available`、`email-address/available`、`i/update-email`、`i/email-verification`、`verify-email`、`request-reset-password`、`reset-password`、`miauth/gen-token`、`i`、`i/update`（含 `users/update` 别名）、`i/2fa/*`、`i/change-password`、`i/regenerate-token`、`i/signin-history`、`users/show`、`users/notes`、`users/followers`、`users/following`、`i/pin`、`i/unpin`，以及 OAuth 的三个端点。个人资料打包（`UserLite` / `UserDetailed` / `MeDetailed`）与 `users/notes` 用到的 `Note` 打包也在此文档化。
 
 ---
 
@@ -22,6 +22,12 @@
 | POST | `/api/i/regenerate-token` | 需登录 | `internal/httpapi/security.go:57` | 校验密码后换 16 字符原生 token |
 | POST | `/api/i/signin-history` | 需登录 | `internal/httpapi/security.go:95` | 登录历史，id 游标分页 |
 | POST | `/api/username/available` | 匿名 | `internal/httpapi/account.go:174` | 用户名是否可注册 |
+| POST | `/api/email-address/available` | 匿名 | `internal/httpapi/email.go:245` | 邮箱是否可用；`{available, reason?}` |
+| POST | `/api/i/update-email` | 需登录 | `internal/httpapi/email.go:175` | 校验密码后换邮箱并发送验证链接 |
+| POST | `/api/i/email-verification` | 需登录 | `internal/httpapi/email.go:54` | 给已登记邮箱重发验证链接 |
+| POST | `/api/verify-email` | 需登录 | `internal/httpapi/email.go:104` | 用邮件里的 code 标记邮箱已验证 |
+| POST | `/api/request-reset-password` | 匿名 | `internal/httpapi/email.go:281` | 发送密码重置链接；恒 204 |
+| POST | `/api/reset-password` | 匿名 | `internal/httpapi/email.go:336` | 用重置链接里的 token 设置新密码 |
 | POST | `/api/miauth/gen-token` | 需登录 | `internal/httpapi/account.go:290` | 为 MiAuth 会话签发 32 字符 token |
 | POST | `/api/i` | 需登录 | `internal/httpapi/account.go:200` | 当前用户 `MeDetailed` |
 | POST | `/api/i/update` | 需登录 | `internal/httpapi/i_update.go:66` | 修改 name / description / avatar / 两个可见性开关 |
@@ -242,8 +248,8 @@ token 解析（`internal/account/tokens.go:88`）：
 
 | 字段 | 类型 | 实际取值 |
 |------|------|----------|
-| `email` | null | 恒为 `null`（有 `user_profiles.email` 列但从不读取） |
-| `emailVerified` | boolean | 恒为 `false` |
+| `email` | string \| null | `user_profiles.email`；未设置时为 `null`（2026-11-06 第三十八波起读取真实值） |
+| `emailVerified` | boolean | `user_profiles.email_verified`；改邮箱后重置为 `false` |
 | `securityKeysList` | array | 恒为 `[]` |
 
 `includeSecrets` 的判定在各 handler 里：`i`、`i/update`、`i/pin`、`i/unpin` 用 `info.Token == nil`（即请求方用的是 16 字符原生 token），`signup` 恒为 `true`（`internal/httpapi/account.go:85`）。**用 MiAuth/OAuth token 调 `i` 时不会返回 `email` 字段。**
@@ -372,7 +378,7 @@ token 解析（`internal/account/tokens.go:88`）：
 ### 与 Misskey 的差异 / 已知缺口
 
 - Misskey 在关闭注册时返回**无 code 的裸 400**；Cinderfish 返回带 `code` 的结构化错误，前端可以用 `REGISTRATION_DISABLED` 做文案分支。
-- 未实现：邮箱注册与邮箱验证（`emailRequiredForSignup`）、已验证用户名墓碑（`usedUsernames`）、保留用户名（`preservedUsernames`）、任何 captcha 校验、邀请码的邮件绑定流程。
+- 未实现：注册时填写邮箱（`emailRequiredForSignup` 恒 `false`，注册请求里的 `email` 字段被忽略）、已验证用户名墓碑（`usedUsernames`）、保留用户名（`preservedUsernames`）、任何 captcha 校验、邀请码的邮件绑定流程。注册后的邮箱通过 `i/update-email` 补填，见下一节。
 - **远端账号会占用本地用户名**：查重只查本地行（`internal/account/service.go:202`），但 `username_lower` 的唯一索引是全表的（`internal/db/db.go:187`），所以当某个联邦远端账号已用同名时的本地注册会落到 `DUPLICATED_USERNAME`。
 - 成功响应结构与 Misskey 的 `SignupApiService` 一致（`MeDetailed` + `token`），Firefish 的注册页在成功后还会再调一次 `signin`（`packages/client/src/components/MkSignup.vue:502`），这条路径可以正常工作。
 
@@ -1322,3 +1328,66 @@ OAuth 2.0 授权码端点（仅 PKCE `S256`）。认证：**需要登录**，且
 
 错误：`NO_SUCH_FILE`（文件不存在/不属于自己）、`INVALID_PARAM`（不是 JSON、格式不符、缺 `fileId`）、
 `AUTHENTICATION_FAILED`。导入是增量操作，不删除任何现有数据；没有限流。
+
+## 2026-11-06 增补：邮箱与找回密码（第三十八波）
+
+迁移 v18 新增 `user_profiles.email_verified` 与 `email_challenges`（`id`、`user_id`、`purpose`、
+`email`、`code`、`created_at`、`expires_at`、`used_at`，`code` 唯一索引）。两种用途互不通用：
+`verify` 用于邮箱验证，`reset` 用于密码重置——一条重置链接不能当验证链接用，反之亦然。
+
+邮件发送走 `internal/mail`：配置了 `mail.host` 时用 SMTP（`starttls` / `tls` / `none` 三种），
+没配置时把整封邮件打到进程日志，运营者可以从日志里复制链接完成初始化。链接格式为
+`<实例根 URL>/verify-email/<code>` 与 `<实例根 URL>/reset-password/<code>`，code 是 32 字节
+随机数的十六进制（64 字符）。
+
+### POST /api/email-address/available（匿名）
+
+`{ email }`。格式非法返回 `{"available": false, "reason": "format"}`；被其它账号占用返回
+`{"available": false, "reason": "used"}`；可用返回 `{"available": true}`（不带 `reason`）。
+从不返回错误码，便于注册表单边输边查。
+
+### POST /api/i/update-email（需登录）
+
+| 参数 | 校验 |
+|------|------|
+| `password` | 必填；错误时 403 + id-only 信封 `932c904e…`（与 signin 同一 id） |
+| `email` | 必填；`account.ValidateEmail`：单 `@`、域名含点、无空白与 `,;<>`、≤254 字符 |
+
+成功后写入 `user_profiles.email` 并把 `email_verified` 置 `false`，然后给新地址发验证链接
+（`verify` 用途，1 小时有效），返回 `MeDetailed`（`includeSecrets` 恒 true，所以能看到新的
+`email` 与 `emailVerified:false`）。地址被占用返回 400 `EMAIL_ALREADY_REGISTERED`。
+**地址已保存但发信失败**时返回 500，且不回滚地址——客户端可以重发。
+
+### POST /api/i/email-verification（需登录）
+
+`{ email? }`。给已登记地址重发验证链接。没有登记地址 → 400 `INVALID_PARAM`；给了 `email`
+但与登记值不匹配（忽略大小写）→ 400 `INVALID_PARAM`。成功 204。同一用途 60 秒内重复请求
+返回 429 `RATE_LIMIT_EXCEEDED`。
+
+### POST /api/verify-email（需登录）
+
+`{ code }`。消费 `verify` 用途的链接并把当前账号的 `email_verified` 置 `true`，返回 204。
+链接失效/已用过 → 400 `INVALID_EMAIL_CODE`；链接属于另一个账号 → 同样 400（code 已被消费）；
+链接发出后地址又被改过 → 400 `INVALID_EMAIL_CODE`（旧链接不能证明新邮箱）。
+
+### POST /api/request-reset-password（匿名）
+
+`{ username, email }`。**恒 204**：账号不存在、地址不匹配、被节流、甚至发信失败都不暴露差别，
+避免枚举。命中时发 `reset` 用途链接（24 小时有效）。同一账号 60 秒内只发一封。
+
+### POST /api/reset-password（匿名）
+
+| 参数 | 校验 |
+|------|------|
+| `token` | 必填；即邮件链接里的 code |
+| `password` | 必填；仅要求非空（与 `i/change-password` 一致），bcrypt cost 8 |
+
+成功：换密码、把 `email_verified` 置 `true`（收到链接本身就是控制权证明）、返回 204。
+链接失效/已用过 → 400 `INVALID_TOKEN`。不吊销已签发的 access token（与 `i/change-password`
+行为一致），吊销靠 `i/revoke-token`。
+
+### 已知限制
+
+- 注册流程不接受邮箱（`emailRequiredForSignup` 恒 `false`），邮箱只能在登录后补填。
+- 没有「重新发送」冷却以外的限流，也没有按 IP 的发送配额。
+- 不支持 HTML 邮件与多语言模板：正文是固定中文纯文本。

@@ -15,15 +15,15 @@
 | 指标 | 数量 |
 |------|------|
 | Misskey 端点总数 | 440 |
-| Cinderfish 已注册路由 | 125 |
-| 其中 Misskey 同名路径 | 118 |
+| Cinderfish 已注册路由 | 131 |
+| 其中 Misskey 同名路径 | 124 |
 | 其中 Cinderfish 自有路径/别名 | 7（`notifications` 别名、`admin/federation/mode`、`admin/federation/allowlist`、`miauth/{session}/check`、`admin/object-storage`、`admin/deliver-queue`、`notes/history`） |
-| 未实现（Misskey 同名） | 322 |
+| 未实现（Misskey 同名） | 316 |
 
 统计口径：`internal/httpapi/server.go` 里 `HandleFunc("METHOD /api/…")` 的去重路径；
 GET 与 POST 同名路径只算一个。
 
-## 2. 已实现（125 条注册路由）
+## 2. 已实现（131 条注册路由）
 
 ```
 admin/accounts/create       admin/announcements/create  admin/announcements/delete
@@ -41,7 +41,7 @@ drive/files/upload-from-url
 drive/files/update
 drive                       drive/folders               drive/folders/create
 drive/folders/delete        drive/folders/show          drive/folders/update
-emojis                      federation/instances
+email-address/available     emojis                      federation/instances
 federation/show-instance
 following/create            following/delete
 following/requests/accept    following/requests/cancel   following/requests/list
@@ -54,6 +54,7 @@ i/signin-history
 i/notifications             i/pin                       i/registry/clear
 i/registry/get              i/registry/get-all          i/registry/get-detail
 i/registry/keys             i/registry/remove           i/registry/scopes
+i/email-verification        i/update-email
 i/read-announcement         i/registry/set              i/revoke-token
 i/unpin                     i/update                    i/webhooks/create
 i/webhooks/delete           i/webhooks/list             i/webhooks/show
@@ -69,8 +70,10 @@ notes/reactions/create      notes/reactions/delete      notes/renotes
 notes/search                notes/search-by-tag
 notes/replies               notes/show                  notes/state                 notes/timeline
 notifications*              notifications/mark-all-as-read
-ping                        signin                      signup                        stats
+ping                        request-reset-password      reset-password
+signin                      signup                      stats
 username/available          users/followers             users/following
+verify-email
 users                       users/notes                 users/report-abuse
 users/search
 users/show
@@ -91,6 +94,10 @@ users/update
 
 2026-11-06 第十九波新增：`stats`（公开计数）；`admin/update-meta` 增加六个合规 URL 与
 `serverRules`（不是新路由）。
+
+2026-11-06 第三十八波新增：`email-address/available`、`i/update-email`、`i/email-verification`、
+`verify-email`、`request-reset-password`、`reset-password`（迁移 v18：`email_challenges` 与
+`user_profiles.email_verified`；`MeDetailed.email`/`emailVerified` 从「恒 null/false」变成真值）。
 
 2026-11-06 第三十七波新增：`admin/announcements/update`（部分更新，`imageUrl: null`/`expiresAt: null` 清空，404 `NO_SUCH_ANNOUNCEMENT`）。
 

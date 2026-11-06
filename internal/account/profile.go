@@ -52,6 +52,10 @@ type Profile struct {
 	// MutedNotificationTypes hides those notification kinds from the list
 	// and the unread badge.
 	MutedNotificationTypes []string
+	// Email is the address on file; empty when none is set. Verified is
+	// only meaningful when Email is non-empty.
+	Email         string
+	EmailVerified bool
 }
 
 // ProfileField is one row of Misskey's "fields" (profile metadata) list.
@@ -73,15 +77,15 @@ func (s *Service) AttachDrive(drive *media.DriveService) {
 // GetProfile loads a user's profile. A user without a profile row reads
 // as the zero value instead of failing.
 func (s *Service) GetProfile(ctx context.Context, userID string) (*Profile, error) {
-	var name, description, avatarURL, followersVis, followingVis *string
+	var name, description, avatarURL, followersVis, followingVis, email *string
 	var settings []byte
-	var twoFactorEnabled, usePasswordLessLogin bool
+	var twoFactorEnabled, usePasswordLessLogin, emailVerified bool
 	err := s.pool.QueryRow(ctx, `
 SELECT name, description, avatar_url, followers_visibility, following_visibility, settings,
-       two_factor_enabled, use_password_less_login
+       two_factor_enabled, use_password_less_login, email, email_verified
 FROM user_profiles WHERE user_id = $1
 `, userID).Scan(&name, &description, &avatarURL, &followersVis, &followingVis, &settings,
-		&twoFactorEnabled, &usePasswordLessLogin)
+		&twoFactorEnabled, &usePasswordLessLogin, &email, &emailVerified)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return &Profile{}, nil
 	}
@@ -136,6 +140,8 @@ FROM user_profiles WHERE user_id = $1
 		CarefulBot:           stored.CarefulBot,
 		AutoAcceptFollowed:   stored.AutoAcceptFollowed,
 		InjectFeaturedNote:   stored.InjectFeaturedNote,
+		Email:                derefString(email),
+		EmailVerified:        emailVerified,
 	}, nil
 }
 

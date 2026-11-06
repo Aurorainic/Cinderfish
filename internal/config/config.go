@@ -24,7 +24,27 @@ type Config struct {
 	Federation Federation `toml:"federation"`
 	Media      Media      `toml:"media"`
 	Redis      Redis      `toml:"redis"`
+	Mail       Mail       `toml:"mail"`
 }
+
+// Mail configures outbound email. An empty Host means the server logs the
+// messages instead of delivering them: verification links still work when
+// copied out of the log, so a fresh instance can be set up before SMTP is
+// reachable, and tests never touch the network.
+type Mail struct {
+	Host     string `toml:"host"`
+	Port     int    `toml:"port"`
+	Username string `toml:"username"`
+	Password string `toml:"password"`
+	// From is the envelope sender. It defaults to no-reply@<domain>.
+	From string `toml:"from"`
+	// TLS selects the transport: "starttls" (default, submission port),
+	// "tls" (implicit TLS, port 465) or "none" (plain text, tests only).
+	TLS string `toml:"tls"`
+}
+
+// Enabled reports whether a real SMTP host is configured.
+func (m Mail) Enabled() bool { return strings.TrimSpace(m.Host) != "" }
 
 // Redis enables the optional Redis backend. PostgreSQL stays the system
 // of record; Redis carries cross-process Streaming events and delivery
@@ -71,6 +91,7 @@ func (c *Config) Addr() string {
 var validRegistration = map[string]bool{"open": true, "invite": true, "admin": true}
 var validFederation = map[string]bool{"public": true, "allowlist": true, "none": true}
 var validMediaBackend = map[string]bool{"local": true, "s3": true}
+var validMailTLS = map[string]bool{"starttls": true, "tls": true, "none": true}
 
 // Load reads the TOML file at path (optional; defaults apply otherwise),
 // then applies CINDERFISH_* environment overrides and validates the result.
@@ -85,6 +106,7 @@ func Load(path string) (*Config, error) {
 		WebDir:           "./web/dist",
 		Media:            Media{Backend: "local", LocalPath: "./data/files"},
 		Redis:            Redis{Enabled: false, URL: "redis://127.0.0.1:6379/0", Prefix: "cinderfish"},
+		Mail:             Mail{Port: 587, TLS: "starttls"},
 	}
 
 	if path != "" {
@@ -95,6 +117,19 @@ func Load(path string) (*Config, error) {
 	applyEnv(c)
 	if strings.TrimSpace(c.Redis.Prefix) == "" {
 		c.Redis.Prefix = "cinderfish"
+	}
+	if c.Mail.TLS == "" {
+		c.Mail.TLS = "starttls"
+	}
+	if c.Mail.Port == 0 {
+		if c.Mail.TLS == "tls" {
+			c.Mail.Port = 465
+		} else {
+			c.Mail.Port = 587
+		}
+	}
+	if strings.TrimSpace(c.Mail.From) == "" {
+		c.Mail.From = "no-reply@" + strings.TrimSpace(c.Domain)
 	}
 	if err := c.validate(); err != nil {
 		return nil, err
@@ -114,6 +149,12 @@ func applyEnv(c *Config) {
 	setStr("CINDERFISH_REDIS_URL", &c.Redis.URL)
 	setStr("CINDERFISH_REDIS_PREFIX", &c.Redis.Prefix)
 	setBool("CINDERFISH_REDIS_ENABLED", &c.Redis.Enabled)
+	setStr("CINDERFISH_MAIL_HOST", &c.Mail.Host)
+	setStr("CINDERFISH_MAIL_USERNAME", &c.Mail.Username)
+	setStr("CINDERFISH_MAIL_PASSWORD", &c.Mail.Password)
+	setStr("CINDERFISH_MAIL_FROM", &c.Mail.From)
+	setStr("CINDERFISH_MAIL_TLS", &c.Mail.TLS)
+	setInt("CINDERFISH_MAIL_PORT", &c.Mail.Port)
 	setInt("CINDERFISH_PORT", &c.Port)
 }
 
@@ -167,6 +208,12 @@ func (c *Config) validate() error {
 		if s.Endpoint == "" || s.Bucket == "" {
 			return fmt.Errorf("config: media.s3.endpoint and media.s3.bucket are required for the s3 backend")
 		}
+	}
+	if !validMailTLS[c.Mail.TLS] {
+		return fmt.Errorf("config: mail.tls must be starttls, tls or none (got %q)", c.Mail.TLS)
+	}
+	if c.Mail.Enabled() && (c.Mail.Port <= 0 || c.Mail.Port > 65535) {
+		return fmt.Errorf("config: invalid mail port %d", c.Mail.Port)
 	}
 	return nil
 }
