@@ -4405,7 +4405,8 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
   仍未验证的：编辑页内删除。
 - **第十二波边角（2026-11-07，见 §12DU）**：`admin/get-table-stats` 的计数来自 `pg_class.reltuples`，
   未 `ANALYZE` 前实测为 20001、实际 23001，`ANALYZE notes` 后为 23001——与 PostgreSQL 语义一致；
-  大 schema 渲染性能、vacuum 与索引维护仍未验证/按设计未做。
+  `/admin/database` 页面在真实库上渲染 4.4 MB / 36 表 / 90 索引与各表行数（§12DZ）；
+  vacuum 与索引维护按设计未做。
 - **第十三波的部分边角（2026-11-06，见 §12AC.4）**：邀请码注册已由
   `TestSignupWithInviteCode` 覆盖（有效码建号、单次使用、失败后释放），账户层另有
   `TestRegisterInviteMode` 的释放断言。注册页界面已于 2026-11-07 走查（§12CV：填表 → 提交 →
@@ -5778,3 +5779,19 @@ CINDERFISH_TEST_DATABASE_URL=... go test ./... -count=1         # 全绿
 
 Deck 在 390 宽退化为「主列」单列，1400 宽显示主列 + 侧栏，均渲染正常。
 仍未验证：Deck 的列拖拽、列增减与 profile 切换。
+
+## 12DZ. 第一百一十一波：统计失败降级与管理台数据库页（2026-11-07）
+
+### 12DZ.1 统计失败降级
+
+用 CDP `Fetch` 拦截并让 `/api/users/stats` 请求失败（`failedStats=1`），再打开
+`/settings/account-info`：页面正常渲染，计数块整体隐藏（文本里没有「帖子数量」），没有错误弹窗
+或崩溃。这正是 §12DM 里代码所写的降级路径。
+
+### 12DZ.2 管理台数据库页
+
+`/admin/database` 读取 `admin/get-table-stats`：显示「4.4 MB · 36 张表 · 90 个索引」，
+并按大小列出表（`ap_activities` 2,155 行 / 3.2 MB、`users`、`notes`、`notifications` 等）。
+请求耗时的测量见 §12DU。
+
+仍未验证：`refresh` 按钮触发重新统计的等待态、磁盘配额告警（本实例无配额）。
