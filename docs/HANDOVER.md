@@ -4162,8 +4162,10 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
 - ~~**第六波的搜索过滤组合未全测**~~：2026-11-07 补了 `TestNotesSearchFilters`，覆盖
   `offset`、`userId`、`host`（空 / 非空）与 `withFiles`（`notes/search` 与 `notes/search-by-tag`）。
   仍然没有构造数据的：远端作者的搜索结果；`ILIKE '%…%'` 的性能没有压测。
-- **第七波的排序与游标组合未全测（2026-11-06，见 §12W.4）**：四种 sort、hostname/userId、文件游标与
-  远端文件没有构造数据；`state=silenced` 仅在实现层面为空集。
+- ~~**第七波的排序与游标组合未全测**~~：2026-11-07 补了 `TestAdminDriveFilters`，用构造的远端账号与
+  文件覆盖 `userId`、`origin=remote`、`hostname`（大小写折叠）与 `sinceId`/`untilId`/双游标。
+  `admin/show-users` 的四种 sort 仍未构造数据（只有 state/username/origin 有用例），
+  `state=silenced` 仍在实现层面为空集。
 - **第八波未测的边角（2026-11-06，见 §12X.4）**：公告图片渲染、`untilId` 多页、`limit` 上限、
   浏览器内过期隐藏均未构造数据；已读跟踪与首页横幅按设计未做。
 - **第十波未测边角（2026-11-06，见 §12Z.4）**：远端举报、分页游标与 toast 文案未验证；转发、

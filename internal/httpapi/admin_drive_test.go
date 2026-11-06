@@ -2,6 +2,7 @@ package httpapi_test
 
 import (
 	"bytes"
+	"context"
 	"net/http"
 	"testing"
 )
@@ -103,5 +104,77 @@ func TestAdminDriveFiles(t *testing.T) {
 	resp, _ = postRawWithToken(t, ts, "/api/admin/drive/files", aliceToken, map[string]any{})
 	if resp.StatusCode != http.StatusForbidden {
 		t.Errorf("non-admin status = %d, want 403", resp.StatusCode)
+	}
+}
+
+// TestAdminDriveFilters covers the filters the admin file list applies on top
+// of origin/type: userId, hostname, and the id cursor.
+func TestAdminDriveFilters(t *testing.T) {
+	ts, srv := adminTestServer(t, "open")
+
+	_, alice := post(t, ts, "/api/signup", map[string]any{"username": "alice", "password": "password123"})
+	aliceToken, _ := alice["token"].(string)
+	aliceID, _ := alice["id"].(string)
+	_, bob := post(t, ts, "/api/signup", map[string]any{"username": "bob", "password": "password123"})
+	bobToken, _ := bob["token"].(string)
+
+	if resp, body := uploadFile(t, ts.URL, aliceToken, "a.txt", bytes.NewBufferString("aaa")); resp.StatusCode != http.StatusOK {
+		t.Fatalf("alice upload: %d %v", resp.StatusCode, body)
+	}
+	if resp, body := uploadFile(t, ts.URL, bobToken, "b.txt", bytes.NewBufferString("bbb")); resp.StatusCode != http.StatusOK {
+		t.Fatalf("bob upload: %d %v", resp.StatusCode, body)
+	}
+
+	// A remote account with a file, inserted directly: the drive API only
+	// creates local uploads.
+	pool := srv.TestPool()
+	if _, err := pool.Exec(context.Background(), `
+INSERT INTO users (id, username, username_lower, host, uri)
+VALUES ('w63remote', 'remotee', 'remotee', 'remote.example', 'https://remote.example/users/remotee')`); err != nil {
+		t.Fatalf("insert remote user: %v", err)
+	}
+	if _, err := pool.Exec(context.Background(), `
+INSERT INTO drive_files (id, user_id, name, content_type, size, md5, storage_key, storage_backend, created_at)
+VALUES ('w63remotefile', 'w63remote', 'r.txt', 'text/plain', 1, 'r', 'r/key', 'local', now() + interval '1 minute')`); err != nil {
+		t.Fatalf("insert remote file: %v", err)
+	}
+
+	list := func(params map[string]any) []any {
+		resp, raw := postRawWithToken(t, ts, "/api/admin/drive/files", "admintoken000000", params)
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("admin/drive/files %v: %d %v", params, resp.StatusCode, raw)
+		}
+		arr, _ := raw.([]any)
+		return arr
+	}
+
+	if got := list(map[string]any{"origin": "combined"}); len(got) != 3 {
+		t.Fatalf("combined files = %d, want 3", len(got))
+	}
+	if got := list(map[string]any{"userId": aliceID}); len(got) != 1 {
+		t.Errorf("userId files = %d, want 1", len(got))
+	}
+	if got := list(map[string]any{"origin": "remote"}); len(got) != 1 {
+		t.Errorf("remote files = %d, want 1", len(got))
+	}
+	if got := list(map[string]any{"hostname": "REMOTE.EXAMPLE"}); len(got) != 1 {
+		t.Errorf("hostname files = %d, want 1 (the filter folds case)", len(got))
+	}
+	if got := list(map[string]any{"hostname": "other.example"}); len(got) != 0 {
+		t.Errorf("hostname other = %d, want 0", len(got))
+	}
+
+	// The newest file is the remote one (created a minute ahead), so an untilId
+	// cursor at its id keeps the two local uploads.
+	if got := list(map[string]any{"untilId": "w63remotefile"}); len(got) != 2 {
+		t.Errorf("untilId files = %d, want 2", len(got))
+	}
+	// sinceId walks the other way and finds only newer rows.
+	if got := list(map[string]any{"sinceId": "w63remotefile"}); len(got) != 0 {
+		t.Errorf("sinceId files = %d, want 0", len(got))
+	}
+	// Both cursors together bound the page.
+	if got := list(map[string]any{"sinceId": "w63remotefile", "untilId": "aaaaaaaaaaaa"}); len(got) != 0 {
+		t.Errorf("bounded cursor files = %d, want 0", len(got))
 	}
 }
