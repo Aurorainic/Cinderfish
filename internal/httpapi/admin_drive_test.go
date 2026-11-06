@@ -227,3 +227,66 @@ func TestAdminShowUsersSorts(t *testing.T) {
 		t.Errorf("-createdAt = %v, want root first and bob last", got)
 	}
 }
+
+// TestAdminDriveShowFile covers the administrative file detail endpoint: any
+// uploader's file with its owner attached, and the 403/400/404 answers.
+func TestAdminDriveShowFile(t *testing.T) {
+	ts, _ := adminTestServer(t, "open")
+
+	_, alice := post(t, ts, "/api/signup", map[string]any{"username": "alice", "password": "password123"})
+	aliceToken, _ := alice["token"].(string)
+	_, bob := post(t, ts, "/api/signup", map[string]any{"username": "bob", "password": "password123"})
+	bobToken, _ := bob["token"].(string)
+
+	resp, uploaded := uploadFile(t, ts.URL, aliceToken, "photo.png", bytes.NewBufferString("\x89PNG\r\n\x1a\nfake"))
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("upload: %d %v", resp.StatusCode, uploaded)
+	}
+	fileID, _ := uploaded["id"].(string)
+	if fileID == "" {
+		t.Fatalf("upload returned no id: %v", uploaded)
+	}
+
+	// The administrator sees another user's file and its owner.
+	resp, raw := postRawWithToken(t, ts, "/api/admin/drive/show-file", "admintoken000000", map[string]any{"fileId": fileID})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("show-file: %d %v", resp.StatusCode, raw)
+	}
+	file, _ := raw.(map[string]any)
+	if file["id"] != fileID || file["name"] != "photo.png" {
+		t.Errorf("file = %v/%v, want %s/photo.png", file["id"], file["name"], fileID)
+	}
+	// uploadFile sends the multipart part as application/octet-stream, so the
+	// stored type is that; the detail view must return exactly what was stored.
+	if file["type"] != uploaded["type"] || file["type"] != "application/octet-stream" {
+		t.Errorf("type = %v, want the stored %v", file["type"], uploaded["type"])
+	}
+	if file["url"] == nil || file["url"] == "" {
+		t.Errorf("file has no url: %v", file)
+	}
+	if _, ok := file["thumbnailUrl"]; !ok {
+		t.Errorf("thumbnailUrl missing from %v", file)
+	}
+	owner, _ := file["user"].(map[string]any)
+	if owner["username"] != "alice" || owner["id"] != alice["id"] {
+		t.Errorf("owner = %v, want alice", owner)
+	}
+
+	// A non-administrator is refused, even for their own file.
+	resp, errBody := postWithToken(t, ts, "/api/admin/drive/show-file", bobToken, map[string]any{"fileId": fileID})
+	if resp.StatusCode != http.StatusForbidden {
+		t.Errorf("non-admin = %d %v, want 403", resp.StatusCode, errBody)
+	}
+
+	// fileId is required and an unknown one answers NO_SUCH_FILE.
+	if resp, _ := postWithToken(t, ts, "/api/admin/drive/show-file", "admintoken000000", map[string]any{}); resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("missing fileId = %d, want 400", resp.StatusCode)
+	}
+	resp, missing := postWithToken(t, ts, "/api/admin/drive/show-file", "admintoken000000", map[string]any{"fileId": "000000000000000000000000"})
+	if resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("unknown file = %d %v, want 404", resp.StatusCode, missing)
+	}
+	if e, _ := missing["error"].(map[string]any); e["code"] != "NO_SUCH_FILE" {
+		t.Errorf("unknown file code = %v, want NO_SUCH_FILE", e["code"])
+	}
+}

@@ -115,7 +115,7 @@
 							</CfKeyValue>
 						</template>
 						<CfInfo v-else class="note">
-							上传者账号已不存在（文件行仍在，因为删除账号不会级联删除云盘文件）。
+							上传者账号已不存在。账号删除会连同云盘文件一起删除，这里的数据属于异常遗留。
 						</CfInfo>
 					</section>
 

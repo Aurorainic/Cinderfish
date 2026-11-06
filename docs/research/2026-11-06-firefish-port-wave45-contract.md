@@ -45,4 +45,9 @@ cd web && pnpm run check:port           # hardTotal 0（400 文件）
 cd web && pnpm build                    # exit 0
 ```
 
-台账：137 路由 / 130 同名 / 310 未实现。未执行 `go test`、数据库测试与浏览器走查。
+台账：137 路由 / 130 同名 / 310 未实现。未执行浏览器走查（2026-11-07 补：
+`TestAdminDriveShowFile` 与四类预览走查，见 HANDOVER §12BI.4）。
+
+关于 `user: null`：`drive_files.user_id` 是 `ON DELETE CASCADE`，账号删除还会先删云盘对象，
+所以正常流程构造不出「文件在、用户不在」。该分支仅保留为防御代码，页面文案已改为
+「账号删除会连同云盘文件一起删除」。

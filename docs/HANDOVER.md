@@ -3363,7 +3363,7 @@ cd web && pnpm build                                           # exit 0
 
 ## 12BI. 批次：管理台文件详情（2026-11-06）
 
-**工作方式**：目标模式第四十五波，继续只写代码、验证到编译层。施工依据
+**工作方式**：目标模式第四十五波，先只写代码验证到编译层，2026-11-07 补齐端点用例与浏览器走查。施工依据
 `docs/research/2026-11-06-firefish-port-wave45-contract.md`。
 
 ### 12BI.1 落地清单
@@ -3392,11 +3392,42 @@ cd web && pnpm run check:port           # hardTotal 0（400 文件）
 cd web && pnpm build                    # exit 0
 ```
 
-### 12BI.4 仍未验证
+### 12BI.4 补验证（2026-11-07）
 
-- 详情页在图片/视频/音频/其它四类文件下的渲染。
-- 上传者已删除账号时的 `user: null` 分支。
-- `go test` 与浏览器走查未执行。
+`internal/httpapi/admin_drive_test.go` 新增 `TestAdminDriveShowFile`：
+
+- 管理员能取到他人上传的文件，返回 `id`/`name`/`type`/`size`/`url`/`thumbnailUrl`
+  以及 `user`（用户名与 id）；
+- 非管理员（即使文件是自己的）403；缺 `fileId` 400；未知 id 404 `NO_SUCH_FILE`。
+
+真实二进制 + Helium 走查（`w45admin`，四类文件各一）：
+
+- `/admin/files` 每行都有「详情」链接，指向 `/admin/file/<id>`。
+- 图片 → `<img>`（src 指向 `/media/...`，1×1 PNG 实际加载）；
+- 视频 → `<video controls>`；音频 → `<audio controls>`；
+- 其它（text/plain）→「text/plain 没有内联预览」占位块；
+- 四页均显示名称、ID、类型、大小、上传时间、敏感标记、链接、上传者 `@w45admin`
+  与「本页只读」说明（截图 `/tmp/w45-shots/file-*.png`）。
+- 未登录访客被路由守卫送回首页，看不到文件字段。
+
+**`user: null` 分支不可达**：`drive_files.user_id` 是 `ON DELETE CASCADE`，
+`i/delete-account` 还会先删云盘对象，账号消失时文件行必然一起消失。页面原先写着
+「删除账号不会级联删除云盘文件」，这是错误描述，已改为「账号删除会连同云盘文件一起删除，
+此分支仅防御异常遗留数据」。分支保留，但没有任何正常流程能构造出该状态，因此未测试。
+
+```
+gofmt -l internal/ cmd/                                        # 空
+go vet ./...                                                   # exit 0
+CINDERFISH_TEST_DATABASE_URL=... go test ./... -count=1         # 全绿
+cd web && pnpm exec vue-tsc --noEmit                           # exit 0
+cd web && pnpm run check:port                                  # hardTotal 0
+cd web && pnpm build                                           # exit 0
+```
+
+### 12BI.5 仍未验证
+
+- 敏感文件的模糊预览（只验证了 `isSensitive: false` 的实际图片）。
+- 真实视频/音频的播放（走查文件是只有容器头的占位字节，元数据预加载会失败）。
 
 ## 12BJ. 批次：缩略图管道（2026-11-06）
 
@@ -3617,7 +3648,7 @@ cd web && pnpm build                    # exit 0
 | 42 | **按活动作者签名**（原为固定管理员密钥） | 编译层 |
 | 43 | `users/stats`、`hashtags/search`、`registry/keys-with-type`、`notes/featured` | 端点用例（§12BG.4） |
 | 44 | 实例级自定义 CSS + 邮件状态页 | 用例 + 浏览器走查（§12BH.4） |
-| 45 | `admin/drive/show-file` + 管理台文件详情 | 编译层 |
+| 45 | `admin/drive/show-file` + 管理台文件详情 | 用例 + 浏览器走查（§12BI.4） |
 | 46 | 缩略图生成管道（`thumbnailUrl` 不再恒 null） | 编译层 |
 | 47 | 锁推生效 + 关注类通知落库 + 隐私页七个真开关 | 编译层 |
 | 48 | 邮件通知（四类触发 + 公告群发） | 编译层 |
@@ -4349,7 +4380,10 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
 - **第四十四波已补验证（2026-11-07，见 §12BH.4）**：实例 CSS 的保存→下发→注入链路用
   `TestInstanceCustomCSS` 与无头浏览器走查覆盖（含 100 KiB 边界、空串清除、访客生效）；
   邮件状态页在未配置实例下走查通过。仍未验证的：已配置 SMTP 的页面呈现与账号级覆盖截图。
-- **第四十五波未测（2026-11-06，见 §12BI.4）**：文件详情的四类预览与 `user: null` 分支未走查。
+- **第四十五波已补验证（2026-11-07，见 §12BI.4）**：`admin/drive/show-file` 有端点用例；
+  文件详情的图片/视频/音频/其它四类预览、字段与「详情」入口均走查通过。仍未验证的：
+  敏感文件模糊预览、真实音视频播放。`user: null` 分支因外键级联在正常流程下不可达，
+  仅作防御保留。
 - **第四十六波未测（2026-11-06，见 §12BJ.4）**：缩略图生成与删除只有编译层证据。
 - **第四十七波未测（2026-11-06，见 §12BK.4）**：锁推与关注通知只有编译层证据。
 - **第四十八波未测（2026-11-06，见 §12BL.4）**：邮件通知与公告群发只有编译层证据。
