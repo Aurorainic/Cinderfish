@@ -103,6 +103,7 @@ export const ENDPOINTS = {
 	iUnpin: "i/unpin",
 	iKnownAs: "i/known-as",
 	iMove: "i/move",
+	oauthAuthorize: "oauth/authorize",
 	iFavorites: "i/favorites",
 	iNotifications: "i/notifications",
 
@@ -562,6 +563,18 @@ export interface EndpointMap {
 	[ENDPOINTS.iUnpin]: { req: NoteIdParams; res: MeDetailed };
 	[ENDPOINTS.iKnownAs]: { req: { alsoKnownAs: string[] }; res: MeDetailed };
 	[ENDPOINTS.iMove]: { req: { moveToAccount: string }; res: MeDetailed };
+	[ENDPOINTS.oauthAuthorize]: {
+		req: {
+			client_id: string;
+			redirect_uri: string;
+			response_type: "code";
+			code_challenge: string;
+			code_challenge_method: "S256";
+			state?: string;
+			scope?: string[];
+		};
+		res: { redirect: string };
+	};
 	[ENDPOINTS.iFavorites]: {
 		req: PaginationParams;
 		res: NoteFavorite[];

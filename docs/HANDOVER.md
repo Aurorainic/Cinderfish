@@ -1,9 +1,9 @@
 # Cinderfish 交接说明
 
-- 最后更新：2026-11-06（目标模式第五十一至五十二波：账号迁移 `i/move`/`i/known-as`、入站 `Move`、
-  `migration` v19、`SettingsMigration` 真页面与 `MkMoved` 横幅；随后是 KaTeX 宏页、集成说明页。
-  恢复目标模式时先补了 §12BO.3 的验证债，`go test ./...`（含数据库）已全绿，详见 §12BP、§12BQ。
-  浏览器走查仍待用户手动确认后执行）
+- 最后更新：2026-11-06（目标模式第五十一至五十三波：账号迁移 `i/move`/`i/known-as`、入站 `Move`、
+  `migration` v19、`SettingsMigration` 与 `MkMoved`；KaTeX 宏页与集成说明页；OAuth 交互式同意页
+  （`POST /api/oauth/authorize`）。恢复目标模式时先补了 §12BO.3 的验证债，`go test ./...`（含数据库）
+  已全绿，详见 §12BP–§12BR。浏览器走查仍待用户手动确认后执行）
 - 项目名 **Cinderfish**（2026-10-28 定名，Go module `github.com/Aurorainic/cinderfish`）
 - 仓库：当前目录 `/home/lainsaka/文档/MilnFish`，分支 `main`；远程 `origin` 为
   `https://github.com/Aurorainic/Cinderfish.git`（GitHub 仓库已更名，本地目录改名待办）
@@ -3725,6 +3725,38 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
   `SignupComplete`（缺 `auth/session/*`、OAuth 同意页、邮箱确认注册）、
   `SettingsPlugin`、`SettingsPluginInstall`（缺 AiScript 运行时）。
 
+## 12BR. 第五十三波：OAuth 交互式同意页（2026-11-06）
+
+契约见 `docs/research/2026-11-06-firefish-port-wave53-contract.md`。
+
+### 12BR.1 落地清单
+
+| 层 | 内容 |
+|----|------|
+| 后端 | `GET /oauth/authorize` 无凭据时返回 SPA；抽出 `parseOAuthAuthorize` / `issueOAuthGrant` / `oauthRedirectURL`；新增 `POST /api/oauth/authorize`（返回跳转地址） |
+| 前端 | `OAuth.vue` 占位页 → 同意页（登录、应用主机、scope、接受/取消） |
+| 台账 | 140 条注册路由；自有路径 8 条（新增 `oauth/authorize`） |
+| 测试 | `oauth_consent_test.go` 三条用例 |
+
+### 12BR.2 有意的限制
+
+- 取消授权不回跳客户端（不发 `access_denied`），只显示已拒绝。
+- 不做「记住此应用」与 scope 勾选：本站 scope 是粗粒度四类，按请求整体授予/拒绝。
+- `client_id` 不做 URL 校验；同意页只在能解析时显示主机。
+
+### 12BR.3 验证证据
+
+- `gofmt -l internal/ cmd/` 无输出；`go vet ./...` 通过。
+- `CINDERFISH_TEST_DATABASE_URL=… go test ./...` 全绿，含三条新用例；既有 OAuth 三件套未受影响。
+- `vue-tsc --noEmit`、`check:port`（hardTotal 0）、`pnpm build` 全绿。
+
+### 12BR.4 仍未验证
+
+- 同意页**没有浏览器走查**：登录内嵌、接受后的 `location.assign`、缺参提示都只过了编译。
+- `GET /oauth/authorize` 无凭据分支在**没有前端构建**时保持 401 的旧行为，没有专门用例。
+- 没有真实第三方客户端（misskey-js / Firefish Web）跑完整 OAuth 登录。
+
+
 
 
 ## 13. 文档索引
@@ -3805,6 +3837,7 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
 | `docs/research/2026-11-06-firefish-port-wave50-contract.md` | **第五十波施工契约（状态栏），见 §12BN** |
 | `docs/research/2026-11-06-firefish-port-wave51-contract.md` | **第五十一波施工契约（账号迁移），见 §12BP** |
 | `docs/research/2026-11-06-firefish-port-wave52-contract.md` | **第五十二波施工契约（设置页收尾），见 §12BQ** |
+| `docs/research/2026-11-06-firefish-port-wave53-contract.md` | **第五十三波施工契约（OAuth 同意页），见 §12BR** |
 
 ## 14. 已知的未验证项
 
@@ -3877,6 +3910,9 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
 - **第五十一波未测（2026-11-06，见 §12BP.4）**：迁移页表单与 `MkMoved` 横幅只过编译；`i/move` 的
   真实双实例投递只验证到入队；跨实例的「关注者改关」没有端到端用例；`users/show` 的 `userIds`
   批量参数没有前端调用方。
+- **第五十二至五十三波未测（2026-11-06，见 §12BQ.4 / §12BR.4）**：KaTeX 宏页、集成说明页、OAuth
+  同意页都只过编译；`GET /oauth/authorize` 无凭据且无前端构建的 401 分支没有用例；没有真实第三方
+  客户端跑完整 OAuth 登录。
 - **仍未移植的设置页**：邮箱、整合、导入导出、迁移、Webhook、插件、自定义 KaTeX、状态栏、
   删除账号、应用授权以外的账号操作；对应后端端点不存在或前端缺少依赖（见第五波契约 §3.3）。
 - **仍缺的 widgets**：rss、rss-ticker、server-metric、online-users、federation、job-queue、aiscript、
