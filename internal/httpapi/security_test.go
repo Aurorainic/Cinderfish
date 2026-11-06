@@ -85,3 +85,53 @@ func TestRegenerateToken(t *testing.T) {
 		t.Errorf("signin history row has no success flag: %v", first)
 	}
 }
+
+// TestSigninHistoryPagination proves the list pages newest-first with a
+// untilId cursor and honours limit.
+func TestSigninHistoryPagination(t *testing.T) {
+	ts := newTestServer(t, "open")
+	_, token := createUser(t, ts, uniqueName(t))
+	username := ""
+	if _, me := postWithToken(t, ts, "/api/i", token, map[string]any{}); me["username"] != nil {
+		username, _ = me["username"].(string)
+	}
+	for i := 0; i < 12; i++ {
+		resp, out := post(t, ts, "/api/signin", map[string]any{"username": username, "password": "hunter2"})
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("signin %d = %d %v", i, resp.StatusCode, out)
+		}
+	}
+
+	var seen []string
+	cursor := ""
+	for page := 0; page < 5; page++ {
+		body := map[string]any{"limit": 5}
+		if cursor != "" {
+			body["untilId"] = cursor
+		}
+		rows := postListWithToken(t, ts, "/api/i/signin-history", token, body)
+		if len(rows) == 0 {
+			break
+		}
+		for _, item := range rows {
+			m, _ := item.(map[string]any)
+			id, _ := m["id"].(string)
+			seen = append(seen, id)
+		}
+		last, _ := rows[len(rows)-1].(map[string]any)
+		cursor, _ = last["id"].(string)
+		if len(rows) < 5 {
+			break
+		}
+	}
+	if len(seen) < 12 {
+		t.Errorf("paged through %d signins, want at least 12", len(seen))
+	}
+	unique := map[string]bool{}
+	for _, id := range seen {
+		if unique[id] {
+			t.Errorf("duplicate signin id across pages: %s", id)
+		}
+		unique[id] = true
+	}
+}

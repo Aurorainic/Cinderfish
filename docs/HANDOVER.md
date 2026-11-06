@@ -4400,8 +4400,8 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
 - **第十一波的部分边角（2026-11-06，见 §12AA.4）**：失败路径已由
   `TestWebhookDeliveryFailureStatus` 覆盖（接收端 500 → `latestStatus=500`；
   连接失败 → `1`），未产生的事件类型由 `TestWebhookIgnoresUnproducedEvents` 覆盖
-  （订阅 follow 的 webhook 在关注发生时收不到投递）。仍未验证的：投递重试与顺序
-  （实现上不重试，一条事件一条独立请求）、编辑页内删除。
+  （订阅 follow 的 webhook 在关注发生时收不到投递）。投递**按设计不重试**，一条事件一个独立请求；
+  仍未验证的：编辑页内删除。
 - **第十二波未测边角（2026-11-06，见 §12AB.4）**：reltuples 估算与实际行数的偏差、大 schema 渲染性能
   未验证；vacuum 与索引维护按设计未做。
 - **第十三波的部分边角（2026-11-06，见 §12AC.4）**：邀请码注册已由
@@ -4421,7 +4421,7 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
   `TestRemoteMentionIsDeliveredAndNotifies` 覆盖（2026-11-07，见 §12CD）：本地笔记 @ 远端账号会
   解析成 Mention 标签、经投递队列送到对端并产生 `mention` 通知（顺带修掉了入站提及被写成
   `reply` 的缺陷）。流式推送的 mention/reply/follow 事件与未读计数已由 §12CW 覆盖；
-  仍未验证的：directNotes 与类型过滤组合的推送。
+  `directNotes` 属聊天范围，首版不做（通知页也去掉了该页签），因此不再作为待验证项。
 - **第十七波的部分边角（2026-11-06，见 §12AG.4）**：`users` 目录的未登录视角、`state=admin`、
   `origin=remote`、`hostname`（需与 `origin=combined` 组合，与 Misskey 一致）与两种 createdAt 排序
   已由 `TestUsersDirectoryFilters` 覆盖（2026-11-07），并确认封禁账号从目录消失。
@@ -4444,7 +4444,7 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
   （`TestPasswordChange` 与 `TestRegenerateToken`），并且 2026-11-07 用真实二进制 + 浏览器走查了
   `/settings/security`：改密后页面提示「密码已更新」，旧密码登录 403、新密码 200；
   「重新生成令牌」显示了新令牌，旧令牌 `/api/i` 401、新令牌 200；登录历史区渲染正常；移动端无溢出。
-  分页（每页 10 条）仍未构造满页数据。
+  分页满页数据已由 §12DE 的 12 次登录用例覆盖。
 - **第二十二波的部分边角（2026-11-06，见 §12AL.4）**：资料扩展字段（location / birthday / lang /
   fields）与 `injectFeaturedNote` 的保存、`users/show` 回读、四种非法值（日期、语言标签、位置过长、
   字段过多）与 null 清空已由 `TestIUpdateProfileDetails` 覆盖（2026-11-07）。仍未验证的：
@@ -5456,3 +5456,23 @@ CINDERFISH_TEST_DATABASE_URL=... go test ./... -count=1         # 全绿
 无头环境需要显式触发 Vue 的 `input` 事件。均为脚本细节，不是应用缺陷。
 
 仍未验证：两步验证登录的移动端布局、备份码（按设计未做）。
+
+## 12DE. 第九十二波：登录历史分页与两处“上游同样如此”的澄清（2026-11-07）
+
+### 12DE.1 用例
+
+`TestSigninHistoryPagination`：同一账号连续成功登录 12 次，`i/signin-history` 以 `limit=5`
+和 `untilId` 翻页，累计至少 12 条且 id 不重复。
+
+### 12DE.2 文档澄清（无代码改动）
+
+- `injectFeaturedNote`：Misskey 后端也只存储该开关，时间线注入是客户端行为；Cinderfish 前端没有
+  实现注入，后端“没有效果”与上游一致。
+- Webhook：实现按设计不重试，一条事件一个独立请求；§14 不再把它列为未验证。
+- `directNotes`：属于聊天范围，首版不做，通知页也去掉了该页签，不再作为推送待验证项。
+
+```
+gofmt -l internal/ cmd/                                        # 空
+go vet ./...                                                   # exit 0
+CINDERFISH_TEST_DATABASE_URL=... go test ./... -count=1         # 全绿
+```
