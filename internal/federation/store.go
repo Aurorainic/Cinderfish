@@ -302,6 +302,18 @@ func (s *Store) NoteExists(ctx context.Context, apID string) (bool, error) {
 	return true, nil
 }
 
+// NoteIDByAPID returns the local id of a stored note addressed by its AP id.
+func (s *Store) NoteIDByAPID(ctx context.Context, apID string) (string, error) {
+	var id string
+	if err := s.pool.QueryRow(ctx, `SELECT id FROM notes WHERE ap_id = $1 OR uri = $1 LIMIT 1`, apID).Scan(&id); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return "", ErrRemoteNotFound
+		}
+		return "", fmt.Errorf("federation: load note id: %w", err)
+	}
+	return id, nil
+}
+
 // RemoteNote is a note received over ActivityPub.
 type RemoteNote struct {
 	APID        string

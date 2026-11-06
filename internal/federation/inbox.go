@@ -312,6 +312,67 @@ func (i *Inbox) notifyForNote(ctx context.Context, actor *RemoteUser, note Objec
 	return nil
 }
 
+// ImportObject fetches an arbitrary ActivityPub object and stores it, so a
+// caller can resolve a URL a user pasted (ap/show, remote interaction).
+//
+// It returns the stored kind ("Note" or "User") and the corresponding local
+// id. A note is stored the same way an inbound Create stores it, but without
+// notifications: the object was not addressed to anyone here.
+func (i *Inbox) ImportObject(ctx context.Context, uri string) (kind, id string, err error) {
+	if uri == "" {
+		return "", "", fmt.Errorf("federation: empty object uri")
+	}
+	obj, err := i.client.FetchObject(ctx, uri, uri)
+	if err != nil {
+		return "", "", err
+	}
+	if obj.IsActor() {
+		actor, err := i.upsertActor(ctx, uri, obj)
+		if err != nil {
+			return "", "", err
+		}
+		return "User", actor.ID, nil
+	}
+	if !obj.IsPost() {
+		return "", "", fmt.Errorf("federation: %s is not a note or an actor (%s)", uri, obj.Type())
+	}
+
+	authorURI := obj.Ref("attributedTo")
+	if authorURI == "" {
+		return "", "", fmt.Errorf("federation: note %s has no attributedTo", uri)
+	}
+	author, err := i.resolveActor(ctx, authorURI)
+	if err != nil {
+		return "", "", err
+	}
+	host, err := HostOf(uri)
+	if err != nil || host != author.Host {
+		return "", "", fmt.Errorf("federation: note %s is not hosted by its author", uri)
+	}
+
+	if exists, err := i.store.NoteExists(ctx, uri); err != nil {
+		return "", "", err
+	} else if exists {
+		// Resolving a note that is already stored must not create a second
+		// row; the local id is all the caller needs.
+		noteID, err := i.store.NoteIDByAPID(ctx, uri)
+		if err != nil {
+			return "", "", err
+		}
+		return "Note", noteID, nil
+	}
+
+	data := NoteDataFromAP(obj, author, i.renderer)
+	storedID, err := i.store.InsertRemoteNote(ctx, data)
+	if err != nil {
+		return "", "", err
+	}
+	if i.OnNoteCreated != nil {
+		i.OnNoteCreated(ctx, storedID, author.ID)
+	}
+	return "Note", storedID, nil
+}
+
 // deleteActivity handles Delete of a note or of the actor itself.
 func (i *Inbox) deleteActivity(ctx context.Context, actor *RemoteUser, activity Object) (string, error) {
 	obj := activity.Object("object")

@@ -161,6 +161,8 @@ func (s *Server) registerRoutes() {
 	// move itself.
 	s.mux.HandleFunc("POST /api/i/known-as", s.handleIKnownAs)
 	s.mux.HandleFunc("POST /api/i/move", s.handleIMove)
+	// Federation lookup: resolves an ActivityPub URL to a note or a user.
+	s.mux.HandleFunc("POST /api/ap/show", s.handleAPShow)
 	s.mux.HandleFunc("POST /api/users", s.handleUsers)
 	s.mux.HandleFunc("POST /api/users/show", s.handleUsersShow)
 	s.mux.HandleFunc("POST /api/users/search", s.handleUsersSearch)
