@@ -10,6 +10,7 @@ import (
 
 	"github.com/Aurorainic/cinderfish/internal/config"
 	"github.com/Aurorainic/cinderfish/internal/httpapi"
+	"github.com/Aurorainic/cinderfish/internal/media"
 )
 
 // adminTestServer builds an instance with the given registration mode and
@@ -24,6 +25,11 @@ func adminTestServer(t *testing.T, mode string) (*httptest.Server, *httpapi.Serv
 		Media: config.Media{Backend: "local"},
 	}
 	srv := httpapi.NewServerWithDB(cfg, pool)
+	storage, err := media.NewLocalStorage(t.TempDir(), "/media")
+	if err != nil {
+		t.Fatalf("local storage: %v", err)
+	}
+	srv.SetStorage(storage)
 	ts := httptest.NewServer(srv)
 	t.Cleanup(ts.Close)
 

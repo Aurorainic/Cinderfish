@@ -163,6 +163,7 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("POST /api/admin/emoji/delete", s.handleAdminEmojiDelete)
 	s.mux.HandleFunc("POST /api/admin/accounts/create", s.handleAdminAccountsCreate)
 	s.mux.HandleFunc("POST /api/admin/show-users", s.handleAdminShowUsers)
+	s.mux.HandleFunc("POST /api/admin/drive/files", s.handleAdminDriveFiles)
 	s.mux.HandleFunc("POST /api/admin/suspend-user", s.handleAdminSuspendUser)
 	s.mux.HandleFunc("POST /api/admin/unsuspend-user", s.handleAdminUnsuspendUser)
 	s.mux.HandleFunc("GET /api/admin/federation/mode", s.handleAdminFederationMode)

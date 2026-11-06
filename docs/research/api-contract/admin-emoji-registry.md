@@ -1002,3 +1002,34 @@ scope 归一化：去空串、去重、字典序排序（`normalizeScope`，`reg
 `usePasswordLessLogin`、`securityKeys`。
 
 UserLite 部分也有简化：`name`/`avatarUrl` 只从 profile 行来，没有 blurhash、没有 `instance` 信息。
+
+## 2026-11-06 增补：管理台用户筛选与文件盘点
+
+### POST /api/admin/show-users（参数扩展）
+
+原有 `limit` / `offset` 之外新增（全部可选，缺省时行为与原实现一致）：
+
+| 参数 | 取值 | 说明 |
+|------|------|------|
+| `sort` | `+follower` `-follower` `+createdAt` `-createdAt` `+updatedAt` `-updatedAt` | `+` 为倒序（最新/最多在前） |
+| `state` | `all` `alive` `available` `admin` `moderator` `adminOrModerator` `silenced` `suspended` | `alive` 退化为「未冻结」；`silenced` 恒为空集 |
+| `origin` | `combined` `local` `remote` | 缺省 combined |
+| `username` | string | 小写前缀匹配 |
+| `hostname` | string | 精确匹配，缺省表示不限 |
+
+返回 `UserDetailed[]`（无总数）。默认排序是按 `created_at ASC`。非法 `state`/`origin` 返回 400。
+
+### POST /api/admin/drive/files（新）
+
+管理员/版主专用，跨账号列出文件，按 id 倒序。
+
+| 参数 | 说明 |
+|------|------|
+| `limit` | 默认 10，上限 100 |
+| `sinceId` / `untilId` | 文件 id 游标 |
+| `userId` | 只看某个账号；给出后忽略 origin/hostname |
+| `type` | 内容类型前缀：`image`、`image/png`、`image/*`；其它字符一律 400 |
+| `origin` | combined / local / remote（按上传者所在实例） |
+| `hostname` | 上传者实例精确匹配 |
+
+返回 `DriveFile[]`，每条额外带 `user`（UserLite，上传者）。非管理员返回 403。

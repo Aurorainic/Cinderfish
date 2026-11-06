@@ -64,17 +64,30 @@ func (s *Server) handleAdminShowUsers(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var body struct {
-		Limit  int `json:"limit"`
-		Offset int `json:"offset"`
+		Limit    int     `json:"limit"`
+		Offset   int     `json:"offset"`
+		Sort     string  `json:"sort"`
+		State    string  `json:"state"`
+		Origin   string  `json:"origin"`
+		Username *string `json:"username"`
+		Hostname *string `json:"hostname"`
 	}
 	if err := decodeOptionalJSON(r, &body); err != nil {
 		writeAPIError(w, err)
 		return
 	}
 
-	users, err := s.accounts.ListLocal(r.Context(), body.Limit, body.Offset)
+	users, err := s.accounts.AdminList(r.Context(), account.AdminUserParams{
+		Limit:    body.Limit,
+		Offset:   body.Offset,
+		Sort:     body.Sort,
+		State:    body.State,
+		Origin:   body.Origin,
+		Username: body.Username,
+		Hostname: body.Hostname,
+	})
 	if err != nil {
-		writeInternalServerError(w)
+		writeAPIError(w, invalidParamError(err.Error()))
 		return
 	}
 
