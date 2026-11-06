@@ -4667,7 +4667,9 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
 - ~~**缩略图/WebP 生成未实现**~~：第四十六波实现了缩略图（≤512px，JPEG/PNG）；WebP 仍未做。
 - **前端没有真实第三方客户端联调**：页面已在构建产物上用浏览器走查；2026-11-07 起已用官方
   `misskey-js`（2026.10.2-alpha.0）连过本实例（见 §12CG），仍未用 Misskey Web 前端整站连接。
-- **Redis 只对 miniredis 验证过**：本机没有 `redis-server`，跨进程中继的单元测试与双进程 smoke 都用 miniredis；没有对真实 Redis 做过持久化/认证/网络闪断验证。
+- **Redis 只对 miniredis 验证过**：单元测试仍用 miniredis；2026-11-07 起已用真实 `redis-server`
+  （8.0.5，端口 6390，无认证）跑过双进程 Streaming 中继（§12CH）。仍未验证：认证、网络闪断、
+  持久化配置与 `w69:deliver` 投递唤醒。
 - **Streaming 未做真实 Misskey 客户端联调**：已用自写 WebSocket 客户端验证；2026-11-07 起
   也用 `misskey-js` 的 `Stream` 验证了 `localTimeline` 与 `main` 频道（§12CG）。仍未用 Misskey Web 整站连接。
 - **联邦没有任何第三方联调**：只跑了本实现的双实例测试（真签名、真 HTTP、真库），没有对 Mastodon / GoToSocial / 真实 Misskey 实例互通。这是 M5 之后最该补的验证。
@@ -4820,3 +4822,33 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
 - Misskey Web 整站连接（登录、页面渲染、Streaming 重连）。
 - 多标签页/重连后的频道恢复。
 - 并发大量事件时的顺序与丢失率。
+
+## 12CH. 第六十九波：真实 Redis 双进程 Streaming 中继（2026-11-07）
+
+此前 Redis 相关证据全部来自 miniredis。本机实际装有 `redis-server 8.0.5`，这一轮用真实 Redis
+把「进程 A 产生事件 → 进程 B 的 WebSocket 收到」跑通。仓库代码未改动。
+
+### 12CH.1 环境
+
+- `redis-server --port 6390 --save '' --appendonly no --dir /tmp/w69-redis`（无认证）。
+- 两个真实二进制实例共用 `cinderfish_test` 库：
+  - A：`127.0.0.1:3998`，`[redis] enabled=true, prefix="w69"`；
+  - B：`127.0.0.1:3997`，同一 Redis 与前缀；
+  - 两边的 `federation_mode = "none"`（本波只验证 Streaming 中继）。
+- 两个实例启动日志都出现 `listening for cross-process events on redis channel "w69:stream"`，
+  `PUBSUB NUMSUB w69:stream` 返回 2。
+
+### 12CH.2 结果
+
+- 从 A 的 API 注册并 `notes/create`（`misskey-js`）；
+- 同一个 token 的 `misskey-js Stream` 连到 **B** 的 `/streaming`，订阅 `localTimeline`；
+- 收到 `note` 事件，id 与 A 刚创建的笔记一致（`00mw5bvf3x1cullkai`），文本一致。
+
+由于 B 自己不产生这条笔记，事件必然经过 Redis 广播，证明真实 Redis 的中继路径可用。
+
+### 12CH.3 仍未验证
+
+- Redis 认证（`requirepass` / ACL）与 TLS。
+- 网络闪断后的重订阅；`ListenRedis` 的重连行为只有代码阅读。
+- `w69:deliver` 投递唤醒：两实例都是 `federation_mode = "none"`，没有产生投递。
+- 持久化（本轮 `save ''`、`appendonly no`，符合 pub/sub 不需要持久化的语义）。
