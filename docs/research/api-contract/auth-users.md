@@ -212,7 +212,7 @@ token 解析（`internal/account/tokens.go:88`）：
 | `bannerId` | null | 恒为 `null` |
 | `followedMessage` | null | 恒为 `null` |
 | `injectFeaturedNote` | boolean | `settings.injectFeaturedNote`，默认 `false` |
-| `receiveAnnouncementEmail` | boolean | `false` |
+| `receiveAnnouncementEmail` | boolean | `settings.receiveAnnouncementEmail`（第四十八波起可写） |
 | `alwaysMarkNsfw` | boolean | `settings.alwaysMarkNsfw`，默认 `false` |
 | `autoSensitive` | boolean | `settings.autoSensitive`，默认 `false` |
 | `carefulBot` | boolean | `settings.carefulBot`，默认 `false` |
@@ -240,7 +240,7 @@ token 解析（`internal/account/tokens.go:88`）：
 | `mutedInstances` | array | `[]` |
 | `mutingNotificationTypes` | array | `settings.mutingNotificationTypes`，默认 `[]`；只接受 mention/reply/renote/quote/reaction |
 | `notificationRecieveConfig` | object | `{}`（字段名沿用 Misskey 的拼写错误 `Recieve`） |
-| `emailNotificationTypes` | array | `[]` |
+| `emailNotificationTypes` | array | `settings.emailNotificationTypes`（第四十八波起可写，取值 mention / reply / follow / receiveFollowRequest） |
 | `achievements` | array | `[]` |
 | `loggedInDays` | number | `0` |
 | `policies` | object | `{}` |
@@ -683,7 +683,7 @@ token 解析（`internal/account/tokens.go:88`）：
 | `noCrawle` / `preventAiLearning` / `isExplorable` / `hideOnlineStatus` / `publicReactions` / `alwaysMarkNsfw` / `autoSensitive` / `carefulBot` / `autoAcceptFollowed` / `injectFeaturedNote` | boolean | 否 | 无 | `settings.<字段名>`，读回时 `isExplorable` 缺省为 `true` |
 | `isLocked` | boolean | 否 | 无 | `users.is_locked`（不是 settings）；锁推后新关注进入待审 |
 
-**被静默忽略的字段**（Firefish 的设置页会发）：`bannerId`、`followedMessage`、`isBot`、`isCat`、`speakAsCat`、`requireSigninToViewContents`、`mutedWords`、`notificationRecieveConfig`、`emailNotificationTypes`、`alsoKnownAs`、`avatarDecorations`、`chatScope`、`pinnedPageId` 等。它们不会报错，也不会保存。`mutedInstances` 单独处理（见 §`i/update` 的 `mutedInstances`）。
+**被静默忽略的字段**（Firefish 的设置页会发）：`bannerId`、`followedMessage`、`isBot`、`isCat`、`speakAsCat`、`requireSigninToViewContents`、`mutedWords`、`notificationRecieveConfig`、`alsoKnownAs`、`avatarDecorations`、`chatScope`、`pinnedPageId` 等。它们不会报错，也不会保存。`mutedInstances` 单独处理（见 §`i/update` 的 `mutedInstances`）。
 
 ### 响应 200
 
@@ -1405,3 +1405,17 @@ OAuth 2.0 授权码端点（仅 PKCE `S256`）。认证：**需要登录**，且
 
 `userId` 省略时取调用者（需要凭据），这是给账号信息页用的便利；上游要求必填。
 其它所有数字都是公开信息，因此端点不要求登录。
+
+## 2026-11-06 增补：邮件通知（第四十八波）
+
+`i/update` 现在接受两个邮件通知字段（都存进 `user_profiles.settings`）：
+
+| 字段 | 校验 | 效果 |
+|------|------|------|
+| `emailNotificationTypes` | 数组，取值 `mention` / `reply` / `follow` / `receiveFollowRequest`，其它 400 | 命中的通知同时发邮件 |
+| `receiveAnnouncementEmail` | 布尔 | 管理员发布公告时给该账号发一封 |
+
+发送规则：只有**邮箱已验证**且启用了对应类型时才发。邮件在后台 goroutine 里发送（单封 30 秒超时、
+公告群发 2 分钟），失败只记日志，绝不影响产生通知的请求。站内通知比邮件更宽——转发、引用、反应
+只进站内列表。公告群发在 `admin/announcements/create` 成功后触发，收件人由
+`account.AnnouncementMailRecipients` 从 settings 里筛出（已验证 + 已订阅）。

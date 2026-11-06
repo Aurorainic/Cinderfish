@@ -67,6 +67,11 @@ export interface ProfileUpdateRequest {
 	isLocked?: boolean;
 	/** Notification types the account does not want to see. */
 	mutingNotificationTypes?: string[];
+	/** Reasons that are also mailed; the backend accepts mention, reply,
+	 * follow and receiveFollowRequest. */
+	emailNotificationTypes?: string[];
+	/** Whether instance announcements are mailed. */
+	receiveAnnouncementEmail?: boolean;
 }
 
 /** Stored credential entry for the account switcher. */

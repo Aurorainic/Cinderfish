@@ -4,12 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
 	"strings"
 	"time"
 	"unicode/utf8"
 
 	"github.com/Aurorainic/cinderfish/internal/announcement"
+	"github.com/Aurorainic/cinderfish/internal/mail"
 )
 
 const (
@@ -186,7 +188,33 @@ func (s *Server) handleAdminAnnouncementsCreate(w http.ResponseWriter, r *http.R
 		writeInternalServerError(w)
 		return
 	}
+	// Notify the subscribers in the background: the announcement is already
+	// saved, and a slow SMTP server must not delay the admin's request.
+	s.mailAnnouncement(title, text)
+
 	writeJSON(w, http.StatusOK, packAnnouncement(created, false))
+}
+
+// mailAnnouncement sends one notice to every verified subscriber.
+func (s *Server) mailAnnouncement(title, text string) {
+	if s.mail == nil || s.accounts == nil {
+		return
+	}
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		defer cancel()
+		recipients, err := s.accounts.AnnouncementMailRecipients(ctx)
+		if err != nil {
+			log.Printf("mail: announcement recipients: %v", err)
+			return
+		}
+		body := title + "\n\n" + text + "\n\n你可以在账号设置里取消订阅实例公告邮件。"
+		for _, to := range recipients {
+			if err := s.mail.Send(ctx, mail.Message{To: to, Subject: title, Body: body}); err != nil {
+				log.Printf("mail: announcement to %s: %v", to, err)
+			}
+		}
+	}()
 }
 
 // handleAdminAnnouncementsList is POST /api/admin/announcements/list.

@@ -186,6 +186,7 @@ func (s *Server) notifyNoteCreated(r *http.Request, n *note.Note, actorID string
 			s.publishMentionEvent(n, target)
 		}
 		s.publishNotificationCreated(notificationID, target)
+		s.maybeSendNotificationMail(r.Context(), target, reasons[target], actorID, n.ID)
 	}
 }
 

@@ -138,7 +138,7 @@ func packMeDetailed(u *account.User, createdAt time.Time, includeSecrets bool, p
 	packed["isModerator"] = u.IsAdmin
 	packed["isAdmin"] = u.IsAdmin
 	packed["injectFeaturedNote"] = prof != nil && prof.InjectFeaturedNote
-	packed["receiveAnnouncementEmail"] = false
+	packed["receiveAnnouncementEmail"] = prof != nil && prof.ReceiveAnnouncementEmail
 	packed["alwaysMarkNsfw"] = prof != nil && prof.AlwaysMarkNsfw
 	packed["autoSensitive"] = prof != nil && prof.AutoSensitive
 	packed["carefulBot"] = prof != nil && prof.CarefulBot
@@ -174,7 +174,11 @@ func packMeDetailed(u *account.User, createdAt time.Time, includeSecrets bool, p
 		packed["mutingNotificationTypes"] = []any{}
 	}
 	packed["notificationRecieveConfig"] = map[string]any{}
-	packed["emailNotificationTypes"] = []any{}
+	if prof != nil && prof.EmailNotificationTypes != nil {
+		packed["emailNotificationTypes"] = prof.EmailNotificationTypes
+	} else {
+		packed["emailNotificationTypes"] = []any{}
+	}
 	packed["achievements"] = []any{}
 	packed["loggedInDays"] = 0
 	packed["policies"] = map[string]any{}

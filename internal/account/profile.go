@@ -56,6 +56,10 @@ type Profile struct {
 	// only meaningful when Email is non-empty.
 	Email         string
 	EmailVerified bool
+	// EmailNotificationTypes lists the notification reasons that are also
+	// mailed; ReceiveAnnouncementEmail subscribes to instance notices.
+	EmailNotificationTypes   []string
+	ReceiveAnnouncementEmail bool
 	// IsLocked means new followers need manual approval. It lives in
 	// users.is_locked (the same column a remote actor's locked flag uses), so
 	// the federation code and the profile agree.
@@ -98,21 +102,23 @@ FROM user_profiles WHERE user_id = $1
 		return nil, fmt.Errorf("account: get profile: %w", err)
 	}
 	var stored struct {
-		MutedInstances     []string       `json:"mutedInstances"`
-		Location           string         `json:"location"`
-		Birthday           string         `json:"birthday"`
-		Lang               string         `json:"lang"`
-		Fields             []ProfileField `json:"fields"`
-		NoCrawle           bool           `json:"noCrawle"`
-		PreventAiLearning  bool           `json:"preventAiLearning"`
-		IsExplorable       *bool          `json:"isExplorable"`
-		HideOnlineStatus   bool           `json:"hideOnlineStatus"`
-		PublicReactions    bool           `json:"publicReactions"`
-		AlwaysMarkNsfw     bool           `json:"alwaysMarkNsfw"`
-		AutoSensitive      bool           `json:"autoSensitive"`
-		CarefulBot         bool           `json:"carefulBot"`
-		AutoAcceptFollowed bool           `json:"autoAcceptFollowed"`
-		InjectFeaturedNote bool           `json:"injectFeaturedNote"`
+		MutedInstances           []string       `json:"mutedInstances"`
+		Location                 string         `json:"location"`
+		Birthday                 string         `json:"birthday"`
+		Lang                     string         `json:"lang"`
+		Fields                   []ProfileField `json:"fields"`
+		NoCrawle                 bool           `json:"noCrawle"`
+		PreventAiLearning        bool           `json:"preventAiLearning"`
+		IsExplorable             *bool          `json:"isExplorable"`
+		HideOnlineStatus         bool           `json:"hideOnlineStatus"`
+		PublicReactions          bool           `json:"publicReactions"`
+		AlwaysMarkNsfw           bool           `json:"alwaysMarkNsfw"`
+		AutoSensitive            bool           `json:"autoSensitive"`
+		CarefulBot               bool           `json:"carefulBot"`
+		AutoAcceptFollowed       bool           `json:"autoAcceptFollowed"`
+		InjectFeaturedNote       bool           `json:"injectFeaturedNote"`
+		EmailNotificationTypes   []string       `json:"emailNotificationTypes"`
+		ReceiveAnnouncementEmail bool           `json:"receiveAnnouncementEmail"`
 	}
 	if len(settings) > 0 {
 		_ = json.Unmarshal(settings, &stored)
@@ -123,31 +129,33 @@ FROM user_profiles WHERE user_id = $1
 		isExplorable = *stored.IsExplorable
 	}
 	return &Profile{
-		Name:                 derefString(name),
-		Description:          derefString(description),
-		AvatarURL:            derefString(avatarURL),
-		FollowersVisibility:  derefString(followersVis),
-		FollowingVisibility:  derefString(followingVis),
-		MutedInstances:       stored.MutedInstances,
-		TwoFactorEnabled:     twoFactorEnabled,
-		UsePasswordLessLogin: usePasswordLessLogin,
-		Location:             stored.Location,
-		Birthday:             stored.Birthday,
-		Lang:                 stored.Lang,
-		Fields:               stored.Fields,
-		NoCrawle:             stored.NoCrawle,
-		PreventAiLearning:    stored.PreventAiLearning,
-		IsExplorable:         isExplorable,
-		HideOnlineStatus:     stored.HideOnlineStatus,
-		PublicReactions:      stored.PublicReactions,
-		AlwaysMarkNsfw:       stored.AlwaysMarkNsfw,
-		AutoSensitive:        stored.AutoSensitive,
-		CarefulBot:           stored.CarefulBot,
-		AutoAcceptFollowed:   stored.AutoAcceptFollowed,
-		InjectFeaturedNote:   stored.InjectFeaturedNote,
-		Email:                derefString(email),
-		EmailVerified:        emailVerified,
-		IsLocked:             isLocked,
+		Name:                     derefString(name),
+		Description:              derefString(description),
+		AvatarURL:                derefString(avatarURL),
+		FollowersVisibility:      derefString(followersVis),
+		FollowingVisibility:      derefString(followingVis),
+		MutedInstances:           stored.MutedInstances,
+		TwoFactorEnabled:         twoFactorEnabled,
+		UsePasswordLessLogin:     usePasswordLessLogin,
+		Location:                 stored.Location,
+		Birthday:                 stored.Birthday,
+		Lang:                     stored.Lang,
+		Fields:                   stored.Fields,
+		NoCrawle:                 stored.NoCrawle,
+		PreventAiLearning:        stored.PreventAiLearning,
+		IsExplorable:             isExplorable,
+		HideOnlineStatus:         stored.HideOnlineStatus,
+		PublicReactions:          stored.PublicReactions,
+		AlwaysMarkNsfw:           stored.AlwaysMarkNsfw,
+		AutoSensitive:            stored.AutoSensitive,
+		CarefulBot:               stored.CarefulBot,
+		AutoAcceptFollowed:       stored.AutoAcceptFollowed,
+		InjectFeaturedNote:       stored.InjectFeaturedNote,
+		Email:                    derefString(email),
+		EmailVerified:            emailVerified,
+		IsLocked:                 isLocked,
+		EmailNotificationTypes:   stored.EmailNotificationTypes,
+		ReceiveAnnouncementEmail: stored.ReceiveAnnouncementEmail,
 	}, nil
 }
 
@@ -267,4 +275,30 @@ func (s *Service) SetLocked(ctx context.Context, userID string, locked bool) err
 		return fmt.Errorf("account: set locked: %w", err)
 	}
 	return nil
+}
+
+// AnnouncementMailRecipients lists the verified addresses that asked to receive
+// instance announcements. The subscription lives in user_profiles.settings, so
+// the query filters there rather than in a column of its own.
+func (s *Service) AnnouncementMailRecipients(ctx context.Context) ([]string, error) {
+	rows, err := s.pool.Query(ctx, `
+SELECT email FROM user_profiles
+WHERE email IS NOT NULL AND email <> '' AND email_verified
+  AND COALESCE((settings->>'receiveAnnouncementEmail')::boolean, FALSE)
+ORDER BY user_id
+`)
+	if err != nil {
+		return nil, fmt.Errorf("account: announcement recipients: %w", err)
+	}
+	defer rows.Close()
+
+	out := []string{}
+	for rows.Next() {
+		var email string
+		if err := rows.Scan(&email); err != nil {
+			return nil, fmt.Errorf("account: scan announcement recipient: %w", err)
+		}
+		out = append(out, email)
+	}
+	return out, rows.Err()
 }

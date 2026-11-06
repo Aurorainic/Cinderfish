@@ -25,6 +25,10 @@ type ProfileDetailsPatch struct {
 	AutoAcceptFollowed      *bool
 	InjectFeaturedNote      *bool
 	MutingNotificationTypes *[]string
+	// Email notifications. Types is the set of reasons that should also be
+	// mailed; Announcement switches instance notices.
+	EmailNotificationTypes   *[]string
+	ReceiveAnnouncementEmail *bool
 }
 
 // UpdateProfileDetails merges the provided metadata keys into the profile's
@@ -45,6 +49,12 @@ func (s *Service) UpdateProfileDetails(ctx context.Context, userID string, patch
 	}
 	if patch.MutingNotificationTypes != nil {
 		settings["mutingNotificationTypes"] = *patch.MutingNotificationTypes
+	}
+	if patch.EmailNotificationTypes != nil {
+		settings["emailNotificationTypes"] = *patch.EmailNotificationTypes
+	}
+	if patch.ReceiveAnnouncementEmail != nil {
+		settings["receiveAnnouncementEmail"] = *patch.ReceiveAnnouncementEmail
 	}
 	for key, value := range map[string]*bool{
 		"noCrawle":           patch.NoCrawle,

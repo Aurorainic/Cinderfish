@@ -249,4 +249,5 @@ func (s *Server) createNotification(ctx context.Context, recipientID, kind, noti
 		return
 	}
 	s.publishNotificationCreated(id, recipientID)
+	s.maybeSendNotificationMail(ctx, recipientID, kind, notifierID, noteID)
 }

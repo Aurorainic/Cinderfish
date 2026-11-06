@@ -51,9 +51,35 @@
 
 			<section class="_formBlock">
 				<h2 class="sectionTitle">{{ t("emailNotification") }}</h2>
+				<CfInfo v-if="!me.emailVerified" warn class="note">
+					邮箱还没验证，下面的开关不会发出任何邮件。请先完成验证。
+				</CfInfo>
+
+				<CfSwitch
+					:model-value="me.receiveAnnouncementEmail"
+					:disabled="savingMail"
+					class="_formBlock"
+					@update:model-value="onMailSwitch('receiveAnnouncementEmail', $event)"
+				>
+					接收实例公告邮件
+				</CfSwitch>
+
+				<CfSwitch
+					v-for="item in mailTypes"
+					:key="item.type"
+					:model-value="hasMailType(item.type)"
+					:disabled="savingMail"
+					class="_formBlock"
+					@update:model-value="onMailType(item.type, $event)"
+				>
+					{{ item.label }}
+				</CfSwitch>
+
 				<CfInfo class="note">
-					邮件通知类型与「接收实例公告邮件」两个开关还没有服务端存储（`i/update`
-					不接受这两个字段），因此这里不显示开关。
+					回复、提及、关注与关注请求可以同时发邮件；转发、引用与反应只在站内通知。
+				</CfInfo>
+				<CfInfo v-if="mailError != null" warn class="note">
+					{{ mailError }}
 				</CfInfo>
 			</section>
 
@@ -76,12 +102,13 @@
 // a link. The two notification switches in Firefish write fields Cinderfish
 // does not store, so they are described instead of rendered.
 import { computed, ref } from "vue";
-import { me, updateMe } from "@/account";
+import { me, updateMe, updateProfile } from "@/account";
 import { ApiError, api } from "@/api/client";
 import CfButton from "@/components/ui/CfButton.vue";
 import CfInfo from "@/components/ui/CfInfo.vue";
 import CfInput from "@/components/ui/CfInput.vue";
 import CfKeyValue from "@/components/ui/CfKeyValue.vue";
+import CfSwitch from "@/components/ui/CfSwitch.vue";
 import { t } from "@/i18n";
 import { inputText } from "@/os";
 import { definePageMetadata } from "@/scripts/page-metadata";
@@ -90,6 +117,8 @@ defineOptions({ name: "CfPageSettingsEmail" });
 
 const draft = ref("");
 const busy = ref(false);
+const savingMail = ref(false);
+const mailError = ref<string | null>(null);
 const errorText = ref<string | null>(null);
 const notice = ref<string | null>(null);
 
@@ -134,6 +163,51 @@ async function save(): Promise<void> {
 	} finally {
 		busy.value = false;
 	}
+}
+
+// The four reasons the backend mails about (see
+// docs/research/api-contract/auth-users.md §POST /api/i/update).
+type MailType = "mention" | "reply" | "follow" | "receiveFollowRequest";
+
+const mailTypes: { type: MailType; label: string }[] = [
+	{ type: "mention", label: "被提及时" },
+	{ type: "reply", label: "被回复时" },
+	{ type: "follow", label: "被关注时" },
+	{ type: "receiveFollowRequest", label: "收到关注请求时" },
+];
+
+function hasMailType(type: MailType): boolean {
+	return (me.value?.emailNotificationTypes ?? []).includes(type);
+}
+
+async function saveMail(patch: {
+	emailNotificationTypes?: string[];
+	receiveAnnouncementEmail?: boolean;
+}): Promise<void> {
+	if (savingMail.value) return;
+	savingMail.value = true;
+	mailError.value = null;
+	try {
+		await updateProfile(patch);
+	} catch (cause) {
+		mailError.value = errorMessage(cause);
+	} finally {
+		savingMail.value = false;
+	}
+}
+
+function onMailSwitch(key: "receiveAnnouncementEmail", value: boolean | null): void {
+	if (value == null) return;
+	void saveMail({ [key]: value });
+}
+
+function onMailType(type: MailType, value: boolean | null): void {
+	if (value == null) return;
+	const current = me.value?.emailNotificationTypes ?? [];
+	const next = value
+		? [...current.filter((t) => t !== type), type]
+		: current.filter((t) => t !== type);
+	void saveMail({ emailNotificationTypes: next });
 }
 
 async function resend(): Promise<void> {

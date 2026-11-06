@@ -3417,6 +3417,48 @@ cd web && pnpm build                    # exit 0
 - 隐私页七个开关的保存与回读。
 - `go test` 与浏览器走查未执行。
 
+## 12BL. 批次：邮件通知（2026-11-06）
+
+**工作方式**：目标模式第四十八波，继续只写代码、验证到编译层。施工依据
+`docs/research/2026-11-06-firefish-port-wave48-contract.md`。
+
+### 12BL.1 落地清单
+
+| 层 | 文件 | 说明 |
+|----|------|------|
+| 存储 | `internal/account/profile*.go` | `EmailNotificationTypes` / `ReceiveAnnouncementEmail`（settings）；`AnnouncementMailRecipients` |
+| 入参 | `internal/httpapi/i_update.go` | 两个字段 + 类型白名单校验 |
+| 打包 | `internal/httpapi/users_pack.go` | 两个字段读真值 |
+| 发送 | `internal/httpapi/notification_mail.go`、`notes.go`、`following.go` | `maybeSendNotificationMail`（后台、30 秒、失败只记日志）；四条通知路径接入 |
+| 公告 | `internal/httpapi/announcements.go` | `mailAnnouncement` 群发（2 分钟） |
+| 前端 | `pages/SettingsEmail.vue`、`account/types.ts` | 五个真实开关；`ProfileUpdateRequest` 两字段 |
+| 文档 | `auth-users.md` | 字段与发送规则 |
+
+### 12BL.2 有意的限制
+
+1. 纯文本中文正文，无 HTML/多语言/退订头。
+2. 不发转发、引用、反应邮件。
+3. 公告群发串行逐封。
+4. 无发送重试队列。
+5. 未新增测试。
+
+### 12BL.3 验证证据（编译层）
+
+```
+gofmt -l internal/ cmd/                 # 空
+go vet ./...                            # exit 0
+cd web && pnpm exec vue-tsc --noEmit    # exit 0
+cd web && pnpm run check:port           # hardTotal 0（400 文件）
+cd web && pnpm build                    # exit 0
+```
+
+### 12BL.4 仍未验证
+
+- 真实投递：提及/回复/关注/关注请求四类邮件。
+- 未验证邮箱、未订阅、类型未勾选三种不发送分支。
+- 公告群发的收件人筛选与并发行为。
+- `go test` 与浏览器走查未执行。
+
 ## 13. 文档索引
 
 | 文档 | 内容 |
@@ -3490,6 +3532,7 @@ cd web && pnpm build                    # exit 0
 | `docs/research/2026-11-06-firefish-port-wave45-contract.md` | **第四十五波施工契约（管理台文件详情），见 §12BI** |
 | `docs/research/2026-11-06-firefish-port-wave46-contract.md` | **第四十六波施工契约（缩略图管道），见 §12BJ** |
 | `docs/research/2026-11-06-firefish-port-wave47-contract.md` | **第四十七波施工契约（锁推生效与关注通知），见 §12BK** |
+| `docs/research/2026-11-06-firefish-port-wave48-contract.md` | **第四十八波施工契约（邮件通知），见 §12BL** |
 
 ## 14. 已知的未验证项
 
@@ -3556,6 +3599,7 @@ cd web && pnpm build                    # exit 0
 - **第四十五波未测（2026-11-06，见 §12BI.4）**：文件详情的四类预览与 `user: null` 分支未走查。
 - **第四十六波未测（2026-11-06，见 §12BJ.4）**：缩略图生成与删除只有编译层证据。
 - **第四十七波未测（2026-11-06，见 §12BK.4）**：锁推与关注通知只有编译层证据。
+- **第四十八波未测（2026-11-06，见 §12BL.4）**：邮件通知与公告群发只有编译层证据。
 - **仍未移植的设置页**：邮箱、整合、导入导出、迁移、Webhook、插件、自定义 KaTeX、状态栏、
   删除账号、应用授权以外的账号操作；对应后端端点不存在或前端缺少依赖（见第五波契约 §3.3）。
 - **仍缺的 widgets**：rss、rss-ticker、server-metric、online-users、federation、job-queue、aiscript、

@@ -97,6 +97,10 @@ func (s *Server) handleIUpdate(w http.ResponseWriter, r *http.Request) {
 		IsLocked *bool `json:"isLocked"`
 		// Notification types the user does not want to see.
 		MutingNotificationTypes json.RawMessage `json:"mutingNotificationTypes"`
+		// Email notifications: which reasons are also mailed, and whether
+		// instance announcements are mailed.
+		EmailNotificationTypes   json.RawMessage `json:"emailNotificationTypes"`
+		ReceiveAnnouncementEmail *bool           `json:"receiveAnnouncementEmail"`
 	}
 	if err := decodeOptionalJSON(r, &body); err != nil {
 		writeAPIError(w, err)
@@ -173,6 +177,15 @@ func (s *Server) handleIUpdate(w http.ResponseWriter, r *http.Request) {
 		}
 		details.MutingNotificationTypes = &muting
 	}
+	if len(body.EmailNotificationTypes) > 0 {
+		mailTypes, apiErr := parseEmailNotificationTypes(body.EmailNotificationTypes)
+		if apiErr != nil {
+			writeAPIError(w, apiErr)
+			return
+		}
+		details.EmailNotificationTypes = &mailTypes
+	}
+	details.ReceiveAnnouncementEmail = body.ReceiveAnnouncementEmail
 
 	if err := s.accounts.UpdateProfileDetails(r.Context(), info.User.ID, details); err != nil {
 		writeInternalServerError(w)
@@ -342,6 +355,40 @@ func parseMutingNotificationTypes(raw json.RawMessage) ([]string, *APIError) {
 		t = strings.TrimSpace(t)
 		if _, ok := knownNotificationTypes[t]; !ok {
 			return nil, invalidParamError("unknown notification type: " + t)
+		}
+		if _, ok := seen[t]; ok {
+			continue
+		}
+		seen[t] = struct{}{}
+		out = append(out, t)
+	}
+	return out, nil
+}
+
+// emailNotificationTypes are the reasons Firefish mails about. The list is
+// smaller than the in-app one: reactions, renotes and quotes are not mailed,
+// matching upstream's own email notification types.
+var emailNotificationTypes = map[string]struct{}{
+	"mention":              {},
+	"reply":                {},
+	"follow":               {},
+	"receiveFollowRequest": {},
+}
+
+// parseEmailNotificationTypes validates i/update's emailNotificationTypes.
+func parseEmailNotificationTypes(raw json.RawMessage) ([]string, *APIError) {
+	var types []string
+	if string(raw) != "null" {
+		if err := json.Unmarshal(raw, &types); err != nil {
+			return nil, invalidParamError("emailNotificationTypes must be an array of notification types")
+		}
+	}
+	out := make([]string, 0, len(types))
+	seen := make(map[string]struct{}, len(types))
+	for _, t := range types {
+		t = strings.TrimSpace(t)
+		if _, ok := emailNotificationTypes[t]; !ok {
+			return nil, invalidParamError("unknown email notification type: " + t)
 		}
 		if _, ok := seen[t]; ok {
 			continue
