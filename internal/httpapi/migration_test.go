@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/Aurorainic/cinderfish/internal/federation"
 )
@@ -108,6 +109,15 @@ func TestTwoInstanceMove(t *testing.T) {
 	b := newInstance(t, "beta")
 	routeTo(t, a, b)
 	routeTo(t, b, a)
+	// Beta must also reach its own public host to validate the target actor
+	// when the delivered Move arrives.
+	b.srv.SetFederationHTTPClient(&http.Client{
+		Transport: &hostRewriteTransport{hosts: map[string]string{
+			"alpha.example": a.ts.URL,
+			"beta.example":  b.ts.URL,
+		}},
+		Timeout: 10 * timeSecond,
+	})
 
 	aliceToken, aliceID := a.signup(t, "alphaalice")
 	bobToken, bobID := b.signup(t, "betabob")
@@ -131,11 +141,60 @@ func TestTwoInstanceMove(t *testing.T) {
 		t.Fatalf("beta i/known-as = %d %v", resp.StatusCode, out)
 	}
 
+	// bob follows alice so the Move has a remote audience to reach.
+	bobKeyID, _, bobActorRef := actorInfo(t, b, bobID)
+	bobKP, err := b.srv.FederationLocalKey(context.Background(), bobID)
+	if err != nil {
+		t.Fatalf("beta key: %v", err)
+	}
+	bobPriv, err := federation.ParsePrivateKeyPEM(bobKP.PrivatePEM)
+	if err != nil {
+		t.Fatalf("parse beta key: %v", err)
+	}
+	follow := federation.Object{
+		"@context": federation.Context,
+		"id":       bobActorRef + "#follows/move",
+		"type":     "Follow",
+		"actor":    bobActorRef,
+		"object":   "https://alpha.example/users/" + aliceID,
+	}
+	if resp, body := postSigned(t, a.ts, "/inbox", follow, bobKeyID, bobPriv); resp.StatusCode != http.StatusAccepted {
+		t.Fatalf("follow = %d %s", resp.StatusCode, body)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+	a.srv.StartFederationWorkers(ctx)
+
 	resp, out := postWithToken(t, a.ts, "/api/i/move", aliceToken, map[string]any{
 		"moveToAccount": "@betabob@beta.example",
 	})
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("i/move = %d %v", resp.StatusCode, out)
+	}
+
+	// The Move is delivered: beta marks its remote copy of alice as moved.
+	deadline := time.Now().Add(10 * time.Second)
+	for {
+		var movedTo string
+		err := b.srv.TestPool().QueryRow(context.Background(),
+			`SELECT COALESCE(moved_to_uri, '') FROM users WHERE uri = $1`, "https://alpha.example/users/"+aliceID).Scan(&movedTo)
+		if err == nil && movedTo == bobActor {
+			break
+		}
+		if time.Now().After(deadline) {
+			rows, _ := a.srv.TestPool().Query(context.Background(),
+				`SELECT inbox_url, attempts, COALESCE(last_error,'') FROM deliver_queue WHERE payload->>'type' = 'Move'`)
+			for rows.Next() {
+				var inbox, lastErr string
+				var attempts int
+				_ = rows.Scan(&inbox, &attempts, &lastErr)
+				t.Logf("queued Move -> %s attempts=%d err=%s", inbox, attempts, lastErr)
+			}
+			rows.Close()
+			t.Fatalf("beta did not apply the delivered Move (movedTo=%q err=%v)", movedTo, err)
+		}
+		time.Sleep(200 * time.Millisecond)
 	}
 	moved, _ := out["movedToUri"].(map[string]any)
 	if moved == nil || moved["username"] != "betabob" || moved["host"] != "beta.example" {

@@ -4554,8 +4554,9 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
   刷新保留均走查通过；期间发现固定条使用了不存在的 `block-end` 属性、导致贴在左上角，
   已修为 `inset-block-end`。仍未验证的：移动端/Deck/Zen、多条目叠加、减少动画偏好。
 - **第五十一波部分补验证（2026-11-07 对账 §12CB/§12CC）**：迁移页表单、本地目标拒绝、`MkMoved`
-  横幅（含本地目标的 `MkMention` 多余 `@` 修复）都已走查。仍未验证的：`i/move` 的真实双实例投递
-  （只到入队）、跨实例「关注者改关」的端到端、`users/show` 的 `userIds` 批量参数没有前端调用方。
+  横幅（含本地目标的 `MkMention` 多余 `@` 修复）都已走查；`i/move` 的双实例投递已于
+  2026-11-07 补齐（§12DI：beta 收到 Move 并把远端副本标记为已迁移）。仍未验证的：
+  跨实例「关注者改关」的端到端、`users/show` 的 `userIds` 批量参数没有前端调用方。
 - **第五十二至五十三波部分补验证（2026-11-07 对账 §12CB）**：KaTeX 宏页的保存/解析、`/oauth/authorize`
   同意页与授权码落库、`/auth/<token>` 应用名与权限都已走查。仍未验证的：没有真实第三方客户端跑完整 OAuth 登录
   （`GET /oauth/authorize` 无凭据且无前端构建时的 401 分支已在 §12CK 补用例）。
@@ -5538,3 +5539,21 @@ CINDERFISH_TEST_DATABASE_URL=... go test ./... -count=1         # 全绿
 
 仍未验证：拖拽文件夹到另一个文件夹（`moveFolderInto` 的实现路径相同，但没有单独走查）、
 触屏设备上的替代交互。
+
+## 12DI. 第九十六波：i/move 的双实例投递（2026-11-07）
+
+第五十一波只验证到 `i/move` 入队，没有让 worker 真正投递。`TestTwoInstanceMove` 现在：
+
+1. beta 的 bob 先发签名 Follow 给 alpha 的 alice（Move 只发给旧账号的关注者）；
+2. beta 的 federation HTTP client 同时映射 `alpha.example` 与自己的 `beta.example` 到
+   httptest（入站 Move 校验目标 actor 时会回源自己的公共域名）；
+3. alice 调 `i/move` → alpha 的 worker 把 `Move` 投到 beta 的 inbox（日志 `inbox Move ... ok`）；
+4. 轮询 beta 的 `users.moved_to_uri`，确认远端副本被标记为 `https://beta.example/users/<bob>`。
+
+```
+gofmt -l internal/ cmd/                                        # 空
+go vet ./...                                                   # exit 0
+CINDERFISH_TEST_DATABASE_URL=... go test ./... -count=1         # 全绿
+```
+
+仍未验证：跨实例「关注者改关」的端到端、真实异种软件的 Move 互认。
