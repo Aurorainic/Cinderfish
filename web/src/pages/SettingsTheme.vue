@@ -162,6 +162,7 @@ import {
 	builtinThemes,
 	compileTheme,
 	defaultThemeIds,
+	fetchInstalledThemes,
 	listInstalledThemes,
 	themeMode,
 	type Theme,
@@ -231,7 +232,12 @@ function onMode(value: RadioValue): void {
 	}
 }
 
-function refreshInstalled(): void {
+async function refreshInstalled(): Promise<void> {
+	try {
+		await fetchInstalledThemes();
+	} catch {
+		// Offline: the localStorage cache is the best list available.
+	}
 	installedThemes.value = listInstalledThemes();
 }
 

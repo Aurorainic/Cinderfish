@@ -82,10 +82,11 @@ import CfInfo from "@/components/ui/CfInfo.vue";
 import FormSection from "@/components/form/section.vue";
 import { useTheme } from "@/composables/use-theme";
 import { t } from "@/i18n";
-import { confirm, success } from "@/os";
+import { alert, confirm, success } from "@/os";
 import { definePageMetadata } from "@/scripts/page-metadata";
 import {
 	compileTheme,
+	fetchInstalledThemes,
 	listInstalledThemes,
 	themeMode,
 	uninstallTheme,
@@ -99,7 +100,12 @@ const { theme, selectedThemeIds, setThemeForMode } = useTheme();
 const themes = ref<Theme[]>(listInstalledThemes());
 const activeId = computed(() => theme.value.id);
 
-function refresh(): void {
+async function refresh(): Promise<void> {
+	try {
+		await fetchInstalledThemes();
+	} catch {
+		// Offline: the localStorage cache is the best list available.
+	}
 	themes.value = listInstalledThemes();
 }
 
@@ -147,7 +153,13 @@ async function remove(item: Theme): Promise<void> {
 	});
 	if (canceled) return;
 
-	uninstallTheme(item.id);
+	try {
+		await uninstallTheme(item.id);
+	} catch (error) {
+		const text = error instanceof Error ? error.message : String(error);
+		alert({ type: "error", text: `卸载失败：${text}` });
+		return;
+	}
 	// The slot would otherwise keep pointing at a theme that no longer exists,
 	// leaving the previous CSS variables in place until the next reload.
 	const mode = themeMode(item);

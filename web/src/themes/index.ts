@@ -16,6 +16,7 @@ export {
 } from "./builtin";
 export {
 	INSTALLED_THEMES_KEY,
+	fetchInstalledThemes,
 	findInstalledTheme,
 	installTheme,
 	listInstalledThemes,

@@ -4693,7 +4693,8 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
 - ~~**30 个 Firefish 内置主题只移植了 4 个**~~：第四波移植了剩余 26 个调色板（`themes/builtin/*.json5`
   经 `?raw` 加载），当前可选主题 28 个；全部 12 个浅色与 16 个深色调色板已于 2026-11-07 逐个
   切换验证（§12EM：`--bg` 有效、无异常），Nord 的浅/深具体色值见 §12DX。
-- **主题安装只在本浏览器生效**：`cinderfish.installedThemes` 存 localStorage，没有走 `i/registry`，换设备不同步。
+- ~~**主题安装只在本浏览器生效**~~：2026-11-07 改为 Firefish 的做法——`i/registry`（scope `client`、
+  key `themes`）为权威，localStorage 只做按账号隔离的缓存，见 §12EW。
 - **i18n 只覆盖 zh-CN / ja-JP**，其余 37 个 locale 未生成；`yaml` devDependency 未装
   （重新生成 locale 前要先 `pnpm add -D yaml`）。
 - **S3 后端未做真实服务端验证**：2026-11-07 起已用 moto 与 s3rver 两个 S3 协议实现验证
@@ -6157,3 +6158,41 @@ username_lower LIKE 'iperfu%'`，再 `ANALYZE notes`；临时服务已停止。
 - `TestDriveSaveStoresWebPThumbnail`：上传路径写出 `.thumb.png` 对象并能在存储后端回读。
 - 真实二进制：`drive/files/create` 上传 `sample.webp` → `thumbnailUrl` 指向 `.thumb.png`；
   `GET` 原图 200 `image/webp` 2524 B，`GET` 缩略图 200 `image/png` 70761 B，PNG 头为 512×256。
+
+## 12EW. 第一百三十三波：已安装主题写入 i/registry（2026-11-07）
+
+§14 记的「主题安装只在本浏览器生效」是移植缺口：参考实现
+`firefish@b425f61:packages/client/src/theme-store.ts` 把已安装主题放在服务端注册表
+（scope `["client"]`、key `themes`），localStorage 只是 `themes:<userId>` 缓存；本实现此前只写
+localStorage，而且缓存键不区分账号。
+
+### 12EW.1 落地清单
+
+| 层 | 文件 | 内容 |
+|----|------|------|
+| 存储 | `web/src/themes/installed.ts` | `i/registry/get/set` 为权威；缓存键 `cinderfish.installedThemes:<userId>`，无账号时用基名；缓存按账号判定失效 |
+| 安装/卸载 | 同上 | `installTheme`/`uninstallTheme` 改为 async：先取最新列表，再写 registry，成功后写缓存；registry 失败不落本地 |
+| 设置页 | `SettingsTheme.vue`、`SettingsThemeManage.vue`、`SettingsThemeInstall.vue` | 挂载/激活时 `fetchInstalledThemes()`，离线时回退到缓存；卸载失败弹错误框 |
+| 文案 | `SettingsThemeInstall.vue` | 原「数据只存在本浏览器 localStorage」改为「保存在账号的 i/registry，本浏览器只做缓存」 |
+
+`NO_SUCH_KEY` 不视为错误（与 Firefish 一致）：本地缓存可能来自离线安装。
+
+### 12EW.2 有意的限制
+
+- 启动时不在应用壳里预取注册表：只有三个主题设置页会拉取，与 Firefish 的 `fetchThemes` 调用点一致。
+  因此「在另一台设备安装、本设备直接选中」仍需先打开主题设置页一次。
+- 主题**选择**（哪种模式用哪个主题）仍存在设备本地，与 Firefish 的 `theme`/`colorSchema`
+  localStorage 键一致，不在本波范围。
+
+### 12EW.3 验证证据
+
+- `vue-tsc --noEmit`、`check:port`（hardTotal 0）、`pnpm build` 全绿；`gofmt`/`go vet`/全量 Go 测试未受影响。
+- 无头浏览器（1400×900，Helium/CDP）：
+  - 在 `/settings/theme/install` 粘贴主题并安装 → 页面出现「W132 Theme」，`i/registry/get`
+    （scope `client`、key `themes`）返回 `[{id:"w132theme", …}]`；
+  - 删除 `cinderfish.installedThemes:<alice.id>` 后重新打开 `/settings/theme/manage`，卡片仍在，
+    缓存被重新写入——列表确实来自 registry；
+  - 切换到 bob 的会话打开同一页：0 张卡片、缓存键不存在，账号隔离成立；
+  - 在管理页点「卸载」→ 确认框 → 卡片清空、显示「还没有安装任何主题」，registry 返回 `[]`，
+    缓存为 `[]`。
+- 截图：`/tmp/w132-shots/installed.png`、`alice-manage-after-clear.png`、`bob-manage.png`（不入库）。

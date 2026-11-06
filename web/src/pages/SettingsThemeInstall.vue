@@ -48,8 +48,8 @@
 							<code>kind</code>）；未覆盖的颜色会从该基础主题继承。
 						</li>
 						<li>
-							已安装 {{ installedCount }} 个主题，数据只存在本浏览器的
-							localStorage。
+							已安装 {{ installedCount }} 个主题，列表保存在账号的
+							<i>i/registry</i> 里，本浏览器只做缓存，换设备登录同一账号会同步。
 						</li>
 					</ul>
 				</div>
@@ -63,15 +63,16 @@
 
 <script lang="ts" setup>
 // Firefish's theme installer: a textarea plus preview/install. The parser is
-// `parseJson5` from the theme engine (no `json5` package), and the install goes
-// straight to localStorage through `installTheme` — there is no network call.
+// `parseJson5` from the theme engine (no `json5` package), and `installTheme`
+// writes the list to `i/registry` (scope ["client"], key "themes") with the
+// localStorage copy as cache, matching Firefish's theme-store.ts.
 //
 // Differences from upstream:
 //   * `preview()` is gone: it called `applyTheme()` on the live document with
 //     an uninstalled theme and there is no preview window to scope it to;
 //   * the theme is normalised before validation (missing `author` → "") because
 //     Firefish's own `d-u0` / `l-u0` palettes ship without one.
-import { computed, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import CfButton from "@/components/ui/CfButton.vue";
 import CfInfo from "@/components/ui/CfInfo.vue";
 import FormSection from "@/components/form/section.vue";
@@ -79,6 +80,7 @@ import FormTextarea from "@/components/form/textarea.vue";
 import { t } from "@/i18n";
 import { definePageMetadata } from "@/scripts/page-metadata";
 import {
+	fetchInstalledThemes,
 	findInstalledTheme,
 	findTheme,
 	installTheme,
@@ -174,7 +176,7 @@ function readTheme(source: string): Theme | null {
 	return theme;
 }
 
-function install(): void {
+async function install(): Promise<void> {
 	errorMessage.value = "";
 	installedTheme.value = null;
 	if (trimmedCode.value === "") {
@@ -186,7 +188,7 @@ function install(): void {
 	if (theme == null) return;
 
 	try {
-		installTheme(theme);
+		await installTheme(theme);
 	} catch (error) {
 		errorMessage.value = `安装失败：${errorText(error)}`;
 		return;
@@ -196,6 +198,15 @@ function install(): void {
 	installedCount.value = listInstalledThemes().length;
 	code.value = "";
 }
+
+onMounted(async () => {
+	try {
+		await fetchInstalledThemes();
+	} catch {
+		// Offline: the localStorage cache is the best list available.
+	}
+	installedCount.value = listInstalledThemes().length;
+});
 
 function reset(): void {
 	code.value = "";
