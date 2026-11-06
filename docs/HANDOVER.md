@@ -1,6 +1,9 @@
 # Cinderfish 交接说明
 
-- 最后更新：2026-11-05（前端第三波：发帖链路、个人页、设置、内容页、Firefish 导航壳、deck 与 widgets 已落地并通过浏览器走查，见 §12S）
+- 最后更新：2026-11-06（目标模式第三十七至五十波：公告编辑、邮件与邮箱验证、出站投递修复、
+  编辑 Update、按作者签名、四个兼容端点、实例 CSS、管理台文件详情、缩略图、锁推与关注通知、
+  邮件通知、管理页说明化、状态栏；**目标已按用户要求暂停，暂停点见 §12BO**。注意：自第十九波起
+  未执行 `go test` 与浏览器走查，恢复工作后第一件事是补验证，见 §12BO.3）
 - 项目名 **Cinderfish**（2026-10-28 定名，Go module `github.com/Aurorainic/cinderfish`）
 - 仓库：当前目录 `/home/lainsaka/文档/MilnFish`，分支 `main`；远程 `origin` 为
   `https://github.com/Aurorainic/Cinderfish.git`（GitHub 仓库已更名，本地目录改名待办）
@@ -3492,6 +3495,106 @@ cd web && pnpm build                    # exit 0
 - 六个说明页的渲染与管理台菜单分组在窄屏下的表现。
 - 浏览器走查未执行。
 
+## 12BN. 批次：状态栏（2026-11-06）
+
+**工作方式**：目标模式第五十波，只改前端。施工依据
+`docs/research/2026-11-06-firefish-port-wave50-contract.md`。本波之后目标被用户暂停，
+见 §12BO。
+
+### 12BN.1 落地清单
+
+| 层 | 文件 | 说明 |
+|----|------|------|
+| 条目 | `components/statusbar/CfStatusbarFederation.vue` | 拉 `federation/instances`（30 条），CSS 跑马灯滚动主机名；刷新间隔/滚动时长/反向/着色 |
+| 容器 | `components/statusbar/CfStatusbars.vue` | 五档高度、深色底、名称；未知类型就地说明 |
+| 设置页 | `pages/SettingsStatusbar.vue` | 增删/上下移/名称/类型/高度/深色/联邦参数，即时写 store |
+| 挂载 | `ui/layouts/UniversalLayout.vue`、`pages/SettingsIndex.vue` | 底部固定条（有配置才出现）+ 设置入口 |
+| 文档 | 本契约 | rss / userList 为何不做 |
+
+### 12BN.2 有意的限制
+
+1. 只实现 `federation` 类型；`rss` 需要媒体代理，`userList` 属首版范围外，设置页列为禁用。
+2. 排序只有上移/下移，没有拖拽。
+3. 只有 Universal 布局挂载；Deck / Zen 未接。
+4. 存储作用域 `deviceAccount`，不跨设备同步。
+5. 未新增测试。
+
+### 12BN.3 验证证据（编译层）
+
+```
+cd web && pnpm exec vue-tsc --noEmit    # exit 0
+cd web && pnpm run check:port           # hardTotal 0（400 文件）
+cd web && pnpm build                    # exit 0
+```
+
+### 12BN.4 仍未验证
+
+- 状态栏在桌面/移动下的实际高度、跑马灯速度与遮挡。
+- 增删/排序/参数改动是否即时反映在底部条上。
+- 浏览器走查未执行。
+
+## 12BO. 暂停点：2026-11-06 目标模式终止
+
+用户于第五十波结束后要求「停止目标与流程，更新 HANDOVER」。本节记录停止时的确切状态，
+供下一次接手时直接继续，不需要重新推导。
+
+### 12BO.1 停止时的仓库状态
+
+- 工作树干净；第五十波的改动已提交（`5609384`）。
+- 台账：**137 条已注册路由 / 130 条 Misskey 同名 / 310 条未实现**，Tier 1 缺口 **0**
+  （`docs/research/2026-11-04-misskey-api-coverage.md`）。
+- 迁移版本 **v18**（`email_challenges` + `user_profiles.email_verified`）。
+- 前端占位页（`cf-page-placeholder`）**34 个**：其中 19 个属于用户已裁决的首版范围外
+  （`AdminRelays`、`AntennaTimeline`、`Channel*`×3、`Clip`、`Gallery*`×3、`Messaging*`×2、
+  `MyAntennas*`×3、`MyClips*`×2、`MyGroups*`×2、`MyLists*`×2、`Page*`×3、`UserListTimeline`），
+  其余 15 个见 §12BO.3。
+
+### 12BO.2 本轮（§12BA–§12BN，第三十七至五十波）实际完成的内容
+
+| 波 | 主题 | 关键证据 |
+|----|------|----------|
+| 37 | `admin/announcements/update` + 公告编辑 UI | 端点 + 页面，编译层 |
+| 38 | SMTP 发送、`email_challenges`（v18）、六个邮箱端点 | 编译层 |
+| 39 | 邮箱设置/验证/重置三页 + 忘记密码入口 | 编译层 |
+| 40 | **修复出站投递从未接线** + `notes/unrenote` | 编译层，双实例未验证 |
+| 41 | 编辑的双向 `Update` | 编译层 |
+| 42 | **按活动作者签名**（原为固定管理员密钥） | 编译层 |
+| 43 | `users/stats`、`hashtags/search`、`registry/keys-with-type`、`notes/featured` | 编译层 |
+| 44 | 实例级自定义 CSS + 邮件状态页 | 编译层 |
+| 45 | `admin/drive/show-file` + 管理台文件详情 | 编译层 |
+| 46 | 缩略图生成管道（`thumbnailUrl` 不再恒 null） | 编译层 |
+| 47 | 锁推生效 + 关注类通知落库 + 隐私页七个真开关 | 编译层 |
+| 48 | 邮件通知（四类触发 + 公告群发） | 编译层 |
+| 49 | 六个无后端管理页转说明页 | 编译层 |
+| 50 | 状态栏（federation 类型） | 编译层 |
+
+### 12BO.3 停止时仍待办的事项
+
+**必须先做的验证**（自第十九波起全部欠账，这是恢复工作后第一优先级）：
+`go test ./...`、`CINDERFISH_TEST_DATABASE_URL=… go test ./...`、真实二进制手工走查、
+无头浏览器截图与交互。近期波次的高风险未验证点：SMTP 真投递、双实例
+Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除、锁推审批链路、邮件通知触发、
+状态栏渲染。
+
+**未移植且无后端**（15 个占位页）：
+`Auth`、`OAuth`、`AuthorizeInteraction`、`SignupComplete`（应用授权 / Signup 确认流程，后端缺
+`auth/session/*` 与邮箱确认注册）、`SettingsIntegration`（第三方登录，明确不做）、
+`SettingsPlugin`、`SettingsPluginInstall`（缺 AiScript 运行时）、`SettingsCustomKatexMacro`
+（缺 `katex` 依赖）、`SettingsMigration`（缺 `i/move`）、`EmptyPage`（内部空页）。
+
+**下一波的候选顺序**（按价值/风险排序）：
+1. `i/move` + `SettingsMigration`（ActivityPub Move，最后一处有联邦影响的设置）；
+2. OAuth 交互式同意页（需后端把 token 从请求头改到表单，属行为变更，需先确认）；
+3. AiScript 插件运行时（工作量大，需引依赖）；
+4. KaTeX 自定义宏（需引 `katex`）；
+5. `SettingsIntegration` 等无后端页转说明页（与第四十九波同法）。
+
+### 12BO.4 恢复方式
+
+用户在会话中重新授权后，按「从 `docs/HANDOVER.md` 的未验证清单继续」即可；每波仍走
+代码 → 编译检查 → 提交 → 更新契约与本节记录的流程。若用户要求开始执行测试/浏览器走查，
+先把 §12BO.3 的验证欠账补完再开新波。
+
 ## 13. 文档索引
 
 | 文档 | 内容 |
@@ -3567,6 +3670,7 @@ cd web && pnpm build                    # exit 0
 | `docs/research/2026-11-06-firefish-port-wave47-contract.md` | **第四十七波施工契约（锁推生效与关注通知），见 §12BK** |
 | `docs/research/2026-11-06-firefish-port-wave48-contract.md` | **第四十八波施工契约（邮件通知），见 §12BL** |
 | `docs/research/2026-11-06-firefish-port-wave49-contract.md` | **第四十九波施工契约（无后端管理页转说明页），见 §12BM** |
+| `docs/research/2026-11-06-firefish-port-wave50-contract.md` | **第五十波施工契约（状态栏），见 §12BN** |
 
 ## 14. 已知的未验证项
 
@@ -3635,6 +3739,7 @@ cd web && pnpm build                    # exit 0
 - **第四十七波未测（2026-11-06，见 §12BK.4）**：锁推与关注通知只有编译层证据。
 - **第四十八波未测（2026-11-06，见 §12BL.4）**：邮件通知与公告群发只有编译层证据。
 - **第四十九波未测（2026-11-06，见 §12BM.4）**：六个说明页与菜单分组未走查。
+- **第五十波未测（2026-11-06，见 §12BN.4）**：状态栏的渲染与交互未走查。
 - **仍未移植的设置页**：邮箱、整合、导入导出、迁移、Webhook、插件、自定义 KaTeX、状态栏、
   删除账号、应用授权以外的账号操作；对应后端端点不存在或前端缺少依赖（见第五波契约 §3.3）。
 - **仍缺的 widgets**：rss、rss-ticker、server-metric、online-users、federation、job-queue、aiscript、
