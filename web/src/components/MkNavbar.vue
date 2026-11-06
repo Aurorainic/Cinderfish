@@ -226,13 +226,14 @@ const OVERFLOW_ENTRIES: NavEntry[] = [
 /**
  * First-release scope keeps chat / channels / clips / gallery / pages /
  * antennas / lists as placeholder routes (Misskey API coverage register §5).
+ * Search is listed again now that `notes/search` and `users/search` exist; it
+ * opens /search, which carries its own query box.
  * The menu table still knows them so the store shape stays Firefish-compatible,
  * but they are filtered out instead of leading to a dead end.
  */
 const UNAVAILABLE_MENU: ReadonlySet<MenuOption> = new Set<MenuOption>([
 	"messaging",
 	"channels",
-	"search",
 ]);
 
 const router = useRouter();

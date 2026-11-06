@@ -4,7 +4,7 @@
 		<template #header>
 			<MkPageHeader :display-back-button="true" />
 		</template>
-		<MkSpacer :content-max="800">
+		<MkSpacer :content-max="800" :margin-min="16" :margin-max="32">
 			<div class="header">
 				<span class="tag">#{{ tag }}</span>
 				<span v-if="trend != null" class="stat">{{
@@ -15,15 +15,14 @@
 				}}</span>
 			</div>
 
-			<template v-if="fetching && items.length === 0">
-				<CfLoading />
-			</template>
+			<CfLoading v-if="fetching && items.length === 0" />
 			<MkError v-else-if="error != null && items.length === 0" @retry="reload" />
 			<template v-else>
-				<CfInfo v-if="notes.length === 0">
-					最近加载的本地时间线里没有带这个标签的帖子；继续加载更多可以往下找。
+				<CfInfo v-if="items.length === 0">
+					还没有带这个标签的帖子。标签匹配不区分大小写，只搜索引过的正文里的
+					<code>#标签</code>。
 				</CfInfo>
-				<CfDateSeparatedList v-else :items="notes" direction="down">
+				<CfDateSeparatedList v-else :items="items" direction="down">
 					<template #default="{ item }">
 						<MkNote :key="item.id" class="note" :note="item" />
 					</template>
@@ -41,21 +40,29 @@
 </template>
 
 <script lang="ts" setup>
-// Firefish searches notes with `notes/search-by-tag` and users with
-// `users/search`; Cinderfish has neither endpoint (contract §2). The page keeps
-// the tag header and the trend statistic, and filters the local timeline in the
-// browser by `note.tags` — the same field the backend indexes for
-// `hashtags/trend`. Remote notes never appear here, matching the "local
-// timeline" scope the contract prescribes.
+// Firefish pages a tag with `notes/search-by-tag`. Cinderfish now implements
+// it (jsonb tag containment + visibility, mutes and blocks), so the list comes
+// from the server instead of filtering the local timeline in the browser. That
+// also means remote notes carrying the tag are found when the instance
+// federates, which the old client-side filter could never do.
 import { computed, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import { api } from "@/api/client";
 import type { HashtagTrend, NoteDetailed } from "@/api/types";
-import { CfButton, CfDateSeparatedList, CfInfo, CfLoading } from "@/components/ui";
+import CfButton from "@/components/ui/CfButton.vue";
+import CfDateSeparatedList from "@/components/ui/CfDateSeparatedList.vue";
+import CfInfo from "@/components/ui/CfInfo.vue";
+import CfLoading from "@/components/ui/CfLoading.vue";
+import MkError from "@/components/global/MkError.vue";
 import MkNote from "@/components/MkNote.vue";
+import MkPageHeader from "@/components/global/MkPageHeader.vue";
+import MkSpacer from "@/components/global/MkSpacer.vue";
+import MkStickyContainer from "@/components/global/MkStickyContainer.vue";
 import { usePagination } from "@/composables/use-pagination";
 import { t } from "@/i18n";
 import { definePageMetadata } from "@/scripts/page-metadata";
+
+defineOptions({ name: "CfPageTag" });
 
 const route = useRoute();
 
@@ -63,28 +70,14 @@ const tag = computed(() =>
 	typeof route.params.tag === "string" ? route.params.tag : "",
 );
 
-const {
-	items,
-	fetching,
-	moreFetching,
-	hasMore,
-	error,
-	reload,
-	loadMore,
-} = usePagination<NoteDetailed>({
-	endpoint: "notes/local-timeline",
-	limit: 20,
-	// The tag watcher below owns the first load (and every tag change), so the
-	// hook must not fire its own immediate request.
-	immediate: false,
-});
-
-function matchesTag(note: NoteDetailed): boolean {
-	const needle = tag.value.toLowerCase();
-	return note.tags.some((noteTag) => noteTag.toLowerCase() === needle);
-}
-
-const notes = computed(() => items.value.filter(matchesTag));
+const { items, fetching, moreFetching, hasMore, error, reload, loadMore } =
+	usePagination<NoteDetailed>({
+		endpoint: "notes/search-by-tag",
+		limit: 20,
+		params: () => ({ tag: tag.value }),
+		// The tag watcher below owns the first load and every tag change.
+		immediate: false,
+	});
 
 const trend = ref<HashtagTrend | null>(null);
 

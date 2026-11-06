@@ -1521,6 +1521,76 @@ cd web && pnpm build                    # exit 0
 - **屏蔽的通知副作用**：Misskey 屏蔽后不投递对方通知；本实现未在通知层过滤（时间线与 `users/show` 已过滤）。
 - **无需登录的注册/登录表单**、emoji 文件上传点击路径、Streaming 实时插入仍是前几波遗留的未验证项。
 
+## 12V. 批次：前端第六波——搜索与标签（2026-11-06）
+
+**工作方式**：目标模式下自主推进，一轮完成「代码 → 全量测试 → 真实二进制 → 无头浏览器 → 文档 → 提交」。
+施工依据 `docs/research/2026-11-06-firefish-port-wave6-contract.md`。
+
+### 12V.1 落地清单
+
+| 层 | 文件 | 说明 |
+|----|------|------|
+| 笔记搜索 | `internal/note/search.go`（新） | `Search`、`SearchByTag`、`escapeLike`；时间线的静音/屏蔽/实例静音条件抽为 `addViewerRelationFilters` 共用 |
+| 用户搜索 | `internal/account/search.go`（新） | 用户名/昵称/简介 ILIKE，排除冻结与双向屏蔽，支持 offset 与 id 游标 |
+| 端点 | `internal/httpapi/search.go`（新）、`server.go` | `notes/search`、`notes/search-by-tag`、`users/search`；匿名可读、坏 token 视为匿名 |
+| 搜索页 | `web/src/pages/Search.vue` | 输入框、帖子/用户页签、按 query remount 的分页；桌面与移动均可用 |
+| 标签页 | `web/src/pages/Tag.vue` | 改走 `notes/search-by-tag`，不再只在本地时间线里客户端过滤 |
+| 导航 | `web/src/components/MkNavbar.vue` | `search` 移出不可用集合，「更多」菜单恢复搜索入口 |
+| 接口层 | `web/src/api/endpoints.ts`、`types.ts` | 三个端点与参数类型 |
+| 测试 | `internal/httpapi/search_test.go`（新，5 个用例） | 可见性、LIKE 转义、静音过滤、标签大小写、用户搜索 origin 与屏蔽 |
+
+### 12V.2 明确的取舍
+
+1. 没有全文索引，走 Misskey 的 ILIKE 回退：只匹配正文，不匹配 CW、附件描述与投票选项。
+2. `notes/search-by-tag` 只实现 `tag` 单标签形式；上游的 `query: string[][]` 布尔组合没有调用方。
+3. `users/search` 额外接受 `sinceId`/`untilId`，让前端复用一个分页组件；offset 仍可用。
+4. `users/search` 为每条结果填充 `notesCount` 等计数（每行两次聚合查询），避免卡片显示 0 帖子。
+5. 标签匹配大小写不敏感：`notes.tags` 保留作者写法，用 `lower(t) = lower($1)` 而不是 jsonb 的 `?`。
+6. 搜索页不保留上游 swiper：页签直接切换面板，键盘与窄屏更稳。
+
+### 12V.3 验证证据
+
+```
+gofmt -l internal/ cmd/                 # 空
+go vet ./...                            # exit 0
+CINDERFISH_TEST_DATABASE_URL=… go test -count=1 ./...   # 全绿（新增 5 个搜索用例）
+cd web && pnpm exec vue-tsc --noEmit    # exit 0
+cd web && pnpm run check:port           # 398 文件，hardTotal 0
+cd web && pnpm build                    # exit 0
+```
+
+真实二进制 `:3991`（开发库，`federation_mode=none`）：
+
+| 场景 | 结果 |
+|------|------|
+| 匿名 `notes/search?query=searchable` | 2 条（alice 公开 + bob 公开） |
+| alice 带 token 同一查询 | 3 条（多出她自己的 followers 帖） |
+| `query=%`（LIKE 通配符） | 0 条，转义生效 |
+| `notes/search-by-tag` `w6tag` / `W6Tag` | 均为 1 条 |
+| `users/search?query=w6ali` | `["w6alice"]`，`notesCount=2`；`origin=remote` 为 0 |
+| `origin=bogus` / 缺 `query` | 400 |
+| 屏蔽后 `users/search`（带 bob token） | 0 条；匿名仍 1 条 |
+
+无头 Helium 156（CDP，1440×900 / 390×844）：
+
+| 页面 | 证据 |
+|------|------|
+| `/search?q=searchable` | 显示 alice 公开帖与 bob 帖，**不显示** alice 的 followers 帖；`scrollWidth == clientWidth`，无 JS 异常 |
+| `/search?q=w6` 用户页签 | w6bob「1 帖子」、w6alice「2 帖子」，计数正确 |
+| `/tags/w6tag` | 显示「被 1 人提到 · 最近 7 天」与带 `#W6Tag` 的帖子 |
+| 侧栏/更多菜单 | 「搜索」作为顶级入口出现（此前被过滤） |
+| 移动端 `/search?q=w6`、`/tags/w6tag` | 均渲染，无横向溢出、无异常 |
+
+走查数据已清理：删除 w6alice、w6bob 及其全部笔记，用户数回到 23；临时二进制、媒体目录、profile 与
+服务全部清理，截图留在 `/tmp/w6-shots`（不入库）。
+
+### 12V.4 仍未验证
+
+- `offset` 分页路径、`withFiles`、`host`、`userId` 过滤只写了实现，没有构造数据实测。
+- 远端用户与远端笔记的搜索：实例当前 `federation_mode=none`，没有远程行可搜。
+- 大结果集性能：`ILIKE '%…%'` 会全表扫描；个人实例可接受，但没有压测。
+- 搜索页的用户页签在空结果时显示「无用户」，有结果时的卡片样式已目视，但没有测很长的简介换行。
+
 ## 13. 文档索引
 
 | 文档 | 内容 |
@@ -1552,12 +1622,15 @@ cd web && pnpm build                    # exit 0
 | `docs/research/2026-11-05-firefish-port-wave3-contract.md` | **第三波施工契约（发帖链路、个人页、设置、内容页、壳层/widgets 的模块映射与 13 个写作用域），见 §12S** |
 | `docs/research/2026-11-06-firefish-port-wave4-contract.md` | **第四波施工契约（管理台、主题体系、注册表、本地设置、静态页的模块映射与 7 个写作用域），见 §12T** |
 | `docs/research/2026-11-06-firefish-port-wave5-contract.md` | **第五波施工契约（静音/屏蔽、令牌管理、实例静音、无障碍、多账号、4 个 widget 与明确不做的项），见 §12U** |
+| `docs/research/2026-11-06-firefish-port-wave6-contract.md` | **第六波施工契约（notes/search、notes/search-by-tag、users/search 与搜索/标签页），见 §12V** |
 
 ## 14. 已知的未验证项
 
 - **第五波的 API 与页面渲染已验证（2026-11-06，见 §12U.3）**：静音/屏蔽/实例静音/令牌撤销都做了
   真实二进制回读，五个设置页与四个 widget 在桌面/移动无头浏览器里走查过；仍未验证的是 UI 点击路径
   （撤销、切换账号、widget 配置弹窗）、列表分页游标与实例静音非法输入，见 §12U.4。
+- **第六波的搜索过滤组合未全测（2026-11-06，见 §12V.4）**：`offset`/`withFiles`/`host`/`userId`
+  与远端结果没有构造数据；`ILIKE '%…%'` 的性能没有压测。
 - **仍未移植的设置页**：邮箱、整合、安全（2FA）、导入导出、迁移、Webhook、插件、自定义 KaTeX、状态栏、
   删除账号、应用授权以外的账号操作；对应后端端点不存在或前端缺少依赖（见第五波契约 §3.3）。
 - **仍缺的 widgets**：rss、rss-ticker、server-metric、online-users、federation、job-queue、aiscript、

@@ -62,6 +62,7 @@ export const ENDPOINTS = {
 
 	// users
 	usersShow: "users/show",
+	usersSearch: "users/search",
 	usersNotes: "users/notes",
 	usersFollowers: "users/followers",
 	usersFollowing: "users/following",
@@ -98,6 +99,8 @@ export const ENDPOINTS = {
 	notesShow: "notes/show",
 	notesDelete: "notes/delete",
 	notesReplies: "notes/replies",
+	notesSearch: "notes/search",
+	notesSearchByTag: "notes/search-by-tag",
 	notesConversation: "notes/conversation",
 	notesChildren: "notes/children",
 	notesRenotes: "notes/renotes",
@@ -156,6 +159,36 @@ export interface PaginationParams {
 	untilId?: string;
 	sinceDate?: number;
 	untilDate?: number;
+}
+
+export interface NotesSearchParams {
+	query: string;
+	limit?: number;
+	offset?: number;
+	sinceId?: string;
+	untilId?: string;
+	/** null = local only, a host = that instance, absent = every instance. */
+	host?: string | null;
+	userId?: string;
+	withFiles?: boolean;
+}
+
+export interface NotesSearchByTagParams {
+	tag: string;
+	limit?: number;
+	sinceId?: string;
+	untilId?: string;
+	withFiles?: boolean;
+}
+
+export interface UsersSearchParams {
+	query: string;
+	origin?: "combined" | "local" | "remote";
+	host?: string | null;
+	limit?: number;
+	offset?: number;
+	sinceId?: string;
+	untilId?: string;
 }
 
 export interface RelationListParams {
@@ -441,6 +474,19 @@ export interface EndpointMap {
 		res: EmptyResponse;
 	};
 	[ENDPOINTS.hashtagsTrend]: { req: Record<string, never>; res: HashtagTrend[] };
+
+	[ENDPOINTS.notesSearch]: {
+		req: NotesSearchParams;
+		res: NoteDetailed[];
+	};
+	[ENDPOINTS.notesSearchByTag]: {
+		req: NotesSearchByTagParams;
+		res: NoteDetailed[];
+	};
+	[ENDPOINTS.usersSearch]: {
+		req: UsersSearchParams;
+		res: UserDetailed[];
+	};
 
 	[ENDPOINTS.notesTimeline]: { req: TimelineParams; res: NoteDetailed[] };
 	[ENDPOINTS.notesLocalTimeline]: { req: TimelineParams; res: NoteDetailed[] };
