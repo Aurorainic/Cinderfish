@@ -6,6 +6,7 @@
 // so `EndpointName` can drive `api()`'s typing.
 
 import type {
+	AdminDriveFile,
 	AdminEmoji,
 	AuthorizedApp,
 	BlockingRecord,
@@ -142,6 +143,7 @@ export const ENDPOINTS = {
 	// admin
 	adminAccountsCreate: "admin/accounts/create",
 	adminShowUsers: "admin/show-users",
+	adminDriveFiles: "admin/drive/files",
 	adminSuspendUser: "admin/suspend-user",
 	adminUnsuspendUser: "admin/unsuspend-user",
 	adminFederationMode: "admin/federation/mode",
@@ -348,6 +350,21 @@ export interface AdminAccountsCreateParams {
 export interface AdminShowUsersParams {
 	limit?: number;
 	offset?: number;
+	sort?: "+follower" | "-follower" | "+createdAt" | "-createdAt" | "+updatedAt" | "-updatedAt";
+	state?: "all" | "alive" | "available" | "admin" | "moderator" | "adminOrModerator" | "silenced" | "suspended";
+	origin?: "combined" | "local" | "remote";
+	username?: string | null;
+	hostname?: string | null;
+}
+
+export interface AdminDriveFilesParams {
+	limit?: number;
+	sinceId?: string;
+	untilId?: string;
+	userId?: string | null;
+	type?: string | null;
+	origin?: "combined" | "local" | "remote";
+	hostname?: string | null;
 }
 
 export interface FollowingRequestsParams extends PaginationParams {
@@ -545,6 +562,10 @@ export interface EndpointMap {
 	[ENDPOINTS.adminShowUsers]: {
 		req: AdminShowUsersParams;
 		res: UserDetailed[];
+	};
+	[ENDPOINTS.adminDriveFiles]: {
+		req: AdminDriveFilesParams;
+		res: AdminDriveFile[];
 	};
 	[ENDPOINTS.adminSuspendUser]: {
 		req: { userId: string };

@@ -15,13 +15,60 @@
 				<div class="toolbar">
 					<div class="summary">
 						<span class="page">第 {{ pageNumber }} 页</span>
-						<span class="hint">每页 {{ LIMIT }} 位本地账号</span>
+						<span class="hint">每页 {{ LIMIT }} 位账号</span>
 					</div>
 					<CfButton primary :disabled="creating" @click="toggleCreateForm">
 						<i class="ph-user-plus ph-bold"></i>
 						创建账号
 					</CfButton>
 				</div>
+
+				<form class="filters" @submit.prevent="applyFilters">
+					<CfSelect
+						v-model="sort"
+						class="field"
+						@update:model-value="applyFilters"
+					>
+						<template #label>排序</template>
+						<option value="">账号 id</option>
+						<option value="+createdAt">最新注册</option>
+						<option value="-createdAt">最早注册</option>
+						<option value="+follower">关注者最多</option>
+						<option value="-follower">关注者最少</option>
+					</CfSelect>
+					<CfSelect
+						v-model="state"
+						class="field"
+						@update:model-value="applyFilters"
+					>
+						<template #label>状态</template>
+						<option value="all">全部</option>
+						<option value="available">正常</option>
+						<option value="suspended">已冻结</option>
+						<option value="admin">管理员</option>
+					</CfSelect>
+					<CfSelect
+						v-model="origin"
+						class="field"
+						@update:model-value="applyFilters"
+					>
+						<template #label>来源</template>
+						<option value="combined">全部</option>
+						<option value="local">本地</option>
+						<option value="remote">远程</option>
+					</CfSelect>
+					<CfInput v-model="usernameFilter" class="field">
+						<template #label>用户名前缀</template>
+						<template #prefix>@</template>
+					</CfInput>
+					<CfInput v-model="hostnameFilter" class="field">
+						<template #label>实例主机</template>
+					</CfInput>
+					<div class="filterActions">
+						<CfButton type="submit" primary>应用</CfButton>
+						<CfButton type="button" @click="resetFilters">重置</CfButton>
+					</div>
+				</form>
 
 				<form
 					v-if="createOpen"
@@ -75,7 +122,7 @@
 				<CfLoading v-if="loading" />
 				<MkError v-else-if="loadError != null" @retry="load" />
 				<CfInfo v-else-if="users.length === 0" warn class="empty">
-					<span v-if="offset === 0">这个实例还没有本地用户。</span>
+					<span v-if="offset === 0">没有符合筛选条件的账号。</span>
 					<span v-else>这一页没有用户，请返回上一页。</span>
 				</CfInfo>
 				<div v-else class="user-list">
@@ -105,9 +152,9 @@
 				</div>
 
 				<CfInfo class="notice">
-					后端 <code>admin/show-users</code> 只接受 <code>limit</code> 与
-					<code>offset</code>，没有排序、状态、来源筛选、搜索和总数，所以这里只有上一页/下一页，
-					下一页依据「本页恰好取满 {{ LIMIT }} 位」判断。
+					筛选与排序由 <code>admin/show-users</code> 服务端执行；接口不返回总数，所以只有上一页/下一页，
+					下一页依据「本页恰好取满 {{ LIMIT }} 位」判断。`alive` 与 `silenced` 没有对应字段，
+					页面不提供这两个状态。
 				</CfInfo>
 			</div>
 		</MkSpacer>
@@ -117,10 +164,12 @@
 <script setup lang="ts">
 // Firefish's admin user list is a filtered grid driven by `MkPagination` with
 // `sort` / `state` / `origin` / username / host parameters. Cinderfish's
-// `admin/show-users` accepts only `limit` and `offset` (contract §2, §5), so:
-//   * the three select filters and the two search inputs are gone rather than
-//     drawn as dead controls;
-//   * pagination is manual offset paging (30 rows per page, previous/next);
+// `admin/show-users` now takes Misskey's `sort` / `state` / `origin` /
+// `username` / `hostname` filters, so the three selects and two inputs are
+// real:
+//   * the return value is still an array with no total, so pagination stays
+//     offset based (30 rows per page, previous/next) and "next" is inferred
+//     from a full page;
 //   * each row gains the suspend toggle, which upstream keeps on the
 //     user-info page — this port has `admin/suspend-user` but no per-user
 //     admin detail endpoint worth a second round-trip;
@@ -140,6 +189,7 @@ import CfButton from "@/components/ui/CfButton.vue";
 import CfInfo from "@/components/ui/CfInfo.vue";
 import CfInput from "@/components/ui/CfInput.vue";
 import CfLoading from "@/components/ui/CfLoading.vue";
+import CfSelect from "@/components/ui/CfSelect.vue";
 import { t } from "@/i18n";
 import * as os from "@/os";
 import { definePageMetadata } from "@/scripts/page-metadata";
@@ -158,6 +208,12 @@ const createUsername = ref<string | number | null>("");
 const createPassword = ref<string | number | null>("");
 const creating = ref(false);
 const createError = ref<string | null>(null);
+
+const sort = ref("");
+const state = ref("all");
+const origin = ref("combined");
+const usernameFilter = ref<string | number | null>("");
+const hostnameFilter = ref<string | number | null>("");
 
 const pageNumber = computed<number>(() => Math.floor(offset.value / LIMIT) + 1);
 // No total count is available, so a full page is the only "there may be more"
@@ -185,9 +241,16 @@ async function load(): Promise<void> {
 	loading.value = true;
 	loadError.value = null;
 	try {
+		const username = String(usernameFilter.value ?? "").trim();
+		const hostname = String(hostnameFilter.value ?? "").trim();
 		users.value = await api("admin/show-users", {
 			limit: LIMIT,
 			offset: offset.value,
+			...(sort.value !== "" ? { sort: sort.value as never } : {}),
+			state: state.value as never,
+			origin: origin.value as never,
+			...(username !== "" ? { username } : {}),
+			...(hostname !== "" ? { hostname } : {}),
 		});
 	} catch (cause) {
 		users.value = [];
@@ -201,6 +264,20 @@ function goPrev(): void {
 	if (offset.value === 0) return;
 	offset.value = Math.max(0, offset.value - LIMIT);
 	void load();
+}
+
+function applyFilters(): void {
+	offset.value = 0;
+	void load();
+}
+
+function resetFilters(): void {
+	sort.value = "";
+	state.value = "all";
+	origin.value = "combined";
+	usernameFilter.value = "";
+	hostnameFilter.value = "";
+	applyFilters();
 }
 
 function goNext(): void {
@@ -317,7 +394,27 @@ definePageMetadata({
 		}
 	}
 
-	> .create-card {
+	> .filters {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+	gap: 10px;
+	align-items: end;
+	margin-bottom: 16px;
+	padding: 14px 16px;
+	background: var(--panel);
+	border-radius: var(--radius);
+
+	.field {
+		margin: 0;
+	}
+
+	.filterActions {
+		display: flex;
+		gap: 8px;
+	}
+}
+
+.create-card {
 		padding: 16px;
 		background: var(--panel);
 		border-radius: var(--radius);

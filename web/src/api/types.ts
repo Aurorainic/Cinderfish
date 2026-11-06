@@ -413,3 +413,8 @@ export interface AuthorizedApp {
 	createdAt: string;
 	lastUsedAt: string | null;
 }
+
+/** A drive file as `admin/drive/files` returns it: the uploader is attached. */
+export interface AdminDriveFile extends DriveFile {
+	user: UserLite | null;
+}

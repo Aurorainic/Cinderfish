@@ -1591,6 +1591,74 @@ cd web && pnpm build                    # exit 0
 - 大结果集性能：`ILIKE '%…%'` 会全表扫描；个人实例可接受，但没有压测。
 - 搜索页的用户页签在空结果时显示「无用户」，有结果时的卡片样式已目视，但没有测很长的简介换行。
 
+## 12W. 批次：前端第七波——管理台用户筛选与文件盘点（2026-11-06）
+
+**工作方式**：延续目标模式，一轮完成代码、测试、真实二进制、浏览器走查、文档与提交。施工依据
+`docs/research/2026-11-06-firefish-port-wave7-contract.md`。
+
+### 12W.1 落地清单
+
+| 层 | 文件 | 说明 |
+|----|------|------|
+| 用户筛选 | `internal/account/admin_users.go`（新） | `AdminList`：sort/state/origin/username/hostname；`UsersByIDs` 批量取上传者 |
+| 文件清单 | `internal/media/admin.go`（新） | `ListAll` 跨账号、按 userId/type/origin/hostname/游标过滤 |
+| 端点 | `internal/httpapi/admin_drive.go`（新）、`admin_accounts.go`、`server.go` | `admin/drive/files`；`admin/show-users` 接新参数 |
+| 用户页 | `web/src/pages/AdminUsers.vue` | 三个下拉 + 两个输入 + 应用/重置；说明改为真实行为 |
+| 文件页 | `web/src/pages/AdminFiles.vue` | 从占位页改为真实清单：筛选、缩略图、大小、上传者、时间、加载更多 |
+| 管理菜单 | `web/src/pages/AdminIndex.vue` | 新增「文件」 |
+| 接口层 | `web/src/api/endpoints.ts`、`types.ts` | `AdminShowUsersParams` 扩参、`AdminDriveFile` |
+| 测试 | `internal/httpapi/admin_drive_test.go`（新，2 个用例） | state/username/origin 筛选、文件来源/类型过滤、非法 type 400、非管理员 403 |
+
+### 12W.2 有意的降级
+
+1. `state=silenced` 返回空集（没有该字段），`alive` 退化为「未冻结」，`±updatedAt` 按 `created_at`。
+2. `admin/show-users` 仍不返回总数，分页靠 offset 与「本页取满 30 条」判断。
+3. 文件页只读：删除与批量清理没有端点，页面明确说明。
+4. 默认排序用 `created_at ASC` 而不是 `id ASC`：引导管理员的 id 是手写的 `root1`，否则会排到 ULID 之后。
+5. 上传者只带 UserLite（`user` 字段），不是完整 UserDetailed。
+
+### 12W.3 验证证据
+
+```
+gofmt -l internal/ cmd/                 # 空
+go vet ./...                            # exit 0
+CINDERFISH_TEST_DATABASE_URL=… go test -count=1 ./...   # 全绿（新增 2 个管理台用例）
+cd web && pnpm exec vue-tsc --noEmit    # exit 0
+cd web && pnpm run check:port           # 398 文件，hardTotal 0
+cd web && pnpm build                    # exit 0
+```
+
+真实二进制 `:3991`（开发库，`federation_mode=none`，管理员 w7admin）：
+
+| 场景 | 结果 |
+|------|------|
+| `admin/show-users state=suspended` | 仅 `["w7dana"]` |
+| `username=w7d` / `origin=remote` | `["w7dana"]` / 0 |
+| `admin/drive/files origin=local` | 列出 w7-note.txt、w7-photo.png，`user.username=w7dana` |
+| `type=image` / `type=text` | 分别命中图片 / 文本 |
+| `type=image' OR 1=1` | 400，未进入 LIKE |
+| 非管理员调用 | 403（测试里用未冻结账号验证） |
+
+无头 Helium 156（桌面 1440×900、移动 390×844）：
+
+| 页面 | 证据 |
+|------|------|
+| `/admin/users` | 排序/状态/来源/用户名前缀/实例主机五个控件存在；把状态设为「已冻结」并应用后，列表只剩 w7dana，w7admin 不在结果里 |
+| `/admin/files` | 三行文件（w7-note.txt、w7-photo.png、遗留 sunset.png），上传者 @w7dana / @w4alice、类型、大小、时间正确；类型切到「图片」后文本文件消失 |
+| `/admin` | 菜单出现「文件」，当前页高亮 |
+| 移动端 `/admin/{files,users}` | 无横向溢出、无 JS 异常，筛选栏自动换行 |
+
+走查数据已清理：删除 w7admin、w7dana 与其上传（行随账号级联，`/tmp/w7-media` 目录删除），用户数回到 23；
+临时二进制、配置、profile 与服务全部清理，截图留在 `/tmp/w7-shots`（不入库）。
+
+### 12W.4 仍未验证
+
+- `sort` 的四种取值只验证了默认与 state，没有逐一对「关注者最多/最少」排序结果做断言。
+- `hostname` 过滤、`userId` 直接过滤、`sinceId`/`untilId` 游标在文件列表上没有构造多页数据。
+- `state=silenced` 的空集语义只按实现检查，UI 没有提供该选项（页面说明原因）。
+- 文件缩略图只在 146 B 的纯白 PNG 上看过；缺失媒体文件（遗留 sunset.png）会触发一次 404，属预期。
+- 远端文件（origin=remote）没有数据可看，实例当前不联邦。
+
 ## 13. 文档索引
 
 | 文档 | 内容 |
@@ -1623,6 +1691,7 @@ cd web && pnpm build                    # exit 0
 | `docs/research/2026-11-06-firefish-port-wave4-contract.md` | **第四波施工契约（管理台、主题体系、注册表、本地设置、静态页的模块映射与 7 个写作用域），见 §12T** |
 | `docs/research/2026-11-06-firefish-port-wave5-contract.md` | **第五波施工契约（静音/屏蔽、令牌管理、实例静音、无障碍、多账号、4 个 widget 与明确不做的项），见 §12U** |
 | `docs/research/2026-11-06-firefish-port-wave6-contract.md` | **第六波施工契约（notes/search、notes/search-by-tag、users/search 与搜索/标签页），见 §12V** |
+| `docs/research/2026-11-06-firefish-port-wave7-contract.md` | **第七波施工契约（admin/show-users 筛选、admin/drive/files 与用户/文件管理页），见 §12W** |
 
 ## 14. 已知的未验证项
 
@@ -1631,6 +1700,8 @@ cd web && pnpm build                    # exit 0
   （撤销、切换账号、widget 配置弹窗）、列表分页游标与实例静音非法输入，见 §12U.4。
 - **第六波的搜索过滤组合未全测（2026-11-06，见 §12V.4）**：`offset`/`withFiles`/`host`/`userId`
   与远端结果没有构造数据；`ILIKE '%…%'` 的性能没有压测。
+- **第七波的排序与游标组合未全测（2026-11-06，见 §12W.4）**：四种 sort、hostname/userId、文件游标与
+  远端文件没有构造数据；`state=silenced` 仅在实现层面为空集。
 - **仍未移植的设置页**：邮箱、整合、安全（2FA）、导入导出、迁移、Webhook、插件、自定义 KaTeX、状态栏、
   删除账号、应用授权以外的账号操作；对应后端端点不存在或前端缺少依赖（见第五波契约 §3.3）。
 - **仍缺的 widgets**：rss、rss-ticker、server-metric、online-users、federation、job-queue、aiscript、
