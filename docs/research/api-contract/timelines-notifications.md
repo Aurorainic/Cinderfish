@@ -422,7 +422,7 @@ HTTP 列表与 Streaming `notification` 事件共用此对象（注释明确要�
 | `untilId` | string | 否 | — | |
 | `markAsRead` | bool | 否 | **true** | `true` 或省略 → 把本次返回的未读通知标为已读 |
 | `includeTypes` | array\<string\> | 否 | — | 白名单。**`includeTypes: []`（显式空数组）返回空列表**；`null`/缺省表示不过滤 |
-| `excludeTypes` | array\<string\> | 否 | — | 黑名单。**只有 `includeTypes` 为 null 时才生效**（include 优先，`internal/note/reaction.go:278`） |
+| `excludeTypes` | array\<string\> | 否 | — | 黑名单。**只有 `includeTypes` 为 null 时才生效**（include 优先，`internal/note/reaction.go:278`）。账号的 `mutingNotificationTypes` 会自动并入这里 |
 | `sinceDate` / `untilDate` | — | — | — | **不支持，传了被忽略** |
 
 `markAsRead` 的行为细节（`internal/httpapi/notifications.go:80`–`92`）：
@@ -658,7 +658,7 @@ Misskey Streaming API 的 WebSocket 入口。`internal/httpapi/streaming.go:45` 
 - 远端笔记的 Streaming 事件是**残缺的**：联邦入站只发 `PublishTyped("notesStream", "note", {"id","userId"})`（`internal/httpapi/federation_wire.go:50`）。
   `localTimeline` / `globalTimeline` 会因为 `visibility` 缺失（不是 `public`）而丢掉它；但 `homeTimeline` / `hybridTimeline` 在"已关注该远端作者"时会把这个**只有 id 和 userId 的对象**当成一条笔记推给客户端。
   前端收到缺少 `text`/`user`/`createdAt` 的 note 时应回落到 REST 拉取（`notes/show`）或直接忽略。
-- 没有 `unreadNotification` 延迟事件，红点只能靠 `notification` 事件自增或轮询 `/api/i` 的 `unreadNotificationsCount`。
+- 没有 `unreadNotification` 延迟事件，红点只能靠 `notification` 事件自增或轮询 `/api/i` 的 `unreadNotificationsCount`。`unreadNotificationsCount` 与列表一样排除 `mutingNotificationTypes` 里的类型。
 - `follow`/`followed`/`unfollow` 的 body 是 `{"id":...}`，上游是 Packed User；只读 `body.id` 的客户端没问题。
 - 无 mute/block，`isNoteMutedOrBlocked` 恒 false（`internal/streaming/channel_timeline.go:99`）；无频道概念，`hasChannelID` 恒 false（`:90`）。
 - `withReplies` 的回复过滤用 `following.withReplies`，而 `followings` 表**没有 `withReplies` 列**，`LoadFollows` 恒返回 `false`（`internal/httpapi/streaming_adapters.go:59`）——即"关注时选择显示回复"这个设置目前不生效。

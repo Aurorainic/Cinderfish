@@ -231,7 +231,7 @@ token 解析（`internal/account/tokens.go:88`）：
 | `mutedWords` | array | `[]` |
 | `hardMutedWords` | array | `[]` |
 | `mutedInstances` | array | `[]` |
-| `mutingNotificationTypes` | array | `[]` |
+| `mutingNotificationTypes` | array | `settings.mutingNotificationTypes`，默认 `[]`；只接受 mention/reply/renote/quote/reaction |
 | `notificationRecieveConfig` | object | `{}`（字段名沿用 Misskey 的拼写错误 `Recieve`） |
 | `emailNotificationTypes` | array | `[]` |
 | `achievements` | array | `[]` |
@@ -672,9 +672,10 @@ token 解析（`internal/account/tokens.go:88`）：
 | `birthday` | string \| null | 否 | `YYYY-MM-DD` 或不带值的日期，否则 400 | `settings.birthday` |
 | `lang` | string \| null | 否 | ≤ 16 字符且只含字母/数字/`-` | `settings.lang` |
 | `fields` | array \| null | 否 | 最多 16 条 `{name,value}`；name ≤ 255、value ≤ 1024；空 name 丢弃 | `settings.fields` |
+| `mutingNotificationTypes` | array \| null | 否 | 只接受本后端产生的 5 类通知，最多 5 项 | `settings.mutingNotificationTypes` |
 | `noCrawle` / `preventAiLearning` / `isExplorable` / `hideOnlineStatus` / `publicReactions` / `alwaysMarkNsfw` / `autoSensitive` / `carefulBot` / `autoAcceptFollowed` / `injectFeaturedNote` | boolean | 否 | 无 | `settings.<字段名>`，读回时 `isExplorable` 缺省为 `true` |
 
-**被静默忽略的字段**（Firefish 的设置页会发）：`bannerId`、`followedMessage`、`isBot`、`isCat`、`speakAsCat`、`isLocked`、`requireSigninToViewContents`、`mutedWords`、`mutingNotificationTypes`、`notificationRecieveConfig`、`emailNotificationTypes`、`alsoKnownAs`、`avatarDecorations`、`chatScope`、`pinnedPageId` 等。它们不会报错，也不会保存。`mutedInstances` 单独处理（见 §`i/update` 的 `mutedInstances`）。
+**被静默忽略的字段**（Firefish 的设置页会发）：`bannerId`、`followedMessage`、`isBot`、`isCat`、`speakAsCat`、`isLocked`、`requireSigninToViewContents`、`mutedWords`、`notificationRecieveConfig`、`emailNotificationTypes`、`alsoKnownAs`、`avatarDecorations`、`chatScope`、`pinnedPageId` 等。它们不会报错，也不会保存。`mutedInstances` 单独处理（见 §`i/update` 的 `mutedInstances`）。
 
 ### 响应 200
 

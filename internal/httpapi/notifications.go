@@ -23,18 +23,31 @@ func (s *Server) markAllNotificationsRead(ctx context.Context, userID string) er
 // applyUnreadNotifications fills the MeDetailed unread state from the
 // notification table (core/entities/UserEntityService.ts L612 and L614):
 // unreadNotificationsCount is the number of unread rows and
-// hasUnreadNotification says whether there are any. The shell badge and
-// the notifications page's "mark all as read" button read both.
+// hasUnreadNotification says whether there are any. Types the user muted are
+// left out of the badge, matching the list endpoint.
 func (s *Server) applyUnreadNotifications(ctx context.Context, userID string, packed map[string]any) {
 	if s.notifications == nil {
 		return
 	}
-	count, err := s.notifications.UnreadCount(ctx, userID)
+	count, err := s.notifications.UnreadCount(ctx, userID, s.mutedNotificationTypes(ctx, userID))
 	if err != nil {
 		return
 	}
 	packed["unreadNotificationsCount"] = count
 	packed["hasUnreadNotification"] = count > 0
+}
+
+// mutedNotificationTypes reads the account's muted kinds, tolerating a
+// missing profile or a transient read failure by filtering nothing.
+func (s *Server) mutedNotificationTypes(ctx context.Context, userID string) []string {
+	if s.accounts == nil {
+		return nil
+	}
+	prof, err := s.accounts.GetProfile(ctx, userID)
+	if err != nil || prof == nil {
+		return nil
+	}
+	return prof.MutedNotificationTypes
 }
 
 // handleNotifications implements POST /api/notifications.
@@ -66,6 +79,10 @@ func (s *Server) handleNotifications(w http.ResponseWriter, r *http.Request) {
 		writeAuthenticationError(w)
 		return
 	}
+
+	// Misskey merges the account's muted types into excludeTypes; an
+	// explicit includeTypes still wins, as in NotificationService.
+	body.ExcludeTypes = append(body.ExcludeTypes, s.mutedNotificationTypes(r.Context(), info.User.ID)...)
 
 	notifications, err := s.notifications.List(
 		r.Context(), info.User.ID, body.Limit, body.SinceID, body.UntilID,

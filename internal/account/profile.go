@@ -49,6 +49,9 @@ type Profile struct {
 	CarefulBot         bool
 	AutoAcceptFollowed bool
 	InjectFeaturedNote bool
+	// MutedNotificationTypes hides those notification kinds from the list
+	// and the unread badge.
+	MutedNotificationTypes []string
 }
 
 // ProfileField is one row of Misskey's "fields" (profile metadata) list.

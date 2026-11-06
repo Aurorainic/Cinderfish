@@ -168,7 +168,11 @@ func packMeDetailed(u *account.User, createdAt time.Time, includeSecrets bool, p
 	} else {
 		packed["mutedInstances"] = []any{}
 	}
-	packed["mutingNotificationTypes"] = []any{}
+	if prof != nil && prof.MutedNotificationTypes != nil {
+		packed["mutingNotificationTypes"] = prof.MutedNotificationTypes
+	} else {
+		packed["mutingNotificationTypes"] = []any{}
+	}
 	packed["notificationRecieveConfig"] = map[string]any{}
 	packed["emailNotificationTypes"] = []any{}
 	packed["achievements"] = []any{}

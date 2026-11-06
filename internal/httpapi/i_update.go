@@ -92,6 +92,8 @@ func (s *Server) handleIUpdate(w http.ResponseWriter, r *http.Request) {
 		CarefulBot         *bool `json:"carefulBot"`
 		AutoAcceptFollowed *bool `json:"autoAcceptFollowed"`
 		InjectFeaturedNote *bool `json:"injectFeaturedNote"`
+		// Notification types the user does not want to see.
+		MutingNotificationTypes json.RawMessage `json:"mutingNotificationTypes"`
 	}
 	if err := decodeOptionalJSON(r, &body); err != nil {
 		writeAPIError(w, err)
@@ -160,6 +162,14 @@ func (s *Server) handleIUpdate(w http.ResponseWriter, r *http.Request) {
 	details.CarefulBot = body.CarefulBot
 	details.AutoAcceptFollowed = body.AutoAcceptFollowed
 	details.InjectFeaturedNote = body.InjectFeaturedNote
+	if len(body.MutingNotificationTypes) > 0 {
+		muting, apiErr := parseMutingNotificationTypes(body.MutingNotificationTypes)
+		if apiErr != nil {
+			writeAPIError(w, apiErr)
+			return
+		}
+		details.MutingNotificationTypes = &muting
+	}
 
 	if err := s.accounts.UpdateProfileDetails(r.Context(), info.User.ID, details); err != nil {
 		writeInternalServerError(w)
@@ -291,6 +301,44 @@ func validLangTag(value string) bool {
 		}
 	}
 	return true
+}
+
+// knownNotificationTypes lists the kinds this backend produces. Misskey has
+// more (follow, pollEnded, …), but accepting a type that can never arrive
+// would make the setting look functional when it is not.
+var knownNotificationTypes = map[string]struct{}{
+	"mention":  {},
+	"reply":    {},
+	"renote":   {},
+	"quote":    {},
+	"reaction": {},
+}
+
+// parseMutingNotificationTypes validates i/update's mutingNotificationTypes.
+func parseMutingNotificationTypes(raw json.RawMessage) ([]string, *APIError) {
+	var types []string
+	if string(raw) != "null" {
+		if err := json.Unmarshal(raw, &types); err != nil {
+			return nil, invalidParamError("mutingNotificationTypes must be an array of notification types")
+		}
+	}
+	if len(types) > len(knownNotificationTypes) {
+		return nil, invalidParamError("mutingNotificationTypes has too many entries")
+	}
+	out := make([]string, 0, len(types))
+	seen := make(map[string]struct{}, len(types))
+	for _, t := range types {
+		t = strings.TrimSpace(t)
+		if _, ok := knownNotificationTypes[t]; !ok {
+			return nil, invalidParamError("unknown notification type: " + t)
+		}
+		if _, ok := seen[t]; ok {
+			continue
+		}
+		seen[t] = struct{}{}
+		out = append(out, t)
+	}
+	return out, nil
 }
 
 // parseMutedInstances turns the `mutedInstances` request value into a clean

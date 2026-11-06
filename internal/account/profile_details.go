@@ -10,20 +10,21 @@ import (
 // pointer leaves the value unchanged; a pointer to an empty value clears it.
 // They are stored inside `user_profiles.settings`.
 type ProfileDetailsPatch struct {
-	Location           *string
-	Birthday           *string
-	Lang               *string
-	Fields             *[]ProfileField
-	NoCrawle           *bool
-	PreventAiLearning  *bool
-	IsExplorable       *bool
-	HideOnlineStatus   *bool
-	PublicReactions    *bool
-	AlwaysMarkNsfw     *bool
-	AutoSensitive      *bool
-	CarefulBot         *bool
-	AutoAcceptFollowed *bool
-	InjectFeaturedNote *bool
+	Location                *string
+	Birthday                *string
+	Lang                    *string
+	Fields                  *[]ProfileField
+	NoCrawle                *bool
+	PreventAiLearning       *bool
+	IsExplorable            *bool
+	HideOnlineStatus        *bool
+	PublicReactions         *bool
+	AlwaysMarkNsfw          *bool
+	AutoSensitive           *bool
+	CarefulBot              *bool
+	AutoAcceptFollowed      *bool
+	InjectFeaturedNote      *bool
+	MutingNotificationTypes *[]string
 }
 
 // UpdateProfileDetails merges the provided metadata keys into the profile's
@@ -41,6 +42,9 @@ func (s *Service) UpdateProfileDetails(ctx context.Context, userID string, patch
 	}
 	if patch.Fields != nil {
 		settings["fields"] = *patch.Fields
+	}
+	if patch.MutingNotificationTypes != nil {
+		settings["mutingNotificationTypes"] = *patch.MutingNotificationTypes
 	}
 	for key, value := range map[string]*bool{
 		"noCrawle":           patch.NoCrawle,
