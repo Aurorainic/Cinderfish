@@ -110,6 +110,12 @@ const menuDef = computed<MkSuperMenuGroup[]>(() => [
 				active: isActive("/admin/emojis"),
 			},
 			{
+				icon: "ph-database ph-bold ph-lg",
+				text: t("database"),
+				to: "/admin/database",
+				active: isActive("/admin/database"),
+			},
+			{
 				icon: "ph-folder-open ph-bold ph-lg",
 				text: t("files"),
 				to: "/admin/files",

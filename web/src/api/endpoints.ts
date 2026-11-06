@@ -20,6 +20,7 @@ import type {
 	FollowRequest,
 	Following,
 	HashtagTrend,
+	IndexStat,
 	MeDetailed,
 	MetaDetailed,
 	MetaLite,
@@ -36,6 +37,7 @@ import type {
 	RegistryDetail,
 	SigninResponse,
 	SignupResponse,
+	TableStat,
 	UserNameAvailability,
 	UserDetailed,
 	UserLite,
@@ -133,6 +135,8 @@ export const ENDPOINTS = {
 	// notifications
 	announcements: "announcements",
 	adminAbuseReports: "admin/abuse-user-reports",
+	adminTableStats: "admin/get-table-stats",
+	adminIndexStats: "admin/get-index-stats",
 	adminResolveAbuseReport: "admin/resolve-abuse-user-report",
 	adminAnnouncementsCreate: "admin/announcements/create",
 	adminAnnouncementsList: "admin/announcements/list",
@@ -588,6 +592,15 @@ export interface EndpointMap {
 		req: { userId: string; comment: string };
 		res: EmptyResponse;
 	};
+	[ENDPOINTS.adminTableStats]: {
+		req: Record<string, never>;
+		res: Record<string, TableStat>;
+	};
+	[ENDPOINTS.adminIndexStats]: {
+		req: Record<string, never>;
+		res: IndexStat[];
+	};
+
 	[ENDPOINTS.adminAbuseReports]: {
 		req: AbuseReportsParams;
 		res: AbuseReport[];

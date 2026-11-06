@@ -456,3 +456,18 @@ export interface Webhook {
 	latestSentAt: string | null;
 	latestStatus: number | null;
 }
+
+/** One table's planner estimate and on-disk size. */
+export interface TableStat {
+	count: number;
+	size: number;
+}
+
+/** One row of `admin/get-index-stats`. */
+export interface IndexStat {
+	schemaname: string;
+	tablename: string;
+	indexname: string;
+	tablespace: string | null;
+	indexdef: string;
+}

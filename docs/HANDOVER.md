@@ -1901,6 +1901,61 @@ Go 测试另外覆盖 reply 事件与 `latestStatus=200` 回写。截图在 `/tm
 - 重试、批量并发与投递顺序没有测试；个人实例先接受。
 - 编辑页的删除只走了列表删除路径，编辑页内的删除按钮没有点击。
 
+## 12AB. 批次：前端第十二波——数据库概览（2026-11-06）
+
+**工作方式**：目标模式第十二波，一轮完成两个只读端点、管理页、测试、真实二进制与浏览器走查、
+文档与提交。施工依据 `docs/research/2026-11-06-firefish-port-wave12-contract.md`。
+
+### 12AB.1 落地清单
+
+| 层 | 文件 | 说明 |
+|----|------|------|
+| 端点 | `internal/httpapi/admin_database.go`（新）、`server.go` | `admin/get-table-stats`（reltuples + total size）、`admin/get-index-stats`（pg_indexes） |
+| 页面 | `web/src/pages/AdminDatabase.vue` | 总大小、表按大小排序（行数/大小/占比条）、索引列表与可展开定义 |
+| 菜单 | `web/src/pages/AdminIndex.vue` | 内容组新增「数据库」 |
+| 接口层 | `endpoints.ts`、`types.ts` | 两个端点、`TableStat`、`IndexStat` |
+| 测试 | `internal/httpapi/admin_database_test.go`（新） | 表/索引存在性、数值类型、非管理员 403、匿名 401 |
+
+### 12AB.2 有意的限制
+
+1. 行数是 `pg_class.reltuples` 估算而非 `COUNT(*)`，页面注明；未分析的表显示 0。
+2. 只读：没有 vacuum、删除或索引重建。
+3. 表与索引不分页，schema 规模决定返回量（当前 31 表 / 75 索引）。
+4. 不泄露连接信息或敏感元数据。
+
+### 12AB.3 验证证据
+
+```
+gofmt -l internal/ cmd/                 # 空
+go vet ./...                            # exit 0
+CINDERFISH_TEST_DATABASE_URL=… go test -count=1 ./...   # 全绿（新增 1 个用例）
+cd web && pnpm exec vue-tsc --noEmit    # exit 0
+cd web && pnpm run check:port           # 398 文件，hardTotal 0
+cd web && pnpm build                    # exit 0
+```
+
+真实二进制 `:3991`（开发库）：
+
+| 场景 | 结果 |
+|------|------|
+| `admin/get-table-stats` | 31 张表；`users` = 24 行 / 136 KB |
+| `admin/get-index-stats` | 75 条索引记录 |
+| `/admin/database` | 总大小 1.5 MB、31 表 75 索引；表按大小排序（notes → users → notifications …） |
+| 索引「定义」展开 | 显示 `CREATE INDEX …` 原文 |
+| 管理菜单 | 内容组出现「数据库」并高亮 |
+| 移动端 390×844 | 表格与索引列表正常换行，无横向溢出 |
+| 非管理员 / 匿名 | 403 / 401（测试覆盖） |
+
+无头 Helium 156：桌面与移动均无 JS 异常。截图在 `/tmp/w12-shots`（不入库）。
+
+走查数据已清理：w12admin 删除，用户数回到 23；临时二进制、配置、媒体目录、profile 与服务停止。
+
+### 12AB.4 仍未验证
+
+- `reltuples` 估算与实际行数的偏差没有用 `ANALYZE` 前后对比。
+- 大 schema（数百表/索引）下的页面滚动与渲染性能没有测试（无分页）。
+- `vacuum`、索引维护与表清理按设计未做。
+
 ## 13. 文档索引
 
 | 文档 | 内容 |
@@ -1938,6 +1993,7 @@ Go 测试另外覆盖 reply 事件与 `latestStatus=200` 回写。截图在 `/tm
 | `docs/research/2026-11-06-firefish-port-wave9-contract.md` | **第九波施工契约（i/export、i/delete-account、导出页与注销页），见 §12Y** |
 | `docs/research/2026-11-06-firefish-port-wave10-contract.md` | **第十波施工契约（举报表 v11、三个举报端点、用户菜单入口与管理页），见 §12Z** |
 | `docs/research/2026-11-06-firefish-port-wave11-contract.md` | **第十一波施工契约（webhooks 表 v12、五个端点、异步投递与设置页），见 §12AA** |
+| `docs/research/2026-11-06-firefish-port-wave12-contract.md` | **第十二波施工契约（admin/get-table-stats、admin/get-index-stats 与数据库页），见 §12AB** |
 
 ## 14. 已知的未验证项
 
@@ -1954,6 +2010,8 @@ Go 测试另外覆盖 reply 事件与 `latestStatus=200` 回写。截图在 `/tm
   通知与自动处置按设计未做。
 - **第十一波未测边角（2026-11-06，见 §12AA.4）**：失败/超时路径、重试与投递顺序、编辑页内删除、
   未产生的事件类型没有实测。
+- **第十二波未测边角（2026-11-06，见 §12AB.4）**：reltuples 估算与实际行数的偏差、大 schema 渲染性能
+  未验证；vacuum 与索引维护按设计未做。
 - **仍未移植的设置页**：邮箱、整合、安全（2FA）、导入导出、迁移、Webhook、插件、自定义 KaTeX、状态栏、
   删除账号、应用授权以外的账号操作；对应后端端点不存在或前端缺少依赖（见第五波契约 §3.3）。
 - **仍缺的 widgets**：rss、rss-ticker、server-metric、online-users、federation、job-queue、aiscript、
