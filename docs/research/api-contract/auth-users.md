@@ -1087,3 +1087,8 @@ OAuth 2.0 授权码端点（仅 PKCE `S256`）。认证：**需要登录**，且
 - 存储位置是 `user_profiles.settings` 的 `mutedInstances` 键，不需要新迁移；
 - `POST /api/i` 与 `i/update` 的响应回读该数组，客户端据此渲染设置页；
 - 所有时间线在登录状态下按 `n.user_host` 过滤掉被静音实例的帖子。
+
+### POST /api/users/search（见 notes-core.md 增补）
+
+用户搜索按用户名、昵称与简介匹配，支持 `origin`（combined/local/remote）与 `limit`/`offset`，
+并额外接受 `sinceId`/`untilId` 供游标分页。带凭据时排除双向屏蔽，结果带三个计数。

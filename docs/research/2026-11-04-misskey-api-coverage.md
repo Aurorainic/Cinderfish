@@ -15,15 +15,15 @@
 | 指标 | 数量 |
 |------|------|
 | Misskey 端点总数 | 440 |
-| Cinderfish 已注册路由 | 79 |
-| 其中 Misskey 同名路径 | 76 |
+| Cinderfish 已注册路由 | 82 |
+| 其中 Misskey 同名路径 | 79 |
 | 其中 Cinderfish 自有路径/别名 | 3（`notifications` 别名、`admin/federation/mode`、`admin/federation/allowlist`） |
-| 未实现（Misskey 同名） | 364 |
+| 未实现（Misskey 同名） | 358 |
 
 统计口径：`internal/httpapi/server.go` 里 `HandleFunc("METHOD /api/…")` 的去重路径；
 GET 与 POST 同名路径只算一个。
 
-## 2. 已实现（79 条注册路由）
+## 2. 已实现（82 条注册路由）
 
 ```
 admin/accounts/create       admin/emoji/add             admin/emoji/delete
@@ -48,11 +48,13 @@ notes/create                notes/delete                notes/favorites/create
 notes/favorites/delete      notes/global-timeline       notes/hybrid-timeline
 notes/local-timeline        notes/polls/vote            notes/reactions
 notes/reactions/create      notes/reactions/delete      notes/renotes
+notes/search                notes/search-by-tag
 notes/replies               notes/show                  notes/timeline
 notifications*              notifications/mark-all-as-read
 ping                        signin                      signup
 username/available          users/followers             users/following
-users/notes                 users/show                  users/update
+users/notes                 users/search                users/show
+users/update
 ```
 
 `*` 为 Cinderfish 自有路径/别名：`notifications` 是 `i/notifications` 的兼容别名
@@ -67,6 +69,9 @@ users/notes                 users/show                  users/update
 `following/requests/*`、`users/update`、`signin`、`signup`、`username/available`、
 `i/registry/scopes`，以及 `admin/federation/mode` 的 GET。
 
+2026-11-06 第六波新增：`notes/search`、`notes/search-by-tag`、`users/search`（均走 ILIKE 回退，
+无全文索引；`search-by-tag` 只支持单 `tag` 形式）。
+
 2026-11-06 第五波新增：`mute/create|delete|list`、`blocking/create|delete|list`、`i/apps`、
 `i/revoke-token`；同时 `i/update` 增加 `mutedInstances` 字段（不是新路由）。
 
@@ -75,8 +80,8 @@ users/notes                 users/show                  users/update
 | 命名空间 | 缺口 | 说明 |
 |----------|------|------|
 | `i/*` | 50 | 账号设置、2FA、导出/导入、注册表、应用授权等 |
-| `users/*` | 29 | 列表、搜索、反应、推荐、关注请求、更新资料字段 |
-| `notes/*` | 26 | 会话/子帖、提及、投票、收藏、搜索、翻译、草稿 |
+| `users/*` | 28 | 列表、搜索、反应、推荐、关注请求、更新资料字段 |
+| `notes/*` | 24 | 会话/子帖、提及、投票、收藏、搜索、翻译、草稿 |
 | `chat/*` | 25 | 私聊（首版可选） |
 | `drive/*` | 16 | 文件夹、URL 上传、去重、批量移动 |
 | `channels/*` | 16 | 频道（首版可选） |

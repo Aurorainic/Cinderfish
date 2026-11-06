@@ -880,3 +880,44 @@
 5. 收藏/回应按钮的乐观更新可以直接做：两者都是幂等写入，重复请求不会报错。
 6. 投票提交后必须重新拉取笔记才能看到新票数（响应是空对象）。
 7. 时间解析对两种格式都要兼容：笔记/收藏/回应是 RFC3339Nano，DriveFile 是固定毫秒。
+
+## 2026-11-06 增补：搜索（notes/search、notes/search-by-tag、users/search）
+
+### POST /api/notes/search
+
+匿名可用；带凭据时额外套用静音、屏蔽与实例静音过滤。
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `query` | string，必填 | 正文包含匹配（`ILIKE`），大小写不敏感；`%`、`_`、`\` 会被转义 |
+| `limit` | int，默认 10，上限 100 | |
+| `offset` | int，默认 0 | 只有不带游标时生效 |
+| `sinceId` / `untilId` | id | 笔记 id 游标；与时间线同一套升/降序规则 |
+| `host` | string \| null | 缺省=全部；`null`=仅本地；字符串=指定实例 |
+| `userId` | id \| null | 只看某个作者的帖子 |
+| `withFiles` | bool | 只返回带附件的帖子 |
+
+返回 `Note[]`（与时间线同形的 NoteDetailed）。错误：`query` 为空 → 400。
+
+### POST /api/notes/search-by-tag
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `tag` | string，必填 | 标签名（不带 `#`）；大小写不敏感 |
+| `limit` / `sinceId` / `untilId` / `withFiles` | | 同上 |
+
+只实现上游的 `tag` 单标签形式；`query: string[][]` 布尔组合未实现。
+返回 `Note[]`，可见性与静音/屏蔽规则同时间线。
+
+### POST /api/users/search
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `query` | string，必填 | 匹配 `username`、昵称、简介（`ILIKE` 包含） |
+| `origin` | `combined` \| `local` \| `remote` | 缺省视为 combined |
+| `host` | string \| null | 缺省=全部；`null`=本地 |
+| `limit` / `offset` | | 默认 10 / 0 |
+| `sinceId` / `untilId` | id | 本实现额外支持，供前端游标分页 |
+
+返回 `UserDetailed[]`，排除冻结账号；带凭据时排除双向屏蔽关系；每条结果带
+`notesCount` / `followersCount` / `followingCount`。`origin` 非法 → 400。

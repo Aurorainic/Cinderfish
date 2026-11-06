@@ -75,6 +75,22 @@ func (q *queryBuilder) viewerArg(viewerID string) string {
 	return fmt.Sprintf("$%d", len(q.args))
 }
 
+// addViewerRelationFilters drops notes the viewer must not see: authors they
+// muted, both directions of a block, and notes from instance hosts they muted.
+// Doing this in SQL keeps pagination honest: a filtered page still returns
+// `limit` notes instead of a short page with holes.
+func (q *queryBuilder) addViewerRelationFilters(viewerID string) {
+	if viewerID == "" {
+		return
+	}
+	me := q.viewerArg(viewerID)
+	q.conds = append(q.conds,
+		fmt.Sprintf("NOT EXISTS (SELECT 1 FROM mutes m WHERE m.muter_id = %s AND m.mutee_id = n.user_id)", me),
+		fmt.Sprintf("NOT EXISTS (SELECT 1 FROM blocks b WHERE (b.blocker_id = %s AND b.blockee_id = n.user_id) OR (b.blocker_id = n.user_id AND b.blockee_id = %s))", me, me),
+		fmt.Sprintf("NOT EXISTS (SELECT 1 FROM user_profiles up WHERE up.user_id = %s AND up.settings ? 'mutedInstances' AND (up.settings->'mutedInstances') ? n.user_host)", me),
+	)
+}
+
 // addNoteVisibility adds Misskey's generateVisibilityQuery
 // (packages/backend/src/core/QueryService.ts L270-315): public and home
 // notes are readable by everyone, a followers-only note by its author,
@@ -166,17 +182,7 @@ func (s *TimelineService) Timeline(ctx context.Context, p TimelineParams) ([]*No
 	// Visibility filter.
 	q.addNoteVisibility(p.ViewerID)
 
-	// Muted accounts vanish from every timeline, and a block hides the two
-	// accounts from each other in both directions. Doing this in SQL keeps
-	// pagination honest: a filtered page still returns `limit` notes.
-	if p.ViewerID != "" {
-		me := q.viewerArg(p.ViewerID)
-		q.conds = append(q.conds,
-			fmt.Sprintf("NOT EXISTS (SELECT 1 FROM mutes m WHERE m.muter_id = %s AND m.mutee_id = n.user_id)", me),
-			fmt.Sprintf("NOT EXISTS (SELECT 1 FROM blocks b WHERE (b.blocker_id = %s AND b.blockee_id = n.user_id) OR (b.blocker_id = n.user_id AND b.blockee_id = %s))", me, me),
-			fmt.Sprintf("NOT EXISTS (SELECT 1 FROM user_profiles up WHERE up.user_id = %s AND up.settings ? 'mutedInstances' AND (up.settings->'mutedInstances') ? n.user_host)", me),
-		)
-	}
+	q.addViewerRelationFilters(p.ViewerID)
 
 	// Replies are excluded unless asked for. A reply to a note the viewer
 	// wrote is kept, matching Misskey's rule that a reply to one's own
