@@ -95,6 +95,27 @@
 		<button class="_button primary submit" type="submit" :disabled="shouldDisableSubmitting">
 			{{ submitting ? `${t("signup")}…` : t("signup") }}
 		</button>
+
+		<!-- The instance's terms and rules are part of signup, as in Firefish:
+		     the links only appear when the administrator configured them. -->
+		<p v-if="hasTerms" class="terms">
+			注册即表示你同意
+			<a
+				v-if="meta?.tosUrl"
+				:href="meta.tosUrl"
+				target="_blank"
+				rel="nofollow noopener"
+				>本实例的服务条款</a
+			>
+			<template v-if="meta?.tosUrl && (meta?.serverRules ?? []).length > 0"
+				>与</template
+			>
+			<RouterLink
+				v-if="(meta?.serverRules ?? []).length > 0"
+				to="/about"
+				>实例规则</RouterLink
+			>。
+		</p>
 	</form>
 </template>
 
@@ -115,6 +136,9 @@ const emit = defineEmits<{
 const host = typeof window === "undefined" ? "localhost" : window.location.host;
 
 const meta = ref<MetaLite | null>(null);
+const hasTerms = computed(
+	() => (meta.value?.tosUrl ?? "") !== "" || (meta.value?.serverRules ?? []).length > 0,
+);
 const username = ref("");
 const password = ref("");
 const retypedPassword = ref("");
@@ -387,6 +411,18 @@ async function onSubmit(): Promise<void> {
 		&.error {
 			background: var(--infoWarnBg);
 			color: var(--infoWarnFg);
+		}
+	}
+
+	.terms {
+		margin: 12px 0 0;
+		font-size: 0.86em;
+		line-height: 1.5;
+		opacity: 0.8;
+		text-align: center;
+
+		> a {
+			color: var(--accent);
 		}
 	}
 
