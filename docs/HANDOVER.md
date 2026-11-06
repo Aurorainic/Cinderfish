@@ -1458,7 +1458,7 @@ CINDERFISH_TEST_DATABASE_URL=… go test -count=1 ./...   # 全绿
   `notes/history` 不存在，历史页只说明；`ErrorPage.vue` 目前未被路由使用。
 - **未走查**：登录/注册表单的真实交互（仍用注入 localStorage 的方式进入）、emoji 新增的浏览器文件上传
   点击路径（新增由 API 验证、列表由 UI 验证）、通知的 Streaming 实时插入、偏好导入与重置、主题的
-  26 个调色板只目视检查了 Nord；图片上传/投票/引用与转贴发帖仍沿用第三波状态。
+  26 个调色板的 Nord 浅/深两版已在 §12DX 实际切换；图片上传/投票/引用与转贴发帖仍沿用第三波状态。
 - **未实装（首版范围外）**：chat/channels/lists/antennas/clips/groups/gallery/pages、剩余约 10 个 widget、
   其余 37 个 locale、实例级主题。
 
@@ -4683,7 +4683,8 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
   实时推送（新帖插入、通知红点）没有实测。
 - ~~**CfTab 选项卡标签不显示**~~：第三波已修（§12S.2 第 1 条），笔记详情页签实测可见。
 - ~~**30 个 Firefish 内置主题只移植了 4 个**~~：第四波移植了剩余 26 个调色板（`themes/builtin/*.json5`
-  经 `?raw` 加载），当前可选主题 28 个；只目视检查了 Nord，其余调色板仅验证了解析、校验与打包。
+  经 `?raw` 加载），当前可选主题 28 个；Nord 的浅色/深色已在 2026-11-07 实际切换验证
+  （§12DX，背景分别为 rgb(216,222,233) 与 rgb(46,52,64)），其余调色板仍只验证了解析/打包。
 - **主题安装只在本浏览器生效**：`cinderfish.installedThemes` 存 localStorage，没有走 `i/registry`，换设备不同步。
 - **i18n 只覆盖 zh-CN / ja-JP**，其余 37 个 locale 未生成；`yaml` devDependency 未装
   （重新生成 locale 前要先 `pnpm add -D yaml`）。
@@ -5755,3 +5756,12 @@ gofmt -l internal/ cmd/                                        # 空
 go vet ./...                                                   # exit 0
 CINDERFISH_TEST_DATABASE_URL=... go test ./... -count=1         # 全绿
 ```
+
+## 12DX. 第一百零九波：主题调色板的实际切换（2026-11-07）
+
+`/settings/theme`：把浅色主题切到 `l-nord`，`getComputedStyle(document.body).backgroundColor`
+从 `rgb(250,244,237)` 变为 `rgb(216,222,233)`；再选「深色」并把深色主题切到 `d-nord`，
+变为 `rgb(46,52,64)`。`--bg` 与 body 背景一致，无未捕获异常。截图
+`/tmp/w110-shots/theme-nord.png`。
+
+仍未验证：其余 26 个调色板的逐一看色（解析、变量校验与打包已有构建覆盖）、移动端主题页排版。
