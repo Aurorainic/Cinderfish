@@ -34,6 +34,27 @@
 					</MkA>
 				</div>
 			</div>
+			<template v-if="tab === 'users'">
+				<CfLoading v-if="usersFetching && users.length === 0" />
+				<MkError v-else-if="usersError !== null && users.length === 0" @retry="loadUsers" />
+				<CfInfo v-else-if="users.length === 0">还没有可展示的账号。</CfInfo>
+				<template v-else>
+					<div class="userList">
+						<MkUserInfo
+							v-for="user in users"
+							:key="user.id"
+							class="user"
+							:user="user"
+						/>
+					</div>
+					<div v-if="usersHasMore" class="more">
+						<CfButton v-if="!usersFetching" @click="loadMoreUsers">
+							加载更多
+						</CfButton>
+						<CfLoading v-else mini />
+					</div>
+				</template>
+			</template>
 			<MkNotes v-else-if="tab === 'local'" :pagination="localPagination" />
 			<MkNotes v-else-if="tab === 'global'" :pagination="globalPagination" />
 		</MkSpacer>
@@ -47,19 +68,23 @@
 // trending hashtags (`hashtags/trend`), the local timeline and — when the
 // instance federates — the global timeline. The swiper is dropped: switching
 // tabs renders one pane instead of slides.
-import { computed, ref, watch } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import { api } from "@/api/client";
 import type { HashtagTrend } from "@/api/types";
 import MkNotes from "@/components/MkNotes.vue";
+import MkUserInfo from "@/components/MkUserInfo.vue";
+import MkError from "@/components/global/MkError.vue";
+import CfButton from "@/components/ui/CfButton.vue";
 import { CfInfo, CfLoading } from "@/components/ui";
+import type { UserDetailed } from "@/api/types";
 import type { Paging } from "@/components/ui";
 import { t } from "@/i18n";
 import { instance } from "@/instance";
 import { me } from "@/account";
 import { definePageMetadata } from "@/scripts/page-metadata";
 
-type ExploreTab = "tags" | "local" | "global";
+type ExploreTab = "users" | "tags" | "local" | "global";
 
 interface TabDefinition {
 	key: ExploreTab;
@@ -77,6 +102,11 @@ const isGlobalTimelineAvailable = computed(
 );
 
 const headerTabs = computed<TabDefinition[]>(() => [
+	{
+		key: "users",
+		title: t("users"),
+		icon: "ph-users-three ph-bold ph-lg",
+	},
 	{
 		key: "tags",
 		title: t("popularTags"),
@@ -98,7 +128,7 @@ const headerTabs = computed<TabDefinition[]>(() => [
 		: []),
 ]);
 
-const tab = ref<ExploreTab>("tags");
+const tab = ref<ExploreTab>("users");
 
 // `/explore/tags/:tag` resolves to this page (router/routes.ts), so a tag in the
 // path selects the trend pane and marks the matching row.
@@ -107,9 +137,15 @@ const highlightedTag = computed(() => {
 	return typeof tag === "string" ? tag.toLowerCase() : null;
 });
 
+onMounted(() => {
+	void loadUsers();
+});
+
 function onTabUpdate(key: string): void {
-	if (key === "tags" || key === "local" || key === "global") {
+	if (key === "users" || key === "tags" || key === "local" || key === "global") {
+		const changed = tab.value !== key;
 		tab.value = key;
+		if (key === "users" && changed && users.value.length === 0) void loadUsers();
 	}
 }
 
@@ -127,6 +163,60 @@ async function fetchTrend(): Promise<void> {
 		trends.value = [];
 	} finally {
 		trendFetching.value = false;
+	}
+}
+
+// `users` is offset-paginated (Misskey has no cursor for it), so this pane
+// keeps its own offset instead of going through CfPagination's id cursor.
+const USERS_LIMIT = 20;
+const users = ref<UserDetailed[]>([]);
+const usersFetching = ref(false);
+const usersError = ref<string | null>(null);
+const usersOffset = ref(0);
+const usersHasMore = ref(false);
+
+async function loadUsers(): Promise<void> {
+	usersFetching.value = true;
+	usersError.value = null;
+	usersOffset.value = 0;
+	try {
+		const page = await api("users", {
+			limit: USERS_LIMIT + 1,
+			offset: 0,
+			sort: "+follower",
+			state: "all",
+			origin: "local",
+		});
+		usersHasMore.value = page.length > USERS_LIMIT;
+		users.value = page.slice(0, USERS_LIMIT);
+		usersOffset.value = users.value.length;
+	} catch (cause) {
+		users.value = [];
+		usersError.value = cause instanceof Error ? cause.message : String(cause);
+	} finally {
+		usersFetching.value = false;
+	}
+}
+
+async function loadMoreUsers(): Promise<void> {
+	if (usersFetching.value) return;
+	usersFetching.value = true;
+	usersError.value = null;
+	try {
+		const page = await api("users", {
+			limit: USERS_LIMIT + 1,
+			offset: usersOffset.value,
+			sort: "+follower",
+			state: "all",
+			origin: "local",
+		});
+		usersHasMore.value = page.length > USERS_LIMIT;
+		users.value = [...users.value, ...page.slice(0, USERS_LIMIT)];
+		usersOffset.value = users.value.length;
+	} catch (cause) {
+		usersError.value = cause instanceof Error ? cause.message : String(cause);
+	} finally {
+		usersFetching.value = false;
 	}
 }
 
@@ -167,6 +257,24 @@ definePageMetadata(
 </script>
 
 <style lang="scss" scoped>
+.userList {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.user {
+	padding: 12px 14px;
+	background: var(--panel);
+	border-radius: var(--radius);
+}
+
+.more {
+	display: flex;
+	justify-content: center;
+	padding: 12px 0;
+}
+
 .tags {
 	> .tagList {
 		display: grid;

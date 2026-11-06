@@ -2191,6 +2191,62 @@ cd web && pnpm build                    # exit 0
 - 未读页签在流式推送到达时的实时插入没有专门验证。
 - directNotes、按类型过滤与页签组合没有走查。
 
+## 12AG. 批次：前端第十七波——用户发现（2026-11-06）
+
+**工作方式**：目标模式第十七波，一轮完成公开用户目录、发现页用户页签、测试、真实二进制与浏览器
+走查、文档与提交。施工依据 `docs/research/2026-11-06-firefish-port-wave17-contract.md`。
+
+### 12AG.1 落地清单
+
+| 层 | 文件 | 说明 |
+|----|------|------|
+| 目录 | `internal/account/users_list.go`（新） | `ListUsers`：冻结过滤、sort/state/origin/hostname、offset 分页 |
+| 端点 | `internal/httpapi/users_list.go`（新）、`server.go` | `POST /api/users`；匿名可读，登录补 `isFollowing`/`isFollowed` |
+| 页面 | `web/src/pages/Explore.vue` | 新增「用户」页签并设为默认；`MkUserList` + `sort=+follower` |
+| 接口层 | `endpoints.ts` | `usersList` |
+| 测试 | `internal/httpapi/users_list_test.go`（新） | 冻结过滤、粉丝排序、来源、关注标记、非法 state 400 |
+
+### 12AG.2 有意的限制
+
+1. `alive` 与 `all` 相同（均排除冻结）；没有 moderator 标记，相关 state 等价于 admin。
+2. 没有随机/推荐排序。
+3. 远程用户在非联邦实例上为空集。
+4. **offset 分页**：`users` 只支持 offset，用户页签因此自己维护 offset 与「加载更多」
+   （请求 `limit+1` 判断 hasMore），没有复用走 id 游标的 `MkUserList`。
+
+### 12AG.3 验证证据
+
+```
+gofmt -l internal/ cmd/                 # 空
+go vet ./...                            # exit 0
+CINDERFISH_TEST_DATABASE_URL=… go test -count=1 ./...   # 全绿（新增目录端点用例）
+cd web && pnpm exec vue-tsc --noEmit    # exit 0
+cd web && pnpm run check:port           # 398 文件，hardTotal 0
+cd web && pnpm build                    # exit 0
+```
+
+真实二进制 `:3991`（开发库 23 个账号 + w17alice/w17bob）：
+
+| 场景 | 结果 |
+|------|------|
+| `POST /api/users`（local） | 25 个账号 |
+| `sort=+follower&limit=3` | 粉丝数 1 的账号排在前面 |
+| `state=bogus` | 400 |
+| `/explore`（默认页签） | 页签「用户 / 热门标签 / 本地」；用户卡片显示帖子/关注/粉丝计数 |
+| 点「加载更多」 | 用户卡片从 20 条增至 24 条（开发库 23 账号 + 走查账号） |
+| 切到「热门标签」 | 趋势标签正常 |
+| 移动端 390×844 | 用户卡片正常换行，无横向溢出、无 JS 异常 |
+
+无头 Helium 156。截图在 `/tmp/w17-shots`（不入库）。
+
+走查数据已清理：w17alice/w17bob 与关注关系级联删除，用户数回到 23；服务与临时文件停止。
+
+### 12AG.4 仍未验证 / 已知偏差
+
+- 远程用户目录、`hostname` 过滤与 `state=admin` 没有构造数据。
+- 用户页签的「加载更多」没有分页到底后的空态截图（当前数据量只够翻一页）。
+- 未登录访客看到的目录没有走查（走查注入的是登录会话）。
+
 ## 13. 文档索引
 
 | 文档 | 内容 |
@@ -2233,6 +2289,7 @@ cd web && pnpm build                    # exit 0
 | `docs/research/2026-11-06-firefish-port-wave14-contract.md` | **第十四波施工契约（blockedHosts、策略与入站拒绝、实例屏蔽页），见 §12AD** |
 | `docs/research/2026-11-06-firefish-port-wave15-contract.md` | **第十五波施工契约（MiAuth check、fetched 标记与授权页），见 §12AE** |
 | `docs/research/2026-11-06-firefish-port-wave16-contract.md` | **第十六波施工契约（notes/mentions、unreadOnly 与通知页签），见 §12AF** |
+| `docs/research/2026-11-06-firefish-port-wave17-contract.md` | **第十七波施工契约（公开 users 目录与发现页用户页签），见 §12AG** |
 
 ## 14. 已知的未验证项
 
@@ -2259,6 +2316,8 @@ cd web && pnpm build                    # exit 0
   拒绝回执、scope 强制按设计未做。
 - **第十六波未测边角（2026-11-06，见 §12AF.4）**：远端提及、流式推送下的未读实时插入、directNotes
   与类型过滤组合未验证。
+- **第十七波未测边角（2026-11-06，见 §12AG.4）**：远程目录、hostname、`state=admin` 与未登录视角
+  未走查；用户页签的 offset 分页已实测能从 20 增至 24。
 - **仍未移植的设置页**：邮箱、整合、安全（2FA）、导入导出、迁移、Webhook、插件、自定义 KaTeX、状态栏、
   删除账号、应用授权以外的账号操作；对应后端端点不存在或前端缺少依赖（见第五波契约 §3.3）。
 - **仍缺的 widgets**：rss、rss-ticker、server-metric、online-users、federation、job-queue、aiscript、

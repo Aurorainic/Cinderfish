@@ -75,6 +75,7 @@ export const ENDPOINTS = {
 	iNotifications: "i/notifications",
 
 	// users
+	usersList: "users",
 	usersShow: "users/show",
 	usersSearch: "users/search",
 	usersReportAbuse: "users/report-abuse",
@@ -464,6 +465,17 @@ export interface EndpointMap {
 		res: Notification[];
 	};
 
+	[ENDPOINTS.usersList]: {
+		req: {
+			limit?: number;
+			offset?: number;
+			sort?: "+follower" | "-follower" | "+createdAt" | "-createdAt" | "+updatedAt" | "-updatedAt";
+			state?: "all" | "alive" | "admin" | "moderator" | "adminOrModerator";
+			origin?: "combined" | "local" | "remote";
+			hostname?: string | null;
+		};
+		res: UserDetailed[];
+	};
 	[ENDPOINTS.usersShow]: { req: UsersShowParams; res: UserDetailed };
 	[ENDPOINTS.usersNotes]: { req: UsersNotesParams; res: NoteDetailed[] };
 	[ENDPOINTS.usersFollowers]: {
