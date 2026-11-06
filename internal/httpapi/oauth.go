@@ -55,81 +55,198 @@ func (s *Server) handleOAuthMetadata(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, s.oauthMetadata())
 }
 
-// handleOAuthAuthorize serves GET /oauth/authorize.
-//
-// The full flow needs an interactive consent page; without one the
-// endpoint reports that a login is required, which is what Misskey's
-// decision step would eventually confirm.
-func (s *Server) handleOAuthAuthorize(w http.ResponseWriter, r *http.Request) {
-	q := r.URL.Query()
+// oauthAuthorizeParams is a validated authorization request. Only the code
+// flow with PKCE is accepted, which is what Firebase/Misskey clients use.
+type oauthAuthorizeParams struct {
+	ClientID      string
+	RedirectURI   string
+	CodeChallenge string
+	State         string
+	Scopes        []string
+}
 
-	clientID := q.Get("client_id")
-	redirectURI := q.Get("redirect_uri")
-	responseType := q.Get("response_type")
-	codeChallenge := q.Get("code_challenge")
-	codeChallengeMethod := q.Get("code_challenge_method")
+// oauthRequestError is a validation failure that maps onto an OAuth 2.0
+// error response.
+type oauthRequestError struct {
+	code        string
+	description string
+}
 
-	if clientID == "" {
-		s.writeOAuthError(w, http.StatusBadRequest, "invalid_request", "client_id must be provided", "")
-		return
-	}
-	if redirectURI == "" {
-		s.writeOAuthError(w, http.StatusBadRequest, "invalid_request", "redirect_uri must be provided", "")
-		return
-	}
-	if responseType != "code" {
-		s.writeOAuthError(w, http.StatusBadRequest, "unsupported_response_type", "Only the code response type is supported", "")
-		return
-	}
-	if codeChallenge == "" {
-		s.writeOAuthError(w, http.StatusBadRequest, "invalid_request", "code_challenge parameter is required", "")
-		return
-	}
-	if codeChallengeMethod != "S256" {
-		s.writeOAuthError(w, http.StatusBadRequest, "invalid_request", "code_challenge_method parameter must be set as S256", "")
-		return
-	}
+func (e *oauthRequestError) Error() string { return e.description }
 
-	// The request is well formed. A logged in session is needed to
-	// complete the consent step; without one the flow cannot continue.
-	info, err := s.authenticate(r.Context(), r, nil)
-	if err != nil || info == nil {
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		w.WriteHeader(http.StatusUnauthorized)
-		_, _ = w.Write([]byte(`<!doctype html><meta charset="utf-8"><title>CinderFish</title>` +
-			`<p>Sign in to authorize this application.</p>`))
-		return
+// parseOAuthAuthorize validates the query parameters of an authorization
+// request. Both the GET endpoint and the SPA's consent call use it, so the
+// rules cannot drift between them.
+func parseOAuthAuthorize(q url.Values) (*oauthAuthorizeParams, *oauthRequestError) {
+	p := &oauthAuthorizeParams{
+		ClientID:      q.Get("client_id"),
+		RedirectURI:   q.Get("redirect_uri"),
+		CodeChallenge: q.Get("code_challenge"),
+		State:         q.Get("state"),
+	}
+	switch {
+	case p.ClientID == "":
+		return nil, &oauthRequestError{"invalid_request", "client_id must be provided"}
+	case p.RedirectURI == "":
+		return nil, &oauthRequestError{"invalid_request", "redirect_uri must be provided"}
+	case q.Get("response_type") != "code":
+		return nil, &oauthRequestError{"unsupported_response_type", "Only the code response type is supported"}
+	case p.CodeChallenge == "":
+		return nil, &oauthRequestError{"invalid_request", "code_challenge parameter is required"}
+	case q.Get("code_challenge_method") != "S256":
+		return nil, &oauthRequestError{"invalid_request", "code_challenge_method parameter must be set as S256"}
 	}
 
-	// Issue the authorization code directly. The interactive consent page
-	// is part of the frontend work (M6).
+	// scope may be repeated or space separated; both forms appear in the wild.
+	for _, raw := range q["scope"] {
+		for _, scope := range strings.Fields(raw) {
+			p.Scopes = append(p.Scopes, scope)
+		}
+	}
+	if len(p.Scopes) == 0 {
+		p.Scopes = []string{"read"}
+	}
+	return p, nil
+}
+
+// issueOAuthGrant records an authorization code for the user and returns it.
+func (s *Server) issueOAuthGrant(ctx context.Context, userID string, p *oauthAuthorizeParams) (string, error) {
 	code := auth.GenerateGrantCode()
-	scopes := q["scope"]
-	if len(scopes) == 0 {
-		scopes = []string{"read"}
-	}
-	if _, err := s.pool.Exec(r.Context(), `
+	if _, err := s.pool.Exec(ctx, `
 INSERT INTO oauth_grant_codes (code, client_id, user_id, redirect_uri, code_challenge, scopes)
 VALUES ($1, $2, $3, $4, $5, $6)
-`, code, clientID, info.User.ID, redirectURI, codeChallenge, mustJSON(scopes)); err != nil {
-		s.writeOAuthError(w, http.StatusInternalServerError, "server_error", "Could not issue the authorization code", "")
-		return
+`, code, p.ClientID, userID, p.RedirectURI, p.CodeChallenge, mustJSON(p.Scopes)); err != nil {
+		return "", err
 	}
+	return code, nil
+}
 
-	target, err := url.Parse(redirectURI)
+// oauthRedirectURL builds the client redirect carrying the code and state.
+func (s *Server) oauthRedirectURL(p *oauthAuthorizeParams, code string) (string, error) {
+	target, err := url.Parse(p.RedirectURI)
 	if err != nil {
-		s.writeOAuthError(w, http.StatusBadRequest, "invalid_request", "Invalid redirect_uri", "")
-		return
+		return "", err
 	}
 	values := target.Query()
 	values.Set("code", code)
-	if state := q.Get("state"); state != "" {
-		values.Set("state", state)
+	if p.State != "" {
+		values.Set("state", p.State)
 	}
 	values.Set("iss", "https://"+s.cfg.Domain)
 	target.RawQuery = values.Encode()
+	return target.String(), nil
+}
 
-	http.Redirect(w, r, target.String(), http.StatusFound)
+// handleOAuthAuthorize serves GET /oauth/authorize.
+//
+// Two callers share this path. A client that already has a credential (an
+// Authorization header) gets the authorization code immediately, which keeps
+// the previous server-to-server behaviour. A browser without one is served the
+// SPA, which renders the consent page and then calls POST /api/oauth/authorize
+// with the signed-in user's token.
+func (s *Server) handleOAuthAuthorize(w http.ResponseWriter, r *http.Request) {
+	params, paramErr := parseOAuthAuthorize(r.URL.Query())
+	if paramErr != nil {
+		s.writeOAuthError(w, http.StatusBadRequest, paramErr.code, paramErr.description, "")
+		return
+	}
+
+	info, err := s.authenticate(r.Context(), r, nil)
+	if err == nil && info != nil {
+		code, err := s.issueOAuthGrant(r.Context(), info.User.ID, params)
+		if err != nil {
+			s.writeOAuthError(w, http.StatusInternalServerError, "server_error", "Could not issue the authorization code", "")
+			return
+		}
+		target, err := s.oauthRedirectURL(params, code)
+		if err != nil {
+			s.writeOAuthError(w, http.StatusBadRequest, "invalid_request", "Invalid redirect_uri", "")
+			return
+		}
+		http.Redirect(w, r, target, http.StatusFound)
+		return
+	}
+
+	// No credential: this is a browser asking for the consent page.
+	if s.web != nil {
+		s.web.serve(w, r)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(http.StatusUnauthorized)
+	_, _ = w.Write([]byte(`<!doctype html><meta charset="utf-8"><title>CinderFish</title>` +
+		`<p>Sign in to authorize this application.</p>`))
+}
+
+// handleOAuthAuthorizeAPI implements POST /api/oauth/authorize, the call the
+// consent page makes once the user approves.
+//
+// The response is the client redirect URL rather than a 302, because the SPA
+// has to leave the API call's JSON world and navigate the browser itself.
+// This endpoint is Cinderfish-specific: Misskey's clients never call it.
+func (s *Server) handleOAuthAuthorizeAPI(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		ClientID            string          `json:"client_id"`
+		RedirectURI         string          `json:"redirect_uri"`
+		ResponseType        string          `json:"response_type"`
+		CodeChallenge       string          `json:"code_challenge"`
+		CodeChallengeMethod string          `json:"code_challenge_method"`
+		State               string          `json:"state"`
+		Scope               json.RawMessage `json:"scope"`
+	}
+	if err := decodeOptionalJSON(r, &body); err != nil {
+		writeAPIError(w, err)
+		return
+	}
+	info, err := s.authenticate(r.Context(), r, bodyAsMap(r))
+	if err != nil || info == nil {
+		writeAuthenticationError(w)
+		return
+	}
+
+	q := url.Values{}
+	q.Set("client_id", body.ClientID)
+	q.Set("redirect_uri", body.RedirectURI)
+	q.Set("response_type", body.ResponseType)
+	q.Set("code_challenge", body.CodeChallenge)
+	q.Set("code_challenge_method", body.CodeChallengeMethod)
+	q.Set("state", body.State)
+	if len(body.Scope) > 0 {
+		var list []string
+		if err := json.Unmarshal(body.Scope, &list); err == nil {
+			for _, scope := range list {
+				q.Add("scope", scope)
+			}
+		} else {
+			var single string
+			if err := json.Unmarshal(body.Scope, &single); err == nil {
+				q.Add("scope", single)
+			}
+		}
+	}
+	params, paramErr := parseOAuthAuthorize(q)
+	if paramErr != nil {
+		writeAPIError(w, &APIError{
+			Message: paramErr.description, Code: "INVALID_PARAM",
+			ID: errIDOAuthInvalidRequest, Kind: "client", Status: http.StatusBadRequest,
+		})
+		return
+	}
+
+	code, err := s.issueOAuthGrant(r.Context(), info.User.ID, params)
+	if err != nil {
+		writeInternalServerError(w)
+		return
+	}
+	target, err := s.oauthRedirectURL(params, code)
+	if err != nil {
+		writeAPIError(w, &APIError{
+			Message: "Invalid redirect_uri.", Code: "INVALID_PARAM",
+			ID: errIDOAuthInvalidRequest, Kind: "client", Status: http.StatusBadRequest,
+		})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"redirect": target})
 }
 
 // handleOAuthToken implements POST /oauth/token.

@@ -237,6 +237,7 @@ func (s *Server) registerRoutes() {
 
 	s.mux.HandleFunc("GET /.well-known/oauth-authorization-server", s.handleOAuthMetadata)
 	s.mux.HandleFunc("GET /oauth/authorize", s.handleOAuthAuthorize)
+	s.mux.HandleFunc("POST /api/oauth/authorize", s.handleOAuthAuthorizeAPI)
 	s.mux.HandleFunc("POST /oauth/token", s.handleOAuthToken)
 
 	s.mux.HandleFunc("POST /api/notes/create", s.handleNotesCreate)

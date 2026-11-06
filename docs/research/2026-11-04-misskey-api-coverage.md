@@ -15,15 +15,15 @@
 | 指标 | 数量 |
 |------|------|
 | Misskey 端点总数 | 440 |
-| Cinderfish 已注册路由 | 139 |
+| Cinderfish 已注册路由 | 140 |
 | 其中 Misskey 同名路径 | 132 |
-| 其中 Cinderfish 自有路径/别名 | 7（`notifications` 别名、`admin/federation/mode`、`admin/federation/allowlist`、`miauth/{session}/check`、`admin/object-storage`、`admin/deliver-queue`、`notes/history`） |
+| 其中 Cinderfish 自有路径/别名 | 8（`notifications` 别名、`admin/federation/mode`、`admin/federation/allowlist`、`miauth/{session}/check`、`admin/object-storage`、`admin/deliver-queue`、`notes/history`、`oauth/authorize`（同意页调用）） |
 | 未实现（Misskey 同名） | 308 |
 
 统计口径：`internal/httpapi/server.go` 里 `HandleFunc("METHOD /api/…")` 的去重路径；
 GET 与 POST 同名路径只算一个。
 
-## 2. 已实现（139 条注册路由）
+## 2. 已实现（140 条注册路由）
 
 ```
 admin/accounts/create       admin/announcements/create  admin/announcements/delete
@@ -73,7 +73,8 @@ notes/featured              notes/renotes               notes/search
 notes/search-by-tag         notes/unrenote
 notes/replies               notes/show                  notes/state                 notes/timeline
 notifications*              notifications/mark-all-as-read
-ping                        request-reset-password      reset-password
+oauth/authorize*            ping                        request-reset-password
+reset-password
 signin                      signup                      stats
 username/available          users/followers             users/following
 verify-email
@@ -86,7 +87,8 @@ users/update
 
 `*` 为 Cinderfish 自有路径/别名：`notifications` 是 `i/notifications` 的兼容别名
 （Misskey 客户端读 `i/notifications`）；`admin/federation/mode` 与
-`admin/federation/allowlist` 是本项目自有的运行期联邦开关（Misskey 没有同名端点）。
+`admin/federation/allowlist` 是本项目自有的运行期联邦开关（Misskey 没有同名端点）；
+`oauth/authorize`（POST）是授权同意页调用的一次性端点，返回客户端跳转地址而不是 302。
 `i/registry/scopes` 对应 Firefish 客户端的调用；Misskey `c05e844` 同位置是
 `i/registry/scopes-with-domain`，多一个 domain 分组。
 
