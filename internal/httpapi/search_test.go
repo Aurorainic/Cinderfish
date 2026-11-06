@@ -265,3 +265,42 @@ VALUES ('w63file', $1, 'w63.txt', 'text/plain', 3, 'w63md5', 'w63/key', 'local')
 		t.Errorf("search-by-tag withFiles = %v, want the tagged note", tagged)
 	}
 }
+
+// TestNotesSearchRemoteAuthor covers the host filter with a real remote row:
+// an empty host keeps local notes only, a named host returns the remote note,
+// and the tag search finds it too.
+func TestNotesSearchRemoteAuthor(t *testing.T) {
+	f := newFederationServer(t, "public")
+
+	if _, err := f.pool.Exec(context.Background(), `
+INSERT INTO users (id, username, username_lower, password_hash, host)
+VALUES ('srchremote', 'ruser', 'ruser', 'x', 'remote.example')`); err != nil {
+		t.Fatalf("insert remote user: %v", err)
+	}
+	if _, err := f.pool.Exec(context.Background(), `
+INSERT INTO notes (id, user_id, user_host, visibility, text, tags)
+VALUES ('srchnote', 'srchremote', 'remote.example', 'public', 'w63remote searchable', '["remotetag"]'::jsonb)`); err != nil {
+		t.Fatalf("insert remote note: %v", err)
+	}
+
+	search := func(params map[string]any) []any {
+		params["query"] = "w63remote"
+		return postListWithToken(t, f.ts, "/api/notes/search", "", params)
+	}
+	if got := search(map[string]any{"host": "remote.example"}); len(got) != 1 {
+		t.Fatalf("remote host search = %v, want the remote note", got)
+	} else if n, _ := got[0].(map[string]any); n["id"] != "srchnote" {
+		t.Errorf("remote search note = %v", n["id"])
+	}
+	if got := search(map[string]any{"host": ""}); len(got) != 0 {
+		t.Errorf("local host search = %v, want none", got)
+	}
+	if got := search(map[string]any{}); len(got) != 1 {
+		t.Errorf("unfiltered search = %v, want the remote note", got)
+	}
+
+	tagged := postListWithToken(t, f.ts, "/api/notes/search-by-tag", "", map[string]any{"tag": "remotetag"})
+	if len(tagged) != 1 {
+		t.Fatalf("tag search = %v, want the remote note", tagged)
+	}
+}

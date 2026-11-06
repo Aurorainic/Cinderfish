@@ -4450,8 +4450,8 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
   分页满页数据已由 §12DE 的 12 次登录用例覆盖。
 - **第二十二波的部分边角（2026-11-06，见 §12AL.4）**：资料扩展字段（location / birthday / lang /
   fields）与 `injectFeaturedNote` 的保存、`users/show` 回读、四种非法值（日期、语言标签、位置过长、
-  字段过多）与 null 清空已由 `TestIUpdateProfileDetails` 覆盖（2026-11-07）。仍未验证的：
-  「推荐笔记」开关对时间线的实际影响（时间线里注入了 featured note 的展示没有走查）。
+  字段过多）与 null 清空已由 `TestIUpdateProfileDetails` 覆盖（2026-11-07）。`injectFeaturedNote`
+  在 Misskey 后端也只存储、不参与时间线查询（注入是客户端行为），本实现与之一致。
 - **第二十三波已补验证并修缺陷（2026-11-06，见 §12AM.4）**：`TestNotificationTypeMuting` 覆盖了
   静音后列表与未读数联动、显式 `includeTypes` 优先、未知类型 400、重复项去重与清空。
   用例暴露了缺陷：`GetProfile` 从不读取 `settings.mutingNotificationTypes`，所以静音写入后
@@ -4559,8 +4559,8 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
   窄屏（280px）排版已由 §12EK 测量（六页均无横向溢出，说明区完整、无表单控件）。
 - **第五十波已补验证（2026-11-07，见 §12BN.4）**：状态栏在真实二进制下添加、着色、滚动与
   刷新保留均走查通过；期间发现固定条使用了不存在的 `block-end` 属性、导致贴在左上角，
-  已修为 `inset-block-end`；多条目叠加已由 §12EI 覆盖。仍未验证的：移动端/Deck/Zen 下的状态栏、
-  减少动画偏好（无头环境无法确认）。
+  已修为 `inset-block-end`；多条目叠加（§12EI）与 390 宽移动端（§12EP：底边贴住视口、无溢出）
+  已覆盖；Deck/Zen 按设计不挂载状态栏。仍未验证的：减少动画偏好（无头环境无法确认）。
 - **第五十一波部分补验证（2026-11-07 对账 §12CB/§12CC）**：迁移页表单、本地目标拒绝、`MkMoved`
   横幅（含本地目标的 `MkMention` 多余 `@` 修复）都已走查；`i/move` 的双实例投递已于
   2026-11-07 补齐（§12DI）；跨实例「关注者改关」由 §12EN 覆盖（本地关注者被迁移到新远端账号并
@@ -5966,3 +5966,14 @@ gofmt -l internal/ cmd/                                        # 空
 go vet ./...                                                   # exit 0
 CINDERFISH_TEST_DATABASE_URL=... go test ./... -count=1         # 全绿
 ```
+
+## 12EP. 第一百二十六波：移动端状态栏与远端作者搜索（2026-11-07）
+
+- 390×844 下 `/settings/statusbar` 添加一条条目后回到首页：`.cf-statusbars` 的
+  `getBoundingClientRect().bottom` 等于 `window.innerHeight`（844），高度 27px，页面无横向溢出；
+  截图 `/tmp/w122-shots/statusbar-mobile.png`。
+- `TestNotesSearchRemoteAuthor`：插入一条 `user_host=remote.example` 的公开笔记后，
+  `notes/search` 的 `host: "remote.example"` 命中它，`host: ""` 只返回本地（0 条），
+  不传 `host` 返回全部；`notes/search-by-tag` 也能查到该远端标签。
+
+至此 §14 里只剩减少动画偏好一项无法在无头环境确认；Deck/Zen 状态栏按设计不挂载。
