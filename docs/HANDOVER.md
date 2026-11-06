@@ -2813,6 +2813,41 @@ cd web && pnpm build                    # exit 0
 - 非法 URL/颜色的 400 分支。
 - `go test` 与浏览器走查未执行。
 
+## 12AV. 批次：已收录实例列表（2026-11-06）
+
+**工作方式**：目标模式第三十二波，继续只写代码、验证到编译层。施工依据
+`docs/research/2026-11-06-firefish-port-wave32-contract.md`。
+
+### 12AV.1 落地清单
+
+| 层 | 文件 | 说明 |
+|----|------|------|
+| 端点 | `internal/httpapi/federation_instance.go`、`server.go` | `federation/instances` 按 users.host 聚合 |
+| 前端 | `api/endpoints.ts`、`pages/AdminFederation.vue` | 「已收录实例」表格与加载状态 |
+| 文档 | `meta-federation.md`、台账 | 端点小节与计数（121/114/326） |
+
+### 12AV.2 有意的限制
+
+1. 只统计库内已出现的主机。
+2. 无投递状态、pubSub、软件信息。
+3. 无分页 UI。
+
+### 12AV.3 验证证据（编译层）
+
+```
+gofmt -l internal/ cmd/                 # 空
+go vet ./...                            # exit 0
+cd web && pnpm exec vue-tsc --noEmit    # exit 0
+cd web && pnpm run check:port           # hardTotal 0
+cd web && pnpm build                    # exit 0
+```
+
+### 12AV.4 仍未验证
+
+- 列表排序、host 过滤与空库表现。
+- 表格在移动端与实例信息页跳转。
+- `go test` 与浏览器走查未执行。
+
 ## 13. 文档索引
 
 | 文档 | 内容 |
@@ -2870,6 +2905,7 @@ cd web && pnpm build                    # exit 0
 | `docs/research/2026-11-06-firefish-port-wave29-contract.md` | **第二十九波施工契约（关于页），见 §12AS** |
 | `docs/research/2026-11-06-firefish-port-wave30-contract.md` | **第三十波施工契约（账号导入），见 §12AT** |
 | `docs/research/2026-11-06-firefish-port-wave31-contract.md` | **第三十一波施工契约（实例图标/横幅/主题色），见 §12AU** |
+| `docs/research/2026-11-06-firefish-port-wave32-contract.md` | **第三十二波施工契约（已收录实例列表），见 §12AV** |
 
 ## 14. 已知的未验证项
 
@@ -2920,6 +2956,7 @@ cd web && pnpm build                    # exit 0
 - **第二十九波未测（2026-11-06，见 §12AS.4）**：关于页只过了编译层，布局与外链未走查。
 - **第三十波未测（2026-11-06，见 §12AT.4）**：账号导入只过了编译层，导出→导入往返、冲突与非法格式未验证。
 - **第三十一波未测（2026-11-06，见 §12AU.4）**：实例图标/横幅/主题色只过了编译层，保存与展示未验证。
+- **第三十二波未测（2026-11-06，见 §12AV.4）**：已收录实例列表只过了编译层，排序/过滤/空库未验证。
 - **仍未移植的设置页**：邮箱、整合、导入导出、迁移、Webhook、插件、自定义 KaTeX、状态栏、
   删除账号、应用授权以外的账号操作；对应后端端点不存在或前端缺少依赖（见第五波契约 §3.3）。
 - **仍缺的 widgets**：rss、rss-ticker、server-metric、online-users、federation、job-queue、aiscript、

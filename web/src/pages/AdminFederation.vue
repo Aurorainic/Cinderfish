@@ -119,10 +119,39 @@
 					<CfInfo v-if="hostError != null" warn>{{ hostError }}</CfInfo>
 				</section>
 
-				<CfInfo>
-					降级说明：Firefish 的联邦页还会列出每个实例的投递状态与
-					pubSub 统计（<code>federation/instances</code>），本实例没有这个端点，因此这里只管理模式与白名单。
-				</CfInfo>
+				<section class="panel _panel">
+					<h2>已收录实例</h2>
+					<p class="caption">
+						只统计本库已经出现的远端主机；软件与投递状态没有在线校验，因此不显示。
+					</p>
+					<MkLoading v-if="instancesLoading" />
+					<CfInfo v-else-if="instancesError != null" warn>
+						{{ instancesError }}
+					</CfInfo>
+					<CfInfo v-else-if="instances.length === 0">
+						本实例还没有收录任何远端用户。
+					</CfInfo>
+					<table v-else class="instances">
+						<thead>
+							<tr>
+								<th>主机</th>
+								<th>用户</th>
+								<th>帖子</th>
+							</tr>
+						</thead>
+						<tbody>
+							<tr v-for="item in instances" :key="item.host">
+								<td>
+									<MkA :to="`/instance-info/${item.host}`" class="_monospace">
+										{{ item.host }}
+									</MkA>
+								</td>
+								<td>{{ item.usersCount }}</td>
+								<td>{{ item.notesCount }}</td>
+							</tr>
+						</tbody>
+					</table>
+				</section>
 			</div>
 		</MkSpacer>
 	</MkStickyContainer>
@@ -131,8 +160,8 @@
 <script setup lang="ts">
 // Firefish's admin/federation.vue is a thin wrapper around the public
 // about.federation.vue instance browser (`federation/instances`). Cinderfish
-// has no instance list and no per-instance statistics; what it does have is the
-// live federation switch and the allowlist:
+// aggregates that list from the hosts already present in users/notes, and adds
+// the live federation switch and the allowlist:
 //
 //   GET  admin/federation/mode       -> { mode: public | allowlist | none }
 //   POST admin/federation/mode       -> same shape, applies to the next request
@@ -145,7 +174,7 @@
 // the page says so instead of disabling the editor.
 import { computed, onMounted, ref } from "vue";
 import { ApiError, api, apiGet } from "@/api/client";
-import type { FederationModeResponse } from "@/api/types";
+import type { FederationInstance, FederationModeResponse } from "@/api/types";
 import { isAdmin } from "@/account";
 import { confirm, success } from "@/os";
 import { host as ownHost } from "@/config";
@@ -193,6 +222,9 @@ const MODE_OPTIONS: readonly ModeOption[] = [
 const adminUser = computed(() => isAdmin());
 
 const loading = ref(true);
+const instances = ref<FederationInstance[]>([]);
+const instancesLoading = ref(true);
+const instancesError = ref<string | null>(null);
 const loadFailed = ref(false);
 
 const mode = ref<FederationMode>("public");
@@ -356,8 +388,24 @@ function allowlistErrorText(error: unknown): string {
 	return String(error);
 }
 
+async function loadInstances(): Promise<void> {
+	instancesLoading.value = true;
+	instancesError.value = null;
+	try {
+		instances.value = await api("federation/instances", { limit: 30 });
+	} catch (error) {
+		instancesError.value =
+			error instanceof ApiError ? error.message : String(error);
+	} finally {
+		instancesLoading.value = false;
+	}
+}
+
 onMounted(() => {
-	if (adminUser.value) void load();
+	if (adminUser.value) {
+		void load();
+		void loadInstances();
+	}
 });
 
 definePageMetadata({
@@ -544,5 +592,23 @@ definePageMetadata({
 	margin: 0 auto 8px auto;
 	font-size: 32px;
 	opacity: 0.5;
+}
+.instances {
+	margin-block-start: 8px;
+	inline-size: 100%;
+	border-collapse: collapse;
+	font-size: 0.9em;
+
+	th,
+	td {
+		padding: 6px 8px;
+		border-block-end: 1px solid var(--divider);
+		text-align: start;
+	}
+
+	th {
+		color: var(--fgTransparentWeak);
+		font-weight: normal;
+	}
 }
 </style>

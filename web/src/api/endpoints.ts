@@ -199,6 +199,7 @@ export const ENDPOINTS = {
 	adminSuspendUser: "admin/suspend-user",
 	adminUnsuspendUser: "admin/unsuspend-user",
 	federationShowInstance: "federation/show-instance",
+	federationInstances: "federation/instances",
 	adminFederationMode: "admin/federation/mode",
 	adminFederationAllowlist: "admin/federation/allowlist",
 } as const;
@@ -870,6 +871,10 @@ export interface EndpointMap {
 	[ENDPOINTS.federationShowInstance]: {
 		req: { host: string };
 		res: FederationInstance | null;
+	};
+	[ENDPOINTS.federationInstances]: {
+		req: { host?: string | null; limit?: number; offset?: number };
+		res: FederationInstance[];
 	};
 
 	[ENDPOINTS.adminFederationMode]: {
