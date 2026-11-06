@@ -4515,7 +4515,7 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
   出站链路——bob 在 beta 关注 alpha 的 alice，投递 worker 把 alice 的新帖 Create 送到 beta 并落库，
   `deliver_queue` 留下已投递行；`TestNotesUnrenote` 覆盖取消转贴（纯转贴删除、幂等、引用转贴不受影响、
   缺参数 400、匿名 401）（2026-11-07）。Announce（纯转帖）的双实例投递已在 §12CM 补上；
-  仍未验证的：投递失败后的重试窗口。
+  失败后的重试与最终成功已由 §12CY 覆盖（`TestDelivererRetriesThenSucceeds`）。
 - **第四十一波已补验证（2026-11-06，见 §12BE.4）**：`TestTwoInstanceNoteUpdate` 用真实 HTTP 覆盖
   出站方向：bob 关注 alice，alice 发帖再编辑，beta 的副本收到 `Update` 并把文本更新为编辑后的
   Markdown（含 `**bold**` 与换行）。用例还暴露并修掉一个缺陷：入站 `Update` 原先取的是 `content`
@@ -5322,3 +5322,22 @@ CINDERFISH_TEST_DATABASE_URL=... go test ./... -count=1         # 全绿
 ```
 
 仍未验证：该通知的 Streaming 推送（事件层已有 `main` 频道用例）、`directNotes` 组合。
+
+## 12CY. 第八十六波：投递失败后的重试窗口（2026-11-07）
+
+第四十波留下的「投递失败后的重试窗口」：
+
+`TestDelivererRetriesThenSucceeds`（`internal/federation/deliver_test.go`）：
+
+1. 接收端第一次回 500、第二次回 202；
+2. 第一次 `ProcessOnce` 后行状态为 `attempts=1`、`delivered_at IS NULL`（已退避）；
+3. 测试把 `next_attempt_at` 改回 `now()` 避免真等 2 秒；
+4. 第二次 `ProcessOnce` 成功，`delivered_at` 置位，接收端总请求数为 2。
+
+```
+gofmt -l internal/ cmd/                                        # 空
+go vet ./...                                                   # exit 0
+CINDERFISH_TEST_DATABASE_URL=... go test ./... -count=1         # 全绿
+```
+
+仍未验证：真实网络抖动下多轮退避的总时长、进程重启后未到期行的恢复（表持久，理论成立）。

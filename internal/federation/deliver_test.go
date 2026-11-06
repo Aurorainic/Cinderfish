@@ -10,6 +10,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -211,5 +212,59 @@ func TestDelivererClaimsEachRowOnce(t *testing.T) {
 	}
 	if delivered != total {
 		t.Errorf("delivered rows = %d, want %d", delivered, total)
+	}
+}
+
+// TestDelivererRetriesThenSucceeds proves a failed delivery is rescheduled and
+// succeeds on the next due attempt, ending as delivered rather than abandoned.
+func TestDelivererRetriesThenSucceeds(t *testing.T) {
+	d, pool, clear := deliverFixture(t)
+	defer clear()
+	ctx := context.Background()
+	activity := federation.Object{
+		"@context": federation.Context, "type": "Delete",
+		"actor": "https://fish.example/users/u", "object": "https://fish.example/notes/retry",
+	}
+
+	var hits int64
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if atomic.AddInt64(&hits, 1) == 1 {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusAccepted)
+	}))
+	t.Cleanup(srv.Close)
+
+	if err := d.Enqueue(ctx, srv.URL, "", "https://fish.example/users/u#main-key", "", activity); err != nil {
+		t.Fatalf("enqueue: %v", err)
+	}
+	if err := d.ProcessOnce(ctx); err != nil {
+		t.Fatalf("first attempt: %v", err)
+	}
+	var attempts int
+	var delivered *time.Time
+	if err := pool.QueryRow(ctx, `SELECT attempts, delivered_at FROM deliver_queue`).Scan(&attempts, &delivered); err != nil {
+		t.Fatalf("row after failure: %v", err)
+	}
+	if attempts != 1 || delivered != nil {
+		t.Fatalf("after failure attempts=%d delivered=%v, want 1/nil", attempts, delivered)
+	}
+
+	// Make the backoff due now instead of sleeping through it.
+	if _, err := pool.Exec(ctx, `UPDATE deliver_queue SET next_attempt_at = now()`); err != nil {
+		t.Fatalf("rewind backoff: %v", err)
+	}
+	if err := d.ProcessOnce(ctx); err != nil {
+		t.Fatalf("second attempt: %v", err)
+	}
+	if err := pool.QueryRow(ctx, `SELECT attempts, delivered_at FROM deliver_queue`).Scan(&attempts, &delivered); err != nil {
+		t.Fatalf("row after success: %v", err)
+	}
+	if attempts != 1 || delivered == nil {
+		t.Errorf("after success attempts=%d delivered=%v, want 1/set", attempts, delivered)
+	}
+	if got := atomic.LoadInt64(&hits); got != 2 {
+		t.Errorf("inbox hits = %d, want 2", got)
 	}
 }
