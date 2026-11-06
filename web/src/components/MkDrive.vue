@@ -134,8 +134,8 @@
 //   * folder moves go through drive/folders/update; because the packed folder
 //     never carries a nested `parent`, the breadcrumb walks parentId with one
 //     drive/folders/show per level;
-//   * the "upload from URL" entry is gone: drive/files/upload-from-url does not
-//     exist;
+//   * "upload from URL" calls drive/files/upload-from-url (the server refuses
+//     private/loopback targets);
 //   * the "keep original uploading" switch is gone with the recompression
 //     pipeline (browser-image-resizer is not a dependency).
 import { computed, onMounted, ref, watch } from "vue";
@@ -148,7 +148,8 @@ import type { Paging } from "@/components/ui/pagination";
 import MkDriveFolder from "@/components/MkDrive.folder.vue";
 import MkDriveFile from "@/components/MkDrive.file.vue";
 import MkDriveNavFolder from "@/components/MkDrive.navFolder.vue";
-import { alert, contextMenu, inputText, popupMenu, type MenuItem } from "@/os";
+import { ApiError } from "@/api/client";
+import { alert, contextMenu, inputText, popupMenu, success, type MenuItem } from "@/os";
 import { t } from "@/i18n";
 import { defaultStore } from "@/store/base";
 import { uploadFile, uploads } from "@/scripts/upload";
@@ -582,6 +583,27 @@ function onDrop(ev: DragEvent): void {
 	}
 }
 
+async function uploadFromUrl(): Promise<void> {
+	const { canceled, result } = await inputText({
+		title: "从 URL 上传",
+		placeholder: "https://example.com/image.png",
+	});
+	if (canceled || result == null || result.trim() === "") return;
+	try {
+		const file = await api("drive/files/upload-from-url", {
+			url: result.trim(),
+			folderId: folder.value?.id ?? null,
+		});
+		pagingHandle()?.prepend(file);
+		success();
+	} catch (error) {
+		void alert({
+			type: "error",
+			text: error instanceof ApiError ? error.message : t("somethingHappened"),
+		});
+	}
+}
+
 function getMenu(): MenuItem[] {
 	const items: MenuItem[] = [
 		{ type: "label", text: t("addFile") },
@@ -589,6 +611,11 @@ function getMenu(): MenuItem[] {
 			text: t("upload"),
 			icon: "ph-upload-simple ph-bold ph-lg",
 			action: selectLocalFile,
+		},
+		{
+			text: "从 URL 上传",
+			icon: "ph-link-simple ph-bold ph-lg",
+			action: uploadFromUrl,
 		},
 		{ type: "label", text: folder.value == null ? t("drive") : folder.value.name },
 	];

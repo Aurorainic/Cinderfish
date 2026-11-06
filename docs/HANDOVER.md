@@ -2920,6 +2920,43 @@ cd web && pnpm build                    # exit 0
 - 未登录、请求失败与笔记不存在时的退回行为。
 - `go test` 与浏览器走查未执行。
 
+## 12AY. 批次：从 URL 上传（2026-11-06）
+
+**工作方式**：目标模式第三十五波，继续只写代码、验证到编译层。施工依据
+`docs/research/2026-11-06-firefish-port-wave35-contract.md`。
+
+### 12AY.1 落地清单
+
+| 层 | 文件 | 说明 |
+|----|------|------|
+| 媒体层 | `internal/media/drive.go` | `MaxSize()` 访问器 |
+| 端点 | `internal/httpapi/drive_url_upload.go`（新）、`server.go` | 带 SSRF 防护的下载上传 |
+| 前端 | `api/endpoints.ts`、`components/MkDrive.vue` | 菜单「从 URL 上传」与列表插入 |
+| 文档 | `drive-media.md`、台账 | 端点小节与计数（123/116/324） |
+
+### 12AY.2 有意的限制
+
+1. 无进度/取消。
+2. 不跟随非 http(s) 重定向、不代理 Cookie。
+3. 不做内容类型白名单。
+
+### 12AY.3 验证证据（编译层）
+
+```
+gofmt -l internal/ cmd/                 # 空
+go vet ./...                            # exit 0
+cd web && pnpm exec vue-tsc --noEmit    # exit 0
+cd web && pnpm run check:port           # hardTotal 0
+cd web && pnpm build                    # exit 0
+```
+
+### 12AY.4 仍未验证
+
+- 公网 URL 下载、私有地址与重定向到私有地址的拒绝。
+- 超大响应、非 2xx 与文件夹归属错误的分支。
+- 菜单输入与列表插入。
+- `go test` 与浏览器走查未执行。
+
 ## 13. 文档索引
 
 | 文档 | 内容 |
@@ -2980,6 +3017,7 @@ cd web && pnpm build                    # exit 0
 | `docs/research/2026-11-06-firefish-port-wave32-contract.md` | **第三十二波施工契约（已收录实例列表），见 §12AV** |
 | `docs/research/2026-11-06-firefish-port-wave33-contract.md` | **第三十三波施工契约（笔记已编辑标记），见 §12AW** |
 | `docs/research/2026-11-06-firefish-port-wave34-contract.md` | **第三十四波施工契约（notes/state 与收藏菜单），见 §12AX** |
+| `docs/research/2026-11-06-firefish-port-wave35-contract.md` | **第三十五波施工契约（从 URL 上传），见 §12AY** |
 
 ## 14. 已知的未验证项
 
@@ -3033,6 +3071,7 @@ cd web && pnpm build                    # exit 0
 - **第三十二波未测（2026-11-06，见 §12AV.4）**：已收录实例列表只过了编译层，排序/过滤/空库未验证。
 - **第三十三波未测（2026-11-06，见 §12AW.4）**：已编辑标记只过了编译层，编辑后的显示与时间提示未验证。
 - **第三十四波未测（2026-11-06，见 §12AX.4）**：notes/state 与菜单只过了编译层，状态切换与失败回退未验证。
+- **第三十五波未测（2026-11-06，见 §12AY.4）**：从 URL 上传只过了编译层，SSRF 拒绝与下载分支未验证。
 - **仍未移植的设置页**：邮箱、整合、导入导出、迁移、Webhook、插件、自定义 KaTeX、状态栏、
   删除账号、应用授权以外的账号操作；对应后端端点不存在或前端缺少依赖（见第五波契约 §3.3）。
 - **仍缺的 widgets**：rss、rss-ticker、server-metric、online-users、federation、job-queue、aiscript、
