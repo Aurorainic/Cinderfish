@@ -190,6 +190,12 @@ const menuDef = computed<MkSuperMenuGroup[]>(() => [
 				to: "/settings/api",
 				active: isActive("/settings/api"),
 			},
+			{
+				icon: "ph-plugs-connected ph-bold ph-lg",
+				text: t("integration"),
+				to: "/settings/integration",
+				active: isActive("/settings/integration"),
+			},
 		],
 	},
 	{

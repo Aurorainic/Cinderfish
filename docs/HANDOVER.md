@@ -1,8 +1,9 @@
 # Cinderfish 交接说明
 
-- 最后更新：2026-11-06（目标模式第五十一波：账号迁移 `i/move`/`i/known-as`、入站 `Move`、
-  `migration` v19、`SettingsMigration` 真页面与 `MkMoved` 横幅；恢复目标模式时先补了 §12BO.3 的
-  验证债，`go test ./...`（含数据库）已全绿，详见 §12BP。浏览器走查仍待用户手动确认后执行）
+- 最后更新：2026-11-06（目标模式第五十一至五十二波：账号迁移 `i/move`/`i/known-as`、入站 `Move`、
+  `migration` v19、`SettingsMigration` 真页面与 `MkMoved` 横幅；随后是 KaTeX 宏页、集成说明页。
+  恢复目标模式时先补了 §12BO.3 的验证债，`go test ./...`（含数据库）已全绿，详见 §12BP、§12BQ。
+  浏览器走查仍待用户手动确认后执行）
 - 项目名 **Cinderfish**（2026-10-28 定名，Go module `github.com/Aurorainic/cinderfish`）
 - 仓库：当前目录 `/home/lainsaka/文档/MilnFish`，分支 `main`；远程 `origin` 为
   `https://github.com/Aurorainic/Cinderfish.git`（GitHub 仓库已更名，本地目录改名待办）
@@ -3689,6 +3690,42 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
   范围内剩 9 个：`Auth`、`OAuth`、`AuthorizeInteraction`、`SignupComplete`、`SettingsIntegration`、
   `SettingsPlugin`、`SettingsPluginInstall`、`SettingsCustomKatexMacro`、`EmptyPage`。
 
+## 12BQ. 第五十二波：设置页收尾（2026-11-06）
+
+契约见 `docs/research/2026-11-06-firefish-port-wave52-contract.md`。
+
+### 12BQ.1 落地清单
+
+| 文件 | 内容 |
+|------|------|
+| `web/src/pages/SettingsCustomKatexMacro.vue` | 宏源文编辑、`parseKaTeXMacros` 写盘、启用开关、重新载入 |
+| `web/src/pages/SettingsIntegration.vue` | 第三方登录说明页（已有 MiAuth 授权、缺 Discord/GitHub/Twitter/Matrix） |
+| `web/src/pages/SettingsIndex.vue` | 菜单新增「整合」 |
+| `web/src/pages/EmptyPage.vue` | 删除（与 `Empty.vue` 重复且无引用） |
+
+### 12BQ.2 有意的限制
+
+- **不引入 `katex`**：宏展开发生在发帖前（`preprocess()`），在 Misskey / Firefish 客户端能被排版；
+  本站仍以代码显示公式，页面已写明。加依赖只为本站排版，与首版取舍不符。
+- 宏页改为「保存」按钮写盘，而不是上游的每次输入即写。
+- 集成页不发任何请求，也没有外部授权跳转。
+
+### 12BQ.3 验证证据
+
+- `vue-tsc --noEmit` 通过。
+- `check:port` hardTotal 0（402 文件），`missingKeys` / `unresolvedComponents` 均空。
+- `pnpm build` 成功。
+- 本波只改前端，后端测试沿用第五十一波的全绿结果。
+
+### 12BQ.4 仍未验证与剩余缺口
+
+- 两个页面**没有浏览器走查**：宏保存后的 `location.reload()` 生效路径、开关持久化、
+  说明页在窄屏下的排版都只过了编译。
+- 占位页剩余 **30 个**，其中范围内 6 个：`Auth`、`OAuth`、`AuthorizeInteraction`、
+  `SignupComplete`（缺 `auth/session/*`、OAuth 同意页、邮箱确认注册）、
+  `SettingsPlugin`、`SettingsPluginInstall`（缺 AiScript 运行时）。
+
+
 
 ## 13. 文档索引
 
@@ -3767,6 +3804,7 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
 | `docs/research/2026-11-06-firefish-port-wave49-contract.md` | **第四十九波施工契约（无后端管理页转说明页），见 §12BM** |
 | `docs/research/2026-11-06-firefish-port-wave50-contract.md` | **第五十波施工契约（状态栏），见 §12BN** |
 | `docs/research/2026-11-06-firefish-port-wave51-contract.md` | **第五十一波施工契约（账号迁移），见 §12BP** |
+| `docs/research/2026-11-06-firefish-port-wave52-contract.md` | **第五十二波施工契约（设置页收尾），见 §12BQ** |
 
 ## 14. 已知的未验证项
 
