@@ -1051,3 +1051,39 @@ OAuth 2.0 授权码端点（仅 PKCE `S256`）。认证：**需要登录**，且
 - `notes/*`、时间线、通知、drive、emoji、registry、admin、ActivityPub、Streaming 属于其它命名空间的文档，本文只在被 `users/notes` 复用时描述了 `Note`/`DriveFile` 打包。
 - `internal/account/registry.go`（`i/registry/*` 的服务层）属于 `admin-emoji-registry` 命名空间，不在本文范围。
 - 未做运行时抓包验证：本文所有结论来自源码阅读；本仓库相关行为有测试覆盖（`internal/httpapi/server_db_test.go:142` 起的 signup/signin/i 测试、`i_update_test.go`、`i_pin_test.go`、`users_test.go`、`users_relations_test.go`、`following_test.go:239-429`），可作为二次核对入口。
+
+## 2026-11-06 增补：应用授权、令牌撤销与实例静音
+
+### POST /api/i/apps
+
+需登录。请求 `{ sort? }`，`sort` 取 `+createdAt` / `-createdAt` / `+lastUsedAt` / `-lastUsedAt`，
+默认按 id 升序。返回数组（无分页）：
+
+```json
+[{
+  "id": "令牌 id（即 revoke 用的 tokenId）",
+  "name": "应用名",
+  "description": "描述",
+  "iconUrl": null,
+  "permission": ["read:notes", "…"],
+  "createdAt": "…",
+  "lastUsedAt": "… 或 null"
+}]
+```
+
+只列 `access_tokens` 里的第三方令牌；原生 16 位 token 与会话不出现在列表里。
+
+### POST /api/i/revoke-token
+
+请求 `{ tokenId }`，返回 204。只能删除调用者自己的令牌；不存在或属于他人的 id 静默 no-op
+（与 Misskey 一致）。删除后该令牌的后续请求返回 401。
+
+### POST /api/i/update 的 `mutedInstances`
+
+新增可选字段 `mutedInstances: string[] | null`：
+
+- `null` 或 `[]` 清空；
+- 每项按主机名校验：转小写、去空白、去重，拒绝带 scheme/路径/`@`/空格的项，最多 200 条；
+- 存储位置是 `user_profiles.settings` 的 `mutedInstances` 键，不需要新迁移；
+- `POST /api/i` 与 `i/update` 的响应回读该数组，客户端据此渲染设置页；
+- 所有时间线在登录状态下按 `n.user_host` 过滤掉被静音实例的帖子。

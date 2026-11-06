@@ -166,6 +166,18 @@ func (s *TimelineService) Timeline(ctx context.Context, p TimelineParams) ([]*No
 	// Visibility filter.
 	q.addNoteVisibility(p.ViewerID)
 
+	// Muted accounts vanish from every timeline, and a block hides the two
+	// accounts from each other in both directions. Doing this in SQL keeps
+	// pagination honest: a filtered page still returns `limit` notes.
+	if p.ViewerID != "" {
+		me := q.viewerArg(p.ViewerID)
+		q.conds = append(q.conds,
+			fmt.Sprintf("NOT EXISTS (SELECT 1 FROM mutes m WHERE m.muter_id = %s AND m.mutee_id = n.user_id)", me),
+			fmt.Sprintf("NOT EXISTS (SELECT 1 FROM blocks b WHERE (b.blocker_id = %s AND b.blockee_id = n.user_id) OR (b.blocker_id = n.user_id AND b.blockee_id = %s))", me, me),
+			fmt.Sprintf("NOT EXISTS (SELECT 1 FROM user_profiles up WHERE up.user_id = %s AND up.settings ? 'mutedInstances' AND (up.settings->'mutedInstances') ? n.user_host)", me),
+		)
+	}
+
 	// Replies are excluded unless asked for. A reply to a note the viewer
 	// wrote is kept, matching Misskey's rule that a reply to one's own
 	// note stays in the timeline.

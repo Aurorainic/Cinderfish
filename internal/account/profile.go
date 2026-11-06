@@ -2,6 +2,7 @@ package account
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -22,6 +23,10 @@ type Profile struct {
 	// "public", which is the column default.
 	FollowersVisibility string
 	FollowingVisibility string
+	// MutedInstances lists instance hosts whose notes this user never
+	// wants to see. It lives in `user_profiles.settings` so it does not
+	// need a migration of its own.
+	MutedInstances []string
 }
 
 // ErrNoSuchAvatarFile is returned when an avatar file id does not name
@@ -38,15 +43,22 @@ func (s *Service) AttachDrive(drive *media.DriveService) {
 // as the zero value instead of failing.
 func (s *Service) GetProfile(ctx context.Context, userID string) (*Profile, error) {
 	var name, description, avatarURL, followersVis, followingVis *string
+	var settings []byte
 	err := s.pool.QueryRow(ctx, `
-SELECT name, description, avatar_url, followers_visibility, following_visibility
+SELECT name, description, avatar_url, followers_visibility, following_visibility, settings
 FROM user_profiles WHERE user_id = $1
-`, userID).Scan(&name, &description, &avatarURL, &followersVis, &followingVis)
+`, userID).Scan(&name, &description, &avatarURL, &followersVis, &followingVis, &settings)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return &Profile{}, nil
 	}
 	if err != nil {
 		return nil, fmt.Errorf("account: get profile: %w", err)
+	}
+	var stored struct {
+		MutedInstances []string `json:"mutedInstances"`
+	}
+	if len(settings) > 0 {
+		_ = json.Unmarshal(settings, &stored)
 	}
 	return &Profile{
 		Name:                derefString(name),
@@ -54,6 +66,7 @@ FROM user_profiles WHERE user_id = $1
 		AvatarURL:           derefString(avatarURL),
 		FollowersVisibility: derefString(followersVis),
 		FollowingVisibility: derefString(followingVis),
+		MutedInstances:      stored.MutedInstances,
 	}, nil
 }
 
@@ -144,4 +157,24 @@ func nullIfEmpty(s string) any {
 		return nil
 	}
 	return s
+}
+
+// UpdateMutedInstances replaces the muted-instance list. The hosts are
+// expected to be already normalised by the caller (lowercase, no scheme).
+func (s *Service) UpdateMutedInstances(ctx context.Context, userID string, hosts []string) error {
+	if hosts == nil {
+		hosts = []string{}
+	}
+	payload, err := json.Marshal(map[string]any{"mutedInstances": hosts})
+	if err != nil {
+		return fmt.Errorf("account: encode muted instances: %w", err)
+	}
+	_, err = s.pool.Exec(ctx, `
+INSERT INTO user_profiles (user_id, settings) VALUES ($1, $2::jsonb)
+ON CONFLICT (user_id) DO UPDATE SET settings = user_profiles.settings || EXCLUDED.settings
+`, userID, payload)
+	if err != nil {
+		return fmt.Errorf("account: update muted instances: %w", err)
+	}
+	return nil
 }

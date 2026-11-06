@@ -153,3 +153,67 @@ func (t *TokenService) Revoke(ctx context.Context, id string) error {
 	}
 	return nil
 }
+
+// App is one authorized application, as listed by `i/apps`.
+type App struct {
+	ID          string
+	Name        string
+	Description string
+	IconURL     string
+	Scopes      []string
+	CreatedAt   time.Time
+	LastUsedAt  *time.Time
+}
+
+// Apps lists the third-party tokens issued to a user. Native tokens and the
+// user's own session are not access_tokens rows, so they never appear here
+// and cannot be revoked through this endpoint.
+func (t *TokenService) Apps(ctx context.Context, userID, sort string) ([]*App, error) {
+	order := "id ASC"
+	switch sort {
+	case "+createdAt":
+		order = "created_at DESC"
+	case "-createdAt":
+		order = "created_at ASC"
+	case "+lastUsedAt":
+		order = "last_used_at DESC NULLS LAST"
+	case "-lastUsedAt":
+		order = "last_used_at ASC NULLS LAST"
+	}
+
+	rows, err := t.pool.Query(ctx, `
+SELECT id, COALESCE(name, ''), COALESCE(description, ''), COALESCE(icon_url, ''),
+       scopes, created_at, last_used_at
+FROM access_tokens WHERE user_id = $1 ORDER BY `+order, userID)
+	if err != nil {
+		return nil, fmt.Errorf("account: list apps: %w", err)
+	}
+	defer rows.Close()
+
+	var out []*App
+	for rows.Next() {
+		var app App
+		var scopesJSON []byte
+		if err := rows.Scan(&app.ID, &app.Name, &app.Description, &app.IconURL,
+			&scopesJSON, &app.CreatedAt, &app.LastUsedAt); err != nil {
+			return nil, fmt.Errorf("account: scan app: %w", err)
+		}
+		if len(scopesJSON) > 0 {
+			if err := json.Unmarshal(scopesJSON, &app.Scopes); err != nil {
+				return nil, fmt.Errorf("account: unmarshal app scopes: %w", err)
+			}
+		}
+		out = append(out, &app)
+	}
+	return out, rows.Err()
+}
+
+// RevokeOwned deletes one of the user's own access tokens. It reports whether
+// a row was removed; a token belonging to someone else is never touched.
+func (t *TokenService) RevokeOwned(ctx context.Context, userID, id string) (bool, error) {
+	tag, err := t.pool.Exec(ctx, `DELETE FROM access_tokens WHERE id = $1 AND user_id = $2`, id, userID)
+	if err != nil {
+		return false, fmt.Errorf("account: revoke own token: %w", err)
+	}
+	return tag.RowsAffected() > 0, nil
+}

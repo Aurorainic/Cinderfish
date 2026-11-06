@@ -54,7 +54,10 @@ func TestGetProfileDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetProfile without row: %v", err)
 	}
-	if prof == nil || *prof != (account.Profile{}) {
+	if prof == nil ||
+		prof.Name != "" || prof.Description != "" || prof.AvatarURL != "" ||
+		prof.FollowersVisibility != "" || prof.FollowingVisibility != "" ||
+		prof.MutedInstances != nil {
 		t.Errorf("profile without row = %+v, want zero value", prof)
 	}
 }

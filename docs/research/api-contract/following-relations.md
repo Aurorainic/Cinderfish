@@ -606,3 +606,57 @@
 | 入站 `Follow` / `Accept` / `Reject` / `Undo` | `internal/federation/inbox.go:101`、`:134`、`:167`、`:189` |
 | 覆盖台账（注意其中的过时描述） | `docs/research/2026-11-04-misskey-api-coverage.md:73`、`:84` |
 | 行为测试 | `internal/httpapi/following_test.go:88`–`:952` |
+
+## 2026-11-06 增补：静音与屏蔽（mute / blocking）
+
+这两组端点与 following 共用 `users` 表上的关系，故记在本文件。表结构 `mutes`、`blocks` 在 schema v1
+就存在，没有新增迁移。
+
+### POST /api/mute/create
+
+请求 `{ userId }`，需登录。成功返回 **204 无正文**。
+
+| 错误 | code | 条件 |
+|------|------|------|
+| 404 `NO_SUCH_USER` | `6fef56f3-e765-4957-88e5-c6f65329b8a5` | userId 不存在 |
+| 400 `MUTEE_IS_YOURSELF` | `a4619cb2-5f23-484b-9301-94c903074e10` | 目标是自己 |
+| 400 `ALREADY_MUTING` | `7e7359cb-160c-4956-b08f-4d1c653cd007` | 已在名单中 |
+
+`expiresAt` 未实现（上游支持限时静音），当前静音永久有效。
+
+### POST /api/mute/delete
+
+请求 `{ userId }`。不存在的关系是 no-op，仍返回 204。
+
+### POST /api/mute/list
+
+请求 `{ limit?, sinceId?, untilId? }`（limit 默认 30、上限 100）。返回数组：
+
+```json
+[{ "id": "关系行 id", "createdAt": "…", "mutee": { /* UserDetailed */ } }]
+```
+
+按关系行 id 倒序，`sinceId`/`untilId` 是关系行 id，不是用户 id。
+
+### POST /api/blocking/create
+
+请求 `{ userId }`，需登录。成功返回 `UserDetailedNotMe` 对象。错误 code 与 mute 对称
+（`NO_SUCH_USER`、`BLOCKEE_IS_YOURSELF`、`ALREADY_BLOCKING`）。
+
+副作用：同一事务内删除双方的 `followings` 与 `follow_requests`，即屏蔽会自动解除互相关注，
+并取消待审请求。
+
+### POST /api/blocking/delete
+
+请求 `{ userId }`，返回 204；已不存在的屏蔽是 no-op。解除屏蔽不会恢复关注关系。
+
+### POST /api/blocking/list
+
+参数与 `mute/list` 相同，返回 `[{ id, createdAt, blockee }]`。
+
+### 对时间线与 `users/show` 的影响
+
+- 所有时间线（home/local/social/global）在登录状态下都会排除：被你静音的作者、双向屏蔽关系中的作者、
+  你静音实例上的作者。过滤在 SQL 里完成，因此分页仍是满页。
+- `users/show` 在带凭据查看他人时返回 `isMuted`、`isBlocked`（是否由你发起）。匿名查看不带这两个字段。
+- `UserDetailed` 只暴露 `isBlocked`（你屏蔽对方）；对方屏蔽你的方向不暴露，避免泄露。

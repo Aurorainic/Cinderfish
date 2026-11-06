@@ -124,6 +124,8 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("POST /api/users/followers", s.handleUsersFollowers)
 	s.mux.HandleFunc("POST /api/users/following", s.handleUsersFollowing)
 	s.mux.HandleFunc("POST /api/miauth/gen-token", s.handleMiAuthGenToken)
+	s.mux.HandleFunc("POST /api/i/apps", s.handleApps)
+	s.mux.HandleFunc("POST /api/i/revoke-token", s.handleRevokeToken)
 
 	// Following. These give the Streaming API's follow/followed events a
 	// source, which M4 left as a known gap.
@@ -134,6 +136,15 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("POST /api/following/requests/accept", s.handleFollowingRequestsAccept)
 	s.mux.HandleFunc("POST /api/following/requests/reject", s.handleFollowingRequestsReject)
 	s.mux.HandleFunc("POST /api/following/requests/cancel", s.handleFollowingRequestsCancel)
+
+	// Mutes and blocks. Both tables exist since schema v1; these endpoints
+	// are what the settings page and the timeline filter read.
+	s.mux.HandleFunc("POST /api/mute/create", s.handleMuteCreate)
+	s.mux.HandleFunc("POST /api/mute/delete", s.handleMuteDelete)
+	s.mux.HandleFunc("POST /api/mute/list", s.handleMuteList)
+	s.mux.HandleFunc("POST /api/blocking/create", s.handleBlockingCreate)
+	s.mux.HandleFunc("POST /api/blocking/delete", s.handleBlockingDelete)
+	s.mux.HandleFunc("POST /api/blocking/list", s.handleBlockingList)
 
 	// Federation administration. The mode and allowlist live in the
 	// database so they change at runtime without a restart.

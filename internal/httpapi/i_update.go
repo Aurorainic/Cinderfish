@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strings"
 	"unicode/utf8"
 
 	"github.com/Aurorainic/cinderfish/internal/account"
@@ -71,6 +72,9 @@ func (s *Server) handleIUpdate(w http.ResponseWriter, r *http.Request) {
 		// Misskey's users/update privacy switches.
 		FollowersVisibility nullableField `json:"followersVisibility"`
 		FollowingVisibility nullableField `json:"followingVisibility"`
+		// mutedInstances takes a JSON array of hosts; null or [] clears it.
+		// RawMessage keeps "absent" distinguishable from "cleared".
+		MutedInstances json.RawMessage `json:"mutedInstances"`
 	}
 	if err := decodeOptionalJSON(r, &body); err != nil {
 		writeAPIError(w, err)
@@ -114,9 +118,26 @@ func (s *Server) handleIUpdate(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	var mutedInstances []string
+	if len(body.MutedInstances) > 0 {
+		hosts, apiErr := parseMutedInstances(body.MutedInstances)
+		if apiErr != nil {
+			writeAPIError(w, apiErr)
+			return
+		}
+		mutedInstances = hosts
+	}
+
 	if avatarID := body.AvatarID.asUpdatePointer(); avatarID != nil && *avatarID != "" {
 		if err := s.checkOwnAvatarFile(r, info.User.ID, *avatarID); err != nil {
 			writeAPIError(w, err)
+			return
+		}
+	}
+
+	if len(body.MutedInstances) > 0 {
+		if err := s.accounts.UpdateMutedInstances(r.Context(), info.User.ID, mutedInstances); err != nil {
+			writeInternalServerError(w)
 			return
 		}
 	}
@@ -142,6 +163,43 @@ func (s *Server) handleIUpdate(w http.ResponseWriter, r *http.Request) {
 	s.applyUserCounts(r.Context(), info.User.ID, packed)
 	s.applyUnreadNotifications(r.Context(), info.User.ID, packed)
 	writeJSON(w, http.StatusOK, packed)
+}
+
+// maxMutedInstances caps the list so a crafted request cannot grow the
+// profile row without bound.
+const maxMutedInstances = 200
+
+// parseMutedInstances turns the `mutedInstances` request value into a clean
+// host list. Hosts are lowercased and trimmed; a scheme, a path or a space is
+// rejected rather than silently mangled.
+func parseMutedInstances(raw json.RawMessage) ([]string, *APIError) {
+	var hosts []string
+	if string(raw) == "null" {
+		return []string{}, nil
+	}
+	if err := json.Unmarshal(raw, &hosts); err != nil {
+		return nil, invalidParamError("mutedInstances must be an array of hosts")
+	}
+	if len(hosts) > maxMutedInstances {
+		return nil, invalidParamError("mutedInstances has too many entries")
+	}
+	out := make([]string, 0, len(hosts))
+	seen := make(map[string]struct{}, len(hosts))
+	for _, host := range hosts {
+		h := strings.ToLower(strings.TrimSpace(host))
+		if h == "" {
+			continue
+		}
+		if len(h) > 253 || strings.ContainsAny(h, "/ \\@") {
+			return nil, invalidParamError("mutedInstances entry is not a host: " + host)
+		}
+		if _, ok := seen[h]; ok {
+			continue
+		}
+		seen[h] = struct{}{}
+		out = append(out, h)
+	}
+	return out, nil
 }
 
 // validFollowVisibility reports whether v is one of Misskey's three

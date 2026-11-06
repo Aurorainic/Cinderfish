@@ -278,6 +278,12 @@ func (s *Server) handleUsersShow(w http.ResponseWriter, r *http.Request) {
 			packed["isFollowed"] = s.federationStore.HasFollowing(r.Context(), user.ID, info.User.ID)
 			packed["hasPendingFollowRequestFromYou"] = s.federationStore.HasPendingFollowRequest(r.Context(), info.User.ID, user.ID)
 			packed["hasPendingFollowRequestToYou"] = s.federationStore.HasPendingFollowRequest(r.Context(), user.ID, info.User.ID)
+			if muted, muteErr := s.accounts.IsMuted(r.Context(), info.User.ID, user.ID); muteErr == nil {
+				packed["isMuted"] = muted
+			}
+			if blocked, blockErr := s.accounts.IsBlocked(r.Context(), info.User.ID, user.ID); blockErr == nil {
+				packed["isBlocked"] = blocked
+			}
 		}
 	}
 	s.applyUserCounts(r.Context(), user.ID, packed)
