@@ -1164,3 +1164,29 @@ UserLite 部分也有简化：`name`/`avatarUrl` 只从 profile 行来，没有 
 - 匹配是**精确主机**：`bad.example` 不覆盖 `sub.bad.example`。
 
 不会删除已收到的帖子/文件，也不取消已有关注。
+
+## 2026-11-06 增补：对象存储与投递队列（只读）
+
+两个 Cinderfish 自有端点，管理员专用，均无写操作。
+
+### POST /api/admin/object-storage
+
+返回生效的媒体配置，**不含 access key / secret key**：
+
+```json
+{ "backend": "local", "localPath": "/srv/data/files", "s3": null }
+{ "backend": "s3", "localPath": null,
+  "s3": { "endpointHost": "s3.example.com", "bucket": "…", "region": "…",
+          "useSSL": true, "publicBaseUrl": null, "hasCredentials": true } }
+```
+
+### POST /api/admin/deliver-queue
+
+```json
+{ "pending": 0, "dueNow": 0, "failed": 0, "oldestNextAt": null,
+  "recent": [{ "id": 12, "host": "peer.example", "attempts": 2,
+               "nextAttemptAt": "…", "lastError": "connection refused" }] }
+```
+
+`pending` = `attempts < 12`，`dueNow` = 其中已到期，`failed` = `attempts >= 12`（worker 不再取用）；
+`recent` 为 id 最大的 20 行。非管理员 403，匿名 401。
