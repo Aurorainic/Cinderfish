@@ -744,8 +744,9 @@ $ cd web && pnpm typecheck && pnpm build
 `TestNotificationHasNoBodyField`。上游比对：`NoteEntityService.isVisibleForMe`（L308-359）与
 `core/entities/NotificationEntityService.ts` 的「不可达则返回 null」语义。
 
-**已知遗留（本波次不做）**：~~`notes/reactions/create` 的读可见性~~（2026-11-07 已接线并有用例，见 §12CT）；`notes/delete` 仍借用
-`notes/show` 的错误 id；提及被回复/引用吸收时不再发主通道 `mention` 事件（客户端会多收一条事件，不影响通知内容）。
+**已知遗留（本波次不做）**：~~`notes/reactions/create` 的读可见性~~（2026-11-07 已接线并有用例，见 §12CT）；~~`notes/delete` 仍借用 `notes/show` 的错误 id~~（2026-11-07 改用 delete 自己的 id，并区分
+ACCESS_DENIED，见 §12CU）；提及被回复/引用吸收时不再发主通道 `mention` 事件（客户端会多收一条事件，
+不影响通知内容）。
 
 ### 11.16 Firefish 前端整体移植 Task 1：参考源码、许可证与能力矩阵（2026-11-01）
 
@@ -986,7 +987,8 @@ POST /inbox                            POST /users/{id}/inbox
 - 新存储方法：`note.TimelineService.Replies/Renotes`、`account.Followers/Following/FollowVisibility/IsFollowing`；游标统一在 `id` 上，`sinceId` 单独出现时正序翻页。
 - 前端接线：`NoteDetailed` 的 回复/转发/引用 页签走 `MkPagination`；`/@user/following`、`/@user/followers` 两个新路由由 `views/profile/UserFollowList.vue` 渲染，403 显示 `MkInfo` 说明。
 - 测试：`TestNotesRepliesVisibility`（5 例）、`TestNotesRenotesVisibility`（5 例）、`TestUsersFollowListsPaginate`、`TestUsersFollowListPrivacy` 等；`go test ./...` 全绿。
-- 仍未做：`users/update` 不能写 `followersVisibility`/`followingVisibility`，这两项目前只能直接改库。
+- `users/update` 的可见性字段当时未接：现在 `i/update` 已写 `followersVisibility`/`followingVisibility`
+  （`TestIUpdateProfileDetails` 覆盖），本条仅作历史记录。
 
 ## 12C. 工作面收敛到后端 API（2026-11-04）
 
@@ -5222,3 +5224,32 @@ CINDERFISH_TEST_DATABASE_URL=... go test ./... -count=1         # 全绿
 
 - 远端反应（Like/EmojiReact）的入站可见性：入站路径按 AP 目标解析，没有“看不见的笔记”概念。
 - 反应删除（`notes/reactions/delete`）的可见性（删除自己的反应不需要看见笔记）。
+
+## 12CU. 第八十二波：notes/delete 的错误语义（2026-11-07）
+
+第十一波记下的遗留：`notes/delete` 借用 `notes/show` 的错误 id，且删除他人笔记与「笔记不存在」
+同码同状态。上游 `notes/delete.ts` 区分两者：
+
+- 笔记不存在 → 404 `NO_SUCH_NOTE`，id `490be23f-8c1f-4796-819f-94cb4f9d1630`；
+- 不是作者且不是管理员 → 403 `ACCESS_DENIED`，id `fe8d7103-0ea8-4ec3-814d-f8b401dc69e9`；
+- 管理员可以删除他人笔记（Misskey 的 moderator 分支）。
+
+### 12CU.1 修改
+
+- 两个专用错误 id；`Get` 失败与 `Delete` 失败都用 delete 的 `NO_SUCH_NOTE`。
+- `Get` 成功后先做作者/管理员判断，陌生人得到 403 而不是 404。
+- 管理员删除时以笔记真实作者身份执行 `Delete`（服务层按 author 限定行）。
+
+### 12CU.2 验证证据
+
+`TestNotesDeleteByOtherUserFails`（admin 实例）：
+
+- 陌生人删除 → 403，`code=ACCESS_DENIED`、id 为 delete 端点自己的；
+- 管理员删除同一笔记 → 200，之后 `notes/show` 404。
+
+`gofmt` / `go vet` / 全量 `go test ./...`（含数据库）全绿。
+
+### 12CU.3 仍未验证
+
+- 管理员从管理台删除他人笔记的界面入口（管理台没有该按钮，按设计走数据库或原帖作者）。
+- `notes/delete` 的限流（上游 1 小时 300 次）未实现。

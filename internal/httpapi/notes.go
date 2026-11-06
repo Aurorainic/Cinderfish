@@ -21,6 +21,8 @@ const (
 	errIDNoteTooLong                  = "6d51c8a2-1e1e-4f7f-b1c9-9f5a0e2d0f3b"
 	errIDNoteEmpty                    = "8f7d1c2e-2b1c-4a3e-9c5a-1e2d3c4b5a6f"
 	errIDNoSuchNote                   = "24fcbfc6-2e37-42b6-8388-c29b3861a08d"
+	errIDNoSuchNoteDelete             = "490be23f-8c1f-4796-819f-94cb4f9d1630"
+	errIDAccessDeniedDelete           = "fe8d7103-0ea8-4ec3-814d-f8b401dc69e9"
 	// notes/renotes carries its own NO_SUCH_NOTE id.
 	errIDNoSuchNoteRenotes = "12908022-2e21-46cd-ba6a-3edaf6093f46"
 	// notes/reactions/create has its own NO_SUCH_NOTE id.
@@ -347,15 +349,32 @@ func (s *Server) handleNotesDelete(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		writeAPIError(w, &APIError{
 			Message: "No such note.", Code: "NO_SUCH_NOTE",
-			ID: errIDNoSuchNote, Kind: "client", Status: http.StatusNotFound,
+			ID: errIDNoSuchNoteDelete, Kind: "client", Status: http.StatusNotFound,
 		})
 		return
 	}
 
-	if err := s.notes.Delete(r.Context(), body.NoteID, info.User.ID); err != nil {
+	// Misskey lets the author or a moderator delete; everyone else gets
+	// ACCESS_DENIED rather than a misleading "no such note"
+	// (notes/delete.ts L63-69).
+	if !info.User.IsAdmin && n.UserID != info.User.ID {
+		writeAPIError(w, &APIError{
+			Message: "Access denied.", Code: "ACCESS_DENIED",
+			ID: errIDAccessDeniedDelete, Kind: "permission", Status: http.StatusForbidden,
+		})
+		return
+	}
+
+	// Delete is scoped to an author id; an administrator acts on the row's
+	// real author after the check above.
+	ownerID := info.User.ID
+	if info.User.IsAdmin {
+		ownerID = n.UserID
+	}
+	if err := s.notes.Delete(r.Context(), body.NoteID, ownerID); err != nil {
 		writeAPIError(w, &APIError{
 			Message: "No such note.", Code: "NO_SUCH_NOTE",
-			ID: errIDNoSuchNote, Kind: "client", Status: http.StatusNotFound,
+			ID: errIDNoSuchNoteDelete, Kind: "client", Status: http.StatusNotFound,
 		})
 		return
 	}

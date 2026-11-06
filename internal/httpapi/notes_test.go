@@ -178,14 +178,26 @@ func TestNotesDelete(t *testing.T) {
 }
 
 func TestNotesDeleteByOtherUserFails(t *testing.T) {
-	ts := newTestServer(t, "open")
+	ts, _ := adminTestServer(t, "open")
 	_, tokenA := createUser(t, ts, uniqueName(t)+"a")
 	_, tokenB := createUser(t, ts, uniqueName(t)+"b")
 	id := createNote(t, ts, tokenA, map[string]any{"text": "not yours"})
 
-	resp, _ := post(t, ts, "/api/notes/delete", map[string]any{"i": tokenB, "noteId": id})
-	if resp.StatusCode != http.StatusNotFound {
-		t.Errorf("status = %d, want 404", resp.StatusCode)
+	// A stranger gets ACCESS_DENIED, not a misleading 404.
+	resp, out := post(t, ts, "/api/notes/delete", map[string]any{"i": tokenB, "noteId": id})
+	if resp.StatusCode != http.StatusForbidden {
+		t.Fatalf("stranger delete = %d %v, want 403", resp.StatusCode, out)
+	}
+	if e, _ := out["error"].(map[string]any); e["code"] != "ACCESS_DENIED" || e["id"] != "fe8d7103-0ea8-4ec3-814d-f8b401dc69e9" {
+		t.Errorf("error = %v, want ACCESS_DENIED with the delete id", e)
+	}
+
+	// An administrator may delete it (Misskey's moderator branch).
+	if status := postNoContentWithToken(t, ts, "/api/notes/delete", "admintoken000000", map[string]any{"noteId": id}); status != http.StatusOK {
+		t.Fatalf("admin delete = %d, want 200", status)
+	}
+	if resp, _ := post(t, ts, "/api/notes/show", map[string]any{"noteId": id}); resp.StatusCode != http.StatusNotFound {
+		t.Errorf("show after admin delete = %d, want 404", resp.StatusCode)
 	}
 }
 
