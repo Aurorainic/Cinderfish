@@ -2884,6 +2884,42 @@ cd web && pnpm build                    # exit 0
 - 未编辑笔记的 `updatedAt: null`。
 - `go test` 与浏览器走查未执行。
 
+## 12AX. 批次：notes/state 与收藏菜单（2026-11-06）
+
+**工作方式**：目标模式第三十四波，继续只写代码、验证到编译层。施工依据
+`docs/research/2026-11-06-firefish-port-wave34-contract.md`。
+
+### 12AX.1 落地清单
+
+| 层 | 文件 | 说明 |
+|----|------|------|
+| 服务层 | `internal/note/state.go`（新） | `State`：收藏、置顶、线程静音 |
+| 端点 | `internal/httpapi/note_state.go`（新）、`server.go` | `notes/state` |
+| 前端 | `api/types.ts`、`endpoints.ts`、`scripts/get-note-menu.ts`、三个笔记组件 | `buildNoteMenu` 先取状态；收藏/置顶按真实状态渲染 |
+| 文档 | `notes-core.md`、台账 | 端点小节与计数（122/115/325） |
+
+### 12AX.2 有意的限制
+
+1. 每次打开菜单多一次 RPC，失败静默退回。
+2. 操作后不就地刷新状态。
+3. 线程静音恒 `false`。
+
+### 12AX.3 验证证据（编译层）
+
+```
+gofmt -l internal/ cmd/                 # 空
+go vet ./...                            # exit 0
+cd web && pnpm exec vue-tsc --noEmit    # exit 0
+cd web && pnpm run check:port           # hardTotal 0
+cd web && pnpm build                    # exit 0
+```
+
+### 12AX.4 仍未验证
+
+- 收藏/取消收藏与置顶项的显示切换。
+- 未登录、请求失败与笔记不存在时的退回行为。
+- `go test` 与浏览器走查未执行。
+
 ## 13. 文档索引
 
 | 文档 | 内容 |
@@ -2943,6 +2979,7 @@ cd web && pnpm build                    # exit 0
 | `docs/research/2026-11-06-firefish-port-wave31-contract.md` | **第三十一波施工契约（实例图标/横幅/主题色），见 §12AU** |
 | `docs/research/2026-11-06-firefish-port-wave32-contract.md` | **第三十二波施工契约（已收录实例列表），见 §12AV** |
 | `docs/research/2026-11-06-firefish-port-wave33-contract.md` | **第三十三波施工契约（笔记已编辑标记），见 §12AW** |
+| `docs/research/2026-11-06-firefish-port-wave34-contract.md` | **第三十四波施工契约（notes/state 与收藏菜单），见 §12AX** |
 
 ## 14. 已知的未验证项
 
@@ -2995,6 +3032,7 @@ cd web && pnpm build                    # exit 0
 - **第三十一波未测（2026-11-06，见 §12AU.4）**：实例图标/横幅/主题色只过了编译层，保存与展示未验证。
 - **第三十二波未测（2026-11-06，见 §12AV.4）**：已收录实例列表只过了编译层，排序/过滤/空库未验证。
 - **第三十三波未测（2026-11-06，见 §12AW.4）**：已编辑标记只过了编译层，编辑后的显示与时间提示未验证。
+- **第三十四波未测（2026-11-06，见 §12AX.4）**：notes/state 与菜单只过了编译层，状态切换与失败回退未验证。
 - **仍未移植的设置页**：邮箱、整合、导入导出、迁移、Webhook、插件、自定义 KaTeX、状态栏、
   删除账号、应用授权以外的账号操作；对应后端端点不存在或前端缺少依赖（见第五波契约 §3.3）。
 - **仍缺的 widgets**：rss、rss-ticker、server-metric、online-users、federation、job-queue、aiscript、

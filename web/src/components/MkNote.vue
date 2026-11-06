@@ -218,7 +218,7 @@ import { pleaseLogin } from "@/scripts/please-login";
 import { focusPrev, focusNext } from "@/scripts/focus";
 import { getWordSoftMute, type Muted } from "@/scripts/check-word-mute";
 import { getNoteSummary } from "@/scripts/get-note-summary";
-import { getNoteMenu } from "@/scripts/get-note-menu";
+import { buildNoteMenu } from "@/scripts/get-note-menu";
 import { reactionPicker } from "@/scripts/reaction-picker";
 import { useNoteCapture } from "@/composables/use-note-capture";
 import { deepClone } from "@/scripts/clone";
@@ -417,13 +417,12 @@ function onContextmenu(ev: MouseEvent): void {
 
 function menu(_viaKeyboard = false): void {
 	const rect = menuButton.value?.getBoundingClientRect();
-	void os
-		.popupMenu(
-			getNoteMenu({
-				note: note.value,
-				isDeleted,
+	void buildNoteMenu({ note: note.value, isDeleted })
+		.then((items) =>
+			os.popupMenu(items, {
+				x: rect?.left ?? 0,
+				y: (rect?.bottom ?? 0) + 4,
 			}),
-			{ x: rect?.left ?? 0, y: (rect?.bottom ?? 0) + 4 },
 		)
 		.then(focus);
 }

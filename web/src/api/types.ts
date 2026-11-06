@@ -391,6 +391,13 @@ export interface TwoFactorRegistration {
 	issuer: string;
 }
 
+/** Result of `notes/state`. */
+export interface NoteState {
+	isFavorited: boolean;
+	isPinned: boolean;
+	isMutedThread: boolean;
+}
+
 /** Result of `i/import`. */
 export interface ImportSummary {
 	notes: number;

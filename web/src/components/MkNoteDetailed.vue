@@ -123,7 +123,7 @@ import MkNoteSub from "@/components/MkNoteSub.vue";
 import { pleaseLogin } from "@/scripts/please-login";
 import { getWordSoftMute, type Muted } from "@/scripts/check-word-mute";
 import { reactionPicker } from "@/scripts/reaction-picker";
-import { getNoteMenu } from "@/scripts/get-note-menu";
+import { buildNoteMenu } from "@/scripts/get-note-menu";
 import { useNoteCapture } from "@/composables/use-note-capture";
 import { deepClone } from "@/scripts/clone";
 import { userPage } from "@/filters/user";
@@ -297,27 +297,15 @@ function onContextmenu(ev: MouseEvent): void {
 		ev.preventDefault();
 		react();
 	} else {
-		void os
-			.contextMenu(
-				getNoteMenu({
-					note: note.value,
-					isDeleted,
-				}),
-				ev,
-			)
+		void buildNoteMenu({ note: note.value, isDeleted })
+			.then((items) => os.contextMenu(items, ev))
 			.then(focus);
 	}
 }
 
 function menu(_viaKeyboard = false): void {
-	void os
-		.popupMenu(
-			getNoteMenu({
-				note: note.value,
-				isDeleted,
-			}),
-			{ x: 0, y: 0 },
-		)
+	void buildNoteMenu({ note: note.value, isDeleted })
+		.then((items) => os.popupMenu(items, { x: 0, y: 0 }))
 		.then(focus);
 }
 

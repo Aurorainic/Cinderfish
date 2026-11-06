@@ -39,6 +39,7 @@ import type {
 	NoteEditResponse,
 	NoteFavorite,
 	NoteReaction,
+	NoteState,
 	Notification,
 	NoteVisibility,
 	ObjectStorageInfo,
@@ -134,6 +135,7 @@ export const ENDPOINTS = {
 	notesShow: "notes/show",
 	notesEdit: "notes/edit",
 	notesHistory: "notes/history",
+	notesState: "notes/state",
 	notesDelete: "notes/delete",
 	notesReplies: "notes/replies",
 	notesMentions: "notes/mentions",
@@ -597,6 +599,7 @@ export interface EndpointMap {
 		};
 		res: NoteEditResponse;
 	};
+	[ENDPOINTS.notesState]: { req: { noteId: string }; res: NoteState };
 	[ENDPOINTS.notesHistory]: {
 		req: { noteId: string; limit?: number };
 		res: NoteEditEntry[];

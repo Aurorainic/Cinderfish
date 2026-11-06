@@ -7,7 +7,7 @@
 // abuse, promote, clips, plugin actions and the user submenu. Edit and the
 // history page are Cinderfish's own additions.
 import type { Ref } from "vue";
-import type { Note, NoteDetailed } from "@/api/types";
+import type { Note, NoteDetailed, NoteState } from "@/api/types";
 import { me } from "@/account";
 import { url } from "@/config";
 import { t } from "@/i18n";
@@ -33,6 +33,33 @@ export interface NoteMenuItem extends MenuItem {
 export interface NoteMenuProps {
 	note: NoteMenuNote;
 	isDeleted: Ref<boolean>;
+	/** Fresh `notes/state` result; null when unknown (logged out or failed). */
+	state?: NoteState | null;
+}
+
+/**
+ * Fetches `notes/state` and builds the menu. Call sites use this instead of
+ * getNoteMenu so favorite/pin entries reflect the real state.
+ */
+export async function buildNoteMenu(
+	props: NoteMenuProps,
+): Promise<NoteMenuItem[]> {
+	const note = props.note;
+	const isPureRenote =
+		note.renote != null &&
+		note.text == null &&
+		note.fileIds.length === 0 &&
+		note.poll == null;
+	const target = (isPureRenote ? note.renote : note) as NoteMenuNote;
+	let state: NoteState | null = null;
+	if (me.value != null) {
+		try {
+			state = await os.api("notes/state", { noteId: target.id });
+		} catch {
+			state = null;
+		}
+	}
+	return getNoteMenu({ ...props, state });
 }
 
 export function getNoteMenu(props: NoteMenuProps): NoteMenuItem[] {
@@ -70,9 +97,12 @@ export function getNoteMenu(props: NoteMenuProps): NoteMenuItem[] {
 	}
 
 	function toggleFavorite(): void {
-		void os.apiWithDialog("notes/favorites/create", {
-			noteId: appearNote.id,
-		});
+		void os.apiWithDialog(
+			props.state?.isFavorited
+				? "notes/favorites/delete"
+				: "notes/favorites/create",
+			{ noteId: appearNote.id },
+		);
 	}
 
 	function togglePin(pin: boolean): void {
@@ -159,7 +189,7 @@ export function getNoteMenu(props: NoteMenuProps): NoteMenuItem[] {
 	const items: (NoteMenuItem | undefined)[] = [
 		{
 			icon: "ph-bookmark-simple ph-bold ph-lg",
-			text: t("favorite"),
+			text: props.state?.isFavorited ? t("unfavorite") : t("favorite"),
 			action: toggleFavorite,
 		},
 		hasRemote
@@ -170,7 +200,7 @@ export function getNoteMenu(props: NoteMenuProps): NoteMenuItem[] {
 			  }
 			: undefined,
 		isAppearAuthor
-			? (current.pinnedNoteIds ?? []).includes(appearNote.id)
+			? (props.state?.isPinned ?? (current.pinnedNoteIds ?? []).includes(appearNote.id))
 				? {
 						icon: "ph-push-pin ph-bold ph-lg",
 						text: t("unpin"),

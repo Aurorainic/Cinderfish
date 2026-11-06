@@ -165,7 +165,7 @@ import MkQuoteButton from "@/components/MkQuoteButton.vue";
 import copyToClipboard from "@/scripts/copy-to-clipboard";
 import { url } from "@/config";
 import { pleaseLogin } from "@/scripts/please-login";
-import { getNoteMenu } from "@/scripts/get-note-menu";
+import { buildNoteMenu } from "@/scripts/get-note-menu";
 import { getWordSoftMute, type Muted } from "@/scripts/check-word-mute";
 import { notePage } from "@/filters/note";
 import { useRouter } from "@/router";
@@ -353,13 +353,12 @@ function onContextmenu(ev: MouseEvent): void {
 
 function menu(_viaKeyboard = false): void {
 	const rect = menuButton.value?.getBoundingClientRect();
-	void os
-		.popupMenu(
-			getNoteMenu({
-				note: note.value,
-				isDeleted,
+	void buildNoteMenu({ note: note.value, isDeleted })
+		.then((items) =>
+			os.popupMenu(items, {
+				x: rect?.left ?? 0,
+				y: (rect?.bottom ?? 0) + 4,
 			}),
-			{ x: rect?.left ?? 0, y: (rect?.bottom ?? 0) + 4 },
 		)
 		.then(focus);
 }
