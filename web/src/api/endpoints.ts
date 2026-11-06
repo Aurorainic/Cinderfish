@@ -23,6 +23,7 @@ import type {
 	Following,
 	HashtagTrend,
 	IndexStat,
+	InstanceStats,
 	MeDetailed,
 	MetaDetailed,
 	MetaLite,
@@ -50,6 +51,7 @@ import type {
 export const ENDPOINTS = {
 	// meta / ping
 	meta: "meta",
+	stats: "stats",
 	ping: "ping",
 
 	// auth
@@ -623,6 +625,11 @@ export interface EndpointMap {
 		req: { userId: string; comment: string };
 		res: EmptyResponse;
 	};
+	[ENDPOINTS.stats]: {
+		req: Record<string, never>;
+		res: InstanceStats;
+	};
+
 	[ENDPOINTS.adminMeta]: {
 		req: Record<string, never>;
 		res: AdminInstanceMeta;
@@ -634,6 +641,13 @@ export interface EndpointMap {
 			maintainerName?: string;
 			maintainerEmail?: string;
 			registrationMode?: "open" | "invite" | "admin";
+			tosUrl?: string | null;
+			privacyPolicyUrl?: string;
+			repositoryUrl?: string;
+			feedbackUrl?: string;
+			inquiryUrl?: string;
+			impressumUrl?: string;
+			serverRules?: string[];
 		};
 		res: AdminInstanceMeta;
 	};

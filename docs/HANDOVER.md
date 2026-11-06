@@ -2301,6 +2301,63 @@ cd web && pnpm build                    # exit 0
 - S3 后端的页面展示只用单元测试检查；没有真实桶。
 - 手动重试/清空、S3 配置写入按设计未做。
 
+## 12AI. 批次：前端第十九波——实例身份、合规与统计（2026-11-06）
+
+**工作方式**：目标模式第十九波，一轮完成设置字段扩展、公开统计端点、管理页与关于页、测试、
+真实二进制与浏览器走查、文档与提交。施工依据
+`docs/research/2026-11-06-firefish-port-wave19-contract.md`。
+
+### 12AI.1 落地清单
+
+| 层 | 文件 | 说明 |
+|----|------|------|
+| 设置字段 | `internal/httpapi/instance_settings.go` | 六个合规 URL + `serverRules`（JSON 数组），`admin/meta` 回读、`update-meta` 校验 |
+| 公开 meta | `internal/httpapi/meta.go` | `tosUrl`/`privacyPolicyUrl`/`repositoryUrl`/`feedbackUrl`/`inquiryUrl`/`impressumUrl`/`serverRules` 改用运行时值 |
+| 统计 | `internal/httpapi/stats.go`（新）、`server.go` | `POST /api/stats`：9 个计数，单条 SQL |
+| 管理页 | `web/src/pages/AdminSettings.vue` | 六个 URL 输入 + 规则文本域，保存时整体提交 |
+| 关于页 | `web/src/pages/About.vue` | 合规链接、规则列表、真实统计数字（替换占位说明） |
+| 接口层 | `endpoints.ts`、`types.ts` | `stats`、`InstanceStats`、`AdminInstanceMeta` 扩展 |
+| 测试 | `internal/httpapi/stats_test.go`（新，2 个用例） | 合规字段回读/校验、统计计数 |
+
+### 12AI.2 有意的限制
+
+1. 规则不进入注册流程（没有“同意规则”勾选）。
+2. 统计即时 `count(*)`，无缓存。
+3. `instancesCount` 只是库里有账号的远程实例数。
+4. 没有 `charts/*` 历史图表。
+
+### 12AI.3 验证证据
+
+```
+gofmt -l internal/ cmd/                 # 空
+go vet ./...                            # exit 0
+CINDERFISH_TEST_DATABASE_URL=… go test -count=1 ./...   # 全绿（新增 2 个用例）
+cd web && pnpm exec vue-tsc --noEmit    # exit 0
+cd web && pnpm run check:port           # 398 文件，hardTotal 0
+cd web && pnpm build                    # exit 0
+```
+
+真实二进制 `:3991`（开发库 23 账号 + w19admin）：
+
+| 场景 | 结果 |
+|------|------|
+| `stats` | usersCount 24、notesCount 154、driveFiles 1、instancesCount 0 |
+| 管理页填写条款 URL 与两条规则并保存 | 保存成功 |
+| `POST /api/meta` | `tosUrl=https://w19.example/tos`、`serverRules` 两条 |
+| `/about` | 显示「服务条款」链接、两条实例规则、用户/帖子/网盘/实例统计数字 |
+| 移动端 `/about` | 无横向溢出、无 JS 异常 |
+
+无头 Helium 156。截图在 `/tmp/w19-shots`（不入库）。
+
+走查数据已清理：`instance_meta` 中本次写入的所有键删除（仅保留既有的 `federationMode`），
+w19admin 删除，用户数回到 23；服务与临时文件停止。
+
+### 12AI.4 仍未验证
+
+- 规则与合规链接没有进入注册/欢迎页流程，只验证了关于页。
+- `instancesCount` 与远程账号计数在非联邦实例上为 0，没有构造远端数据。
+- 统计在大量数据下的耗时没有测量。
+
 ## 13. 文档索引
 
 | 文档 | 内容 |
@@ -2345,6 +2402,7 @@ cd web && pnpm build                    # exit 0
 | `docs/research/2026-11-06-firefish-port-wave16-contract.md` | **第十六波施工契约（notes/mentions、unreadOnly 与通知页签），见 §12AF** |
 | `docs/research/2026-11-06-firefish-port-wave17-contract.md` | **第十七波施工契约（公开 users 目录与发现页用户页签），见 §12AG** |
 | `docs/research/2026-11-06-firefish-port-wave18-contract.md` | **第十八波施工契约（对象存储只读页与投递队列概览），见 §12AH** |
+| `docs/research/2026-11-06-firefish-port-wave19-contract.md` | **第十九波施工契约（合规链接、serverRules、公共 stats 与关于页），见 §12AI** |
 
 ## 14. 已知的未验证项
 
@@ -2375,6 +2433,8 @@ cd web && pnpm build                    # exit 0
   未走查；用户页签的 offset 分页已实测能从 20 增至 24。
 - **第十八波未测边角（2026-11-06，见 §12AH.4）**：退避曲线/并发压测、S3 真实桶展示未验证；
   手动重试与配置写入按设计未做。
+- **第十九波未测边角（2026-11-06，见 §12AI.4）**：规则/合规链接未进入注册流程、远端实例计数与
+  大表统计耗时未验证。
 - **仍未移植的设置页**：邮箱、整合、安全（2FA）、导入导出、迁移、Webhook、插件、自定义 KaTeX、状态栏、
   删除账号、应用授权以外的账号操作；对应后端端点不存在或前端缺少依赖（见第五波契约 §3.3）。
 - **仍缺的 widgets**：rss、rss-ticker、server-metric、online-users、federation、job-queue、aiscript、

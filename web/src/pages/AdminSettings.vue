@@ -53,6 +53,37 @@
 						</template>
 					</CfSelect>
 
+					<CfInput v-model="tosUrl" class="_formBlock" type="url" :disabled="saving">
+						<template #label>服务条款 URL</template>
+						<template #caption>留空表示未提供；显示在关于页。</template>
+					</CfInput>
+					<CfInput v-model="privacyPolicyUrl" class="_formBlock" type="url" :disabled="saving">
+						<template #label>隐私政策 URL</template>
+					</CfInput>
+					<CfInput v-model="repositoryUrl" class="_formBlock" type="url" :disabled="saving">
+						<template #label>源码仓库 URL</template>
+					</CfInput>
+					<CfInput v-model="feedbackUrl" class="_formBlock" type="url" :disabled="saving">
+						<template #label>反馈 URL</template>
+					</CfInput>
+					<CfInput v-model="inquiryUrl" class="_formBlock" type="url" :disabled="saving">
+						<template #label>咨询 URL</template>
+					</CfInput>
+					<CfInput v-model="impressumUrl" class="_formBlock" type="url" :disabled="saving">
+						<template #label>版本说明（Impressum）URL</template>
+					</CfInput>
+					<CfTextarea
+						v-model="rulesText"
+						class="_formBlock"
+						tall
+						:disabled="saving"
+					>
+						<template #label>实例规则（每行一条）</template>
+						<template #caption
+							>最多 20 条、每条 300 字；显示在关于页。空行会被忽略。</template
+						>
+					</CfTextarea>
+
 					<CfInfo v-if="error !== null" warn class="_formBlock">
 						{{ error }}
 					</CfInfo>
@@ -66,7 +97,7 @@
 				</form>
 
 				<CfInfo class="notice">
-					这里只覆盖名称、简介、维护者与注册模式；数据库、媒体、联邦策略等其余设置仍来自
+					这里覆盖名称、简介、维护者、注册模式、合规链接与实例规则；数据库、媒体、联邦策略等其余设置仍来自
 					<code>config.toml</code>，修改后需要重启。上游 <code>admin/update-meta</code> 还有大量字段，
 					本实例忽略未列出的字段。
 				</CfInfo>
@@ -106,6 +137,13 @@ const description = ref("");
 const maintainerName = ref<string | number | null>("");
 const maintainerEmail = ref<string | number | null>("");
 const registrationMode = ref("open");
+const tosUrl = ref<string | number | null>("");
+const privacyPolicyUrl = ref<string | number | null>("");
+const repositoryUrl = ref<string | number | null>("");
+const feedbackUrl = ref<string | number | null>("");
+const inquiryUrl = ref<string | number | null>("");
+const impressumUrl = ref<string | number | null>("");
+const rulesText = ref("");
 const loading = ref(true);
 const loadError = ref<string | null>(null);
 const saving = ref(false);
@@ -122,6 +160,13 @@ function apply(meta: AdminInstanceMeta): void {
 	maintainerName.value = meta.maintainerName;
 	maintainerEmail.value = meta.maintainerEmail;
 	registrationMode.value = meta.registrationMode;
+	tosUrl.value = meta.tosUrl ?? "";
+	privacyPolicyUrl.value = meta.privacyPolicyUrl ?? "";
+	repositoryUrl.value = meta.repositoryUrl ?? "";
+	feedbackUrl.value = meta.feedbackUrl ?? "";
+	inquiryUrl.value = meta.inquiryUrl ?? "";
+	impressumUrl.value = meta.impressumUrl ?? "";
+	rulesText.value = (meta.serverRules ?? []).join("\n");
 }
 
 async function load(): Promise<void> {
@@ -152,6 +197,16 @@ async function save(): Promise<void> {
 				| "open"
 				| "invite"
 				| "admin",
+			tosUrl: String(tosUrl.value ?? "").trim(),
+			privacyPolicyUrl: String(privacyPolicyUrl.value ?? "").trim(),
+			repositoryUrl: String(repositoryUrl.value ?? "").trim(),
+			feedbackUrl: String(feedbackUrl.value ?? "").trim(),
+			inquiryUrl: String(inquiryUrl.value ?? "").trim(),
+			impressumUrl: String(impressumUrl.value ?? "").trim(),
+			serverRules: rulesText.value
+				.split("\n")
+				.map((line) => line.trim())
+				.filter((line) => line !== ""),
 		});
 		apply(updated);
 		saved.value = true;

@@ -52,22 +52,49 @@
 							maintainerEmail !== "" ? maintainerEmail : "—"
 						}}</template>
 					</CfKeyValue>
-					<a
-						v-if="tosUrl != null && tosUrl !== ''"
-						class="link"
-						:href="tosUrl"
-						target="_blank"
-						rel="noopener"
-						>{{ t("tos") }}</a
-					>
+					<div class="links">
+						<a
+							v-for="link in policyLinks"
+							:key="link.href"
+							class="link"
+							:href="link.href"
+							target="_blank"
+							rel="noopener"
+							>{{ link.label }}</a
+						>
+					</div>
+				</div>
+
+				<div v-if="serverRules.length > 0" class="_formBlock">
+					<div class="sectionLabel">实例规则</div>
+					<ol class="rules">
+						<li v-for="(rule, index) in serverRules" :key="index">{{ rule }}</li>
+					</ol>
 				</div>
 
 				<div class="_formBlock">
 					<div class="sectionLabel">{{ t("statistics") }}</div>
-					<CfInfo icon="chart-bar">
-						统计接口尚未提供：后端没有注册 <code>stats</code> 端点（见
-						docs/research/api-contract/meta-federation.md），因此用户数、帖子数无法获取，此处不显示数字。
+					<CfInfo v-if="statsError !== null" icon="chart-bar">
+						统计暂时不可用（{{ statsError }}）。页面其余部分不受影响。
 					</CfInfo>
+					<div v-else-if="stats != null" class="stats">
+						<div class="stat">
+							<span class="value">{{ stats.usersCount }}</span>
+							<span class="label">用户</span>
+						</div>
+						<div class="stat">
+							<span class="value">{{ stats.notesCount }}</span>
+							<span class="label">帖子</span>
+						</div>
+						<div class="stat">
+							<span class="value">{{ stats.instancesCount }}</span>
+							<span class="label">已知实例</span>
+						</div>
+						<div class="stat">
+							<span class="value">{{ stats.driveFiles }}</span>
+							<span class="label">网盘文件</span>
+						</div>
+					</div>
 				</div>
 
 				<div class="_formBlock">
@@ -101,7 +128,7 @@
 // The icon easter egg (woozy mode) is dropped: defaultStore has no
 // `woozyMode` flag and /static-assets/woozy.png is not shipped.
 import { computed, onMounted, ref } from "vue";
-import type { MetaDetailed, MetaLite } from "@/api/types";
+import type { InstanceStats, MetaDetailed, MetaLite } from "@/api/types";
 import { api } from "@/api/client";
 import CfA from "@/components/ui/CfA.vue";
 import CfInfo from "@/components/ui/CfInfo.vue";
@@ -117,6 +144,8 @@ defineOptions({ name: "CfPageAbout" });
 const loading = ref(true);
 const failed = ref(false);
 const meta = ref<MetaDetailed | null>(null);
+const stats = ref<InstanceStats | null>(null);
+const statsError = ref<string | null>(null);
 
 /** Falls back to the cached meta so the hero does not flash empty. */
 const view = computed<MetaLite>(() => meta.value ?? instance);
@@ -135,9 +164,30 @@ const version = computed(() => view.value.version ?? "");
 const maintainerName = computed(() => view.value.maintainerName ?? "");
 const maintainerEmail = computed(() => view.value.maintainerEmail ?? "");
 // MetaLite types tosUrl as the literal null; the backend may gain a real URL.
-const tosUrl = computed<string | null>(
-	() => (view.value.tosUrl as string | null) ?? null,
-);
+const policyLinks = computed(() => {
+	const items: { label: string; href: string }[] = [];
+	if (view.value.tosUrl != null && view.value.tosUrl !== "") {
+		items.push({ label: t("tos"), href: view.value.tosUrl });
+	}
+	if (view.value.privacyPolicyUrl !== "") {
+		items.push({ label: "隐私政策", href: view.value.privacyPolicyUrl });
+	}
+	if (view.value.repositoryUrl !== "") {
+		items.push({ label: "源码仓库", href: view.value.repositoryUrl });
+	}
+	if (view.value.feedbackUrl !== "") {
+		items.push({ label: "反馈", href: view.value.feedbackUrl });
+	}
+	if (view.value.inquiryUrl !== "") {
+		items.push({ label: "咨询", href: view.value.inquiryUrl });
+	}
+	if (view.value.impressumUrl !== "") {
+		items.push({ label: "版本说明", href: view.value.impressumUrl });
+	}
+	return items;
+});
+
+const serverRules = computed<string[]>(() => view.value.serverRules ?? []);
 
 const iconUrl = computed(() => {
 	const icon = view.value.iconUrl;
@@ -174,6 +224,13 @@ async function load(): Promise<void> {
 		failed.value = true;
 	} finally {
 		loading.value = false;
+	}
+
+	try {
+		stats.value = await api("stats", {});
+	} catch (cause) {
+		statsError.value =
+			cause instanceof Error ? cause.message : String(cause);
 	}
 }
 
@@ -226,6 +283,37 @@ definePageMetadata({
 	padding-block-end: 6px;
 	font-size: 0.85em;
 	color: var(--fgTransparentWeak);
+}
+
+.rules {
+	margin: 0;
+	padding-left: 20px;
+	font-size: 0.9em;
+	line-height: 1.6;
+}
+
+.stats {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+	gap: 8px;
+}
+
+.stat {
+	display: flex;
+	flex-direction: column;
+	padding: 12px;
+	background: var(--panel);
+	border-radius: var(--radius);
+
+	.value {
+		font-size: 1.3em;
+		font-weight: 700;
+	}
+
+	.label {
+		font-size: 0.78em;
+		opacity: 0.65;
+	}
 }
 
 .links {

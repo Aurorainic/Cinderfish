@@ -277,7 +277,7 @@ export interface MetaLite {
 	uri: string;
 	description: string;
 	langs: string[];
-	tosUrl: null;
+	tosUrl: string | null;
 	repositoryUrl: string;
 	feedbackUrl: string;
 	impressumUrl: string;
@@ -480,6 +480,26 @@ export interface AdminInstanceMeta {
 	maintainerEmail: string;
 	registrationMode: "open" | "invite" | "admin";
 	blockedHosts: string[];
+	tosUrl: string | null;
+	privacyPolicyUrl: string;
+	repositoryUrl: string;
+	feedbackUrl: string;
+	inquiryUrl: string;
+	impressumUrl: string;
+	serverRules: string[];
+}
+
+/** Counters from `stats`. */
+export interface InstanceStats {
+	usersCount: number;
+	notesCount: number;
+	originalNotesCount: number;
+	originalUsersCount: number;
+	reactionsCount: number;
+	followingCount: number;
+	instancesCount: number;
+	driveFiles: number;
+	driveUsage: number;
 }
 
 /** Read-only media configuration from `admin/object-storage`. */
