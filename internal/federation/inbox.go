@@ -2,6 +2,7 @@ package federation
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"html"
@@ -105,6 +106,8 @@ func (i *Inbox) perform(ctx context.Context, actor *RemoteUser, activity Object)
 		return i.move(ctx, actor, activity)
 	case activity.IsType("Block"):
 		return i.block(ctx, actor, activity)
+	case activity.IsType("Flag"):
+		return i.flag(ctx, actor, activity)
 	}
 	return fmt.Sprintf("unrecognized activity type: %s", activity.Type()), nil
 }
@@ -592,6 +595,33 @@ func (i *Inbox) move(ctx context.Context, actor *RemoteUser, activity Object) (s
 	}
 	if i.OnMoved != nil {
 		i.OnMoved(ctx, actor.ID, target.ID)
+	}
+	return "ok", nil
+}
+
+// flag handles an inbound Flag: a remote instance reporting one of our
+// accounts. Misskey keeps the first local target as the report subject and the
+// remaining URIs in the comment, and Cinderfish does the same so the admin
+// report list needs no schema change.
+func (i *Inbox) flag(ctx context.Context, actor *RemoteUser, activity Object) (string, error) {
+	uris := activity.Refs("object")
+	var target *localActor
+	for _, uri := range uris {
+		if !strings.HasPrefix(uri, i.renderer.BaseURL+"/users/") {
+			continue
+		}
+		if t, err := i.localUserByURI(ctx, uri); err == nil {
+			target = t
+			break
+		}
+	}
+	if target == nil {
+		return "skip: flag names no local user", nil
+	}
+	encoded, _ := json.Marshal(uris)
+	comment := strings.TrimSpace(activity.String("content")) + "\n" + string(encoded)
+	if err := i.store.RecordReport(ctx, actor.ID, target.id, comment); err != nil {
+		return "", err
 	}
 	return "ok", nil
 }

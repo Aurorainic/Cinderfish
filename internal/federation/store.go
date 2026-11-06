@@ -238,6 +238,19 @@ DELETE FROM followings WHERE (follower_id = $1 AND followee_id = $2)
 	return nil
 }
 
+// RecordReport stores an abuse report filed by a remote actor. The reporter
+// is the remote user row, so the admin list and the resolve endpoint work the
+// same as for a local report.
+func (s *Store) RecordReport(ctx context.Context, reporterID, targetUserID, comment string) error {
+	if _, err := s.pool.Exec(ctx, `
+INSERT INTO abuse_reports (id, reporter_id, target_user_id, comment)
+VALUES ($1,$2,$3,$4)
+	`, idgen.New(), reporterID, targetUserID, comment); err != nil {
+		return fmt.Errorf("federation: record report: %w", err)
+	}
+	return nil
+}
+
 // RecordActivity appends an inbound or outbound activity to the audit
 // table.
 func (s *Store) RecordActivity(ctx context.Context, direction, actorURI string, activity Object) error {
