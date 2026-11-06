@@ -241,6 +241,39 @@ func (s *Server) DeliverNote(ctx context.Context, n *note.Note) {
 	}
 }
 
+// DeliverUpdate tells a note's remote audience that its content changed.
+// Renotes have nothing of their own to update, so they are skipped.
+func (s *Server) DeliverUpdate(ctx context.Context, n *note.Note) {
+	if !s.deliverable(n) || n.IsPureRenote() {
+		return
+	}
+	u, err := s.accounts.GetByID(ctx, n.UserID)
+	if err != nil || u == nil {
+		return
+	}
+	doc, err := s.renderNote(ctx, n)
+	if err != nil {
+		log.Printf("httpapi: render note for update: %v", err)
+		return
+	}
+	published := time.Now()
+	if n.UpdatedAt != nil {
+		published = *n.UpdatedAt
+	}
+	activity := s.fedRenderer.RenderUpdate(doc, n.ID, s.fedRenderer.ActorRef(u.ID), published)
+
+	seen := map[string]bool{}
+	for _, inbox := range s.deliveryInboxes(ctx, n) {
+		if seen[inbox] {
+			continue
+		}
+		seen[inbox] = true
+		if err := s.federationDeliver.Enqueue(ctx, inbox, "", s.fedRenderer.KeyID(u.ID), u.ID, activity); err != nil {
+			log.Printf("httpapi: enqueue update to %s: %v", inbox, err)
+		}
+	}
+}
+
 // DeliverDelete withdraws a note from its remote audience: a Delete for a
 // note, an Undo of the Announce for a pure renote.
 func (s *Server) DeliverDelete(ctx context.Context, n *note.Note) {

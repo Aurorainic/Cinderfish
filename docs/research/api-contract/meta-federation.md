@@ -816,7 +816,7 @@ Go 的 mux 不允许通配符出现在段中间，所以路由写成 `GET /{acct
 
 签发者公钥的解析顺序（`internal/httpapi/activitypub.go:644`–`671`）：先查本地 `users.public_key_pem`（按 actor URI），查不到再用联邦客户端抓 actor 文档里的 `publicKey.publicKeyPem`。
 
-支持的活动类型（`internal/federation/inbox.go:56`–`98`）：`Collection`/`OrderedCollection`（递归展开）、`Follow`、`Accept`、`Reject`、`Undo`、`Create`、`Delete`、`Like`、`Announce`、`Update`、`Block`。其它类型（`Move`、`Flag`、`Question`、`EmojiReact` 等）记日志 `unrecognized activity type: X` 后仍回 202。
+支持的活动类型（`internal/federation/inbox.go:56`–`98`）：`Collection`/`OrderedCollection`（递归展开）、`Follow`、`Accept`、`Reject`、`Undo`、`Create`、`Delete`、`Like`、`Announce`、`Update`、`Block`。`Update` 按对象类型分流：actor 文档更新角色信息，笔记对象更新已存远端笔记的正文/CW/敏感标记（要求 `attributedTo` 与投递 actor 一致、id 主机与 actor 主机一致；只动内容，不动可见性与受众）。其它类型（`Move`、`Flag`、`Question`、`EmojiReact` 等）记日志 `unrecognized activity type: X` 后仍回 202。
 
 ### 响应
 

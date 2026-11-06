@@ -81,6 +81,10 @@ func (s *Server) handleNotesEdit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Tell the remote audience the note changed; a peer that ignores status
+	// updates keeps the old copy, which is why the marker is also local.
+	s.DeliverUpdate(r.Context(), updated)
+
 	writeJSON(w, http.StatusOK, map[string]any{
 		"createdNote": packNote(updated, s.notePackContext(r.Context(), updated, info.User.ID)),
 	})

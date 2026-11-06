@@ -134,7 +134,8 @@ Firefish 的「取消转发」与「删除」是两个动作：它传的是**被
 `localOnly` 与远端作者的笔记一律不投。拿不到原笔记 AP id 时（远端原帖缺 `uri`），删除降级为
 `Delete` 转贴本身。
 
-仍未接线：`notes/edit` 不发 `Update`（第三十三波只做了已编辑标记与历史）。
+`notes/edit` 现在发 `Update`（活动 id 为 `<Create id>#updates/<毫秒时间戳>`，保证第二次编辑不会被按 id 去重）。
+入站对端编辑见 `meta-federation.md` 的活动类型表。
 
 ## 5. 隐私语义（可见性）
 

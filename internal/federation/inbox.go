@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"html"
 	"strings"
 	"time"
 )
@@ -407,6 +408,9 @@ func (i *Inbox) update(ctx context.Context, actor *RemoteUser, activity Object) 
 	if obj == nil {
 		return "skip: update has no embedded object", nil
 	}
+	if obj.IsPost() {
+		return i.updateNote(ctx, actor, obj)
+	}
 	if !obj.IsActor() {
 		return fmt.Sprintf("skip: cannot update %s", obj.Type()), nil
 	}
@@ -414,6 +418,50 @@ func (i *Inbox) update(ctx context.Context, actor *RemoteUser, activity Object) 
 		return "", err
 	}
 	return "ok: actor updated", nil
+}
+
+// updateNote applies an edit a peer made to one of its own notes. The object
+// must belong to the delivering actor and live on its host, the same checks
+// create() applies, otherwise any peer could rewrite someone else's note.
+func (i *Inbox) updateNote(ctx context.Context, actor *RemoteUser, note Object) (string, error) {
+	apID := note.Ref("id")
+	if apID == "" {
+		return "skip: updated note has no id", nil
+	}
+	if attr := note.Ref("attributedTo"); attr != "" && attr != actor.URI {
+		return "skip: attributedTo does not match actor", nil
+	}
+	host, err := HostOf(apID)
+	if err != nil || host != actor.Host {
+		return "skip: note id host does not match actor", nil
+	}
+
+	updatedAt := time.Now().UTC()
+	if raw := note.String("updated"); raw != "" {
+		if parsed, err := time.Parse(time.RFC3339, raw); err == nil {
+			updatedAt = parsed
+		}
+	}
+	var text *string
+	if note.Has("content") {
+		value := html.UnescapeString(strings.TrimSpace(note.String("content")))
+		text = &value
+	}
+	var cw *string
+	if note.Has("summary") && note.String("summary") != "" {
+		value := html.UnescapeString(strings.TrimSpace(note.String("summary")))
+		cw = &value
+	}
+
+	if _, err := i.store.UpdateRemoteNote(ctx, apID, text, cw, note.Bool("sensitive"), updatedAt); err != nil {
+		if errors.Is(err, ErrRemoteNotFound) {
+			// The peer edited a note this instance never stored (or already
+			// dropped); nothing to apply.
+			return "skip: note unknown", nil
+		}
+		return "", err
+	}
+	return "ok: note updated", nil
 }
 
 // block handles an inbound Block. The remote peer blocked our user, so

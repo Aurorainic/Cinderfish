@@ -329,6 +329,26 @@ VALUES ($1,$2,$3,$4,FALSE,$5,$6,$7,$8,$9,$10,$11,$12,'[]'::jsonb,'[]'::jsonb,$13
 	return id, nil
 }
 
+// UpdateRemoteNote applies an inbound Update to a stored remote note and
+// reports its local id. Only content moves: visibility and audience stay as
+// stored, because a peer need not resend them and guessing wrong would either
+// leak a followers-only note or hide it from the people already addressed.
+func (s *Store) UpdateRemoteNote(ctx context.Context, apID string, text, cw *string, sensitive bool, updatedAt time.Time) (string, error) {
+	var id string
+	err := s.pool.QueryRow(ctx, `
+UPDATE notes SET text = $2, cw = $3, is_sensitive = $4, updated_at = $5
+WHERE ap_id = $1 AND deleted_at IS NULL
+RETURNING id
+`, apID, text, cw, sensitive, updatedAt).Scan(&id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", ErrRemoteNotFound
+	}
+	if err != nil {
+		return "", fmt.Errorf("federation: update remote note: %w", err)
+	}
+	return id, nil
+}
+
 // FollowRequest records an inbound Follow from a remote actor to a local
 // user who manually approves followers.
 func (s *Store) FollowRequest(ctx context.Context, uri, followerID, followeeID string) error {

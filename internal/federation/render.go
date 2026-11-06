@@ -278,6 +278,29 @@ func (r *Renderer) RenderCreate(note Object, noteID string, actorRef string, pub
 	return withContext(activity)
 }
 
+// RenderUpdate wraps a rendered note in an Update activity.
+//
+// The id carries the edit's timestamp so a peer that de-duplicates by activity
+// id does not drop the second edit of the same note. Peers that ignore status
+// updates (Mastodon) keep the old copy; Misskey, Firefish and Iceshrimp apply
+// it.
+func (r *Renderer) RenderUpdate(note Object, noteID string, actorRef string, published time.Time) Object {
+	activity := Object{
+		"id":        fmt.Sprintf("%s#updates/%d", r.ActivityRef(noteID), published.UnixMilli()),
+		"type":      "Update",
+		"actor":     actorRef,
+		"published": published.UTC().Format(time.RFC3339),
+		"object":    note,
+	}
+	if to, ok := note["to"]; ok {
+		activity["to"] = to
+	}
+	if cc, ok := note["cc"]; ok {
+		activity["cc"] = cc
+	}
+	return withContext(activity)
+}
+
 // RenderDelete builds a Delete activity. object may be an id string or the
 // embedded object; the string form is what every peer accepts.
 func (r *Renderer) RenderDelete(objectID, actorRef string) Object {

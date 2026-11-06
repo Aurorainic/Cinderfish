@@ -3151,6 +3151,44 @@ cd web && pnpm build                    # exit 0
 - `notes/unrenote` 找到/找不到两条分支。
 - `go test` 与浏览器走查未执行。
 
+## 12BE. 批次：编辑的联邦 Update（2026-11-06）
+
+**工作方式**：目标模式第四十一波，继续只写代码、验证到编译层。施工依据
+`docs/research/2026-11-06-firefish-port-wave41-contract.md`。
+
+### 12BE.1 落地清单
+
+| 层 | 文件 | 说明 |
+|----|------|------|
+| 渲染 | `internal/federation/render.go` | `RenderUpdate`：活动 id 带毫秒时间戳，继承 to/cc |
+| 出站 | `internal/httpapi/federation_wire.go`、`note_edit.go` | `DeliverUpdate`（纯转贴跳过）；`notes/edit` 成功后调用 |
+| 入站 | `internal/federation/inbox.go` | `inbox.update` 按对象类型分流；新增 `updateNote`（防伪检查 + 只改内容） |
+| 存储 | `internal/federation/store.go` | `UpdateRemoteNote`：按 ap_id 更新正文/CW/敏感标记/updated_at |
+| 文档 | `notes-core.md`、`meta-federation.md` | 出站 Update 与入站分流说明 |
+
+### 12BE.2 有意的限制
+
+1. 入站只更新正文/CW/敏感标记/时间，不重算标签、提及、表情。
+2. 入站编辑不推 Streaming。
+3. Mastodon 忽略 status `Update`，双向不完全对称。
+4. 未新增测试。
+
+### 12BE.3 验证证据（编译层）
+
+```
+gofmt -l internal/ cmd/   # 空
+go vet ./...              # exit 0
+```
+
+本波未改前端。
+
+### 12BE.4 仍未验证
+
+- 双实例：编辑后对端正文是否真的更新、第二次编辑是否被去重。
+- 入站 `attributedTo`/主机不匹配的拒绝分支。
+- 远端已软删除笔记收到 Update 时的 `skip` 分支。
+- `go test` 与浏览器走查未执行。
+
 ## 13. 文档索引
 
 | 文档 | 内容 |
@@ -3217,6 +3255,7 @@ cd web && pnpm build                    # exit 0
 | `docs/research/2026-11-06-firefish-port-wave38-contract.md` | **第三十八波施工契约（邮件与邮箱验证），见 §12BB** |
 | `docs/research/2026-11-06-firefish-port-wave39-contract.md` | **第三十九波施工契约（邮箱前端页面），见 §12BC** |
 | `docs/research/2026-11-06-firefish-port-wave40-contract.md` | **第四十波施工契约（出站投递与取消转贴），见 §12BD** |
+| `docs/research/2026-11-06-firefish-port-wave41-contract.md` | **第四十一波施工契约（编辑的联邦 Update），见 §12BE** |
 
 ## 14. 已知的未验证项
 
@@ -3276,6 +3315,7 @@ cd web && pnpm build                    # exit 0
 - **第三十八波未测（2026-11-06，见 §12BB.4）**：SMTP 真投递与验证/重置端到端未执行，只有编译层证据。
 - **第三十九波未测（2026-11-06，见 §12BC.4）**：邮箱三页只有编译层证据，渲染与完整链路未走查。
 - **第四十波未测（2026-11-06，见 §12BD.4）**：出站投递与取消转贴只有编译层证据；真实双实例投递未验证。
+- **第四十一波未测（2026-11-06，见 §12BE.4）**：编辑的 Update 双向都只有编译层证据。
 - **仍未移植的设置页**：邮箱、整合、导入导出、迁移、Webhook、插件、自定义 KaTeX、状态栏、
   删除账号、应用授权以外的账号操作；对应后端端点不存在或前端缺少依赖（见第五波契约 §3.3）。
 - **仍缺的 widgets**：rss、rss-ticker、server-metric、online-users、federation、job-queue、aiscript、
