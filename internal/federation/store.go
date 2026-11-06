@@ -702,16 +702,25 @@ UPDATE notes SET deleted_at = now() WHERE (ap_id = $1 OR uri = $1) AND user_id =
 	return nil
 }
 
-// React stores a reaction from a remote actor.
-func (s *Store) React(ctx context.Context, noteAPID, userID, reaction string) error {
-	var noteID string
-	err := s.pool.QueryRow(ctx, "SELECT id FROM notes WHERE ap_id = $1 OR uri = $1", noteAPID).Scan(&noteID)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return ErrRemoteNotFound
+// NoteIDByAPIDOrURL resolves a note's local id from an ActivityPub id. A local
+// note is addressed as <baseURL>/notes/<id> and has no ap_id column value, so
+// that form is resolved directly before falling back to the stored ids.
+func (s *Store) NoteIDByAPIDOrURL(ctx context.Context, apID, baseURL string) (string, error) {
+	if rest, ok := strings.CutPrefix(apID, baseURL+"/notes/"); ok {
+		id := lastPathSegment(rest)
+		if id != "" {
+			var found string
+			if err := s.pool.QueryRow(ctx, "SELECT id FROM notes WHERE id = $1", id).Scan(&found); err == nil {
+				return found, nil
+			}
+		}
 	}
-	if err != nil {
-		return fmt.Errorf("federation: find note: %w", err)
-	}
+	return s.NoteIDByAPID(ctx, apID)
+}
+
+// ReactNoteID stores a reaction addressed by local note id, which is the form
+// both local users and inbound activities end up using.
+func (s *Store) ReactNoteID(ctx context.Context, noteID, userID, reaction string) error {
 	if _, err := s.pool.Exec(ctx, `
 INSERT INTO note_reactions (id, note_id, user_id, emoji, host)
 VALUES ($1,$2,$3,$4,(SELECT host FROM users WHERE id = $3))
@@ -722,13 +731,9 @@ ON CONFLICT (note_id, user_id, emoji) DO NOTHING
 	return nil
 }
 
-// Unreact removes a reaction from a remote actor.
-func (s *Store) Unreact(ctx context.Context, noteAPID, userID string) error {
-	_, err := s.pool.Exec(ctx, `
-DELETE FROM note_reactions WHERE user_id = $2
-  AND note_id = (SELECT id FROM notes WHERE ap_id = $1 OR uri = $1)
-	`, noteAPID, userID)
-	if err != nil {
+// UnreactNoteID removes a reaction addressed by local note id.
+func (s *Store) UnreactNoteID(ctx context.Context, noteID, userID string) error {
+	if _, err := s.pool.Exec(ctx, "DELETE FROM note_reactions WHERE user_id = $2 AND note_id = $1", noteID, userID); err != nil {
 		return fmt.Errorf("federation: remove reaction: %w", err)
 	}
 	return nil

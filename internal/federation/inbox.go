@@ -93,7 +93,9 @@ func (i *Inbox) perform(ctx context.Context, actor *RemoteUser, activity Object)
 		return i.create(ctx, actor, activity)
 	case activity.IsType("Delete"):
 		return i.deleteActivity(ctx, actor, activity)
-	case activity.IsType("Like"):
+	case activity.IsType("Like"), activity.IsType("EmojiReact"), activity.IsType("EmojiReaction"):
+		// Firefish and Misskey send EmojiReact for custom emoji, and Like
+		// with a content field for everything else; both are reactions here.
 		return i.like(ctx, actor, activity)
 	case activity.IsType("Announce"):
 		return i.announce(ctx, actor, activity)
@@ -219,8 +221,12 @@ func (i *Inbox) undo(ctx context.Context, actor *RemoteUser, activity Object) (s
 			i.OnUnfollow(ctx, actor.ID, target.id)
 		}
 		return "ok: unfollowed", nil
-	case obj.IsType("Like"):
-		if err := i.store.Unreact(ctx, obj.Ref("object"), actor.ID); err != nil {
+	case obj.IsType("Like"), obj.IsType("EmojiReact"), obj.IsType("EmojiReaction"):
+		noteID, err := i.store.NoteIDByAPIDOrURL(ctx, obj.Ref("object"), i.renderer.BaseURL)
+		if err != nil {
+			return "skip: target note not found", nil
+		}
+		if err := i.store.UnreactNoteID(ctx, noteID, actor.ID); err != nil {
 			return "", err
 		}
 		return "ok: reaction removed", nil
@@ -432,14 +438,15 @@ func (i *Inbox) like(ctx context.Context, actor *RemoteUser, activity Object) (s
 	if reaction == "" {
 		reaction = "⭐"
 	}
-	if err := i.store.React(ctx, objectID, actor.ID, reaction); err != nil {
-		if errors.Is(err, ErrRemoteNotFound) {
-			return "skip: target note not found", nil
-		}
+	noteID, err := i.store.NoteIDByAPIDOrURL(ctx, objectID, i.renderer.BaseURL)
+	if err != nil {
+		return "skip: target note not found", nil
+	}
+	if err := i.store.ReactNoteID(ctx, noteID, actor.ID, reaction); err != nil {
 		return "", err
 	}
 	if i.OnReaction != nil {
-		if owner, host, err := i.store.NoteOwnerByAPID(ctx, objectID); err == nil && host == nil {
+		if owner, host, err := i.store.NoteOwner(ctx, noteID); err == nil && host == nil {
 			i.OnReaction(ctx, owner, actor.ID, reaction)
 		}
 	}

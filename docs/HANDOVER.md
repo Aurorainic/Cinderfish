@@ -1,10 +1,11 @@
 # Cinderfish 交接说明
 
-- 最后更新：2026-11-06（目标模式第五十一至五十七波：账号迁移、KaTeX 宏页与集成说明页、
+- 最后更新：2026-11-06（目标模式第五十一至五十八波：账号迁移、KaTeX 宏页与集成说明页、
   OAuth 交互式同意页、`ap/show` 与远程互动页、第三方应用授权全流程（`app/*` 与 `auth/session/*`，
-  schema v20）、关注关系设置与其消费方（schema v21）。恢复目标模式时先补了 §12BO.3 的验证债，
+  schema v20）、关注关系设置与其消费方（schema v21）、入站反应修复与 `EmojiReact`。
+  恢复目标模式时先补了 §12BO.3 的验证债，
   `go test ./...`（含数据库）已全绿，
-  详见 §12BP–§12BV。浏览器走查仍待用户手动确认后执行）
+  详见 §12BP–§12BW。浏览器走查仍待用户手动确认后执行）
 - 项目名 **Cinderfish**（2026-10-28 定名，Go module `github.com/Aurorainic/cinderfish`）
 - 仓库：当前目录 `/home/lainsaka/文档/MilnFish`，分支 `main`；远程 `origin` 为
   `https://github.com/Aurorainic/Cinderfish.git`（GitHub 仓库已更名，本地目录改名待办）
@@ -3897,6 +3898,38 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
 - 远端导入触发通知走的是 `OnNoteCreated`，双实例用例没有覆盖到（本波只用了本地发帖触发）。
 - Streaming `homeTimeline` 的实际 WS 过滤行为没有用真实连接验证，只有 `LoadFollows` 的单元断言。
 
+## 12BW. 第五十八波：入站反应修复与 EmojiReact（2026-11-06）
+
+契约见 `docs/research/2026-11-06-firefish-port-wave58-contract.md`。
+本波是**缺陷修复**：写用例时发现远端用户对本地笔记的反应一直没落库。
+
+### 12BW.1 问题与修法
+
+| 问题 | 根因 | 修法 |
+|------|------|------|
+| 远端 `Like` 对本地笔记一直 `skip: target note not found` | `Store.React` 只按 `notes.ap_id/uri` 找笔记，本地笔记这两列为空 | 新增 `Store.NoteIDByAPIDOrURL`，本地笔记按 `<baseURL>/notes/<id>` 解析 |
+| `EmojiReact` / `EmojiReaction` 被当成未知活动 | `perform` / `undo` 只判断 `Like` | 三种类型走同一条反应路径 |
+| 反应写入绕了一层 AP 查询 | 只有 `React(noteAPID)` | 新增 `ReactNoteID` / `UnreactNoteID`，删除已无调用方的 `React` / `Unreact` |
+
+### 12BW.2 有意的限制
+
+- 出站反应仍是 `Like` + `content`（与 Misskey `renderLike` 一致），没有改发 `EmojiReact`。
+- 不处理 `EmojiReact` 的 `tag` 自定义表情定义（还没有远端 emoji 表）。
+- `Flag`、`Question`（投票）仍未处理。
+
+### 12BW.3 验证证据
+
+- `gofmt -l internal/ cmd/` 无输出；`go vet ./...` 通过。
+- `CINDERFISH_TEST_DATABASE_URL=… go test ./...` 全绿。
+- `TestInboundEmojiReact`：双实例 + 真实签名，beta 对 alpha 的本地笔记发 `EmojiReact` →
+  `notes/reactions` 出现 🍮 → `Undo(EmojiReact)` 后清空。修复前这条用例在第一步就失败。
+
+### 12BW.4 仍未验证
+
+- 没有对真实 Misskey / Firefish 实例验证 `EmojiReact` 的收发。
+- 自定义表情反应（`:name:` 形式）没有远端 emoji 解析，仅按文本存库。
+- `Flag`（举报）与 `Question`（投票）入站仍未实现。
+
 
 
 
@@ -3983,6 +4016,7 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
 | `docs/research/2026-11-06-firefish-port-wave55-contract.md` | **第五十五波施工契约（应用授权 app/* 与 auth/session/*），见 §12BT** |
 | `docs/research/2026-11-06-firefish-port-wave56-contract.md` | **第五十六波施工契约（关注关系设置），见 §12BU** |
 | `docs/research/2026-11-06-firefish-port-wave57-contract.md` | **第五十七波施工契约（接线 notify / withReplies），见 §12BV** |
+| `docs/research/2026-11-06-firefish-port-wave58-contract.md` | **第五十八波施工契约（入站反应修复与 EmojiReact），见 §12BW** |
 
 ## 14. 已知的未验证项
 
@@ -4066,6 +4100,8 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
   `sinceDate`/`untilDate`。
 - **第五十七波未测（2026-11-06，见 §12BV.4）**：新通知类型未走查；远端导入触发通知无双实例用例；
   `homeTimeline` 的 WS 过滤只有单元断言。
+- **第五十八波未测（2026-11-06，见 §12BW.4）**：没有对真实 Misskey/Firefish 验证 `EmojiReact`；
+  远端自定义表情未解析；`Flag` / `Question` 入站仍未实现。
 - **仍未移植的设置页**：邮箱、整合、导入导出、迁移、Webhook、插件、自定义 KaTeX、状态栏、
   删除账号、应用授权以外的账号操作；对应后端端点不存在或前端缺少依赖（见第五波契约 §3.3）。
 - **仍缺的 widgets**：rss、rss-ticker、server-metric、online-users、federation、job-queue、aiscript、
