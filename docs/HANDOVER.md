@@ -3586,7 +3586,7 @@ cd web && pnpm build                                           # exit 0
 - 远程关注者的锁推路径：2026-11-07 已用 `TestLockedFollowAcrossInstances` 做双实例端到端
   （入站 Follow → 请求 → API 接受 → 出站 Accept → 对端落库），见 §12CN。
 - 「已发出」页的取消（`requests/cancel`）没有验证关注者一侧的回执。
-- 隐私页其余六个开关的界面回读（本次只操作了锁推开关）。
+- 隐私页其余六个开关的界面回读已由 §12DQ 覆盖（逐个点击并回读 `i`，刷新后仍为开启）。
 
 ## 12BL. 批次：邮件通知（2026-11-06）
 
@@ -4545,8 +4545,8 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
   历史文件补生成（没有离线任务）、大图内存峰值。
 - **第四十七波已补验证（2026-11-07，见 §12BK.4）**：锁推的「关注 → 待审 → 接受」从
   `following/create` 到界面全链路走查通过；`receiveFollowRequest` 与 `follow` 两类通知落库并在
-  通知页渲染。远程关注者的锁推入站路径已由 §12CN 覆盖；入站 Reject 撤回待审请求也已有用例
-  （§12DN）。仍未验证的：其余六个隐私开关的界面回读。
+  通知页渲染。远程关注者的锁推入站路径已由 §12CN 覆盖；入站 Reject 撤回待审请求已有用例
+  （§12DN）；其余六个隐私开关的界面回读见 §12DQ。
 - **第四十八波已补验证（2026-11-07，见 §12BL.4）**：四类通知邮件与公告群发由本地 SMTP 用例
   真实收信验证，未验证/未订阅两种静默分支也在内；邮箱设置页开关的保存与回读走查通过。
   仍未验证的：公网 SMTP 的 TLS/Auth、公告失败隔离、真实客户端的模板显示。
@@ -5684,3 +5684,16 @@ CINDERFISH_TEST_DATABASE_URL=... go test ./... -count=1         # 全绿
 ```
 
 仍未验证：真实邮件服务商、历史文件补生成缩略图、大图生成的内存峰值。
+
+## 12DQ. 第一百零四波：隐私页其余六个开关的界面回读（2026-11-07）
+
+`/settings/privacy` 的服务器字段（`autoAcceptFollowed`、`publicReactions`、`hideOnlineStatus`、
+`noCrawle`、`preventAiLearning`、`isExplorable`）逐个点击，并轮询 `i` 直到字段为 true；
+刷新页面后开关仍为开启。`isExplorable` 再点回关闭后 `i` 为 false。
+
+说明：页面在保存期间会 `disabled` 所有开关，脚本必须串行等待；第一轮把六个开关一次性点击时
+只有第一个生效（其余点击发生在 `saving` 窗口内，被页面正确忽略），串行后全部通过——是脚本
+时序，不是缺陷。
+
+仍未验证：窄屏（320px）下的这一页、`followersVisibility`/`followingVisibility` 两个下拉的
+界面回读（后端已有用例）。
