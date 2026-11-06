@@ -706,6 +706,7 @@ export interface EndpointMap {
 			inquiryUrl?: string;
 			impressumUrl?: string;
 			serverRules?: string[];
+			hiddenTags?: string[];
 		};
 		res: AdminInstanceMeta;
 	};

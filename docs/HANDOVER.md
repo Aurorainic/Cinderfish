@@ -2599,6 +2599,43 @@ cd web && pnpm build                    # exit 0
 - 他人文件夹 400、他人文件 404 的分支。
 - `go test` 与浏览器走查未执行。
 
+## 12AP. 批次：隐藏话题标签（2026-11-06）
+
+**工作方式**：目标模式第二十六波，继续只写代码、验证到编译层。施工依据
+`docs/research/2026-11-06-firefish-port-wave26-contract.md`。
+
+### 12AP.1 落地清单
+
+| 层 | 文件 | 说明 |
+|----|------|------|
+| 实例设置 | `internal/httpapi/instance_settings.go` | `hiddenTags` 键、admin/meta 回读、update-meta 规范化与校验 |
+| 趋势 | `internal/note/hashtag_trend.go`、`internal/httpapi/hashtags.go` | `Trend` 增加排除列表，SQL 用 `<> ALL` |
+| 前端 | `api/types.ts`、`endpoints.ts`、`pages/AdminHashtags.vue`、`pages/AdminIndex.vue` | 真实编辑页与菜单入口 |
+| 文档 | `admin-emoji-registry.md`、`meta-federation.md` | hiddenTags 契约；serverRules 行改为真实值 |
+
+### 12AP.2 有意的限制
+
+1. 只过滤趋势，不影响标签页/搜索/探索列表。
+2. 不做话题标签语法校验。
+3. 即时 SQL，无缓存。
+
+### 12AP.3 验证证据（编译层）
+
+```
+gofmt -l internal/ cmd/                 # 空
+go vet ./...                            # exit 0
+cd web && pnpm exec vue-tsc --noEmit    # exit 0
+cd web && pnpm run check:port           # hardTotal 0
+cd web && pnpm build                    # exit 0
+```
+
+### 12AP.4 仍未验证
+
+- 保存隐藏标签后 `admin/meta` 回读与趋势列表的变化。
+- 去 `#`、小写、去重与超长/超量 400 分支。
+- 管理页在移动端的布局。
+- `go test` 与浏览器走查未执行。
+
 ## 13. 文档索引
 
 | 文档 | 内容 |
@@ -2650,6 +2687,7 @@ cd web && pnpm build                    # exit 0
 | `docs/research/2026-11-06-firefish-port-wave23-contract.md` | **第二十三波施工契约（通知类型静音与未读过滤），见 §12AM** |
 | `docs/research/2026-11-06-firefish-port-wave24-contract.md` | **第二十四波施工契约（笔记编辑与编辑历史），见 §12AN** |
 | `docs/research/2026-11-06-firefish-port-wave25-contract.md` | **第二十五波施工契约（云盘文件重命名/描述/敏感/移动），见 §12AO** |
+| `docs/research/2026-11-06-firefish-port-wave26-contract.md` | **第二十六波施工契约（隐藏话题标签与趋势过滤），见 §12AP** |
 
 ## 14. 已知的未验证项
 
@@ -2694,6 +2732,7 @@ cd web && pnpm build                    # exit 0
   错误分支与菜单入口未验证；远端不接收 Update 是设计限制。
 - **第二十五波未测（2026-11-06，见 §12AO.4）**：云盘文件编辑只过了编译层，保存/回读、拖拽移动与
   错误分支未验证。
+- **第二十六波未测（2026-11-06，见 §12AP.4）**：隐藏标签只过了编译层，保存/回读与趋势过滤未验证。
 - **仍未移植的设置页**：邮箱、整合、导入导出、迁移、Webhook、插件、自定义 KaTeX、状态栏、
   删除账号、应用授权以外的账号操作；对应后端端点不存在或前端缺少依赖（见第五波契约 §3.3）。
 - **仍缺的 widgets**：rss、rss-ticker、server-metric、online-users、federation、job-queue、aiscript、

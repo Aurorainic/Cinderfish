@@ -24,10 +24,10 @@
 // the redirect is unconditional so /admin never renders the empty child.
 //
 // Differences from upstream, all forced by what the backend serves:
-//   * the menu lists only the four ported pages (users, overview, emojis,
-//     federation). The rest of the router table is still `TODO: port`, and
-//     `admin/abuse-user-reports` / `latest-version` do not exist, so the
-//     warnings banner and the quick-action block are gone rather than fake;
+//   * the menu lists only ported pages; the rest of the router table is still
+//     `TODO: port`, and `admin/abuse-user-reports` / `latest-version` do not
+//     exist, so the warnings banner and the quick-action block are gone rather
+//     than fake;
 //   * the instance banner image is dropped (`$instance.iconUrl` is not
 //     mirrored by `@/instance`), and no abuse/report count is shown.
 import {
@@ -114,6 +114,12 @@ const menuDef = computed<MkSuperMenuGroup[]>(() => [
 				text: t("customEmojis"),
 				to: "/admin/emojis",
 				active: isActive("/admin/emojis"),
+			},
+			{
+				icon: "ph-hash ph-bold ph-lg",
+				text: t("hiddenTags"),
+				to: "/admin/hashtags",
+				active: isActive("/admin/hashtags"),
 			},
 			{
 				icon: "ph-tray ph-bold ph-lg",

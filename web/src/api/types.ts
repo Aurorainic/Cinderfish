@@ -531,6 +531,7 @@ export interface AdminInstanceMeta {
 	inquiryUrl: string;
 	impressumUrl: string;
 	serverRules: string[];
+	hiddenTags: string[];
 }
 
 /** Counters from `stats`. */
