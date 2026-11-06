@@ -39,6 +39,7 @@ import type {
 	UserNameAvailability,
 	UserDetailed,
 	UserLite,
+	Webhook,
 } from "./types";
 
 export const ENDPOINTS = {
@@ -53,6 +54,11 @@ export const ENDPOINTS = {
 	miAuthGenToken: "miauth/gen-token",
 	iApps: "i/apps",
 	iExport: "i/export",
+	iWebhooksCreate: "i/webhooks/create",
+	iWebhooksList: "i/webhooks/list",
+	iWebhooksShow: "i/webhooks/show",
+	iWebhooksUpdate: "i/webhooks/update",
+	iWebhooksDelete: "i/webhooks/delete",
 	iDeleteAccount: "i/delete-account",
 	iRevokeToken: "i/revoke-token",
 
@@ -359,6 +365,18 @@ export interface AdminAccountsCreateParams {
 	password: string;
 }
 
+export interface WebhookParams {
+	name: string;
+	url: string;
+	secret: string;
+	on: string[];
+}
+
+export interface WebhookUpdateParams extends WebhookParams {
+	webhookId: string;
+	active: boolean;
+}
+
 export interface AbuseReportsParams {
 	limit?: number;
 	sinceId?: string;
@@ -548,6 +566,24 @@ export interface EndpointMap {
 		req: NotificationsParams;
 		res: Notification[];
 	};
+	[ENDPOINTS.iWebhooksCreate]: { req: WebhookParams; res: Webhook };
+	[ENDPOINTS.iWebhooksList]: {
+		req: Record<string, never>;
+		res: Webhook[];
+	};
+	[ENDPOINTS.iWebhooksShow]: {
+		req: { webhookId: string };
+		res: Webhook;
+	};
+	[ENDPOINTS.iWebhooksUpdate]: {
+		req: WebhookUpdateParams;
+		res: Webhook;
+	};
+	[ENDPOINTS.iWebhooksDelete]: {
+		req: { webhookId: string };
+		res: EmptyResponse;
+	};
+
 	[ENDPOINTS.usersReportAbuse]: {
 		req: { userId: string; comment: string };
 		res: EmptyResponse;

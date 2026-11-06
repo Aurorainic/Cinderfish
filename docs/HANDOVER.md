@@ -1840,6 +1840,67 @@ profile 与服务停止。
 - 举报成功后的 toast 只在浏览器里看到「好」按钮关闭对话框，没有逐字核对提示文案。
 - 转发、通知与自动处置按设计未做。
 
+## 12AA. 批次：前端第十一波——Webhook（2026-11-06）
+
+**工作方式**：目标模式第十一波，一轮完成迁移、服务、五个端点、投递接入、三个页面、测试、
+真实二进制与浏览器走查、文档与提交。施工依据
+`docs/research/2026-11-06-firefish-port-wave11-contract.md`。
+
+### 12AA.1 落地清单
+
+| 层 | 文件 | 说明 |
+|----|------|------|
+| 迁移 | `internal/db/db.go`（v12） | `webhooks` 表；事件列名用 `events` 避开 `ON` 保留字 |
+| 服务 | `internal/webhook/service.go`（新） | CRUD + `Dispatch`（异步投递、5s 超时、回写 latestStatus） |
+| 端点 | `internal/httpapi/webhooks.go`（新）、`server.go` | `i/webhooks/{create,list,show,update,delete}` |
+| 投递接入 | `internal/httpapi/webhooks_dispatch.go`（新）、`notes.go` | 发帖成功后按 reply/renote/note 派发 |
+| 页面 | `WebhookEditor.vue`、`SettingsWebhook*.vue` | 列表、新建、编辑共用表单 |
+| 菜单 | `SettingsIndex.vue` | 客户端设置组新增 Webhook |
+| 接口层 | `endpoints.ts`、`types.ts` | 五个端点与 `Webhook` |
+| 测试 | `internal/httpapi/webhooks_test.go`（新，3 个用例） | CRUD/越权、校验、真实投递（含 reply 事件） |
+
+### 12AA.2 有意的降级
+
+1. 只产生 note / reply / renote 事件；其余枚举可存但不会触发，页面不提供勾选。
+2. 没有 `i/webhooks/test`（参考快照也没有），不造假按钮。
+3. 没有重试队列，失败只记录 `latestStatus`。
+4. 不发送上游的 `X-Firefish-Host` 头。
+
+### 12AA.3 验证证据
+
+```
+gofmt -l internal/ cmd/                 # 空
+go vet ./...                            # exit 0
+CINDERFISH_TEST_DATABASE_URL=… go test -count=1 ./...   # 全绿（新增 3 个用例）
+cd web && pnpm exec vue-tsc --noEmit    # exit 0
+cd web && pnpm run check:port           # 398 文件，hardTotal 0
+cd web && pnpm build                    # exit 0
+```
+
+真实二进制 `:3991` + 本地接收器 `127.0.0.1:4499`（Node，记录请求）：
+
+| 场景 | 结果 |
+|------|------|
+| `/settings/webhook` 空态 | 「还没有 Webhook」 |
+| 表单创建「走查 Webhook」（URL 指向接收器） | 返回列表并显示名称、URL、事件 `note`、尚未投递 |
+| 通过 API 发一条帖子 | 列表显示「最近投递 … HTTP 200」 |
+| 接收器日志 | `X-Firefish-Hook-Id`/`Secret` 正确，body 中 `type=note`、帖子正文与作者匹配 |
+| 编辑页关闭「启用」并保存 | 列表徽标变为「停用」 |
+| 列表删除 + 确认 | 回到空态 |
+| 移动端 `/settings/webhook`、`/webhook/new` | 无横向溢出、无 JS 异常 |
+
+Go 测试另外覆盖 reply 事件与 `latestStatus=200` 回写。截图在 `/tmp/w11-shots`（不入库）。
+
+走查数据已清理：w11user 与 Webhook、帖子级联删除（webhooks 计数 0），用户数回到 23；服务、
+接收器、临时二进制、媒体目录与 profile 停止/删除。
+
+### 12AA.4 仍未验证
+
+- follow / reaction / mention 等事件没有产生方，只验证了 API 接受与页面不展示。
+- 失败与超时路径（`latestStatus=1`、5s 超时）只在实现层检查，没有用挂起的接收器实测。
+- 重试、批量并发与投递顺序没有测试；个人实例先接受。
+- 编辑页的删除只走了列表删除路径，编辑页内的删除按钮没有点击。
+
 ## 13. 文档索引
 
 | 文档 | 内容 |
@@ -1876,6 +1937,7 @@ profile 与服务停止。
 | `docs/research/2026-11-06-firefish-port-wave8-contract.md` | **第八波施工契约（公告表 v10、四个公告端点、公告页与管理页），见 §12X** |
 | `docs/research/2026-11-06-firefish-port-wave9-contract.md` | **第九波施工契约（i/export、i/delete-account、导出页与注销页），见 §12Y** |
 | `docs/research/2026-11-06-firefish-port-wave10-contract.md` | **第十波施工契约（举报表 v11、三个举报端点、用户菜单入口与管理页），见 §12Z** |
+| `docs/research/2026-11-06-firefish-port-wave11-contract.md` | **第十一波施工契约（webhooks 表 v12、五个端点、异步投递与设置页），见 §12AA** |
 
 ## 14. 已知的未验证项
 
@@ -1890,6 +1952,8 @@ profile 与服务停止。
   浏览器内过期隐藏均未构造数据；已读跟踪与首页横幅按设计未做。
 - **第十波未测边角（2026-11-06，见 §12Z.4）**：远端举报、分页游标与 toast 文案未验证；转发、
   通知与自动处置按设计未做。
+- **第十一波未测边角（2026-11-06，见 §12AA.4）**：失败/超时路径、重试与投递顺序、编辑页内删除、
+  未产生的事件类型没有实测。
 - **仍未移植的设置页**：邮箱、整合、安全（2FA）、导入导出、迁移、Webhook、插件、自定义 KaTeX、状态栏、
   删除账号、应用授权以外的账号操作；对应后端端点不存在或前端缺少依赖（见第五波契约 §3.3）。
 - **仍缺的 widgets**：rss、rss-ticker、server-metric、online-users、federation、job-queue、aiscript、

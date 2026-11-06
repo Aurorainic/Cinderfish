@@ -442,3 +442,17 @@ export interface AbuseReport {
 	createdAt: string;
 	forwarded: boolean;
 }
+
+/** One outbound webhook from `i/webhooks/*`. */
+export interface Webhook {
+	id: string;
+	userId: string;
+	name: string;
+	url: string;
+	secret: string;
+	on: string[];
+	active: boolean;
+	createdAt: string;
+	latestSentAt: string | null;
+	latestStatus: number | null;
+}

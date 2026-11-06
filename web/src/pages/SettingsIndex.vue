@@ -6,7 +6,7 @@
 				<div v-if="!narrow || !hasChild" class="nav">
 					<MkSuperMenu :def="menuDef" :grid="narrow" />
 					<CfInfo class="missing">
-						菜单只列出已有页面与端点的设置。邮箱、插件、导入、迁移、Webhook 等仍缺后端端点，未列入。
+						菜单只列出已有页面与端点的设置。邮箱、插件、导入、迁移等仍缺后端端点，未列入。
 					</CfInfo>
 				</div>
 				<section v-if="!(narrow && !hasChild)" class="main">
@@ -200,6 +200,12 @@ const menuDef = computed<MkSuperMenuGroup[]>(() => [
 				text: t("registry"),
 				to: "/registry",
 				active: isActive("/registry"),
+			},
+			{
+				icon: "ph-webhooks-logo ph-bold ph-lg",
+				text: "Webhook",
+				to: "/settings/webhook",
+				active: isActive("/settings/webhook"),
 			},
 			{
 				icon: "ph-arrows-down-up ph-bold ph-lg",
