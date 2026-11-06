@@ -2,10 +2,12 @@ package federation
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
 	"net/url"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -61,10 +63,12 @@ type Policy struct {
 	db       *pgxpool.Pool
 	selfHost string
 
-	// mu guards the cached allowlist.
-	mu       sync.RWMutex
-	cached   []string
-	cachedAt time.Time
+	// mu guards the cached allowlist and blocked-host list.
+	mu        sync.RWMutex
+	cached    []string
+	cachedAt  time.Time
+	blocked   []string
+	blockedAt time.Time
 }
 
 // allowlistTTL bounds how stale the cached allowlist may be. The list
@@ -107,6 +111,9 @@ func (p *Policy) IsAllowed(ctx context.Context, host string) bool {
 	if host == p.selfHost {
 		return true
 	}
+	if p.HostBlocked(ctx, host) {
+		return false
+	}
 	mode, err := p.Mode(ctx)
 	if err != nil || mode == ModeNone {
 		return false
@@ -144,6 +151,102 @@ func (p *Policy) hostInAllowlist(ctx context.Context, host string) bool {
 		}
 	}
 	return false
+}
+
+// HostBlocked reports whether the instance has blocked federation with host.
+// Matching is exact after normalisation: an operator who wants a wildcard adds
+// each host explicitly, which matches how the list is presented in the admin
+// page.
+func (p *Policy) HostBlocked(ctx context.Context, host string) bool {
+	host = normalizeHost(host)
+	if host == "" {
+		return false
+	}
+	for _, entry := range p.BlockedHosts(ctx) {
+		if entry == host {
+			return true
+		}
+	}
+	return false
+}
+
+// BlockedHosts returns the current list, reading through the cache.
+func (p *Policy) BlockedHosts(ctx context.Context) []string {
+	p.mu.RLock()
+	if time.Since(p.blockedAt) < allowlistTTL {
+		out := p.blocked
+		p.mu.RUnlock()
+		return out
+	}
+	p.mu.RUnlock()
+
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if time.Since(p.blockedAt) < allowlistTTL {
+		return p.blocked
+	}
+	entries := p.readBlockedHosts(ctx)
+	p.blocked = entries
+	p.blockedAt = time.Now()
+	return entries
+}
+
+func (p *Policy) readBlockedHosts(ctx context.Context) []string {
+	if p.db == nil {
+		return nil
+	}
+	var raw []byte
+	err := p.db.QueryRow(ctx, "SELECT value FROM instance_meta WHERE key = 'blockedHosts'").Scan(&raw)
+	if err != nil {
+		return nil
+	}
+	var hosts []string
+	if err := json.Unmarshal(raw, &hosts); err != nil {
+		return nil
+	}
+	out := make([]string, 0, len(hosts))
+	for _, host := range hosts {
+		host = normalizeHost(host)
+		if host != "" {
+			out = append(out, host)
+		}
+	}
+	return out
+}
+
+// SetBlockedHosts replaces the list and invalidates the cache immediately, so
+// the next inbox or delivery does not wait for the TTL.
+func (p *Policy) SetBlockedHosts(ctx context.Context, hosts []string) error {
+	if p.db == nil {
+		return fmt.Errorf("federation: no database")
+	}
+	seen := make(map[string]bool, len(hosts))
+	clean := make([]string, 0, len(hosts))
+	for _, host := range hosts {
+		host = normalizeHost(host)
+		if host == "" || seen[host] {
+			continue
+		}
+		seen[host] = true
+		clean = append(clean, host)
+	}
+	sort.Strings(clean)
+
+	payload, err := json.Marshal(clean)
+	if err != nil {
+		return fmt.Errorf("federation: encode blocked hosts: %w", err)
+	}
+	if _, err := p.db.Exec(ctx, `
+INSERT INTO instance_meta (key, value) VALUES ('blockedHosts', $1::jsonb)
+ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
+`, payload); err != nil {
+		return fmt.Errorf("federation: save blocked hosts: %w", err)
+	}
+	p.mu.Lock()
+	p.blocked = clean
+	p.blockedAt = time.Now()
+	p.mu.Unlock()
+	return nil
 }
 
 // Allowlist returns the current entries, reading through the cache.

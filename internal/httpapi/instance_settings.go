@@ -2,7 +2,10 @@ package httpapi
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"net/http"
+	"sort"
 	"strings"
 	"unicode/utf8"
 
@@ -18,6 +21,7 @@ type instanceSettings struct {
 	MaintainerName   string
 	MaintainerEmail  string
 	RegistrationMode string
+	BlockedHosts     []string
 }
 
 // instanceMetaKey maps a settings field to its instance_meta key.
@@ -102,6 +106,62 @@ ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
 	return err
 }
 
+// liveBlockedHosts reads the blocked-host list. It prefers the policy cache
+// (which the inbox and the deliverer use) and falls back to the table when no
+// federation policy is attached, as in some tests.
+func (s *Server) liveBlockedHosts(ctx context.Context) []string {
+	if s.federationPolicy != nil {
+		return s.federationPolicy.BlockedHosts(ctx)
+	}
+	if s.pool == nil {
+		return []string{}
+	}
+	var raw []byte
+	if err := s.pool.QueryRow(ctx,
+		`SELECT value FROM instance_meta WHERE key = 'blockedHosts'`).Scan(&raw); err != nil {
+		return []string{}
+	}
+	var hosts []string
+	if err := json.Unmarshal(raw, &hosts); err != nil {
+		return []string{}
+	}
+	return hosts
+}
+
+// saveBlockedHosts writes the list through the policy when it exists, so the
+// cache is invalidated immediately.
+func (s *Server) saveBlockedHosts(ctx context.Context, hosts []string) error {
+	clean := make([]string, 0, len(hosts))
+	seen := make(map[string]bool, len(hosts))
+	for _, host := range hosts {
+		h := strings.ToLower(strings.TrimSpace(host))
+		if h == "" || seen[h] {
+			continue
+		}
+		if len(h) > 253 || strings.ContainsAny(h, "/ \\@") {
+			return fmt.Errorf("blocked host is not a hostname: %s", host)
+		}
+		seen[h] = true
+		clean = append(clean, h)
+	}
+	if len(clean) > 200 {
+		return fmt.Errorf("blockedHosts has too many entries")
+	}
+	sort.Strings(clean)
+	if s.federationPolicy != nil {
+		return s.federationPolicy.SetBlockedHosts(ctx, clean)
+	}
+	payload, err := json.Marshal(clean)
+	if err != nil {
+		return err
+	}
+	_, err = s.pool.Exec(ctx, `
+INSERT INTO instance_meta (key, value) VALUES ('blockedHosts', $1::jsonb)
+ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
+`, payload)
+	return err
+}
+
 // handleAdminMeta is POST /api/admin/meta. It returns only the subset this
 // instance lets an administrator change.
 func (s *Server) handleAdminMeta(w http.ResponseWriter, r *http.Request) {
@@ -109,12 +169,17 @@ func (s *Server) handleAdminMeta(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	settings := s.liveInstanceSettings(r.Context())
+	blocked := s.liveBlockedHosts(r.Context())
+	if blocked == nil {
+		blocked = []string{}
+	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"name":             settings.Name,
 		"description":      settings.Description,
 		"maintainerName":   settings.MaintainerName,
 		"maintainerEmail":  settings.MaintainerEmail,
 		"registrationMode": settings.RegistrationMode,
+		"blockedHosts":     blocked,
 	})
 }
 
@@ -133,11 +198,12 @@ func (s *Server) handleAdminUpdateMeta(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var body struct {
-		Name             *string `json:"name"`
-		Description      *string `json:"description"`
-		MaintainerName   *string `json:"maintainerName"`
-		MaintainerEmail  *string `json:"maintainerEmail"`
-		RegistrationMode *string `json:"registrationMode"`
+		Name             *string   `json:"name"`
+		Description      *string   `json:"description"`
+		MaintainerName   *string   `json:"maintainerName"`
+		MaintainerEmail  *string   `json:"maintainerEmail"`
+		RegistrationMode *string   `json:"registrationMode"`
+		BlockedHosts     *[]string `json:"blockedHosts"`
 	}
 	if err := decodeOptionalJSON(r, &body); err != nil {
 		writeAPIError(w, err)
@@ -184,6 +250,13 @@ func (s *Server) handleAdminUpdateMeta(w http.ResponseWriter, r *http.Request) {
 			updates["registrationMode"] = value
 		default:
 			writeAPIError(w, invalidParamError("registrationMode must be open, invite or admin"))
+			return
+		}
+	}
+
+	if body.BlockedHosts != nil {
+		if err := s.saveBlockedHosts(r.Context(), *body.BlockedHosts); err != nil {
+			writeAPIError(w, invalidParamError(err.Error()))
 			return
 		}
 	}

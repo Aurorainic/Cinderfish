@@ -625,6 +625,16 @@ func (s *Server) handleInbox(w http.ResponseWriter, r *http.Request) {
 	}
 	_ = keyID
 
+	// A blocked host may not deliver activities to this instance. The check
+	// happens after signature verification so an anonymous caller cannot probe
+	// the blocklist through this route.
+	if s.federationPolicy != nil {
+		if host, err := federation.HostOf(activity.Ref("actor")); err == nil && s.federationPolicy.HostBlocked(r.Context(), host) {
+			http.Error(w, "Forbidden", http.StatusForbidden)
+			return
+		}
+	}
+
 	outcome, err := s.federationInbox.Process(r.Context(), activity)
 	if err != nil {
 		log.Printf("httpapi: inbox %s: %v", activity.Type(), err)

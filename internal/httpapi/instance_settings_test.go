@@ -101,3 +101,37 @@ func TestInstanceSettingsValidationAndPermissions(t *testing.T) {
 		t.Errorf("non-admin read status = %d, want 403", resp.StatusCode)
 	}
 }
+
+func TestInstanceBlockedHosts(t *testing.T) {
+	ts, _ := adminTestServer(t, "open")
+
+	resp, raw := postRawWithToken(t, ts, "/api/admin/update-meta", "admintoken000000", map[string]any{
+		"blockedHosts": []string{"B.Example.com", " a.example.com ", "", "a.example.com"},
+	})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("update-meta blockedHosts: status %d, body %v", resp.StatusCode, raw)
+	}
+	updated, _ := raw.(map[string]any)
+	hosts, _ := updated["blockedHosts"].([]any)
+	if len(hosts) != 2 || hosts[0] != "a.example.com" || hosts[1] != "b.example.com" {
+		t.Errorf("blockedHosts = %v, want [a.example.com b.example.com]", hosts)
+	}
+
+	// The list survives a re-read.
+	resp, raw = postRawWithToken(t, ts, "/api/admin/meta", "admintoken000000", map[string]any{})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("admin/meta: status %d", resp.StatusCode)
+	}
+	current, _ := raw.(map[string]any)
+	if list, _ := current["blockedHosts"].([]any); len(list) != 2 {
+		t.Errorf("admin/meta blockedHosts = %v", current["blockedHosts"])
+	}
+
+	// A hostname with a scheme is rejected.
+	resp, _ = postRawWithToken(t, ts, "/api/admin/update-meta", "admintoken000000", map[string]any{
+		"blockedHosts": []string{"https://evil.example"},
+	})
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("scheme in blockedHosts status = %d, want 400", resp.StatusCode)
+	}
+}

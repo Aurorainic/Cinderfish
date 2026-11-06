@@ -1148,3 +1148,19 @@ UserLite 部分也有简化：`name`/`avatarUrl` 只从 profile 行来，没有 
 
 注册模式立即生效：`signup` 的校验、`meta.disableRegistration` 与 nodeinfo 的
 `openRegistrations` 都会随之变化。返回更新后的同一对象。
+
+### POST /api/admin/update-meta 的 `blockedHosts`
+
+`admin/meta` 恒返回 `blockedHosts: string[]`（空列表为 `[]`）。`admin/update-meta` 接受：
+
+- 数组元素为纯主机名（不含 scheme/路径/`@`/空格），≤253 字符；
+- 服务端小写化、去空、去重、排序，最多 200 条；
+- 空数组清空。
+
+生效范围：
+
+- 出站：`federation.Policy.IsAllowed` 命中即拒绝，所有 AP 请求走这条；
+- 入站：`/inbox` 在签名验证后按 actor 主机拒绝（403）；
+- 匹配是**精确主机**：`bad.example` 不覆盖 `sub.bad.example`。
+
+不会删除已收到的帖子/文件，也不取消已有关注。

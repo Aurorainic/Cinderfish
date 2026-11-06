@@ -77,6 +77,9 @@ users/update
 `following/requests/*`、`users/update`、`signin`、`signup`、`username/available`、
 `i/registry/scopes`，以及 `admin/federation/mode` 的 GET。
 
+2026-11-06 第十四波新增：`admin/update-meta` 增加 `blockedHosts`（不是新路由），策略层在出站与入站
+按精确主机拒绝。
+
 2026-11-06 第十三波新增：`admin/meta`、`admin/update-meta`（只覆盖名称/简介/维护者/邮箱/注册模式）。
 
 2026-11-06 第十二波新增：`admin/get-table-stats`、`admin/get-index-stats`（只读）。

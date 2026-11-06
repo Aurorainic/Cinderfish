@@ -3,6 +3,7 @@ package federation
 import (
 	"context"
 	"testing"
+	"time"
 )
 
 func TestHostMatchesSuffix(t *testing.T) {
@@ -85,5 +86,24 @@ func TestPolicyWithoutDatabaseRefusesEverything(t *testing.T) {
 	}
 	if err := p.CheckAllowed(ctx, "other.example"); err == nil {
 		t.Error("CheckAllowed allowed a host with no database")
+	}
+}
+
+func TestHostBlockedExactMatch(t *testing.T) {
+	p := &Policy{blocked: []string{"evil.example"}, blockedAt: time.Now()}
+	ctx := context.Background()
+
+	if !p.HostBlocked(ctx, "evil.example") {
+		t.Error("blocked host not reported")
+	}
+	if !p.HostBlocked(ctx, "EVIL.Example") {
+		t.Error("blocked host comparison should be case-insensitive")
+	}
+	// Blocking is exact: a subdomain is a different host unless listed.
+	if p.HostBlocked(ctx, "sub.evil.example") {
+		t.Error("subdomain should not inherit a block")
+	}
+	if p.HostBlocked(ctx, "good.example") {
+		t.Error("unrelated host reported as blocked")
 	}
 }
