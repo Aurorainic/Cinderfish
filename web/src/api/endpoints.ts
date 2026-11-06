@@ -51,6 +51,8 @@ export const ENDPOINTS = {
 	usernameAvailable: "username/available",
 	miAuthGenToken: "miauth/gen-token",
 	iApps: "i/apps",
+	iExport: "i/export",
+	iDeleteAccount: "i/delete-account",
 	iRevokeToken: "i/revoke-token",
 
 	// current user
@@ -616,6 +618,14 @@ export interface EndpointMap {
 		res: AuthorizedApp[];
 	};
 	[ENDPOINTS.iRevokeToken]: { req: { tokenId: string }; res: EmptyResponse };
+
+	// Answered with a file body through apiDownload(); the entry keeps
+	// EndpointName exhaustive so api("i/export") still type-checks.
+	[ENDPOINTS.iExport]: { req: Record<string, never>; res: EmptyResponse };
+	[ENDPOINTS.iDeleteAccount]: {
+		req: { password: string };
+		res: EmptyResponse;
+	};
 
 	[ENDPOINTS.muteCreate]: { req: { userId: string }; res: EmptyResponse };
 	[ENDPOINTS.muteDelete]: { req: { userId: string }; res: EmptyResponse };

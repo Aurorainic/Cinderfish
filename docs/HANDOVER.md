@@ -1719,6 +1719,67 @@ cd web && pnpm build                    # exit 0
 - 过期公告的公开隐藏由测试的 400ms 有效期验证，没有在浏览器里等过期。
 - 已读跟踪与首页横幅按设计未做。
 
+## 12Y. 批次：前端第九波——账号数据导出与账号注销（2026-11-06）
+
+**工作方式**：目标模式第九波，一轮完成端点、页面、测试、真实二进制与浏览器走查、文档与提交。
+施工依据 `docs/research/2026-11-06-firefish-port-wave9-contract.md`。
+
+### 12Y.1 落地清单
+
+| 层 | 文件 | 说明 |
+|----|------|------|
+| 导出 | `internal/httpapi/account_data.go`（新） | `i/export`：资料 + 本人帖子 + 关注/粉丝 + 收藏 + 网盘元数据，附件下载 |
+| 注销 | 同上 | `i/delete-account`：密码复核、最后管理员保护、先删网盘对象再硬删账号 |
+| 路由 | `internal/httpapi/server.go` | 两条 POST |
+| 下载 | `web/src/api/client.ts` | 新增 `apiDownload()`，错误仍走 `ApiError` |
+| 导出页 | `web/src/pages/SettingsImportExport.vue` | 占位页改为导出卡片；导入明确未实现 |
+| 注销页 | `web/src/pages/SettingsDeleteAccount.vue` | 密码 + 用户名确认，成功后 `signOut()` 回首页 |
+| 设置菜单 | `web/src/pages/SettingsIndex.vue` | 其它设置组新增两项，说明同步 |
+| 测试 | `internal/httpapi/account_data_test.go`、`account_delete_test.go`（各新） | 导出只含本人数据且不泄 token；注销错误/正确密码、token 失效；最后管理员 400 |
+
+### 12Y.2 有意的取舍
+
+1. 导出是同步 JSON（`cinderfish-account-export@1`），不是 Firefish 的异步 zip；不冒充 Misskey 格式。
+2. 没有导入：缺少格式、冲突规则与限流，页面只放导出按钮并说明原因。
+3. 注销是硬删除（Firefish 先标记后清理）；页面把「无法恢复」写在最前。
+4. 最后一个未冻结管理员不可注销，避免实例失去管理入口。
+
+### 12Y.3 验证证据
+
+```
+gofmt -l internal/ cmd/                 # 空
+go vet ./...                            # exit 0
+CINDERFISH_TEST_DATABASE_URL=… go test -count=1 ./...   # 全绿（新增 3 个用例）
+cd web && pnpm exec vue-tsc --noEmit    # exit 0
+cd web && pnpm run check:port           # 398 文件，hardTotal 0
+cd web && pnpm build                    # exit 0
+```
+
+真实二进制 `:3991`（开发库，`federation_mode=none`）：
+
+| 场景 | 结果 |
+|------|------|
+| `i/export`（w9dana，1 帖 1 关注 1 收藏） | 200，`Content-Disposition: attachment`；JSON 中 user=w9dana、notes=1、followings=1、favorites=1，无 `token` 字段 |
+| 管理页导出按钮 | 真实下载 `cinderfish-export-w9dana-*.json`，内容与 API 一致 |
+| `i/delete-account` 错误密码 | 403 `INVALID_PASSWORD`，账号仍在 |
+| `i/delete-account` 正确密码 | 204；随后原 token 401、`users/show` 404 |
+| 最后管理员保护（独立测试库只有 root） | 400 `LAST_ADMIN`，账号仍可用 |
+| 注销页 | 密码 + 用户名填对后才能点；提交后回到访客首页 |
+
+无头 Helium 156（1440×900 / 390×844）：导出页与注销页桌面/移动均无横向溢出、无 JS 异常；
+注销发生在导出与移动端检查之后，避免会话中途失效。截图在 `/tmp/w9-shots`（不入库）。
+
+走查数据已清理：w9admin 在验证 `LAST_ADMIN` 时被删除——开发库里还有 t3admin，它不是最后管理员，
+行为符合预期（最后管理员保护另用独立测试库验证）；w9dana 与其帖子/关注/收藏全部清除，用户数回到 23；
+临时二进制、配置、下载目录、profile 与服务停止。
+
+### 12Y.4 仍未验证
+
+- 网盘文件较多的账号导出/注销：没有构造 >100 个文件来验证分页删除循环。
+- 导出在帖子很多时的内存占用没有压测（同步编码到响应）。
+- 导入、邮件、2FA、Webhook、迁移等仍无端点。
+- 注销后媒体对象是否真的从磁盘消失，只验证了行删除与 404，没有检查存储目录。
+
 ## 13. 文档索引
 
 | 文档 | 内容 |
@@ -1753,6 +1814,7 @@ cd web && pnpm build                    # exit 0
 | `docs/research/2026-11-06-firefish-port-wave6-contract.md` | **第六波施工契约（notes/search、notes/search-by-tag、users/search 与搜索/标签页），见 §12V** |
 | `docs/research/2026-11-06-firefish-port-wave7-contract.md` | **第七波施工契约（admin/show-users 筛选、admin/drive/files 与用户/文件管理页），见 §12W** |
 | `docs/research/2026-11-06-firefish-port-wave8-contract.md` | **第八波施工契约（公告表 v10、四个公告端点、公告页与管理页），见 §12X** |
+| `docs/research/2026-11-06-firefish-port-wave9-contract.md` | **第九波施工契约（i/export、i/delete-account、导出页与注销页），见 §12Y** |
 
 ## 14. 已知的未验证项
 

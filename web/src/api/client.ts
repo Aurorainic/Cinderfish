@@ -168,6 +168,62 @@ export function apiForm<T = unknown>(
   return send<T>(endpoint, { method: "POST", headers, body: form });
 }
 
+export interface DownloadedFile {
+  blob: Blob;
+  filename: string | null;
+}
+
+/**
+ * POST an RPC that answers with a file body instead of JSON (currently only
+ * `i/export`). Errors still use the JSON error envelope, so a failed request is
+ * raised as ApiError exactly like `api()`.
+ */
+export async function apiDownload(
+  endpoint: string,
+  params: Record<string, unknown> = {},
+  token?: string | null,
+): Promise<DownloadedFile> {
+  const authToken = token ?? getAuthToken();
+  const body: Record<string, unknown> = { ...params };
+  if (authToken != null) body.i = authToken;
+
+  pendingApiRequestsCount.value += 1;
+  try {
+    let response: Response;
+    try {
+      response = await fetch(resolveUrl(endpoint), {
+        method: "POST",
+        credentials: "omit",
+        cache: "no-cache",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+    } catch (cause) {
+      throw ApiError.network(cause);
+    }
+
+    if (!response.ok) {
+      const text = await response.text();
+      let parsed: unknown = null;
+      try {
+        parsed = JSON.parse(text) as unknown;
+      } catch {
+        parsed = text;
+      }
+      throw ApiError.fromResponse(response.status, parsed);
+    }
+
+    const disposition = response.headers.get("content-disposition") ?? "";
+    const match = disposition.match(/filename="?([^";]+)"?/);
+    return {
+      blob: await response.blob(),
+      filename: match?.[1] ?? null,
+    };
+  } finally {
+    pendingApiRequestsCount.value -= 1;
+  }
+}
+
 /** Picks GET or POST from the endpoint table. */
 export function call<E extends EndpointName>(
   endpoint: E,
