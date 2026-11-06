@@ -38,8 +38,9 @@ import { t } from "@/i18n";
  *   - `notes/renotes` cannot be filtered by author (no `userId` parameter), so
  *     "already renoted" can only be tracked locally after this component's own
  *     action; it is never queried per note.
- *   - `notes/unrenote` does not exist in Cinderfish (docs/research/api-contract/
- *     notes-core.md); the undo entry is not rendered.
+ *   - `notes/unrenote` takes the ORIGINAL note's id, so the undo entry is only
+ *     offered after this component renoted in the current session; there is no
+ *     per-note "have I renoted this" lookup behind it.
  *   - Quoting opens the composer through `os.post({ renote })`, matching
  *     Firefish's own call.
  */
@@ -153,6 +154,19 @@ function renote(ev?: MouseEvent): void {
 			text: t("quote"),
 			icon: "ph-quotes ph-bold ph-lg",
 			action: quote,
+		});
+	}
+
+	if (hasRenotedBefore.value) {
+		buttonActions.push({
+			text: t("unrenote"),
+			icon: "ph-x ph-bold ph-lg",
+			action: () => {
+				void apiWithDialog(ENDPOINTS.notesUnrenote, {
+					noteId: props.note.id,
+				});
+				hasRenotedBefore.value = false;
+			},
 		});
 	}
 

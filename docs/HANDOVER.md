@@ -3110,6 +3110,47 @@ cd web && pnpm build                    # exit 0
 - 忘记密码 → 收信 → 重置的完整链路。
 - 浏览器走查与 `go test` 未执行。
 
+## 12BD. 批次：出站投递与取消转贴（2026-11-06）
+
+**工作方式**：目标模式第四十波。本波起点是「转贴不能取消」，读代码时发现更严重的问题：
+`DeliverNote` / `DeliverDelete` 只有定义没有调用点，本地笔记从未投递。施工依据
+`docs/research/2026-11-06-firefish-port-wave40-contract.md`。
+
+### 12BD.1 落地清单
+
+| 层 | 文件 | 说明 |
+|----|------|------|
+| 投递 | `internal/httpapi/federation_wire.go` | `deliverable`/`deliveryInboxes`/`objectRef`；`DeliverNote` 分 `Create`/`Announce`；`DeliverDelete` 分 `Delete`/`Undo(Announce)`；直发只投可见用户 |
+| 接线 | `internal/httpapi/notes.go` | `notes/create`、`notes/delete` 各调一次；新增 `handleNotesUnrenote` |
+| 存储 | `internal/note/renote.go` | `PureRenoteOf`（找调用者的纯转贴，引用不算） |
+| 端点 | `internal/httpapi/server.go` | 注册 `notes/unrenote` |
+| 前端 | `components/MkRenoteButton.vue`、`api/endpoints.ts` | 会话内转过贴后显示「取消转发」 |
+| 文档 | `notes-core.md`、台账 | 投递矩阵与 unrenote 语义（132/125/315） |
+
+### 12BD.2 有意的限制
+
+1. `notes/edit` 仍不发 `Update`。
+2. 远端原帖缺 `uri` 时删除降级为 `Delete` 转贴本身。
+3. 投递失败只记日志，不回滚请求。
+4. 前端只能知道「本次会话内转过」，没有逐笔记的转贴查询。
+
+### 12BD.3 验证证据（编译层）
+
+```
+gofmt -l internal/ cmd/                 # 空
+go vet ./...                            # exit 0
+cd web && pnpm exec vue-tsc --noEmit    # exit 0
+cd web && pnpm run check:port           # hardTotal 0（400 文件）
+cd web && pnpm build                    # exit 0
+```
+
+### 12BD.4 仍未验证
+
+- 真实双实例：Create/Announce/Delete/Undo 的签名、收件箱去重与远端反应。
+- 直发笔记不投关注者这一点没有用例保证。
+- `notes/unrenote` 找到/找不到两条分支。
+- `go test` 与浏览器走查未执行。
+
 ## 13. 文档索引
 
 | 文档 | 内容 |
@@ -3175,6 +3216,7 @@ cd web && pnpm build                    # exit 0
 | `docs/research/2026-11-06-firefish-port-wave37-contract.md` | **第三十七波施工契约（公告编辑），见 §12BA** |
 | `docs/research/2026-11-06-firefish-port-wave38-contract.md` | **第三十八波施工契约（邮件与邮箱验证），见 §12BB** |
 | `docs/research/2026-11-06-firefish-port-wave39-contract.md` | **第三十九波施工契约（邮箱前端页面），见 §12BC** |
+| `docs/research/2026-11-06-firefish-port-wave40-contract.md` | **第四十波施工契约（出站投递与取消转贴），见 §12BD** |
 
 ## 14. 已知的未验证项
 
@@ -3233,6 +3275,7 @@ cd web && pnpm build                    # exit 0
 - **第三十七波未测（2026-11-06，见 §12BA.4）**：公告编辑只过了编译层，保存回读与清空语义未验证。
 - **第三十八波未测（2026-11-06，见 §12BB.4）**：SMTP 真投递与验证/重置端到端未执行，只有编译层证据。
 - **第三十九波未测（2026-11-06，见 §12BC.4）**：邮箱三页只有编译层证据，渲染与完整链路未走查。
+- **第四十波未测（2026-11-06，见 §12BD.4）**：出站投递与取消转贴只有编译层证据；真实双实例投递未验证。
 - **仍未移植的设置页**：邮箱、整合、导入导出、迁移、Webhook、插件、自定义 KaTeX、状态栏、
   删除账号、应用授权以外的账号操作；对应后端端点不存在或前端缺少依赖（见第五波契约 §3.3）。
 - **仍缺的 widgets**：rss、rss-ticker、server-metric、online-users、federation、job-queue、aiscript、

@@ -110,6 +110,9 @@ func (s *Server) handleNotesCreate(w http.ResponseWriter, r *http.Request) {
 	s.publishNoteCreated(n, info.User.ID)
 	// And to the author's outbound webhooks, if any subscribe to this event.
 	s.dispatchNoteWebhook(r.Context(), n, info.User.ID)
+	// Federate: remote followers and mentions receive a Create, or an
+	// Announce when this note is a pure renote.
+	s.DeliverNote(r.Context(), n)
 
 	pc := s.notePackContext(r.Context(), n, info.User.ID)
 	writeJSON(w, http.StatusOK, map[string]any{
@@ -354,8 +357,60 @@ func (s *Server) handleNotesDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Remote peers get a Delete, or an Undo of the Announce for a renote.
+	s.DeliverDelete(r.Context(), n)
 	s.publishNoteDeleted(n)
 	writeJSON(w, http.StatusOK, map[string]any{})
+}
+
+// handleNotesUnrenote implements POST /api/notes/unrenote: it withdraws the
+// caller's pure renote of a note, if there is one.
+//
+// Firefish offers this as a separate action from deleting a note, so the call
+// takes the ORIGINAL note's id and must find the renote itself. Answering 204
+// even when nothing matched keeps the action idempotent: the button stays
+// usable after a double click or a stale timeline.
+func (s *Server) handleNotesUnrenote(w http.ResponseWriter, r *http.Request) {
+	if s.notes == nil {
+		writeAPIError(w, &APIError{
+			Message: "Not available.", Code: "INTERNAL_ERROR",
+			ID: errIDInternal, Kind: "server", Status: http.StatusServiceUnavailable,
+		})
+		return
+	}
+	var body struct {
+		NoteID string `json:"noteId"`
+	}
+	if err := decodeOptionalJSON(r, &body); err != nil {
+		writeAPIError(w, err)
+		return
+	}
+	info, err := s.authenticate(r.Context(), r, bodyAsMap(r))
+	if err != nil || info == nil {
+		writeAuthenticationError(w)
+		return
+	}
+	if body.NoteID == "" {
+		writeAPIError(w, invalidParamError("noteId is required"))
+		return
+	}
+
+	renote, err := s.notes.PureRenoteOf(r.Context(), info.User.ID, body.NoteID)
+	if err != nil {
+		writeInternalServerError(w)
+		return
+	}
+	if renote == nil {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	if err := s.notes.Delete(r.Context(), renote.ID, info.User.ID); err != nil {
+		writeInternalServerError(w)
+		return
+	}
+	s.DeliverDelete(r.Context(), renote)
+	s.publishNoteDeleted(renote)
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // noteListRequest is the parameter set shared by notes/replies and

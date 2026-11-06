@@ -235,6 +235,7 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("POST /api/notes/create", s.handleNotesCreate)
 	s.mux.HandleFunc("POST /api/notes/show", s.handleNotesShow)
 	s.mux.HandleFunc("POST /api/notes/delete", s.handleNotesDelete)
+	s.mux.HandleFunc("POST /api/notes/unrenote", s.handleNotesUnrenote)
 	s.mux.HandleFunc("POST /api/notes/edit", s.handleNotesEdit)
 	s.mux.HandleFunc("POST /api/notes/history", s.handleNotesHistory)
 	s.mux.HandleFunc("POST /api/notes/state", s.handleNotesState)

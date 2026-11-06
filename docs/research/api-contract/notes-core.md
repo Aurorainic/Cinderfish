@@ -18,6 +18,7 @@
 | `POST /api/notes/create` | 必需 | `visibility`、`text`、`cw`、`fileIds`/`mediaIds`、`replyId`、`renoteId`、`poll`、`visibleUserIds`、`localOnly` | `{"createdNote": NoteDetailed}` | `internal/httpapi/notes.go:32` |
 | `POST /api/notes/show` | 可选（弱认证） | `noteId` | `NoteDetailed` | `internal/httpapi/notes.go:255` |
 | `POST /api/notes/delete` | 必需（仅作者） | `noteId` | `{}` | `internal/httpapi/notes.go:313` |
+| `POST /api/notes/unrenote` | 必需 | `noteId`（**原笔记** id） | 空（204） | `internal/httpapi/notes.go:373` |
 | `POST /api/notes/edit` | 必需（仅作者） | `editId`、`text`、`cw`、`visibility`、`localOnly` | `{"createdNote": Note}` | `internal/httpapi/note_edit.go:26` |
 | `POST /api/notes/history` | 必需（仅作者） | `noteId`、`limit` | `NoteEdit[]`（自有端点） | `internal/httpapi/note_edit.go:96` |
 | `POST /api/notes/state` | 必需 | `noteId` | `{isFavorited, isPinned, isMutedThread}` | `internal/httpapi/note_state.go:13` |
@@ -103,7 +104,39 @@
 
 `notes/replies` 与 `notes/children` 对不存在的笔记**不报错**，返回空数组。
 
-### 5. 隐私语义（可见性）
+### 2026-11-06 增补：取消转贴与出站投递
+
+### POST /api/notes/unrenote
+
+Firefish 的「取消转发」与「删除」是两个动作：它传的是**被转贴的原笔记** id，由服务端找回自己
+那条没有其它内容的转贴再删掉。Cinderfish 按这个语义实现：
+
+- 找 `user_id = 调用者 AND renote_id = noteId AND deleted_at IS NULL` 且 **没有** 正文/CW/回复
+  指针/附件/投票 的最新一条（`internal/note/renote.go` `PureRenoteOf`）；
+- 找不到就返回 **204**（幂等，双击或时间线过期都不会报错）；
+- 找到则软删除、推 Streaming `deleted`、按转贴语义发联邦 `Undo(Announce)`。
+
+引用（quote）不算转贴：它带着自己的话，因此不会被本端点删掉。
+
+### 出站投递（2026-11-06 修复）
+
+此前 `DeliverNote` / `DeliverDelete` 只有定义没有调用点，`RenderAnnounce` 从未使用——本地笔记
+根本没有投给远端关注者。现在的接线：
+
+| 触发 | 活动 | 收件人 |
+|------|------|--------|
+| `notes/create`（普通笔记） | `Create` | 远端关注者 + 被提及者 |
+| `notes/create`（纯转贴） | `Announce`（object 为原笔记 AP id） | 同上 |
+| `notes/delete`（普通笔记） | `Delete` | 同上 |
+| `notes/delete` / `notes/unrenote`（纯转贴） | `Undo(Announce)` | 同上 |
+
+直发（`specified`）**只投给可见用户**，不投关注者——否则等于把私信的存在广播给粉丝。
+`localOnly` 与远端作者的笔记一律不投。拿不到原笔记 AP id 时（远端原帖缺 `uri`），删除降级为
+`Delete` 转贴本身。
+
+仍未接线：`notes/edit` 不发 `Update`（第三十三波只做了已编辑标记与历史）。
+
+## 5. 隐私语义（可见性）
 
 可见性判定有两处实现，规则大体一致但不完全相同：单条笔记用 `internal/note/service.go:485` `VisibleTo`（内部走 `noteVisibleToTx`，`:373`），列表用 `internal/note/timeline.go:84` `addNoteVisibility`（一条 SQL 条件）。
 

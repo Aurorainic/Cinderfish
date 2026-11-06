@@ -145,6 +145,7 @@ export const ENDPOINTS = {
 	notesHistory: "notes/history",
 	notesState: "notes/state",
 	notesDelete: "notes/delete",
+	notesUnrenote: "notes/unrenote",
 	notesReplies: "notes/replies",
 	notesMentions: "notes/mentions",
 	notesSearch: "notes/search",
@@ -640,6 +641,7 @@ export interface EndpointMap {
 		res: NoteEditEntry[];
 	};
 	[ENDPOINTS.notesDelete]: { req: NoteIdParams; res: EmptyResponse };
+	[ENDPOINTS.notesUnrenote]: { req: NoteIdParams; res: EmptyResponse };
 	[ENDPOINTS.notesReplies]: { req: NoteListParams; res: NoteDetailed[] };
 	[ENDPOINTS.notesRenotes]: { req: NoteListParams; res: NoteDetailed[] };
 	[ENDPOINTS.notesConversation]: {

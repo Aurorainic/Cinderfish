@@ -145,13 +145,57 @@ SELECT id FROM users WHERE host IS NULL ORDER BY is_admin DESC, created_at ASC L
 	return id, err
 }
 
-// DeliverNote fans a newly created local note out to every remote
-// follower and mentioned user.
-func (s *Server) DeliverNote(ctx context.Context, n *note.Note) {
-	if s.federationDeliver == nil || s.fedRenderer == nil {
-		return
+// deliverable reports whether a local note should leave the instance at all.
+// Remote-authored notes and local-only ones never do.
+func (s *Server) deliverable(n *note.Note) bool {
+	return s.federationDeliver != nil && s.fedRenderer != nil &&
+		!n.LocalOnly && n.UserHost == nil
+}
+
+// deliveryInboxes resolves the remote inboxes a note addresses: the author's
+// remote followers, every mentioned account, and the audience of a direct
+// note. A direct note must not reach followers, or its recipients would learn
+// it exists.
+func (s *Server) deliveryInboxes(ctx context.Context, n *note.Note) []string {
+	var targets []string
+	if n.Visibility != "specified" {
+		if inboxes, err := s.federationStore.InboxesForUser(ctx, n.UserID, false); err == nil {
+			targets = append(targets, inboxes...)
+		} else {
+			log.Printf("httpapi: follower inboxes: %v", err)
+		}
 	}
-	if n.LocalOnly || n.UserHost != nil {
+	if len(n.Mentions) > 0 {
+		if inboxes, err := s.federationStore.MentionedInboxes(ctx, n.Mentions); err == nil {
+			targets = append(targets, inboxes...)
+		}
+	}
+	if n.Visibility == "specified" {
+		audience := s.notes.VisibleUserIDs(ctx, n.ID)
+		if inboxes, err := s.federationStore.MentionedInboxes(ctx, audience); err == nil {
+			targets = append(targets, inboxes...)
+		}
+	}
+	return targets
+}
+
+// objectRef is the ActivityPub id a note is addressed by: the local URL for a
+// local note, its stored URI for a remote one.
+func (s *Server) objectRef(n *note.Note) string {
+	if n.UserHost == nil {
+		return s.fedRenderer.NoteRef(n.ID)
+	}
+	if n.URI != nil && *n.URI != "" {
+		return *n.URI
+	}
+	return ""
+}
+
+// DeliverNote fans a newly created local note out to its remote audience. A
+// pure renote goes out as an Announce of the original note, everything else
+// as a Create of the note itself.
+func (s *Server) DeliverNote(ctx context.Context, n *note.Note) {
+	if !s.deliverable(n) {
 		return
 	}
 	if n.Visibility != "public" && n.Visibility != "home" && n.Visibility != "followers" && n.Visibility != "specified" {
@@ -162,24 +206,31 @@ func (s *Server) DeliverNote(ctx context.Context, n *note.Note) {
 	if err != nil || u == nil {
 		return
 	}
-	doc, err := s.renderNote(ctx, n)
-	if err != nil {
-		log.Printf("httpapi: render note for delivery: %v", err)
-		return
-	}
-	activity := s.fedRenderer.RenderCreate(doc, n.ID, s.fedRenderer.ActorRef(u.ID), n.CreatedAt)
+	actor := s.fedRenderer.ActorRef(u.ID)
 
-	inboxes, err := s.federationStore.InboxesForUser(ctx, u.ID, false)
-	if err != nil {
-		log.Printf("httpapi: follower inboxes: %v", err)
-	}
-	mentionInboxes, err := s.federationStore.MentionedInboxes(ctx, n.Mentions)
-	if err == nil {
-		inboxes = append(inboxes, mentionInboxes...)
+	var activity federation.Object
+	if n.IsPureRenote() {
+		target, err := s.notes.Get(ctx, *n.RenoteID)
+		if err != nil || target == nil {
+			log.Printf("httpapi: render announce for %s: %v", n.ID, err)
+			return
+		}
+		object := s.objectRef(target)
+		if object == "" {
+			return
+		}
+		activity = s.fedRenderer.RenderAnnounce(n.ID, actor, object, n.CreatedAt)
+	} else {
+		doc, err := s.renderNote(ctx, n)
+		if err != nil {
+			log.Printf("httpapi: render note for delivery: %v", err)
+			return
+		}
+		activity = s.fedRenderer.RenderCreate(doc, n.ID, actor, n.CreatedAt)
 	}
 
 	seen := map[string]bool{}
-	for _, inbox := range inboxes {
+	for _, inbox := range s.deliveryInboxes(ctx, n) {
 		if seen[inbox] {
 			continue
 		}
@@ -190,20 +241,39 @@ func (s *Server) DeliverNote(ctx context.Context, n *note.Note) {
 	}
 }
 
-// DeliverDelete fans a note deletion out to the same inboxes.
+// DeliverDelete withdraws a note from its remote audience: a Delete for a
+// note, an Undo of the Announce for a pure renote.
 func (s *Server) DeliverDelete(ctx context.Context, n *note.Note) {
-	if s.federationDeliver == nil || s.fedRenderer == nil {
+	if !s.deliverable(n) {
 		return
 	}
-	if n.LocalOnly || n.UserHost != nil {
-		return
+	actor := s.fedRenderer.ActorRef(n.UserID)
+
+	var activity federation.Object
+	if n.IsPureRenote() {
+		target, err := s.notes.Get(ctx, *n.RenoteID)
+		object := ""
+		if err == nil && target != nil {
+			object = s.objectRef(target)
+		}
+		if object == "" {
+			// Without the original note's id an Undo would be empty; a Delete
+			// of the renote itself is the weaker but valid signal.
+			activity = s.fedRenderer.RenderDelete(s.fedRenderer.NoteRef(n.ID), actor)
+		} else {
+			announce := s.fedRenderer.RenderAnnounce(n.ID, actor, object, n.CreatedAt)
+			activity = s.fedRenderer.RenderUndo(announce, actor)
+		}
+	} else {
+		activity = s.fedRenderer.RenderDelete(s.fedRenderer.NoteRef(n.ID), actor)
 	}
-	inboxes, err := s.federationStore.InboxesForUser(ctx, n.UserID, false)
-	if err != nil {
-		return
-	}
-	activity := s.fedRenderer.RenderDelete(s.fedRenderer.NoteRef(n.ID), s.fedRenderer.ActorRef(n.UserID))
-	for _, inbox := range inboxes {
+
+	seen := map[string]bool{}
+	for _, inbox := range s.deliveryInboxes(ctx, n) {
+		if seen[inbox] {
+			continue
+		}
+		seen[inbox] = true
 		if err := s.federationDeliver.Enqueue(ctx, inbox, "", s.fedRenderer.KeyID(n.UserID), n.UserID, activity); err != nil {
 			log.Printf("httpapi: enqueue delete to %s: %v", inbox, err)
 		}
