@@ -5016,12 +5016,13 @@ CINDERFISH_TEST_DATABASE_URL=... go test ./... -count=1         # 全绿
 - `TestInboundReplyToLocalNote`：bob 关注 alice → alice 发帖 → bob 回复 alpha 上的副本 →
   alpha 落库的回复 `reply_id` 等于 alice 的本地帖 id，alice 收到 `reply` 通知
   （notifier 是 `betabob@beta.example` 的远端副本）。
+- `TestTwoInstanceQuoteReachesOriginalAuthor`：alice 引用 bob 的远端副本并带上自己的文字 →
+  beta 落库的引用 `renote_id` 指向 bob 的本地帖，且文本保留「worth reading」。
 - `gofmt -l internal/ cmd/` 无输出；`go vet ./...` 通过；全量 `go test ./...`（含数据库）全绿。
 
 ### 12CM.3 仍未验证
 
 - 投递失败后的重试窗口（队列 `attempts < 12`）尚未构造真实失败。
-- 引用转帖（quote）到远端帖的对端渲染没有单独走查。
 - 回帖通知的 Streaming 推送仍只有单元断言覆盖。
 
 ## 12CN. 第七十五波：锁推的跨实例关注请求（2026-11-07）
