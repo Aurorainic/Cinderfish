@@ -108,6 +108,8 @@ func (s *Server) handleNotesCreate(w http.ResponseWriter, r *http.Request) {
 	s.notifyNoteCreated(r, n, info.User.ID)
 	// Fan the note out to the streaming timelines and main channels.
 	s.publishNoteCreated(n, info.User.ID)
+	// Followers whose follow asks for notifications get one per note.
+	s.notifyFollowersOfNote(r.Context(), n, info.User.ID)
 	// And to the author's outbound webhooks, if any subscribe to this event.
 	s.dispatchNoteWebhook(r.Context(), n, info.User.ID)
 	// Federate: remote followers and mentions receive a Create, or an

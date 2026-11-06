@@ -62,6 +62,13 @@ func (s *Server) AttachFederation() {
 		if s.streamBus != nil {
 			s.streamBus.PublishTyped("notesStream", "note", map[string]any{"id": noteID, "userId": userID})
 		}
+		// A local follower that asked for this account's notes gets a
+		// notification, the same as for a local author's note.
+		if s.notes != nil {
+			if stored, err := s.notes.Get(ctx, noteID); err == nil {
+				s.notifyFollowersOfNote(ctx, stored, userID)
+			}
+		}
 	}
 	s.federationInbox.OnMoved = func(ctx context.Context, oldUserID, newUserID string) {
 		s.migrateFollowersOf(ctx, oldUserID, newUserID)

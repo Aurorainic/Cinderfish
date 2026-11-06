@@ -44,7 +44,7 @@ func hasReadAccount(scopes []string) bool {
 
 // LoadFollows implements streaming.ViewerLoader for the Server.
 func (s *Server) LoadFollows(ctx context.Context, userID string) (map[string]streaming.Follow, error) {
-	rows, err := s.pool.Query(ctx, "SELECT followee_id FROM followings WHERE follower_id = $1", userID)
+	rows, err := s.pool.Query(ctx, "SELECT followee_id, with_replies FROM followings WHERE follower_id = $1", userID)
 	if err != nil {
 		return nil, err
 	}
@@ -53,12 +53,11 @@ func (s *Server) LoadFollows(ctx context.Context, userID string) (map[string]str
 	out := make(map[string]streaming.Follow)
 	for rows.Next() {
 		var id string
-		if err := rows.Scan(&id); err != nil {
+		var withReplies bool
+		if err := rows.Scan(&id, &withReplies); err != nil {
 			return nil, err
 		}
-		// followings has no withReplies column yet; false matches
-		// Misskey's default for a fresh follow.
-		out[id] = streaming.Follow{WithReplies: false}
+		out[id] = streaming.Follow{WithReplies: withReplies}
 	}
 	return out, rows.Err()
 }

@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"log"
 	"net/http"
 	"time"
 
@@ -125,4 +126,51 @@ func writeInternalServerError(w http.ResponseWriter) {
 		Message: "Internal error.", Code: "INTERNAL_ERROR",
 		ID: errIDInternal, Kind: "server", Status: http.StatusInternalServerError,
 	})
+}
+
+// notifyFollowersOfNote records a "note" notification for every local
+// follower whose follow asks for one (notify = "normal"), which is the
+// setting following/update writes.
+//
+// Direct notes are skipped: their audience is addressed explicitly, and a
+// follower outside that audience must not learn the note exists.
+func (s *Server) notifyFollowersOfNote(ctx context.Context, n *note.Note, authorID string) {
+	if s.notifications == nil || s.pool == nil || n == nil {
+		return
+	}
+	if n.Visibility == note.VisibilitySpecified {
+		return
+	}
+	rows, err := s.pool.Query(ctx, `
+SELECT f.follower_id FROM followings f JOIN users u ON u.id = f.follower_id
+WHERE f.followee_id = $1 AND f.notify IS NOT NULL AND u.host IS NULL
+`, authorID)
+	if err != nil {
+		log.Printf("httpapi: followers to notify of %s: %v", n.ID, err)
+		return
+	}
+	var recipients []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			rows.Close()
+			log.Printf("httpapi: scan notification recipient: %v", err)
+			return
+		}
+		recipients = append(recipients, id)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		log.Printf("httpapi: followers to notify of %s: %v", n.ID, err)
+		return
+	}
+
+	for _, recipientID := range recipients {
+		notificationID, created, err := s.notifications.CreateForLocal(
+			ctx, recipientID, "note", &authorID, &n.ID, nil)
+		if err != nil || !created {
+			continue
+		}
+		s.publishNotificationCreated(notificationID, recipientID)
+	}
 }
