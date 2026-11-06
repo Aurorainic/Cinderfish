@@ -296,3 +296,27 @@ func TestGenerateThumbnailKeepsAlpha(t *testing.T) {
 		t.Errorf("alpha at an opaque pixel = %d, want 65535", a)
 	}
 }
+
+// BenchmarkGenerateThumbnailLarge measures a 12-megapixel JPEG, the shape the
+// pixel guard was written for; the process peak RSS next to it answers the
+// "large image memory" question the handover left open.
+func BenchmarkGenerateThumbnailLarge(b *testing.B) {
+	img := image.NewRGBA(image.Rect(0, 0, 4000, 3000))
+	for y := 0; y < 3000; y++ {
+		for x := 0; x < 4000; x++ {
+			img.Set(x, y, color.RGBA{R: uint8(x % 256), G: uint8(y % 256), B: 128, A: 255})
+		}
+	}
+	var buf bytes.Buffer
+	if err := jpeg.Encode(&buf, img, &jpeg.Options{Quality: 85}); err != nil {
+		b.Fatalf("encode jpeg: %v", err)
+	}
+	data := buf.Bytes()
+	b.SetBytes(int64(len(data)))
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if _, _, err := GenerateThumbnail(data, "image/jpeg"); err != nil {
+			b.Fatalf("thumbnail: %v", err)
+		}
+	}
+}

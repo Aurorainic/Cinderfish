@@ -24,7 +24,8 @@ func main() {
 	toLocalPath := flag.String("to-local-path", "", "target directory for --to local")
 	dryRun := flag.Bool("dry-run", false, "report what would move without changing anything")
 	deleteSource := flag.Bool("delete-source", false, "delete objects from the source after a fully successful run")
-	limit := flag.Int("limit", 0, "migrate at most N files (0 = all)")
+	limit := flag.Int("limit", 0, "process at most N files (0 = all)")
+	backfill := flag.Bool("backfill-thumbnails", false, "generate missing thumbnails for stored images instead of migrating")
 	flag.Parse()
 
 	cfg, err := config.Load(*configPath)
@@ -32,12 +33,18 @@ func main() {
 		log.Fatalf("cinderfish-media-migrate: %v", err)
 	}
 
-	switch *to {
-	case "local", "s3":
-	case "":
-		log.Fatal("cinderfish-media-migrate: --to is required (local or s3)")
-	default:
-		log.Fatalf("cinderfish-media-migrate: unknown target %q", *to)
+	if *backfill {
+		if *to != "" {
+			log.Fatal("cinderfish-media-migrate: --backfill-thumbnails cannot be combined with --to")
+		}
+	} else {
+		switch *to {
+		case "local", "s3":
+		case "":
+			log.Fatal("cinderfish-media-migrate: --to is required (local or s3) unless --backfill-thumbnails is set")
+		default:
+			log.Fatalf("cinderfish-media-migrate: unknown target %q", *to)
+		}
 	}
 
 	ctx := context.Background()
@@ -49,6 +56,24 @@ func main() {
 
 	if _, err := db.Migrate(ctx, pool); err != nil {
 		log.Fatalf("cinderfish-media-migrate: migrate: %v", err)
+	}
+
+	if *backfill {
+		storage, err := openSource(cfg)
+		if err != nil {
+			log.Fatalf("cinderfish-media-migrate: storage: %v", err)
+		}
+		drive := media.NewDriveService(pool, storage)
+		report, err := drive.BackfillThumbnails(ctx, *limit)
+		if err != nil {
+			log.Fatalf("cinderfish-media-migrate: backfill thumbnails: %v", err)
+		}
+		fmt.Printf("scanned=%d generated=%d skipped=%d failed=%d\n",
+			report.Scanned, report.Generated, report.Skipped, report.Failed)
+		if report.Failed > 0 {
+			os.Exit(1)
+		}
+		return
 	}
 
 	source, err := openSource(cfg)

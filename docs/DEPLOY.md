@@ -185,6 +185,17 @@ sudo -u cinderfish /opt/cinderfish/cinderfish-media-migrate --config /etc/cinder
 
 迁移只改 `drive_files.storage_backend` 与对象位置，key（内容哈希）不变，笔记链接无需改写。完成后把 `[media] backend` 切到新后端再重启。`--delete-source` 只在整轮无失败时清理源对象。
 
+补生成缩略图（缩略图功能上线前上传的图片，或当时解码失败的图片）：
+
+```bash
+sudo -u cinderfish /opt/cinderfish/cinderfish-media-migrate --config /etc/cinderfish/config.toml \
+  --backfill-thumbnails --limit 200
+```
+
+它按创建时间扫描 `thumbnail_key IS NULL` 的图片行，读取原图、生成 512 长边预览并写回同一存储后端。
+`--limit` 限制单轮数量（0 = 全部），可以重复运行直到 `generated=0`；`failed` 会保留原样以便下次重试，
+进程以退出码 1 结束。与 `--to` 互斥。
+
 ## 9. 联邦
 
 - 对外只需 443；入站 inbox、WebFinger、NodeInfo 都走同一域名。

@@ -3514,8 +3514,10 @@ cd web && pnpm build                                           # exit 0
 ### 12BJ.5 仍未验证
 
 - PNG 透明通道的保留（测试图为不透明 RGBA）。
-- 历史文件补生成缩略图（仍无离线任务）。
-- 大尺寸真实照片的内存峰值（只以像素上限与实现推断）。
+- ~~历史文件补生成缩略图（仍无离线任务）。~~ 2026-11-07 加了
+  `cinderfish-media-migrate --backfill-thumbnails`，见 §12EU。
+- ~~大尺寸真实照片的内存峰值（只以像素上限与实现推断）。~~ 2026-11-07 用 4000×3000 JPEG 实测，
+  见 §12EU。
 
 ## 12BK. 批次：锁推生效与关注通知（2026-11-06）
 
@@ -4548,8 +4550,8 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
   在正常流程下不可达，仅作防御保留。
 - **第四十六波已补验证（2026-11-07，见 §12BJ.4）**：缩略图生成/跳过/删除与 `/media` 的
   Content-Type 都有用例；真实 PNG/JPEG 上传得到 512 长边缩略图并在 `/my/drive` 实际加载。
-  顺带修复原图直链回 `octet-stream` 的缺口；透明通道由 §12DP 的用例固定。仍未验证的：
-  历史文件补生成（没有离线任务）、大图内存峰值。
+  顺带修复原图直链回 `octet-stream` 的缺口；透明通道由 §12DP 的用例固定。历史文件补生成与
+  大图内存峰值已于 2026-11-07 补上（§12EU）。
 - **第四十七波已补验证（2026-11-07，见 §12BK.4）**：锁推的「关注 → 待审 → 接受」从
   `following/create` 到界面全链路走查通过；`receiveFollowRequest` 与 `follow` 两类通知落库并在
   通知页渲染。远程关注者的锁推入站路径已由 §12CN 覆盖；入站 Reject 撤回待审请求已有用例
@@ -5692,7 +5694,7 @@ go vet ./...                                                   # exit 0
 CINDERFISH_TEST_DATABASE_URL=... go test ./... -count=1         # 全绿
 ```
 
-仍未验证：真实邮件服务商、历史文件补生成缩略图、大图生成的内存峰值。
+仍未验证：真实邮件服务商。历史文件补生成与 4000×3000 图片的内存峰值已在 §12EU 补上。
 
 ## 12DQ. 第一百零四波：隐私页其余六个开关的界面回读（2026-11-07）
 
@@ -6086,3 +6088,37 @@ username_lower LIKE 'iperfu%'`，再 `ANALYZE notes`；临时服务已停止。
 一张 `hashtags` 计数表，而不是每次展开。没有做并发压力测试。
 
 测量数据已清理（删除 `w129%` 用户及其级联的 followings/notes，重新 `ANALYZE`），临时服务已停止。
+
+## 12EU. 第一百三十一波：缩略图补生成与大图内存（2026-11-07）
+
+第四十六波留下的两项：历史文件没有补生成缩略图的离线任务；大图内存峰值只有推断。
+
+### 12EU.1 落地清单
+
+| 层 | 文件 | 内容 |
+|----|------|------|
+| 领域 | `internal/media/backfill.go`（新） | `BackfillThumbnails(ctx, limit)`：按创建时间扫描 `thumbnail_key IS NULL` 的四种图片，读原图 → 生成 → 写回同一后端 → 更新行 |
+| CLI | `cmd/cinderfish-media-migrate/main.go` | `--backfill-thumbnails`（与 `--to` 互斥，`--limit` 复用） |
+| 文档 | `docs/DEPLOY.md` | 运维用法与 `--limit` 分批建议 |
+| 性能 | `internal/media/thumbnail.go` | `averageRect` 对 `*image.YCbCr`/`*image.RGBA`/`*image.NRGBA` 直接取像素，其余类型保留接口路径 |
+
+### 12EU.2 有意的限制
+
+- 只处理 `image/jpeg`、`image/pjpeg`、`image/png`、`image/gif`；WebP 仍未实现（与上传路径一致）。
+- 行上的 `storage_backend` 与当前配置不一致时跳过并记日志：补生成不负责跨后端读取。
+- 原图缺失或超过当前 `maxSize` 计为 `failed`，行保持 `NULL`，下次运行会重试；有失败时进程退出码 1。
+- 补生成是单进程串行任务，没有并发；分批靠 `--limit` 重复运行。
+
+### 12EU.3 验证证据
+
+- `gofmt -l internal/ cmd/` 无输出；`go vet ./...` 通过；
+  `CINDERFISH_TEST_DATABASE_URL=… go test ./internal/media/ -count=1` 全绿。
+- 三个用例：`TestBackfillThumbnails`（旧图生成 512×256、坏图计失败、文本不在扫描范围）、
+  `TestBackfillThumbnailsLimitAndBackend`（`limit=1` 只处理一行；另一后端的行被跳过）、
+  `TestBackfillThumbnailsMissingOriginal`（原图与缩略图对象都缺失时计失败且不产生对象）。
+- 真实二进制：上传 800×400 PNG → 清空 `thumbnail_key` 并删除缩略图对象 →
+  `/tmp/cf-migrate --backfill-thumbnails` 输出 `scanned=2 generated=1 skipped=0 failed=1`；
+  目标行恢复 key，`GET /media/…thumb.png` 返回 200 `image/png`，PNG 头为 512×256。
+- 4000×3000 JPEG（12 MP）基准：优化前 305 ms/op、59.1 MB/op、1239 万次分配；直接取像素后
+  165 ms/op、20.6 MB/op、39.3 万次分配。测试进程峰值 RSS 124 MB，其中约 48 MB 是基准自身持有
+  的源 RGBA 图，缩略图路径本身约 20 MB/次。

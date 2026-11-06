@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"image"
+	"image/color"
 	"image/jpeg"
 	"image/png"
 	"path"
@@ -126,7 +127,71 @@ func downscale(src image.Image, maxSide int) image.Image {
 
 // averageRect averages the pixels of src in [x0,x1)×[y0,y1). Colours are
 // summed in 16-bit space so wide images do not overflow.
+//
+// The generic path boxes one color value per source pixel, which is millions
+// of allocations for a phone photo. JPEG decodes to *image.YCbCr and PNG to
+// *image.RGBA or *image.NRGBA, so those three get direct pixel access; any
+// other decoder keeps the interface path.
 func averageRect(src image.Image, x0, y0, x1, y1 int) color4 {
+	switch s := src.(type) {
+	case *image.YCbCr:
+		var r, g, b, n uint64
+		for y := y0; y < y1; y++ {
+			for x := x0; x < x1; x++ {
+				c := s.YCbCrAt(x, y)
+				cr, cg, cb := color.YCbCrToRGB(c.Y, c.Cb, c.Cr)
+				r += uint64(cr)
+				g += uint64(cg)
+				b += uint64(cb)
+				n++
+			}
+		}
+		if n == 0 {
+			return color4{}
+		}
+		return color4{r: uint8(r / n), g: uint8(g / n), b: uint8(b / n), a: 255}
+	case *image.RGBA:
+		var r, g, b, a, n uint64
+		for y := y0; y < y1; y++ {
+			for x := x0; x < x1; x++ {
+				i := s.PixOffset(x, y)
+				r += uint64(s.Pix[i])
+				g += uint64(s.Pix[i+1])
+				b += uint64(s.Pix[i+2])
+				a += uint64(s.Pix[i+3])
+				n++
+			}
+		}
+		if n == 0 {
+			return color4{}
+		}
+		return color4{
+			r: uint8(r / n), g: uint8(g / n),
+			b: uint8(b / n), a: uint8(a / n),
+		}
+	case *image.NRGBA:
+		var r, g, b, a, n uint64
+		for y := y0; y < y1; y++ {
+			for x := x0; x < x1; x++ {
+				i := s.PixOffset(x, y)
+				alpha := uint64(s.Pix[i+3])
+				// Premultiply while summing, matching color.NRGBA.RGBA.
+				r += uint64(s.Pix[i]) * alpha / 255
+				g += uint64(s.Pix[i+1]) * alpha / 255
+				b += uint64(s.Pix[i+2]) * alpha / 255
+				a += alpha
+				n++
+			}
+		}
+		if n == 0 {
+			return color4{}
+		}
+		return color4{
+			r: uint8(r / n), g: uint8(g / n),
+			b: uint8(b / n), a: uint8(a / n),
+		}
+	}
+
 	var r, g, b, a uint64
 	var n uint64
 	for y := y0; y < y1; y++ {
