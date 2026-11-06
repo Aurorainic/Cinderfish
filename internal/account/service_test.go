@@ -125,6 +125,27 @@ func TestRegisterInviteMode(t *testing.T) {
 	if _, _, err := svc.Register(ctx, account.RegistrationInvite, uniqueUsername(t)+"b", "password123", code); err == nil {
 		t.Error("an invitation code must be single use")
 	}
+
+	// A failed signup releases the code: claim happens before the account is
+	// created, so a taken username must not burn the invitation.
+	retryCode, err := svc.CreateInvite(ctx, nil)
+	if err != nil {
+		t.Fatalf("CreateInvite: %v", err)
+	}
+	if _, _, err := svc.Register(ctx, account.RegistrationInvite, name, "password123", retryCode); err == nil {
+		t.Fatal("registering a taken username must fail")
+	}
+	var used bool
+	if err := pool.QueryRow(context.Background(),
+		`SELECT used_at IS NOT NULL FROM registration_tickets WHERE code = $1`, retryCode).Scan(&used); err != nil {
+		t.Fatalf("read invite: %v", err)
+	}
+	if used {
+		t.Error("a failed signup consumed the invitation code")
+	}
+	if _, _, err := svc.Register(ctx, account.RegistrationInvite, uniqueUsername(t)+"c", "password123", retryCode); err != nil {
+		t.Errorf("reusing the released code: %v", err)
+	}
 }
 
 func TestAuthenticate(t *testing.T) {

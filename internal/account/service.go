@@ -100,6 +100,7 @@ func (s *Service) Register(ctx context.Context, mode RegistrationMode, username,
 		return nil, "", &RegistrationError{Code: "INVALID_PASSWORD", Message: "Invalid password."}
 	}
 
+	claimed := false
 	switch mode {
 	case RegistrationAdmin:
 		return nil, "", &RegistrationError{
@@ -110,10 +111,17 @@ func (s *Service) Register(ctx context.Context, mode RegistrationMode, username,
 		if err := s.claimInvite(ctx, invitationCode); err != nil {
 			return nil, "", err
 		}
+		claimed = true
 	}
 
 	user, err := s.Create(ctx, username, password)
 	if err != nil {
+		// A failed signup must not burn the code: the user can fix the
+		// username and retry with the same invitation, as Misskey's
+		// SignupApiService does when it releases the ticket.
+		if claimed {
+			s.releaseInvite(ctx, invitationCode)
+		}
 		return nil, "", err
 	}
 	return user, user.Token, nil
@@ -198,6 +206,17 @@ WHERE code = $1 AND used_at IS NULL AND used_by_id IS NULL
 		return ErrInvalidInvite
 	}
 	return nil
+}
+
+// releaseInvite makes a claimed code usable again after a failed signup. The
+// conditional UPDATE leaves a code that somehow got bound to a user alone.
+func (s *Service) releaseInvite(ctx context.Context, code string) {
+	if code == "" {
+		return
+	}
+	_, _ = s.pool.Exec(ctx, `
+UPDATE registration_tickets SET used_at = NULL WHERE code = $1 AND used_by_id IS NULL
+`, code)
 }
 
 // CreateInvite generates an invitation code.
