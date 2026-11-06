@@ -1092,3 +1092,39 @@ OAuth 2.0 授权码端点（仅 PKCE `S256`）。认证：**需要登录**，且
 
 用户搜索按用户名、昵称与简介匹配，支持 `origin`（combined/local/remote）与 `limit`/`offset`，
 并额外接受 `sinceId`/`untilId` 供游标分页。带凭据时排除双向屏蔽，结果带三个计数。
+
+## 2026-11-06 增补：账号导出与注销
+
+### POST /api/i/export
+
+需登录。无参数。响应是 `application/json` 附件
+（`Content-Disposition: attachment; filename="cinderfish-export-<user>-<timestamp>.json"`），
+结构与 `cinderfish-account-export@1` 一致：
+
+```json
+{
+  "exportedAt": "…",
+  "format": "cinderfish-account-export@1",
+  "user": { /* MeDetailed，不含 token */ },
+  "notes": [{ "id", "text", "cw", "visibility", "replyId", "renoteId", "fileIds", "tags", "createdAt" }],
+  "followings": [{ "username", "host", "createdAt" }],
+  "followers":  [{ "username", "host", "createdAt" }],
+  "favorites":  [{ "noteId", "createdAt" }],
+  "driveFiles": [{ "name", "type", "size", "createdAt" }]
+}
+```
+
+帖子只含本人的（含私密与关注者可见），不含他人数据；网盘只导元数据。前端通过 `apiDownload()`
+读取 Blob 并触发浏览器下载。
+
+### POST /api/i/delete-account
+
+请求 `{ password }`，需登录。
+
+| 结果 | 条件 |
+|------|------|
+| 204 | 密码正确且不是最后一个未冻结管理员；账号、帖子、关系、收藏、网盘对象随之删除 |
+| 403 `INVALID_PASSWORD` | 密码错误 |
+| 400 `LAST_ADMIN` | 调用者是最后一个未冻结管理员 |
+
+注销是即时的硬删除，token 立即失效。前端在成功后调用 `signOut()` 并回到首页。

@@ -130,6 +130,8 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("POST /api/miauth/gen-token", s.handleMiAuthGenToken)
 	s.mux.HandleFunc("POST /api/i/apps", s.handleApps)
 	s.mux.HandleFunc("POST /api/i/revoke-token", s.handleRevokeToken)
+	s.mux.HandleFunc("POST /api/i/export", s.handleIExport)
+	s.mux.HandleFunc("POST /api/i/delete-account", s.handleIDeleteAccount)
 
 	// Following. These give the Streaming API's follow/followed events a
 	// source, which M4 left as a known gap.
