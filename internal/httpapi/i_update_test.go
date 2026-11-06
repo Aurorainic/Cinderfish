@@ -242,3 +242,75 @@ func TestUsersUpdateVisibility(t *testing.T) {
 		t.Errorf("invalid update changed followingVisibility to %v", me["followingVisibility"])
 	}
 }
+
+// TestIUpdateProfileDetails covers the extended profile fields added in wave
+// 22: location, birthday, lang and fields, plus the injectFeaturedNote switch.
+func TestIUpdateProfileDetails(t *testing.T) {
+	ts := newTestServer(t, "open")
+	userID, token := createUser(t, ts, uniqueName(t))
+
+	resp, body := post(t, ts, "/api/i/update", map[string]any{
+		"i":                  token,
+		"location":           "Tokyo",
+		"birthday":           "1990-02-03",
+		"lang":               "ja-JP",
+		"fields":             []map[string]any{{"name": "site", "value": "https://example.com"}},
+		"injectFeaturedNote": true,
+	})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("i/update details = %d %v", resp.StatusCode, body)
+	}
+	if body["location"] != "Tokyo" || body["birthday"] != "1990-02-03" || body["lang"] != "ja-JP" {
+		t.Errorf("response details = %v/%v/%v", body["location"], body["birthday"], body["lang"])
+	}
+	if body["injectFeaturedNote"] != true {
+		t.Errorf("injectFeaturedNote = %v, want true", body["injectFeaturedNote"])
+	}
+	fields, _ := body["fields"].([]any)
+	if len(fields) != 1 {
+		t.Fatalf("fields = %v, want one entry", body["fields"])
+	}
+	if field, _ := fields[0].(map[string]any); field["name"] != "site" || field["value"] != "https://example.com" {
+		t.Errorf("field = %v", fields[0])
+	}
+
+	// users/show carries the same values so other visitors see them.
+	_, show := post(t, ts, "/api/users/show", map[string]any{"userId": userID})
+	if show["location"] != "Tokyo" || show["birthday"] != "1990-02-03" || show["lang"] != "ja-JP" {
+		t.Errorf("users/show details = %v/%v/%v", show["location"], show["birthday"], show["lang"])
+	}
+	if shown, _ := show["fields"].([]any); len(shown) != 1 {
+		t.Errorf("users/show fields = %v", show["fields"])
+	}
+
+	// Validation: the four shapes users get wrong.
+	cases := []struct {
+		name string
+		body map[string]any
+	}{
+		{"birthday", map[string]any{"birthday": "1990-13-40"}},
+		{"lang", map[string]any{"lang": "not a tag"}},
+		{"location", map[string]any{"location": strings.Repeat("x", 51)}},
+		{"fields", map[string]any{"fields": make([]map[string]any, 17)}},
+	}
+	for _, tc := range cases {
+		tc.body["i"] = token
+		if resp, _ := post(t, ts, "/api/i/update", tc.body); resp.StatusCode != http.StatusBadRequest {
+			t.Errorf("invalid %s status = %d, want 400", tc.name, resp.StatusCode)
+		}
+	}
+
+	// Null clears the details again.
+	resp, cleared := post(t, ts, "/api/i/update", map[string]any{
+		"i": token, "location": nil, "birthday": nil, "injectFeaturedNote": false,
+	})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("clear details = %d %v", resp.StatusCode, cleared)
+	}
+	if cleared["location"] != nil || cleared["birthday"] != nil {
+		t.Errorf("cleared details = %v/%v", cleared["location"], cleared["birthday"])
+	}
+	if cleared["injectFeaturedNote"] != false {
+		t.Errorf("injectFeaturedNote after clear = %v", cleared["injectFeaturedNote"])
+	}
+}
