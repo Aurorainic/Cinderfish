@@ -1096,3 +1096,27 @@ UserLite 部分也有简化：`name`/`avatarUrl` 只从 profile 行来，没有 
 
 `{ reportId }`，标记 `resolved = TRUE` 并返回 204；未知 id 也是 204（幂等）。
 `forward` 未实现，请求里带 `forward` 也不会转发。
+
+## 2026-11-06 增补：数据库统计
+
+管理员/版主专用，只读。
+
+### POST /api/admin/get-table-stats
+
+无参数。返回对象，键为表名：
+
+```json
+{ "users": { "count": 24, "size": 139264 }, "notes": { "count": 157, "size": 229376 } }
+```
+
+`count` 是 `pg_class.reltuples`（规划器估算，未 `ANALYZE` 的表为 0），`size` 是
+`pg_total_relation_size`（含索引与 TOAST）。只列普通表与分区表，排除系统 schema。
+
+### POST /api/admin/get-index-stats
+
+无参数。返回 `pg_indexes` 的映射数组：
+
+```json
+[{ "schemaname": "public", "tablename": "users", "indexname": "users_pkey",
+   "tablespace": null, "indexdef": "CREATE UNIQUE INDEX …" }]
+```

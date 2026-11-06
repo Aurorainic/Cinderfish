@@ -15,19 +15,20 @@
 | 指标 | 数量 |
 |------|------|
 | Misskey 端点总数 | 440 |
-| Cinderfish 已注册路由 | 97 |
-| 其中 Misskey 同名路径 | 94 |
+| Cinderfish 已注册路由 | 99 |
+| 其中 Misskey 同名路径 | 96 |
 | 其中 Cinderfish 自有路径/别名 | 3（`notifications` 别名、`admin/federation/mode`、`admin/federation/allowlist`） |
-| 未实现（Misskey 同名） | 343 |
+| 未实现（Misskey 同名） | 341 |
 
 统计口径：`internal/httpapi/server.go` 里 `HandleFunc("METHOD /api/…")` 的去重路径；
 GET 与 POST 同名路径只算一个。
 
-## 2. 已实现（97 条注册路由）
+## 2. 已实现（99 条注册路由）
 
 ```
 admin/accounts/create       admin/announcements/create  admin/announcements/delete
-admin/abuse-user-reports    admin/resolve-abuse-user-report
+admin/abuse-user-reports    admin/get-index-stats       admin/get-table-stats
+admin/resolve-abuse-user-report
 admin/announcements/list    admin/drive/files           admin/emoji/add
 admin/emoji/delete          admin/emoji/list            admin/federation/allowlist*
 admin/federation/mode*      admin/show-users            admin/suspend-user
@@ -74,6 +75,8 @@ users/update
 `hashtags/trend`、`drive/folders*`、`emojis`、`admin/emoji/*`、`notes/polls/vote`、
 `following/requests/*`、`users/update`、`signin`、`signup`、`username/available`、
 `i/registry/scopes`，以及 `admin/federation/mode` 的 GET。
+
+2026-11-06 第十二波新增：`admin/get-table-stats`、`admin/get-index-stats`（只读）。
 
 2026-11-06 第十一波新增：`i/webhooks/{create,list,show,update,delete}`（迁移 v12；只产生
 note/reply/renote 事件）。
