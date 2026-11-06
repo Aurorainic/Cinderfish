@@ -15,15 +15,15 @@
 | 指标 | 数量 |
 |------|------|
 | Misskey 端点总数 | 440 |
-| Cinderfish 已注册路由 | 117 |
-| 其中 Misskey 同名路径 | 110 |
+| Cinderfish 已注册路由 | 118 |
+| 其中 Misskey 同名路径 | 111 |
 | 其中 Cinderfish 自有路径/别名 | 7（`notifications` 别名、`admin/federation/mode`、`admin/federation/allowlist`、`miauth/{session}/check`、`admin/object-storage`、`admin/deliver-queue`、`notes/history`） |
-| 未实现（Misskey 同名） | 330 |
+| 未实现（Misskey 同名） | 329 |
 
 统计口径：`internal/httpapi/server.go` 里 `HandleFunc("METHOD /api/…")` 的去重路径；
 GET 与 POST 同名路径只算一个。
 
-## 2. 已实现（117 条注册路由）
+## 2. 已实现（118 条注册路由）
 
 ```
 admin/accounts/create       admin/announcements/create  admin/announcements/delete
@@ -39,7 +39,9 @@ blocking/delete             blocking/list               drive/files
 drive/files/create          drive/files/delete          drive/files/show
 drive/files/update
 drive/folders               drive/folders/create        drive/folders/delete
-drive/folders/show          drive/folders/update        emojis                      following/create            following/delete
+drive/folders/show          drive/folders/update        emojis
+federation/show-instance
+following/create            following/delete
 following/requests/accept    following/requests/cancel   following/requests/list
 following/requests/reject    following/requests/sent     hashtags/trend
 i                           i/apps                      i/delete-account
@@ -86,6 +88,8 @@ users/update
 
 2026-11-06 第十九波新增：`stats`（公开计数）；`admin/update-meta` 增加六个合规 URL 与
 `serverRules`（不是新路由）。
+
+2026-11-06 第二十七波新增：`federation/show-instance`（本地取运行时设置与计数，远端只聚合库内数据，不联网抓取）。
 
 2026-11-06 第二十六波新增：`admin/update-meta` 增加 `hiddenTags`（不是新路由），趋势查询按它过滤。
 

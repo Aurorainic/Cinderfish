@@ -200,6 +200,7 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("POST /api/admin/suspend-user", s.handleAdminSuspendUser)
 	s.mux.HandleFunc("POST /api/admin/unsuspend-user", s.handleAdminUnsuspendUser)
 	s.mux.HandleFunc("GET /api/admin/federation/mode", s.handleAdminFederationMode)
+	s.mux.HandleFunc("POST /api/federation/show-instance", s.handleFederationShowInstance)
 	s.mux.HandleFunc("POST /api/admin/federation/mode", s.handleAdminFederationMode)
 	s.mux.HandleFunc("GET /api/admin/federation/allowlist", s.handleAdminAllowlist)
 	s.mux.HandleFunc("POST /api/admin/federation/allowlist", s.handleAdminAllowlist)

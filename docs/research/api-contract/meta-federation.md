@@ -1158,3 +1158,18 @@ page：
 
 `usersCount` = 未冻结本地账号；`instancesCount` = `users.host` 去重；`driveUsage` = 文件大小之和。
 单条 SQL 子查询完成，没有缓存；关于页用它渲染统计。
+
+## 2026-11-06 增补：federation/show-instance
+
+`POST /api/federation/show-instance`（需登录）请求 `{host}`，返回 `FederationInstance` 或 `null`。
+
+Cinderfish 没有 Misskey 的 `instances` 表，也没有在线的 nodeinfo 抓取：
+
+- 本地主机：名称/简介来自运行时实例设置，`softwareName = "cinderfish"`、`softwareVersion = null`、
+  `openRegistrations` 由注册模式推导，用户/帖子数来自实时计数；
+- 其它主机：只统计本库已收录的 `users.host` 与 `notes.user_host` 行；从未出现的主机返回 `null`；
+- `softwareName`/`softwareVersion`/`latestStatus` 等字段对远端恒为 `null`，`isBlocked`/`isSuspended`/
+  `isNotResponding` 恒 `false`。
+
+**不发任何网络请求**，因此该端点不能被用来探测任意地址（SSRF 风险为 0）。代价是远端信息不会自动
+更新，/instance-info 页面也明确这样说明。
