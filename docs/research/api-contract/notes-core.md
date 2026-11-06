@@ -18,6 +18,8 @@
 | `POST /api/notes/create` | 必需 | `visibility`、`text`、`cw`、`fileIds`/`mediaIds`、`replyId`、`renoteId`、`poll`、`visibleUserIds`、`localOnly` | `{"createdNote": NoteDetailed}` | `internal/httpapi/notes.go:32` |
 | `POST /api/notes/show` | 可选（弱认证） | `noteId` | `NoteDetailed` | `internal/httpapi/notes.go:255` |
 | `POST /api/notes/delete` | 必需（仅作者） | `noteId` | `{}` | `internal/httpapi/notes.go:313` |
+| `POST /api/notes/edit` | 必需（仅作者） | `editId`、`text`、`cw`、`visibility`、`localOnly` | `{"createdNote": Note}` | `internal/httpapi/note_edit.go:26` |
+| `POST /api/notes/history` | 必需（仅作者） | `noteId`、`limit` | `NoteEdit[]`（自有端点） | `internal/httpapi/note_edit.go:96` |
 | `POST /api/notes/replies` | 可选（弱认证） | `noteId`、`limit`、`sinceId`、`untilId` | `NoteDetailed[]` | `internal/httpapi/notes.go:370` |
 | `POST /api/notes/renotes` | 可选（弱认证） | 同上 | `NoteDetailed[]` | `internal/httpapi/notes.go:376` |
 | `POST /api/notes/conversation` | 可选（弱认证） | `noteId`、`limit`、`offset` | `Note[]`（非 detail） | `internal/httpapi/notes_thread.go:13` |
@@ -437,6 +439,78 @@
 
 ---
 
+## POST /api/notes/edit
+
+编辑自己的笔记（Firefish 的端点；Misskey 固定版本没有）。实现：`internal/httpapi/note_edit.go:26`；
+服务层 `internal/note/edit.go`。
+
+### 请求字段
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `editId` | string | 是 | 缺失返回 400 `NEEDS_EDIT_ID`（id `d697edc8-…`） |
+| `text` | string \| null | 否 | 不出现 = 不改；`null`/`""` = 清空；≤ 3000 字符 |
+| `cw` | string \| null | 否 | 同上；`null`/`""` = 清空 |
+| `visibility` | string | 否 | `public` / `home` / `followers` / `specified`；缺省保持原值 |
+| `localOnly` | boolean | 否 | 缺省保持原值 |
+
+`fileIds`、`poll`、`replyId`、`renoteId`、`visibleUserIds` 会被忽略：附件与投票不随编辑变化。
+
+### 响应 200
+
+```json
+{ "createdNote": { "id": "…", "text": "…", "cw": null, "visibility": "public", … } }
+```
+
+### 错误
+
+| HTTP | code | 触发 |
+|------|------|------|
+| 401 | `AUTHENTICATION_FAILED` | 未登录 |
+| 400 | `NEEDS_EDIT_ID` | 缺 `editId` |
+| 404 | `NO_SUCH_NOTE` | 笔记不存在或已删除 |
+| 403 | `YOU_ARE_NOT_THE_AUTHOR` | 不是作者 |
+| 400 | `INVALID_PARAM` | 文本超长或 visibility 非法 |
+
+### 副作用
+
+- `notes.updated_at = now()`；`tags` 与本地 `mentions` 按新正文重算，`emojis` 清空。
+- 写入一条 `note_edits` 记录（保存前的文本/CW/附件 id）。
+- **不发 Streaming `updated` 事件，也不投递 ActivityPub `Update`**：关注者看到的仍是旧文本。
+
+### 已知缺口
+
+- 不能编辑附件、投票、回复目标、转发目标与指定可见用户。
+- 远端副本不会更新。
+- 没有 Misskey 的 300 次/小时限流。
+
+---
+
+## POST /api/notes/history
+
+列出自己笔记的编辑记录。**这是 Cinderfish 自有的端点**：Misskey 固定版本（`c05e844`）的
+`endpoints/` 下没有 `notes/history`，所以不计入「Misskey 同名端点」。
+
+### 请求字段
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `noteId` | string | 是 | 缺失返回 400 `INVALID_PARAM` |
+| `limit` | integer | 否 | 默认 20，上限 100 |
+
+### 响应 200
+
+`NoteEdit[]`，按 `id` 降序（最新在前）：
+
+```json
+[{ "id": "…", "noteId": "…", "text": "保存前的正文", "cw": null,
+   "fileIds": [], "createdAt": "2026-11-06T…" }]
+```
+
+只有作者能读：他人笔记返回 403 `YOU_ARE_NOT_THE_AUTHOR`，不存在的笔记返回 404 `NO_SUCH_NOTE`。
+
+---
+
 ## POST /api/notes/replies
 
 列出回复了某条笔记的笔记。实现：`internal/httpapi/notes.go:370` → `serveNoteList`（`:383`）；查询 `internal/note/timeline.go:300`。
@@ -851,6 +925,9 @@
 | `notes/children`、`notes/replies` 目标不存在 | 空数组 | 一致 |
 | `notes/renotes` 目标不存在 | `NO_SUCH_NOTE` | 一致（同 id） |
 | `notes/delete` 删他人笔记 | `ACCESS_DENIED` | `NO_SUCH_NOTE` |
+| `notes/edit` 可编辑字段 | 正文、CW、可见性、附件、投票、回复/转发目标 | 只有正文、CW、可见性、localOnly；附件与投票不变 |
+| `notes/edit` 副作用 | Streaming `updated` + ActivityPub `Update` | 只改本地行并记录历史 |
+| `notes/history` | Misskey 固定版本无此端点 | Cinderfish 自有，仅作者可读 |
 | `notes/reactions/create` 重复回应 | `ALREADY_REACTED` | 幂等，返回 `{}` |
 | `notes/reactions/delete` 参数与失败 | 仅 `noteId`；无回应抛 `NOT_REACTED`；204 | 可选 `reaction`；恒 200 `{}` |
 | `notes/favorites/create` 重复收藏 | `ALREADY_FAVORITED` | 幂等，返回已有行 |

@@ -494,6 +494,21 @@ ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS two_factor_temp_secret TEXT;
 ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS two_factor_enabled BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS use_password_less_login BOOLEAN NOT NULL DEFAULT FALSE;
 `,
+
+	// v15: note editing. `notes.updated_at` marks an edit; `note_edits` keeps
+	// the text/CW of every revision for the history page.
+	15: `
+ALTER TABLE notes ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ;
+CREATE TABLE IF NOT EXISTS note_edits (
+    id         TEXT PRIMARY KEY,
+    note_id    TEXT NOT NULL REFERENCES notes (id) ON DELETE CASCADE,
+    text       TEXT,
+    cw         TEXT,
+    file_ids   TEXT[] NOT NULL DEFAULT '{}',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_note_edits_note ON note_edits (note_id, id DESC);
+`,
 }
 
 // Migrate applies pending migrations in order and returns the version
