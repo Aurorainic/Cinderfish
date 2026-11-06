@@ -92,8 +92,8 @@
 //   * `notifications/mark-all-as-read` exists and is called for real;
 //   * `i/read-all-unread-notes` / `i/read-all-messaging-messages` do not exist,
 //     so those buttons stay disabled with an explicit note;
-//   * `i/update` ignores `mutingNotificationTypes` (internal/httpapi/i_update.go),
-//     so the type list is shown read-only instead of being written silently.
+//   * `i/update` stores `mutingNotificationTypes`; the list below toggles it
+//     and the notification endpoint filters on the stored value.
 // The push-notification block is dropped entirely: `sw/*` is not implemented.
 import { computed, onMounted, ref } from "vue";
 import { me, updateMe, updateProfile } from "@/account";

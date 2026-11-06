@@ -4421,7 +4421,7 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
   `origin=remote`、`hostname`（需与 `origin=combined` 组合，与 Misskey 一致）与两种 createdAt 排序
   已由 `TestUsersDirectoryFilters` 覆盖（2026-11-07），并确认封禁账号从目录消失。
   `state=alive` 因为没有 `users.updatedAt` 列而与 `all` 等价（用例固定了这一点）。
-  **界面**上的发现页用户页签仍未走查。
+  发现页用户页签已于 2026-11-07 走查（§12CS）：`/explore` 默认 users 页签列出账号与计数。
 - **第十八波的部分边角（2026-11-06，见 §12AH.4）**：投递队列的终态已由
   `TestDelivererOutcomes` / `TestDelivererGivesUp` / `TestDelivererAbandonsDisallowedHost`
   覆盖（2026-11-07）：成功标记、500 后退避重排、达到 `MaxAttempts` 放弃、策略拒绝立即放弃。
@@ -4446,11 +4446,13 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
 - **第二十三波已补验证并修缺陷（2026-11-06，见 §12AM.4）**：`TestNotificationTypeMuting` 覆盖了
   静音后列表与未读数联动、显式 `includeTypes` 优先、未知类型 400、重复项去重与清空。
   用例暴露了缺陷：`GetProfile` 从不读取 `settings.mutingNotificationTypes`，所以静音写入后
-  **完全没有效果**；已修复。设置页的**界面**交互仍未走查。
+  **完全没有效果**；已修复。设置页界面已于 2026-11-07 走查（§12CS）：关闭「提及」后
+  `i/update` 写入、API 列表为空、页面显示「没有通知」。
 - **第二十四波的部分边角（2026-11-06，见 §12AN.4）**：编辑链路已由 `TestNotesEditAndHistory`
   覆盖（2026-11-07）：作者改文本/CW/可见性后回读一致，`notes/history` 记录一条修订，非作者
   编辑/读历史 403，缺 editId 400 `NEEDS_EDIT_ID`，未知 id 404，超长文本 400。
-  仍未验证的：笔记菜单的编辑入口**界面**、远端对 Update 的处理（设计上只做尽力投递）。
+  笔记菜单的编辑入口已于 2026-11-07 走查（§12CS：「编辑」「编辑历史」均出现）；仍未验证的：
+  远端对 Update 的处理（设计上只做尽力投递）。
 - **第二十五波的部分边角（2026-11-06，见 §12AO.4）**：文件编辑已由 `TestDriveFilesUpdate` 覆盖
   （2026-11-07）：改名/备注/敏感标记/移动文件夹一次完成并回读，`folderId: null` 移回根目录，
   他人文件 404、未知文件 404、未知文件夹 400、空文件名 400。仍未验证的：**拖拽移动**的界面交互。
@@ -5169,3 +5171,24 @@ CINDERFISH_TEST_DATABASE_URL=... go test ./... -count=1         # 全绿
 - 真实多进程（两个二进制进程）的并发投递；本轮是同一进程内两条 goroutine。
 - worker 崩溃后的 2 分钟租约重投没有构造（需要 kill -9 时机）。
 - 手动重试与队列配置写入按设计未做。
+
+## 12CS. 第八十波：通知静音、发现页与笔记菜单的界面复核（2026-11-07）
+
+补齐 §14 里三个「界面未走查」的具体项，并修掉一处过期注释。
+
+### 12CS.1 结果
+
+| 项 | 操作 | 结果 |
+|----|------|------|
+| 通知设置 | `/settings/notifications` 关闭「提及」 | 开关从 true 变 false；`i` 回读 `mutingNotificationTypes: ["mention"]`；另一账号发 `@w80a` 提及后 `i/notifications` 为 0 条，页面显示「没有通知」 |
+| 发现页用户页签 | 打开 `/explore` | 默认 users 页签列出 alice/w80a/w80b 与各自的帖子/关注计数 |
+| 笔记菜单编辑入口 | 在笔记页点「…」 | 菜单出现「添加到书签/置顶/复制内容/复制链接/编辑/编辑历史/删除」，编辑与历史两项均可见（截图 `/tmp/w80-shots/note-menu-edit.png`） |
+
+`SettingsNotifications.vue` 的注释原写「`i/update` 忽略 `mutingNotificationTypes`，列表只读」，
+与第二十三波的修复不符，已改为「写入并按存储值过滤」（界面本身早就在写）。
+
+### 12CS.2 仍未验证
+
+- 「将所有通知标为已读」与两个禁用按钮（未读笔记/消息）没有在本轮点击。
+- 通知设置页在移动端断点下的排版。
+- 从时间线菜单进入编辑页后的保存流程（后端有 `TestNotesEditAndHistory`，界面只验证到入口）。
