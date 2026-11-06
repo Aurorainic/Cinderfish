@@ -4419,7 +4419,8 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
 - **第十六波的部分边角（2026-11-06，见 §12AF.4）**：远端提及已由
   `TestRemoteMentionIsDeliveredAndNotifies` 覆盖（2026-11-07，见 §12CD）：本地笔记 @ 远端账号会
   解析成 Mention 标签、经投递队列送到对端并产生 `mention` 通知（顺带修掉了入站提及被写成
-  `reply` 的缺陷）。仍未验证的：流式推送下的未读实时插入、directNotes 与类型过滤组合。
+  `reply` 的缺陷）。流式推送的 mention/reply/follow 事件与未读计数已由 §12CW 覆盖；
+  仍未验证的：directNotes 与类型过滤组合的推送。
 - **第十七波的部分边角（2026-11-06，见 §12AG.4）**：`users` 目录的未登录视角、`state=admin`、
   `origin=remote`、`hostname`（需与 `origin=combined` 组合，与 Misskey 一致）与两种 createdAt 排序
   已由 `TestUsersDirectoryFilters` 覆盖（2026-11-07），并确认封禁账号从目录消失。
@@ -5280,3 +5281,23 @@ CINDERFISH_TEST_DATABASE_URL=... go test ./... -count=1         # 全绿
 - 邀请码模式的注册表单（后台打开 `registration_mode = "invite"` 后输入邀请码）。
 - 注册失败（用户名占用、密码不匹配）的界面提示。
 - 移动端断点下的欢迎页与注册弹窗。
+
+## 12CW. 第八十四波：通知的流式推送与未读计数（2026-11-07）
+
+第十六波留下的「流式推送下的未读实时插入」在事件层补了端到端用例。
+
+`internal/httpapi/streaming_notifications_test.go` 的 `TestStreamingNotificationsPushTypes`：
+
+1. alice 连 `main` 频道；
+2. bob 发帖提及 alice、carol 回复 alice 的笔记、dave 关注 alice；
+3. 依次收到三条 `notification` 事件，`body.type` 分别为 mention/reply/follow；
+4. `/api/i` 的 `unreadNotificationsCount` ≥ 3；
+5. `/api/i/notifications` 返回 ≥ 3 条且不含历史遗留的 `body` 字段。
+
+```
+gofmt -l internal/ cmd/                                        # 空
+go vet ./...                                                   # exit 0
+CINDERFISH_TEST_DATABASE_URL=... go test ./... -count=1         # 全绿
+```
+
+仍未验证：`directNotes` 参数与类型过滤组合下的推送、通知列表页在前端收到事件后的插入动画。
