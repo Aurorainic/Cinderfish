@@ -19,6 +19,7 @@ handler 与服务层代码，不是从 Misskey 文档反推；与 Misskey `c05e8
 | `POST /api/drive/files` | 列出调用者云盘里的文件（按文件夹分层，`folderId` 缺省为根） | 必须登录 | `internal/httpapi/drive.go:103` |
 | `POST /api/drive/files/create` | `multipart/form-data` 上传一个文件 | 必须登录（token 只能走请求头） | `internal/httpapi/drive.go:13` |
 | `POST /api/drive/files/show` | 按 id 读取单个文件的元数据 | **匿名可读** | `internal/httpapi/drive.go:152` |
+| `POST /api/drive/files/update` | 改名 / 描述 / 敏感标记 / 移动到文件夹 | 必须登录 | `internal/httpapi/drive.go:214` |
 | `POST /api/drive/files/delete` | 删除自己的一个文件及其存储对象 | 必须登录 | `internal/httpapi/drive.go:181` |
 | `POST /api/drive/folders` | 列出某文件夹下的子文件夹（缺省为根） | 必须登录 | `internal/httpapi/drive_folders.go:51` |
 | `POST /api/drive/folders/create` | 新建文件夹 | 必须登录 | `internal/httpapi/drive_folders.go:98` |
@@ -336,6 +337,32 @@ token（查 `users.token`），其余查 `access_tokens`（miAuth / OAuth 签发
 - 文件被笔记引用时不会级联清理 `notes.file_ids`；笔记打包会跳过查不到的文件（`files` 数组变短），
   不会报错。前端渲染历史笔记时可能遇到 `fileIds` 比 `files` 多。
 - 引用：`internal/httpapi/drive.go:181`–`212`；`internal/media/drive.go:230`。
+
+## POST /api/drive/files/update
+
+- 路径与方法：`POST /api/drive/files/update`（无别名）。
+- 鉴权：必须登录；只能改自己的文件。
+- 请求体（所有字段可选，不出现 = 不改）：
+
+| 字段 | 类型 | 校验 |
+|---|---|---|
+| `fileId` | string | 缺失 → 400 `INVALID_PARAM` |
+| `name` | string \| null | trim 后非空、≤ 255 字符 |
+| `isSensitive` | boolean | — |
+| `comment` | string \| null | ≤ 512 字符；空串清空 |
+| `folderId` | string \| null | 必须是自己的文件夹；`null`/`""` 移回根目录 |
+
+响应：`DriveFile`（`comment` 现在是字符串或 `null`，不再是常量 `null`）。
+
+| HTTP | code | 触发 |
+|---|---|---|
+| 401 | `AUTHENTICATION_FAILED` | 未登录 |
+| 400 | `INVALID_PARAM` | 缺 `fileId`、名称/描述非法 |
+| 400 | `NO_SUCH_FOLDER` | `folderId` 不存在或属于别人 |
+| 404 | `NO_SUCH_FILE` | 文件不存在或属于别人 |
+
+要点：名称/描述的校验在服务层（`internal/media/drive.go` 的 `FileUpdate`）；文件夹归属在更新前
+单独查询。`comment` 存在 `drive_files.comment`（迁移 v16），`packDriveFile` 空值打包为 `null`。
 
 ## POST /api/drive/folders
 

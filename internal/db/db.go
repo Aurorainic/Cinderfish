@@ -509,6 +509,12 @@ CREATE TABLE IF NOT EXISTS note_edits (
 );
 CREATE INDEX IF NOT EXISTS idx_note_edits_note ON note_edits (note_id, id DESC);
 `,
+
+	// v16: drive file captions. `drive/files/update` writes it; the column is
+	// nullable so existing rows read as an empty caption.
+	16: `
+ALTER TABLE drive_files ADD COLUMN IF NOT EXISTS comment TEXT;
+`,
 }
 
 // Migrate applies pending migrations in order and returns the version

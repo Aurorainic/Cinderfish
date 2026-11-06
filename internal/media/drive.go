@@ -35,6 +35,7 @@ type File struct {
 	ThumbnailKey   *string
 	IsSensitive    bool
 	FolderID       *string
+	Comment        string
 	CreatedAt      time.Time
 	URL            string
 }
@@ -131,13 +132,13 @@ VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
 func (s *DriveService) Get(ctx context.Context, id string) (*File, error) {
 	row := s.pool.QueryRow(ctx, `
 SELECT id, user_id, name, content_type, size, md5, storage_key, storage_backend,
-       thumbnail_key, is_sensitive, folder_id, created_at
+       thumbnail_key, is_sensitive, folder_id, COALESCE(comment, ''), created_at
 FROM drive_files WHERE id = $1
 `, id)
 
 	var f File
 	err := row.Scan(&f.ID, &f.UserID, &f.Name, &f.ContentType, &f.Size, &f.MD5,
-		&f.StorageKey, &f.StorageBackend, &f.ThumbnailKey, &f.IsSensitive, &f.FolderID, &f.CreatedAt)
+		&f.StorageKey, &f.StorageBackend, &f.ThumbnailKey, &f.IsSensitive, &f.FolderID, &f.Comment, &f.CreatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -156,7 +157,7 @@ func (s *DriveService) GetMany(ctx context.Context, ids []string) ([]*File, erro
 	}
 	rows, err := s.pool.Query(ctx, `
 SELECT id, user_id, name, content_type, size, md5, storage_key, storage_backend,
-       thumbnail_key, is_sensitive, folder_id, created_at
+       thumbnail_key, is_sensitive, folder_id, COALESCE(comment, ''), created_at
 FROM drive_files WHERE id = ANY($1)
 `, ids)
 	if err != nil {
@@ -168,7 +169,7 @@ FROM drive_files WHERE id = ANY($1)
 	for rows.Next() {
 		var f File
 		if err := rows.Scan(&f.ID, &f.UserID, &f.Name, &f.ContentType, &f.Size, &f.MD5,
-			&f.StorageKey, &f.StorageBackend, &f.ThumbnailKey, &f.IsSensitive, &f.FolderID, &f.CreatedAt); err != nil {
+			&f.StorageKey, &f.StorageBackend, &f.ThumbnailKey, &f.IsSensitive, &f.FolderID, &f.Comment, &f.CreatedAt); err != nil {
 			return nil, fmt.Errorf("media: scan file list: %w", err)
 		}
 		f.URL = s.storage.URL(f.StorageKey)
@@ -188,7 +189,7 @@ func (s *DriveService) List(ctx context.Context, userID string, limit int, since
 
 	query := `
 SELECT id, user_id, name, content_type, size, md5, storage_key, storage_backend,
-       thumbnail_key, is_sensitive, folder_id, created_at
+       thumbnail_key, is_sensitive, folder_id, COALESCE(comment, ''), created_at
 FROM drive_files WHERE user_id = $1`
 	args := []any{userID}
 	if folderID == nil {
@@ -217,7 +218,7 @@ FROM drive_files WHERE user_id = $1`
 	for rows.Next() {
 		var f File
 		if err := rows.Scan(&f.ID, &f.UserID, &f.Name, &f.ContentType, &f.Size, &f.MD5,
-			&f.StorageKey, &f.StorageBackend, &f.ThumbnailKey, &f.IsSensitive, &f.FolderID, &f.CreatedAt); err != nil {
+			&f.StorageKey, &f.StorageBackend, &f.ThumbnailKey, &f.IsSensitive, &f.FolderID, &f.Comment, &f.CreatedAt); err != nil {
 			return nil, fmt.Errorf("media: scan file list: %w", err)
 		}
 		f.URL = s.storage.URL(f.StorageKey)
@@ -267,4 +268,80 @@ func SanitizeName(name string) string {
 		return "file"
 	}
 	return name
+}
+
+// FileUpdate carries the editable metadata of a drive file. A nil pointer
+// leaves that field unchanged; ClearFolder moves the file back to the root.
+type FileUpdate struct {
+	Name        *string
+	IsSensitive *bool
+	Comment     *string
+	FolderID    *string
+	ClearFolder bool
+}
+
+// Update rewrites a file's metadata. The file must belong to userID; a
+// folderId must name one of the user's folders.
+func (s *DriveService) Update(ctx context.Context, userID, fileID string, p FileUpdate) (*File, error) {
+	f, err := s.Get(ctx, fileID)
+	if err != nil {
+		return nil, err
+	}
+	if f.UserID != userID {
+		return nil, ErrNotFound
+	}
+
+	var sets []string
+	var args []any
+	add := func(column string, value any) {
+		args = append(args, value)
+		sets = append(sets, fmt.Sprintf("%s = $%d", column, len(args)))
+	}
+	if p.Name != nil {
+		name := strings.TrimSpace(*p.Name)
+		if name == "" {
+			return nil, ErrInvalidName
+		}
+		if len([]rune(name)) > MaxFileNameLength {
+			return nil, ErrInvalidName
+		}
+		add("name", name)
+	}
+	if p.IsSensitive != nil {
+		add("is_sensitive", *p.IsSensitive)
+	}
+	if p.Comment != nil {
+		comment := strings.TrimSpace(*p.Comment)
+		if len([]rune(comment)) > MaxCommentLength {
+			return nil, ErrInvalidComment
+		}
+		if comment == "" {
+			add("comment", nil)
+		} else {
+			add("comment", comment)
+		}
+	}
+	if p.FolderID != nil {
+		var owner string
+		if err := s.pool.QueryRow(ctx, `SELECT user_id FROM drive_folders WHERE id = $1`, *p.FolderID).Scan(&owner); err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return nil, ErrNoSuchFolder
+			}
+			return nil, fmt.Errorf("media: check folder: %w", err)
+		}
+		if owner != userID {
+			return nil, ErrNoSuchFolder
+		}
+		add("folder_id", *p.FolderID)
+	} else if p.ClearFolder {
+		add("folder_id", nil)
+	}
+	if len(sets) == 0 {
+		return f, nil
+	}
+	args = append(args, fileID)
+	if _, err := s.pool.Exec(ctx, "UPDATE drive_files SET "+strings.Join(sets, ", ")+fmt.Sprintf(" WHERE id = $%d", len(args)), args...); err != nil {
+		return nil, fmt.Errorf("media: update file: %w", err)
+	}
+	return s.Get(ctx, fileID)
 }

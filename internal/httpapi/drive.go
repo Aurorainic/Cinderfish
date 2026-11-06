@@ -211,6 +211,77 @@ func (s *Server) handleDriveFilesDelete(w http.ResponseWriter, r *http.Request) 
 	writeJSON(w, http.StatusOK, map[string]any{})
 }
 
+// handleDriveFilesUpdate implements POST /api/drive/files/update: rename a
+// file, edit its caption, toggle the sensitive flag, or move it between
+// folders. A null folderId moves the file back to the root.
+func (s *Server) handleDriveFilesUpdate(w http.ResponseWriter, r *http.Request) {
+	if s.drive == nil {
+		writeAPIError(w, &APIError{
+			Message: "Not available.", Code: "INTERNAL_ERROR",
+			ID: errIDInternal, Kind: "server", Status: http.StatusServiceUnavailable,
+		})
+		return
+	}
+
+	var body struct {
+		FileID      string        `json:"fileId"`
+		FolderID    nullableField `json:"folderId"`
+		Name        nullableField `json:"name"`
+		IsSensitive *bool         `json:"isSensitive"`
+		Comment     nullableField `json:"comment"`
+	}
+	if err := decodeOptionalJSON(r, &body); err != nil {
+		writeAPIError(w, err)
+		return
+	}
+	info, err := s.authenticate(r.Context(), r, bodyAsMap(r))
+	if err != nil || info == nil {
+		writeAuthenticationError(w)
+		return
+	}
+	if body.FileID == "" {
+		writeAPIError(w, invalidParamError("fileId is required"))
+		return
+	}
+
+	patch := media.FileUpdate{
+		IsSensitive: body.IsSensitive,
+		Name:        body.Name.asUpdatePointer(),
+		Comment:     body.Comment.asUpdatePointer(),
+	}
+	if body.FolderID.provided() {
+		folder := body.FolderID.asUpdatePointer()
+		if folder == nil || *folder == "" {
+			patch.ClearFolder = true
+		} else {
+			patch.FolderID = folder
+		}
+	}
+
+	f, err := s.drive.Update(r.Context(), info.User.ID, body.FileID, patch)
+	switch {
+	case errors.Is(err, media.ErrNotFound):
+		writeAPIError(w, &APIError{
+			Message: "No such file.", Code: "NO_SUCH_FILE",
+			ID: "b6992544-63e7-67f0-fa7f-32444b1b5306", Kind: "client", Status: http.StatusNotFound,
+		})
+		return
+	case errors.Is(err, media.ErrNoSuchFolder):
+		writeAPIError(w, &APIError{
+			Message: "No such folder.", Code: "NO_SUCH_FOLDER",
+			ID: errIDInvalidParam, Kind: "client", Status: http.StatusBadRequest,
+		})
+		return
+	case errors.Is(err, media.ErrInvalidName), errors.Is(err, media.ErrInvalidComment):
+		writeAPIError(w, invalidParamError("the file name or comment is invalid"))
+		return
+	case err != nil:
+		writeInternalServerError(w)
+		return
+	}
+	writeJSON(w, http.StatusOK, packDriveFile(f))
+}
+
 // handleMediaServe serves locally stored files.
 func (s *Server) handleMediaServe(w http.ResponseWriter, r *http.Request) {
 	if s.storage == nil {
@@ -257,7 +328,7 @@ func packDriveFile(f *media.File) map[string]any {
 		"url":          f.URL,
 		"thumbnailUrl": nil,
 		"webpublicUrl": nil,
-		"comment":      nil,
+		"comment":      nilIfEmpty(f.Comment),
 		"folderId":     f.FolderID,
 		"blurhash":     nil,
 	}

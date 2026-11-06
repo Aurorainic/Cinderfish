@@ -25,5 +25,19 @@ type Storage interface {
 // ErrNotFound is returned when a key does not exist.
 var ErrNotFound = errors.New("media: object not found")
 
+// Errors and limits for drive/files/update.
+var (
+	ErrInvalidName    = errors.New("media: invalid file name")
+	ErrInvalidComment = errors.New("media: comment is too long")
+	ErrNoSuchFolder   = errors.New("media: no such folder")
+)
+
+const (
+	// MaxFileNameLength matches Misskey's drive file name limit.
+	MaxFileNameLength = 255
+	// MaxCommentLength caps the drive file caption.
+	MaxCommentLength = 512
+)
+
 // ErrTooLarge is returned when an upload exceeds the configured limit.
 var ErrTooLarge = errors.New("media: file is too large")

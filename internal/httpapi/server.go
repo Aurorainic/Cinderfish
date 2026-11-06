@@ -255,6 +255,7 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("POST /api/drive/folders/delete", s.handleDriveFoldersDelete)
 	s.mux.HandleFunc("POST /api/drive/files", s.handleDriveFilesList)
 	s.mux.HandleFunc("POST /api/drive/files/show", s.handleDriveFilesShow)
+	s.mux.HandleFunc("POST /api/drive/files/update", s.handleDriveFilesUpdate)
 	s.mux.HandleFunc("POST /api/drive/files/delete", s.handleDriveFilesDelete)
 	s.mux.HandleFunc("GET /media/{path...}", s.handleMediaServe)
 
