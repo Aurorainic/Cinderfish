@@ -104,6 +104,7 @@ export const ENDPOINTS = {
 	iKnownAs: "i/known-as",
 	iMove: "i/move",
 	oauthAuthorize: "oauth/authorize",
+	apShow: "ap/show",
 	iFavorites: "i/favorites",
 	iNotifications: "i/notifications",
 
@@ -563,6 +564,13 @@ export interface EndpointMap {
 	[ENDPOINTS.iUnpin]: { req: NoteIdParams; res: MeDetailed };
 	[ENDPOINTS.iKnownAs]: { req: { alsoKnownAs: string[] }; res: MeDetailed };
 	[ENDPOINTS.iMove]: { req: { moveToAccount: string }; res: MeDetailed };
+	[ENDPOINTS.apShow]: {
+		req: { uri: string };
+		res: {
+			type: "Note" | "User";
+			object: NoteDetailed | UserDetailed;
+		};
+	};
 	[ENDPOINTS.oauthAuthorize]: {
 		req: {
 			client_id: string;
