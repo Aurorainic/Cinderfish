@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -157,5 +159,57 @@ UPDATE instance_meta SET value = to_jsonb('none'::text) WHERE key = 'federationM
 		t.Fatalf("pending: %v", err)
 	} else if len(pending) != 0 {
 		t.Errorf("a policy-refused delivery is still pending: %v", pending)
+	}
+}
+
+// TestDelivererClaimsEachRowOnce proves two workers polling the same queue do
+// not send the same activity twice: Pending claims rows atomically with
+// FOR UPDATE SKIP LOCKED.
+func TestDelivererClaimsEachRowOnce(t *testing.T) {
+	d, pool, clear := deliverFixture(t)
+	defer clear()
+	ctx := context.Background()
+	activity := federation.Object{
+		"@context": federation.Context, "type": "Delete",
+		"actor": "https://fish.example/users/u", "object": "https://fish.example/notes/claim",
+	}
+
+	var hits int64
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt64(&hits, 1)
+		w.WriteHeader(http.StatusAccepted)
+	}))
+	t.Cleanup(srv.Close)
+
+	const total = 20
+	for i := 0; i < total; i++ {
+		if err := d.Enqueue(ctx, srv.URL, "", "https://fish.example/users/u#main-key", "", activity); err != nil {
+			t.Fatalf("enqueue %d: %v", i, err)
+		}
+	}
+
+	var wg sync.WaitGroup
+	for worker := 0; worker < 2; worker++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for round := 0; round < 2; round++ {
+				if err := d.ProcessOnce(ctx); err != nil {
+					t.Errorf("process: %v", err)
+				}
+			}
+		}()
+	}
+	wg.Wait()
+
+	if got := atomic.LoadInt64(&hits); got != total {
+		t.Errorf("inbox received %d requests, want %d (duplicates mean no claim)", got, total)
+	}
+	var delivered int
+	if err := pool.QueryRow(ctx, `SELECT count(*) FROM deliver_queue WHERE delivered_at IS NOT NULL`).Scan(&delivered); err != nil {
+		t.Fatalf("count delivered: %v", err)
+	}
+	if delivered != total {
+		t.Errorf("delivered rows = %d, want %d", delivered, total)
 	}
 }

@@ -108,15 +108,23 @@ func (d *Deliverer) Wake() {
 	}
 }
 
-// Pending returns up to limit deliveries that are due now.
+// Pending claims up to limit deliveries that are due now, pushing their
+// next_attempt_at two minutes ahead. The claim is atomic (FOR UPDATE SKIP
+// LOCKED), so two workers never send the same row; a worker that dies leaves
+// the row to be retried after the lease expires.
 func (d *Deliverer) Pending(ctx context.Context, limit int) ([]Delivery, error) {
 	rows, err := d.pool.Query(ctx, `
-SELECT id, payload, inbox_url, COALESCE(activity_id, ''), COALESCE(key_id, ''),
-       COALESCE(user_id, ''), attempts
-FROM deliver_queue
-WHERE delivered_at IS NULL AND attempts < $1 AND next_attempt_at <= now()
-ORDER BY next_attempt_at
-LIMIT $2
+UPDATE deliver_queue
+SET next_attempt_at = now() + interval '2 minutes'
+WHERE id IN (
+    SELECT id FROM deliver_queue
+    WHERE delivered_at IS NULL AND attempts < $1 AND next_attempt_at <= now()
+    ORDER BY next_attempt_at
+    LIMIT $2
+    FOR UPDATE SKIP LOCKED
+)
+RETURNING id, payload, inbox_url, COALESCE(activity_id, ''), COALESCE(key_id, ''),
+          COALESCE(user_id, ''), attempts
 	`, d.MaxAttempts, limit)
 	if err != nil {
 		return nil, fmt.Errorf("federation: read queue: %w", err)

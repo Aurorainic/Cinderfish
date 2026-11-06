@@ -4425,7 +4425,8 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
 - **第十八波的部分边角（2026-11-06，见 §12AH.4）**：投递队列的终态已由
   `TestDelivererOutcomes` / `TestDelivererGivesUp` / `TestDelivererAbandonsDisallowedHost`
   覆盖（2026-11-07）：成功标记、500 后退避重排、达到 `MaxAttempts` 放弃、策略拒绝立即放弃。
-  仍未验证的：并发压测（多 worker 抢同一条）与 S3 真实桶展示；手动重试与配置写入按设计未做。
+  并发安全在 2026-11-07 由 §12CR 补上（`Pending` 改为原子认领，两 worker 各跑两轮不重复投递）；
+  S3 真实桶展示已由 §12CI 的 S3 协议验证部分覆盖。仍未验证的：手动重试与配置写入（按设计未做）。
 - **第十九波的部分边角（2026-11-06，见 §12AI.4）**：规则与合规链接现在进入注册流程（2026-11-07）：
   `CfSignup` 在管理员配置了 `tosUrl` / `serverRules` 时显示「注册即表示你同意 本实例的服务条款与
   实例规则」，浏览器实测两个链接（外链 `_blank`、规则链到 `/about`）、移动端无溢出；清空配置后
@@ -5128,3 +5129,43 @@ CINDERFISH_TEST_DATABASE_URL=... go test ./... -count=1         # 全绿
 - 长时间断网（超过当前重试间隔的连续失败）与消息丢失窗口。
 - Redis ACL 用户（非 `requirepass`）与 TLS。
 - `w78:deliver` 投递唤醒：两个实例都是 `federation_mode = "none"`，没有产生投递。
+
+## 12CR. 第七十九波：投递队列的原子认领（2026-11-07）
+
+补第十八波「多 worker 抢同一条」的并发验证时发现：`Deliverer.Pending` 只是 `SELECT`，
+文档却声称第二个进程不会重复投递。两个 worker 同时轮询会把同一行都发出去。
+
+### 12CR.1 修复
+
+`Pending` 改为一条原子语句：
+
+```sql
+UPDATE deliver_queue SET next_attempt_at = now() + interval '2 minutes'
+WHERE id IN (
+    SELECT id FROM deliver_queue
+    WHERE delivered_at IS NULL AND attempts < $1 AND next_attempt_at <= now()
+    ORDER BY next_attempt_at LIMIT $2
+    FOR UPDATE SKIP LOCKED
+)
+RETURNING ...
+```
+
+认领即租约：成功标记 `delivered_at`，失败由 `fail` 覆盖成退避时间；worker 崩溃时该行在
+2 分钟后重新可投。`ProcessOnce` 的行为不变，测试里 `Pending` 的语义从「查看」变成「认领」。
+
+### 12CR.2 验证证据
+
+`TestDelivererClaimsEachRowOnce`：20 条投递、同一 Deliverer 的两个 goroutine 各跑两轮
+`ProcessOnce`，接收端计数必须恰好 20，`delivered_at` 行数也必须 20。
+
+```
+gofmt -l internal/ cmd/                                        # 空
+go vet ./...                                                   # exit 0
+CINDERFISH_TEST_DATABASE_URL=... go test ./... -count=1         # 全绿
+```
+
+### 12CR.3 仍未验证
+
+- 真实多进程（两个二进制进程）的并发投递；本轮是同一进程内两条 goroutine。
+- worker 崩溃后的 2 分钟租约重投没有构造（需要 kill -9 时机）。
+- 手动重试与队列配置写入按设计未做。
