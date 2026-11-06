@@ -4014,7 +4014,7 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
 ### 12BS.4 仍未验证
 
 - 远程互动页**没有浏览器走查**：加载态、笔记渲染、关注按钮点击都只过了编译。
-- `ImportObject` 的拒绝路径（attributedTo 与 host 不匹配、非 Note/Actor 对象）没有构造对端用例。
+- `ImportObject` 的两条拒绝路径已由 §12EG 覆盖（非 Note/Actor 的 Collection、id 与作者主机不一致）。
 - 真实 Mastodon / Misskey 实例的 `/authorize_interaction` 链接没有实测。
 
 ## 12BT. 第五十五波：第三方应用授权（2026-11-06）
@@ -4533,7 +4533,7 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
   `#main-key`，且 beta 按 actor 公钥验签后接收并落库（若用兜底密钥会被拒）（2026-11-07）。
 - **第四十三波已补验证（2026-11-07，见 §12BG.4）**：四个兼容端点的返回值均有用例覆盖
   （计数一致性、标签排序与 limit/offset、推荐排序与可见性过滤、registry 类型推断）。
-  仍未验证的：账号信息页的实际渲染与统计失败时的降级。
+  账号信息页渲染与统计失败降级已由 §12DM/§12DZ 覆盖。
 - **第四十四波已补验证（2026-11-07，见 §12BH.4）**：实例 CSS 的保存→下发→注入链路用
   `TestInstanceCustomCSS` 与无头浏览器走查覆盖（含 100 KiB 边界、空串清除、访客生效）；
   邮件状态页在未配置实例下走查通过；已配置 SMTP 的页面呈现也在 2026-11-07 走查（§12DP：
@@ -4568,8 +4568,8 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
   同意页与授权码落库、`/auth/<token>` 应用名与权限都已走查。仍未验证的：没有真实第三方客户端跑完整 OAuth 登录
   （`GET /oauth/authorize` 无凭据且无前端构建时的 401 分支已在 §12CK 补用例）。
 - **第五十四波部分补验证（2026-11-07 对账 §12CB）**：`/authorize_interaction` 在远端不可达时的
-  错误态与外链已走查。仍未验证的：`ImportObject` 的拒绝路径没有对端用例；真实 Mastodon/Misskey 的
-  `/authorize_interaction` 链接未实测。
+  错误态与外链已走查；`ImportObject` 的拒绝路径由 §12EG 覆盖。仍未验证的：真实 Mastodon/Misskey 的
+  `/authorize_interaction` 链接。
 - **第五十五波部分补验证（2026-11-07 对账 §12CB）**：`Auth.vue` 已在 `/auth/<token>` 走查。
   仍未验证的：真实第三方客户端没跑过这条授权流程（`app/show` 的 secret 所有者分支已在 §12CK 补用例）。
 - **第五十六波已补验证（2026-11-07，见 §12CC/§12CF）**：「移除关注者」菜单、确认框与行删除已走查；
@@ -4577,9 +4577,8 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
 - **第五十七波部分补验证（2026-11-07，见 §12CB/§12CL）**：`follow` 与 `note` 两类通知在通知页渲染
   已走查；`homeTimeline` 的 withReplies 过滤新增了真实 WebSocket 端到端用例。仍未验证的：
   远端导入通知的双实例用例已由 §12CX 覆盖；仍未验证的是 directNotes 与类型过滤组合的推送。
-- **第五十八波仍未验证**：没有对真实 Misskey/Firefish 验证 `EmojiReact`；远端自定义表情未解析；
-  `Question` 入站已在第六十六波补上（§12CE）；笔记正文的远端自定义表情已在第七十一波解析并渲染
-  （§12CJ）。仍未验证的：真实异种软件互投、反应里的自定义表情。
+- **第五十八波已补验证**：`Question` 入站（§12CE）、笔记正文与反应里的远端自定义表情
+  （§12CJ/§12DC）都已实现并有用例。仍未验证的：真实异种软件互投。
 - **第五十九波部分补验证（2026-11-07 对账 §12CC）**：`/admin/abuses` 的举报者、被举报者、内容与
   「标记已处理」按钮已走查。笔记级目标（入站 Flag 的 note URI）在评论里保留，已加断言（§12DL）；
   仍未验证的：远端举报对真实实例的互认；重复举报没有去重（与 Misskey 一致，后台会看到多条）。
@@ -4629,7 +4628,7 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
 ### 12CB.4 仍未验证
 
 - `MkMoved` 横幅无法在单实例构造（需要远端账号声明本实例账号为其别名）。
-- 双因素登录、移除关注者菜单、远端举报的管理台展示未走查。
+- 双因素登录（§12DK）、移除关注者菜单（§12CC）、远端举报的管理台展示（§12CC）均已走查。
 - 真实联邦联调仍缺（全部联邦证据来自双实例测试）。
 
 ## 12CC. 第六十四波：走查补漏（横幅、移除关注者、举报页、2FA 提示）
@@ -5855,3 +5854,16 @@ CINDERFISH_TEST_DATABASE_URL=... go test ./... -count=1         # 全绿
 `admin/emoji/list` 里出现 `w116emoji2`。
 
 仍未验证：从网盘选择文件的分支、别名与类别字段的输入。
+
+## 12EG. 第一百一十七波：ImportObject 的两条拒绝路径（2026-11-07）
+
+- `TestAPShowRejectsNonEntity`：对 `https://beta.example/users/<id>/followers`（Collection）
+  调 `ap/show` → 400 `NO_SUCH_OBJECT`；
+- `TestAPShowRejectsForeignNote`：伪造 `https://evil.example/notes/1` 的 Note，`attributedTo`
+  指向 `beta.example` 的作者；`ImportObject` 按 host 校验拒绝，同样 400。
+
+```
+gofmt -l internal/ cmd/                                        # 空
+go vet ./...                                                   # exit 0
+CINDERFISH_TEST_DATABASE_URL=... go test ./... -count=1         # 全绿
+```
