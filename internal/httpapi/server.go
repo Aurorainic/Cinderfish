@@ -182,6 +182,8 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("POST /api/admin/show-users", s.handleAdminShowUsers)
 	s.mux.HandleFunc("POST /api/admin/drive/files", s.handleAdminDriveFiles)
 	s.mux.HandleFunc("POST /api/admin/get-table-stats", s.handleAdminTableStats)
+	s.mux.HandleFunc("POST /api/admin/meta", s.handleAdminMeta)
+	s.mux.HandleFunc("POST /api/admin/update-meta", s.handleAdminUpdateMeta)
 	s.mux.HandleFunc("POST /api/admin/get-index-stats", s.handleAdminIndexStats)
 	s.mux.HandleFunc("POST /api/admin/suspend-user", s.handleAdminSuspendUser)
 	s.mux.HandleFunc("POST /api/admin/unsuspend-user", s.handleAdminUnsuspendUser)

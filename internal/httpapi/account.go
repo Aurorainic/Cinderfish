@@ -53,7 +53,7 @@ func (s *Server) handleSignup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	mode := s.registrationMode()
+	mode := s.registrationMode(r.Context())
 	user, token, err := s.accounts.Register(r.Context(), mode, body.Username, body.Password, body.InvitationCode)
 	if err != nil {
 		var regErr *account.RegistrationError
@@ -101,16 +101,10 @@ func loadProfile(ctx context.Context, s *Server, userID string) *account.Profile
 	return prof
 }
 
-// registrationMode maps the configured mode onto the account service.
-func (s *Server) registrationMode() account.RegistrationMode {
-	switch s.cfg.RegistrationMode {
-	case "open":
-		return account.RegistrationOpen
-	case "invite":
-		return account.RegistrationInvite
-	default:
-		return account.RegistrationAdmin
-	}
+// registrationMode maps the runtime (or configured) mode onto the account
+// service.
+func (s *Server) registrationMode(ctx context.Context) account.RegistrationMode {
+	return s.liveRegistrationMode(ctx)
 }
 
 // handleSignin implements POST /api/signin.

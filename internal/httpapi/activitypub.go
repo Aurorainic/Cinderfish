@@ -233,7 +233,7 @@ func (s *Server) serveNodeInfo(w http.ResponseWriter, r *http.Request, version s
 		"software":          map[string]any{"name": "cinderfish", "version": "0.0.1"},
 		"protocols":         []string{"activitypub"},
 		"services":          map[string]any{"inbound": []string{}, "outbound": []string{}},
-		"openRegistrations": s.cfg.RegistrationMode == "open",
+		"openRegistrations": s.liveInstanceSettings(r.Context()).RegistrationMode == "open",
 		"usage": map[string]any{
 			"users":         map[string]any{"total": users},
 			"localPosts":    localPosts,
@@ -241,7 +241,7 @@ func (s *Server) serveNodeInfo(w http.ResponseWriter, r *http.Request, version s
 		},
 		"metadata": map[string]any{
 			"maxNoteTextLength":   3000,
-			"disableRegistration": s.cfg.RegistrationMode != "open",
+			"disableRegistration": s.liveInstanceSettings(r.Context()).RegistrationMode != "open",
 		},
 	}
 	w.Header().Set("Content-Type", `application/json; profile="http://nodeinfo.diaspora.software/ns/schema/`+version+`#"`)

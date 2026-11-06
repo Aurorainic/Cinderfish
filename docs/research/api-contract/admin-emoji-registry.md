@@ -1120,3 +1120,31 @@ UserLite 部分也有简化：`name`/`avatarUrl` 只从 profile 行来，没有 
 [{ "schemaname": "public", "tablename": "users", "indexname": "users_pkey",
    "tablespace": null, "indexdef": "CREATE UNIQUE INDEX …" }]
 ```
+
+## 2026-11-06 增补：运行时实例设置
+
+实例名称、简介、维护者与注册模式保存在 `instance_meta`，`meta` 与 nodeinfo 读运行时值。
+
+### POST /api/admin/meta（管理员）
+
+返回本实例允许修改的字段：
+
+```json
+{ "name": "…", "description": "…", "maintainerName": "…",
+  "maintainerEmail": "…", "registrationMode": "open|invite|admin" }
+```
+
+### POST /api/admin/update-meta（管理员）
+
+接受上述五个字段；缺省或 `null` 表示不变，其它字段忽略。
+
+| 字段 | 校验 |
+|------|------|
+| `name` | 必填（去空白后），≤100 字符 |
+| `description` | ≤500 字符，可为空 |
+| `maintainerName` | ≤100 字符，可为空 |
+| `maintainerEmail` | 可为空；否则需含 `@` 且 ≤254 |
+| `registrationMode` | `open` / `invite` / `admin` |
+
+注册模式立即生效：`signup` 的校验、`meta.disableRegistration` 与 nodeinfo 的
+`openRegistrations` 都会随之变化。返回更新后的同一对象。

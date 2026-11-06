@@ -19,15 +19,16 @@ func (s *Server) handleMeta(w http.ResponseWriter, r *http.Request) {
 		detail = *body.Detail
 	}
 
+	settings := s.liveInstanceSettings(r.Context())
 	meta := map[string]any{
-		"maintainerName":               "",
-		"maintainerEmail":              "",
+		"maintainerName":               settings.MaintainerName,
+		"maintainerEmail":              settings.MaintainerEmail,
 		"version":                      "0.1.0",
 		"providesTarball":              false,
-		"name":                         "Cinderfish",
+		"name":                         settings.Name,
 		"shortName":                    "cinderfish",
 		"uri":                          "https://" + s.cfg.Domain,
-		"description":                  "",
+		"description":                  settings.Description,
 		"langs":                        []string{"en"},
 		"tosUrl":                       nil,
 		"repositoryUrl":                "",
@@ -35,7 +36,7 @@ func (s *Server) handleMeta(w http.ResponseWriter, r *http.Request) {
 		"impressumUrl":                 "",
 		"privacyPolicyUrl":             "",
 		"inquiryUrl":                   "",
-		"disableRegistration":          s.cfg.RegistrationMode != "open",
+		"disableRegistration":          settings.RegistrationMode != "open",
 		"emailRequiredForSignup":       false,
 		"enableHcaptcha":               false,
 		"hcaptchaSiteKey":              "",
