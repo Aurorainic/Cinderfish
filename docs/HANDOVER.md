@@ -1,12 +1,14 @@
 # Cinderfish 交接说明
 
-- 最后更新：2026-11-06（目标模式第五十一至六十二波：账号迁移、KaTeX 宏页与集成说明页、
+- 最后更新：2026-11-06（目标模式第五十一至六十三波：账号迁移、KaTeX 宏页与集成说明页、
   OAuth 交互式同意页、`ap/show` 与远程互动页、第三方应用授权全流程（`app/*` 与 `auth/session/*`，
   schema v20）、关注关系设置与其消费方（schema v21）、入站反应修复与 `EmojiReact`、入站 `Flag`、
   范围内占位页清零（24 个剩余占位页全部在首版范围外）、hashtags 三端点、`users/relation`
-  与频繁回复用户。恢复目标模式时先补了 §12BO.3 的验证债，
+  与频繁回复用户、真实二进制浏览器走查（修掉登录 token 缓存与本地 Actor URI 两个缺陷）。
+  恢复目标模式时先补了 §12BO.3 的验证债，
   `go test ./...`（含数据库）已全绿，
-  详见 §12BP–§12CA。浏览器走查仍待用户手动确认后执行）
+  详见 §12BP–§12CB。第五十一至六十二波的桌面/移动浏览器走查已在第六十三波补完
+  （真实二进制 + Helium 156），当时发现并修复了登录 token 缓存与本地 Actor URI 解析两个缺陷）
 - 项目名 **Cinderfish**（2026-10-28 定名，Go module `github.com/Aurorainic/cinderfish`）
 - 仓库：当前目录 `/home/lainsaka/文档/MilnFish`，分支 `main`；远程 `origin` 为
   `https://github.com/Aurorainic/Cinderfish.git`（GitHub 仓库已更名，本地目录改名待办）
@@ -4150,6 +4152,7 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
 | `docs/research/2026-11-06-firefish-port-wave60-contract.md` | **第六十波施工契约（范围内占位页清零），见 §12BY** |
 | `docs/research/2026-11-06-firefish-port-wave61-contract.md` | **第六十一波施工契约（hashtags 三端点），见 §12BZ** |
 | `docs/research/2026-11-06-firefish-port-wave62-contract.md` | **第六十二波施工契约（users/relation 与频繁回复），见 §12CA** |
+| `docs/research/2026-11-06-firefish-port-wave63-contract.md` | **第六十三波施工契约（真实二进制与浏览器走查），见 §12CB** |
 
 ## 14. 已知的未验证项
 
@@ -4242,6 +4245,48 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
 - **第六十一波未测（2026-11-06，见 §12BZ.4）**：标签页统计未走查；`hashtags/list` 只验证了两个
   排序；大表聚合耗时未测。
 - **第六十二波未测（2026-11-06，见 §12CA.4）**：两个端点没有前端调用方，没有对应走查。
+
+## 12CB. 第六十三波：真实二进制与浏览器走查（2026-11-06）
+
+契约见 `docs/research/2026-11-06-firefish-port-wave63-contract.md`。
+这是第五十一至六十二波欠下的视觉验证：真实二进制 + Helium 156（CDP），单实例，schema v21。
+
+### 12CB.1 走查结论
+
+| 页面 | 结论 |
+|------|------|
+| 登录 → 首页时间线 | **修掉缺陷**：登录前缓存了空 token，登录后仍匿名请求，时间线 401 直到刷新 |
+| `/settings/migration` | 表单与说明正常；本地目标被拒并回显 `User is not remote…` |
+| 迁移页别名保存与回填 | **修掉缺陷**：本地账号没有 `users.uri`，保存后解析不回昵称；修复后回填 `@w63bob` |
+| `/oauth/authorize` | 应用主机与权限正确；接受后 `oauth_grant_codes` 出现 `["read","write"]` 的授权码 |
+| `/auth/<token>` | 应用名与权限正确；接受后会话置位、app 绑定令牌生成（2 scope） |
+| `/authorize_interaction` | 远端不可达时显示错误态与外链 |
+| `/tags/<tag>` | 「被 2 人提到 · 全部时间」，笔记列表正确 |
+| `/my/notifications` | 「关注了您」与「发布了新笔记」都渲染出来（第五十七波的 `note` 类型生效） |
+| KaTeX 宏页 | 保存写入 `customKaTeXMacro` 与 `customKaTeXMacroParsed`，提示「已保存」 |
+| 三个说明页 + `SignupComplete` | 结构与文案正常 |
+| 移动端 390×844（7 页） | 全部 `scrollWidth = clientWidth`，无 JS 异常 |
+
+截图：`/tmp/w63-shots`（42 张，不入库）；服务与临时二进制已停止/删除。
+
+### 12CB.2 修复
+
+1. `mirrorToken` 改用 `setToken()`，让 RPC 客户端的内存 token 与 localStorage 同步（登录后无需刷新）。
+2. 新增 `Server.userByAPID`：本地账号按 `<baseURL>/users/<id>` 解析（`users/show` 单值/批量、
+   `packMovedTo` 共用）；回归断言加进 `TestIKnownAsLocalAlias`。
+
+### 12CB.3 验证证据
+
+- `gofmt -l internal/ cmd/` 无输出；`go vet ./...` 通过。
+- `CINDERFISH_TEST_DATABASE_URL=… go test ./...` 全绿（含新增的 URI 回查断言）。
+- `vue-tsc --noEmit`、`check:port`（hardTotal 0）、`pnpm build` 全绿。
+- 浏览器：无 `Runtime.exceptionThrown`、无 console error；移动端无横向溢出。
+
+### 12CB.4 仍未验证
+
+- `MkMoved` 横幅无法在单实例构造（需要远端账号声明本实例账号为其别名）。
+- 双因素登录、移除关注者菜单、远端举报的管理台展示未走查。
+- 真实联邦联调仍缺（全部联邦证据来自双实例测试）。
 - **仍未移植的设置页**：邮箱、整合、导入导出、迁移、Webhook、插件、自定义 KaTeX、状态栏、
   删除账号、应用授权以外的账号操作；对应后端端点不存在或前端缺少依赖（见第五波契约 §3.3）。
 - **仍缺的 widgets**：rss、rss-ticker、server-metric、online-users、federation、job-queue、aiscript、

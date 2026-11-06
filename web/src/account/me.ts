@@ -14,21 +14,17 @@ import {
 	readStoredAccount,
 	writeStoredAccount,
 } from "./storage";
+import { setToken } from "../api/token";
 import type { MeDetailed } from "./types";
 
 /** Token key owned by the RPC/streaming clients (`web/src/api/token.ts`). */
 export const CLIENT_TOKEN_KEY = "cinderfish.token";
 
 function mirrorToken(account: MeDetailed | null): void {
-	try {
-		if (account?.token != null && account.token !== "") {
-			localStorage.setItem(CLIENT_TOKEN_KEY, account.token);
-		} else {
-			localStorage.removeItem(CLIENT_TOKEN_KEY);
-		}
-	} catch {
-		// Private mode / quota: the in-memory session still works.
-	}
+	// The RPC client caches the token on first use, so writing localStorage is
+	// not enough: a page that started signed out would keep sending anonymous
+	// requests until it was reloaded. setToken updates that copy as well.
+	setToken(account?.token != null && account.token !== "" ? account.token : null);
 }
 
 function publish(account: MeDetailed | null): void {
