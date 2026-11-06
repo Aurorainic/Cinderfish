@@ -18,6 +18,7 @@ import type {
 	DriveFile,
 	DriveFolder,
 	EmojiSimple,
+	FederationInstance,
 	FederationModeResponse,
 	FollowRequest,
 	Following,
@@ -193,6 +194,7 @@ export const ENDPOINTS = {
 	adminDriveFiles: "admin/drive/files",
 	adminSuspendUser: "admin/suspend-user",
 	adminUnsuspendUser: "admin/unsuspend-user",
+	federationShowInstance: "federation/show-instance",
 	adminFederationMode: "admin/federation/mode",
 	adminFederationAllowlist: "admin/federation/allowlist",
 } as const;
@@ -854,6 +856,11 @@ export interface EndpointMap {
 	[ENDPOINTS.blockingList]: {
 		req: RelationListParams;
 		res: BlockingRecord[];
+	};
+
+	[ENDPOINTS.federationShowInstance]: {
+		req: { host: string };
+		res: FederationInstance | null;
 	};
 
 	[ENDPOINTS.adminFederationMode]: {

@@ -534,6 +534,22 @@ export interface AdminInstanceMeta {
 	hiddenTags: string[];
 }
 
+/** One row of `federation/show-instance`. */
+export interface FederationInstance {
+	host: string;
+	name: string | null;
+	description: string | null;
+	softwareName: string | null;
+	softwareVersion: string | null;
+	openRegistrations: boolean | null;
+	usersCount: number;
+	notesCount: number;
+	latestStatus: number | null;
+	isBlocked: boolean;
+	isSuspended: boolean;
+	isNotResponding: boolean;
+}
+
 /** Counters from `stats`. */
 export interface InstanceStats {
 	usersCount: number;

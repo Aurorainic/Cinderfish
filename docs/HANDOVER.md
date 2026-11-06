@@ -2636,6 +2636,43 @@ cd web && pnpm build                    # exit 0
 - 管理页在移动端的布局。
 - `go test` 与浏览器走查未执行。
 
+## 12AQ. 批次：实例信息页（2026-11-06）
+
+**工作方式**：目标模式第二十七波，继续只写代码、验证到编译层。施工依据
+`docs/research/2026-11-06-firefish-port-wave27-contract.md`。
+
+### 12AQ.1 落地清单
+
+| 层 | 文件 | 说明 |
+|----|------|------|
+| 端点 | `internal/httpapi/federation_instance.go`（新）、`server.go` | `federation/show-instance`：本地设置+计数，远端库内聚合，不联网 |
+| 前端类型 | `api/types.ts`、`endpoints.ts` | `FederationInstance`、端点 |
+| 页面 | `pages/InstanceInfo.vue` | 主机查询、软件/注册/计数展示、未知主机与 401 提示 |
+| 文档 | `api-contract/meta-federation.md`、台账 | 端点小节与计数（118/111/329） |
+
+### 12AQ.2 有意的限制
+
+1. 远端信息不联网抓取，只来自本库已收录的行。
+2. 远端软件字段恒 `null`，状态标志恒 `false`。
+3. 页面不显示实例屏蔽/暂停状态。
+
+### 12AQ.3 验证证据（编译层）
+
+```
+gofmt -l internal/ cmd/                 # 空
+go vet ./...                            # exit 0
+cd web && pnpm exec vue-tsc --noEmit    # exit 0
+cd web && pnpm run check:port           # hardTotal 0
+cd web && pnpm build                    # exit 0
+```
+
+### 12AQ.4 仍未验证
+
+- 本机与远端主机的查询结果、未知主机返回 `null`、匿名 401。
+- `host` 归一化（scheme/路径/大小写）的实际输入。
+- 页面路由替换与移动端布局。
+- `go test` 与浏览器走查未执行。
+
 ## 13. 文档索引
 
 | 文档 | 内容 |
@@ -2688,6 +2725,7 @@ cd web && pnpm build                    # exit 0
 | `docs/research/2026-11-06-firefish-port-wave24-contract.md` | **第二十四波施工契约（笔记编辑与编辑历史），见 §12AN** |
 | `docs/research/2026-11-06-firefish-port-wave25-contract.md` | **第二十五波施工契约（云盘文件重命名/描述/敏感/移动），见 §12AO** |
 | `docs/research/2026-11-06-firefish-port-wave26-contract.md` | **第二十六波施工契约（隐藏话题标签与趋势过滤），见 §12AP** |
+| `docs/research/2026-11-06-firefish-port-wave27-contract.md` | **第二十七波施工契约（实例信息页与 show-instance），见 §12AQ** |
 
 ## 14. 已知的未验证项
 
@@ -2733,6 +2771,7 @@ cd web && pnpm build                    # exit 0
 - **第二十五波未测（2026-11-06，见 §12AO.4）**：云盘文件编辑只过了编译层，保存/回读、拖拽移动与
   错误分支未验证。
 - **第二十六波未测（2026-11-06，见 §12AP.4）**：隐藏标签只过了编译层，保存/回读与趋势过滤未验证。
+- **第二十七波未测（2026-11-06，见 §12AQ.4）**：实例信息只过了编译层，本地/远端/未知主机与 401 分支未验证。
 - **仍未移植的设置页**：邮箱、整合、导入导出、迁移、Webhook、插件、自定义 KaTeX、状态栏、
   删除账号、应用授权以外的账号操作；对应后端端点不存在或前端缺少依赖（见第五波契约 §3.3）。
 - **仍缺的 widgets**：rss、rss-ticker、server-metric、online-users、federation、job-queue、aiscript、
