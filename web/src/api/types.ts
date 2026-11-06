@@ -336,6 +336,10 @@ export interface MetaLite {
 }
 
 export interface MetaDetailed extends MetaLite {
+	/** Instance-wide stylesheet an administrator saved from the admin console. */
+	customCss: string;
+	/** SMTP host, or an empty string when mail delivery is not configured. */
+	emailServer: string;
 	cacheRemoteFiles: boolean;
 	cacheRemoteSensitiveFiles: boolean;
 	requireSetup: boolean;
@@ -581,6 +585,10 @@ export interface AdminInstanceMeta {
 	iconUrl: string | null;
 	bannerUrl: string | null;
 	themeColor: string | null;
+	/** Instance-wide stylesheet; empty when none is set. */
+	customCss: string;
+	/** SMTP host, empty when mail delivery is not configured. */
+	emailServer: string;
 }
 
 export interface DriveUsage {

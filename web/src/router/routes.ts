@@ -168,6 +168,7 @@ export const routes: RouteRecordRaw[] = [
       { path: "/admin/abuses", name: "admin-abuses", component: page("AdminAbuses") },
       { path: "/admin/settings", name: "admin-settings", component: page("AdminSettings") },
       { path: "/admin/email-settings", name: "admin-email-settings", component: page("AdminEmailSettings") },
+      { path: "/admin/custom-css", name: "admin-custom-css", component: page("AdminCustomCss") },
       {
         path: "/admin/object-storage",
         name: "admin-object-storage",

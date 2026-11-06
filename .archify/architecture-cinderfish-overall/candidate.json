@@ -10,7 +10,7 @@
       "url": "https://github.com/Aurorainic/Cinderfish.git",
       "provider": "github",
       "link_mode": "web",
-      "revision": "0511de2eaec63b93038b831b129f4f68c72d12f4"
+      "revision": "d8c080f8642dcbe5aa980cfa8a57ca012ae2c595"
     }
   },
   "components": [
@@ -34,13 +34,12 @@
       "id": "web",
       "type": "frontend",
       "label": "web 前端",
-      "sublabel": "Vue 3 · Vite · Firefish 风格外壳",
+      "sublabel": "Vue 3 · Vite · Firefish 客户端整体移植",
       "pos": [40, 40],
       "size": [180, 64],
       "sources": [
-        { "path": "web/src/layouts/AppShell.vue", "line": 1, "end_line": 40, "label": "应用外壳与导航" },
-        { "path": "web/src/api/client.ts", "line": 99, "end_line": 160, "label": "类型化 API 客户端" },
-        { "path": "web/src/stores/streaming.ts", "line": 1, "end_line": 40, "label": "Streaming WebSocket 客户端" }
+        { "path": "web/src/api/client.ts", "line": 97, "end_line": 119, "label": "api shim：类型化端点调用" },
+        { "path": "web/src/stream.ts", "line": 1, "end_line": 23, "label": "Stream 兼容层（Firefish stream 命名）" }
       ]
     },
     {
@@ -51,53 +50,53 @@
       "pos": [300, 60],
       "size": [190, 64],
       "sources": [
-        { "path": "internal/config/config.go", "line": 64, "end_line": 93, "label": "加载与校验" }
+        { "path": "internal/config/config.go", "line": 98, "end_line": 138, "label": "加载与校验" }
       ]
     },
     {
       "id": "main",
       "type": "backend",
       "label": "cmd/cinderfish",
-      "sublabel": "入口 · 迁移 · 装配 · 优雅关闭",
+      "sublabel": "入口 · 自动迁移 · 优雅关闭（另有 admin / media-migrate CLI）",
       "pos": [300, 180],
       "size": [190, 64],
       "sources": [
-        { "path": "cmd/cinderfish/main.go", "line": 24, "end_line": 49, "label": "启动与迁移" },
-        { "path": "cmd/cinderfish/main.go", "line": 71, "end_line": 78, "label": "联邦与投递 worker" }
+        { "path": "cmd/cinderfish/main.go", "line": 27, "end_line": 51, "label": "启动与迁移" },
+        { "path": "cmd/cinderfish/main.go", "line": 90, "end_line": 107, "label": "联邦装配与投递唤醒" }
       ]
     },
     {
       "id": "httpapi",
       "type": "backend",
       "label": "httpapi",
-      "sublabel": "Misskey RPC · AP 路由 · WS 升级",
+      "sublabel": "Misskey RPC 136 路由 · AP 路由 · WS 升级",
       "pos": [300, 320],
       "size": [200, 64],
       "sources": [
-        { "path": "internal/httpapi/server.go", "line": 94, "end_line": 171, "label": "全部路由" },
-        { "path": "internal/httpapi/server.go", "line": 173, "end_line": 179, "label": "SPA 前置分流" }
+        { "path": "internal/httpapi/server.go", "line": 130, "end_line": 317, "label": "registerRoutes：全部路由" },
+        { "path": "internal/httpapi/server.go", "line": 324, "end_line": 329, "label": "静态站点与 SPA 分流" }
       ]
     },
     {
       "id": "account",
       "type": "backend",
       "label": "account / auth",
-      "sublabel": "注册三模式 · token · OAuth PKCE",
+      "sublabel": "注册三模式 · token · OAuth PKCE · TOTP",
       "pos": [560, 40],
       "size": [190, 64],
       "sources": [
-        { "path": "internal/account/service.go", "line": 70, "end_line": 112, "label": "注册与 token" }
+        { "path": "internal/account/service.go", "line": 83, "end_line": 170, "label": "注册与管理员创建" }
       ]
     },
     {
       "id": "note",
       "type": "backend",
       "label": "note",
-      "sublabel": "笔记 · 四时间线 · 反应 · 通知",
+      "sublabel": "笔记 · 时间线 · 反应 · 通知 · 编辑历史",
       "pos": [560, 150],
       "size": [190, 64],
       "sources": [
-        { "path": "internal/note/service.go", "line": 121, "end_line": 197, "label": "创建笔记与提及解析" }
+        { "path": "internal/note/service.go", "line": 138, "end_line": 358, "label": "创建笔记与提及解析" }
       ]
     },
     {
@@ -108,8 +107,8 @@
       "pos": [560, 260],
       "size": [190, 64],
       "sources": [
-        { "path": "internal/httpapi/streaming.go", "line": 10, "end_line": 38, "label": "端点装配" },
-        { "path": "internal/streaming/bus.go", "line": 409, "end_line": 421, "label": "跨进程监听" }
+        { "path": "internal/httpapi/streaming.go", "line": 15, "end_line": 38, "label": "端点装配" },
+        { "path": "internal/streaming/bus.go", "line": 383, "end_line": 407, "label": "Listen：跨进程监听" }
       ]
     },
     {
@@ -120,21 +119,43 @@
       "pos": [560, 370],
       "size": [190, 64],
       "sources": [
-        { "path": "internal/media/storage.go", "line": 11, "end_line": 23, "label": "存储接口" },
-        { "path": "internal/media/migrate.go", "line": 40, "end_line": 95, "label": "跨后端迁移" }
+        { "path": "internal/media/storage.go", "line": 11, "end_line": 25, "label": "存储接口" },
+        { "path": "internal/media/migrate.go", "line": 40, "end_line": 127, "label": "跨后端迁移" }
+      ]
+    },
+    {
+      "id": "mail",
+      "type": "backend",
+      "label": "mail",
+      "sublabel": "验证 / 重置密码邮件 · SMTP 或日志发件",
+      "pos": [560, 480],
+      "size": [190, 64],
+      "sources": [
+        { "path": "internal/mail/mail.go", "line": 25, "end_line": 78, "label": "Sender 接口与 SMTP 实现" }
+      ]
+    },
+    {
+      "id": "webhook",
+      "type": "backend",
+      "label": "webhook",
+      "sublabel": "用户 Webhook · 事件投递",
+      "pos": [560, 590],
+      "size": [190, 64],
+      "sources": [
+        { "path": "internal/webhook/service.go", "line": 44, "end_line": 136, "label": "Webhook 管理与事件投递" }
       ]
     },
     {
       "id": "federation",
       "type": "backend",
       "label": "federation",
-      "sublabel": "HTTP 签名 · AP 渲染/解析 · Inbox",
+      "sublabel": "HTTP 签名 · AP 渲染/解析 · Inbox 十类活动",
       "pos": [300, 520],
       "size": [190, 64],
       "sources": [
-        { "path": "internal/federation/keys.go", "line": 1, "end_line": 8, "label": "包职责" },
-        { "path": "internal/httpapi/activitypub.go", "line": 581, "end_line": 638, "label": "Inbox 验签与处理" },
-        { "path": "internal/federation/signature.go", "line": 33, "end_line": 63, "label": "签名头" }
+        { "path": "internal/federation/inbox.go", "line": 41, "end_line": 57, "label": "活动分发" },
+        { "path": "internal/httpapi/activitypub.go", "line": 576, "end_line": 649, "label": "Inbox 验签与处理" },
+        { "path": "internal/federation/signature.go", "line": 33, "end_line": 46, "label": "签名头" }
       ]
     },
     {
@@ -145,19 +166,19 @@
       "pos": [300, 660],
       "size": [190, 64],
       "sources": [
-        { "path": "internal/federation/deliver.go", "line": 13, "end_line": 52, "label": "队列与重试" }
+        { "path": "internal/federation/deliver.go", "line": 139, "end_line": 172, "label": "队列与重试" }
       ]
     },
     {
       "id": "postgres",
       "type": "database",
       "label": "PostgreSQL",
-      "sublabel": "迁移 v4 · 23 张表",
+      "sublabel": "迁移 v18 · 34 张表",
       "pos": [820, 130],
       "size": [180, 140],
       "sources": [
-        { "path": "internal/db/db.go", "line": 287, "end_line": 351, "label": "v4 迁移" },
-        { "path": "internal/db/db.go", "line": 143, "end_line": 166, "label": "联邦表与投递队列" }
+        { "path": "internal/db/db.go", "line": 530, "end_line": 551, "label": "v18 迁移" },
+        { "path": "internal/db/db.go", "line": 553, "end_line": 585, "label": "Migrate：启动自动升级" }
       ]
     },
     {
@@ -180,8 +201,8 @@
       "pos": [820, 390],
       "size": [180, 64],
       "sources": [
-        { "path": "internal/media/local.go", "line": 14, "end_line": 20, "label": "本地实现" },
-        { "path": "internal/media/s3.go", "line": 35, "end_line": 41, "label": "S3 实现" }
+        { "path": "internal/media/local.go", "line": 21, "end_line": 35, "label": "本地实现" },
+        { "path": "internal/media/s3.go", "line": 41, "end_line": 62, "label": "S3 实现" }
       ]
     }
   ],
@@ -197,6 +218,8 @@
         "note",
         "streaming",
         "media",
+        "mail",
+        "webhook",
         "federation",
         "deliver"
       ]
@@ -208,18 +231,21 @@
     { "from": "client", "to": "httpapi", "label": "Misskey RPC / WS", "variant": "emphasis" },
     { "from": "config", "to": "main", "label": "加载" },
     { "from": "main", "to": "httpapi", "label": "装配路由" },
-    { "from": "httpapi", "to": "account", "label": "注册 / 登录" },
+    { "from": "httpapi", "to": "account", "label": "注册 / 登录 / TOTP" },
     { "from": "httpapi", "to": "note", "label": "笔记 / 时间线" },
     { "from": "httpapi", "to": "streaming", "label": "WS 升级", "variant": "emphasis" },
     { "from": "httpapi", "to": "media", "label": "Drive 上传" },
+    { "from": "httpapi", "to": "mail", "label": "验证 / 重置密码" },
+    { "from": "httpapi", "to": "webhook", "label": "事件 Webhook" },
     { "from": "httpapi", "to": "federation", "label": "AP 路由" },
     { "from": "fediverse", "to": "federation", "label": "Inbox / WebFinger", "variant": "emphasis" },
     { "from": "federation", "to": "note", "label": "远程对象 / 提及" },
-    { "from": "federation", "to": "deliver", "label": "入队" },
+    { "from": "federation", "to": "deliver", "label": "笔记活动入队" },
     { "from": "deliver", "to": "fediverse", "label": "HTTP POST + 签名" },
     { "from": "deliver", "to": "redis", "label": "投递唤醒（可选）", "variant": "dashed" },
     { "from": "account", "to": "postgres", "label": "SQL" },
     { "from": "note", "to": "postgres", "label": "SQL" },
+    { "from": "webhook", "to": "postgres", "label": "webhooks 表" },
     { "from": "streaming", "to": "postgres", "label": "LISTEN/NOTIFY（默认）", "variant": "dashed" },
     { "from": "streaming", "to": "redis", "label": "Pub/Sub（可选）", "variant": "dashed" },
     { "from": "media", "to": "postgres", "label": "drive_files" },
@@ -230,18 +256,19 @@
       "dot": "emerald",
       "title": "当前状态",
       "items": [
-        "M1–M5 已完成：骨架、账户、笔记、Streaming、ActivityPub 联邦",
-        "Redis 可选：Streaming 中继 + 投递唤醒，PostgreSQL 仍是事实来源",
-        "单个 Go 二进制内嵌迁移脚本，启动时自动升级到 v4"
+        "M1–M7 全部完成；2026-11-04 起工作面收敛为后端 API 与联邦，web 前端移植由独立 workflow 推进",
+        "Misskey API 覆盖 136 条注册路由（Misskey 全集 440），差集台账 docs/research/2026-11-04-misskey-api-coverage.md",
+        "迁移 v18 · 34 张表；单二进制内嵌迁移脚本，启动时自动升级",
+        "周边能力已接入：邮件验证/重置、TOTP 两步验证、Webhook、举报、公告、账号导入导出"
       ]
     },
     {
       "dot": "violet",
       "title": "联邦链路",
       "items": [
-        "入站：HTTP Signatures 验签后交给 Inbox，语义结果记日志并回 202",
-        "出站：先写 deliver_queue，worker 按 inbox 逐行重试，指数退避 1s→5min",
-        "三模式 public / allowlist / none 存在数据库，切换立即生效"
+        "入站：HTTP Signatures 验签后交 Inbox，已处理 Follow/Accept/Reject/Undo/Create/Delete/Like/Announce/Update/Block 十类，语义结果记 ap_activities 并回 202",
+        "出站：笔记 Create/Update/Delete/Announce/Undo 投递已接通；先写 deliver_queue，worker 逐条重试，指数退避 1s→5min",
+        "三模式 public / allowlist / none 存库热切换；另有实例屏蔽 blockedHosts 与收录实例列表"
       ]
     },
     {

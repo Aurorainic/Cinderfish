@@ -33,6 +33,8 @@ type instanceSettings struct {
 	IconURL          string
 	BannerURL        string
 	ThemeColor       string
+	// CustomCSS is instance-wide stylesheet text injected into every page.
+	CustomCSS string
 }
 
 // instanceMetaKey maps a settings field to its instance_meta key.
@@ -53,6 +55,7 @@ var instanceMetaKeys = map[string]string{
 	"iconUrl":          "iconUrl",
 	"bannerUrl":        "bannerUrl",
 	"themeColor":       "themeColor",
+	"customCss":        "customCss",
 }
 
 // liveInstanceSettings reads the runtime overrides, falling back to the
@@ -84,6 +87,7 @@ SELECT key, value FROM instance_meta WHERE key = ANY($1)
 		instanceMetaKeys["hiddenTags"],
 		instanceMetaKeys["iconUrl"], instanceMetaKeys["bannerUrl"],
 		instanceMetaKeys["themeColor"],
+		instanceMetaKeys["customCss"],
 	})
 	if err != nil {
 		return out
@@ -138,6 +142,8 @@ SELECT key, value FROM instance_meta WHERE key = ANY($1)
 			out.BannerURL = value
 		case instanceMetaKeys["themeColor"]:
 			out.ThemeColor = value
+		case instanceMetaKeys["customCss"]:
+			out.CustomCSS = value
 		}
 	}
 	return out
@@ -164,6 +170,11 @@ ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
 `, key, value)
 	return err
 }
+
+// maxInstanceCustomCSS bounds the instance stylesheet. 100 KiB is far more
+// than any sane theme override and keeps one admin from bloating every page
+// response.
+const maxInstanceCustomCSS = 100 * 1024
 
 // nilOrString maps an empty settings string to JSON null, which is what
 // Misskey's nullable URL fields expect.
@@ -259,12 +270,16 @@ func (s *Server) handleAdminMeta(w http.ResponseWriter, r *http.Request) {
 		"iconUrl":          nilIfEmpty(settings.IconURL),
 		"bannerUrl":        nilIfEmpty(settings.BannerURL),
 		"themeColor":       nilIfEmpty(settings.ThemeColor),
+		"customCss":        settings.CustomCSS,
+		// The admin console only needs to know whether mail is configured and
+		// which host it goes through; credentials stay in config.toml.
+		"emailServer": s.cfg.Mail.Host,
 	})
 }
 
 // handleAdminUpdateMeta is POST /api/admin/update-meta.
 //
-// Misskey's endpoint accepts dozens of fields; this port accepts the five it
+// Misskey's endpoint accepts dozens of fields; this port accepts the ones it
 // actually stores and ignores the rest, which the admin page documents. A
 // value of null or an absent key leaves the field unchanged.
 func (s *Server) handleAdminUpdateMeta(w http.ResponseWriter, r *http.Request) {
@@ -294,6 +309,7 @@ func (s *Server) handleAdminUpdateMeta(w http.ResponseWriter, r *http.Request) {
 		IconURL          *string   `json:"iconUrl"`
 		BannerURL        *string   `json:"bannerUrl"`
 		ThemeColor       *string   `json:"themeColor"`
+		CustomCSS        *string   `json:"customCss"`
 	}
 	if err := decodeOptionalJSON(r, &body); err != nil {
 		writeAPIError(w, err)
@@ -426,6 +442,15 @@ ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
 			return
 		}
 		updates["themeColor"] = color
+	}
+
+	if body.CustomCSS != nil {
+		css := *body.CustomCSS
+		if len(css) > maxInstanceCustomCSS {
+			writeAPIError(w, invalidParamError("customCss is at most 100 KiB"))
+			return
+		}
+		updates["customCss"] = css
 	}
 
 	if body.HiddenTags != nil {

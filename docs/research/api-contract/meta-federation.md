@@ -320,6 +320,8 @@
 | `enableServiceWorker` | bool | 恒 `false` |
 | `translatorAvailable` | bool | 恒 `false` |
 | `serverRules` | array | 运行时 `serverRules`（迁移 v13 后的实例设置），默认 `[]` |
+| `customCss` | string | 实例级样式表（运行时 `customCss`），默认 `""`；前端注入到 `<style id="cinderfish-instance-custom-css">` |
+| `enableEmail` | boolean | `[mail] host` 非空时为 `true`（2026-11-06 起不再是常量 `false`） |
 | `policies` | object | 只有 `canUseFederation: true`、`canCreateInstantNote: true` 两个键（`internal/httpapi/meta.go:121`–`126`） |
 | `sentryForFrontend` | null | 恒 `null` |
 | `mediaProxy` | string | 恒 `""` |
@@ -588,7 +590,7 @@ base URL 直接字符串拼接进 XML，没有做 XML 转义；因为值来自�
 
 ### 已知限制
 
-1. **与 Misskey 相比缺少大量 metadata**（对照 `packages/backend/src/server/NodeinfoServerService.ts:97`–`132`）：`nodeName`、`nodeDescription`、`nodeAdmins`、`maintainer`、`langs`、`tosUrl`、`privacyPolicyUrl`、`inquiryUrl`、`impressumUrl`、`repositoryUrl`、`feedbackUrl`、`disableLocalTimeline`、`disableGlobalTimeline`、`emailRequiredForSignup`、`enableHcaptcha`/`Recaptcha`/`Mcaptcha`/`Turnstile`、`enableEmail`、`enableServiceWorker`、`proxyAccountName`、`themeColor`——全部未返回。
+1. **与 Misskey 相比缺少大量 metadata**（对照 `packages/backend/src/server/NodeinfoServerService.ts:97`–`132`）：`nodeName`、`nodeDescription`、`nodeAdmins`、`maintainer`、`langs`、`tosUrl`、`privacyPolicyUrl`、`inquiryUrl`、`impressumUrl`、`repositoryUrl`、`feedbackUrl`、`disableLocalTimeline`、`disableGlobalTimeline`、`emailRequiredForSignup`、`enableHcaptcha`/`Recaptcha`/`Mcaptcha`/`Turnstile`、`enableServiceWorker`、`proxyAccountName`、`themeColor`——全部未返回。
 2. `software.homepage` / `software.repository` 未返回。
 3. `usage.users.activeHalfyear` / `activeMonth` 未返回（Misskey 返回 `null`，本实现直接缺字段）。
 4. `version ≥ 2.1` 时 Misskey 会补 `software.repository`/`homepage`；本实现 2.1 与 2.0 文档除 `version` 外完全相同。
@@ -1180,3 +1182,28 @@ Cinderfish 没有 Misskey 的 `instances` 表，也没有在线的 nodeinfo 抓�
 `FederationInstance[]`，按收录用户数降序。数据按 `users.host` 聚合，帖子数来自 `notes.user_host`；
 没有 `instances` 表，所以软件字段与状态标志都是 `null`/`false`。`limit` 默认 30、上限 100。
 管理台联邦页用它列出「已收录实例」。
+
+## 2026-11-06 增补：实例 CSS 与邮件状态（第四十四波）
+
+### meta 新字段
+
+- `customCss`（string）：实例级样式表，空串表示没有。来源是 `instance_meta.customCss`。
+- `enableEmail` 不再是常量 `false`：`[mail] host` 非空即为 `true`。
+- **详细** meta 额外返回 `emailServer`（string）：SMTP 主机名，未配置时为空串。
+  主机名本来就会出现在每封邮件的 `Received` 头里，不算秘密；用户名、密码、发件人、
+  TLS 模式只留在 `config.toml`，任何端点都不返回。
+
+### admin/update-meta 新参数
+
+`customCss`（string）：上限 100 KiB（按字节），超限 400 `INVALID_PARAM`。空串即清除。
+`admin/meta` 的响应也带上 `customCss` 与 `emailServer`，管理台据此渲染编辑器与状态页。
+
+### 前端
+
+- `composables/use-custom-css.ts` 现在维护两个 `<style>`：账号级
+  `cinderfish-custom-css` 与实例级 `cinderfish-instance-custom-css`。实例表先注入，账号表
+  后注入，所以每个账号仍能覆盖实例样式。
+- `pages/AdminCustomCss.vue`：实例 CSS 编辑器（保存 / 还原 / 清除），保存后刷新
+  `instance` 让效果立刻可见。
+- `pages/AdminEmailSettings.vue`：只读状态页——是否配置、SMTP 主机、可用的邮件流程，
+  并说明凭据在 `config.toml`（改完要重启），不渲染会静默失效的输入框。

@@ -1,17 +1,14 @@
 {
   "schemaVersion": 1,
-  "receiptId": "5edfb9cf-38e7-4ad1-99b9-ea49c6ee51b3",
-  "status": "current",
+  "receiptId": "2e420be2-6187-4388-9689-d8cd4d6a272e",
+  "status": "failed",
   "command": "deliver",
-  "type": "architecture",
-  "input": "/home/lainsaka/文档/MilnFish/.archify/architecture-cinderfish-overall/candidate.json",
-  "output": "/home/lainsaka/文档/MilnFish/.archify/architecture-cinderfish-overall/cinderfish-overall.html",
-  "specification": {
-    "sha256": "653acfc25d3ba225356edb19144aac9ffbb44c1d7969715519edaf2899001552",
-    "bytes": 9338
-  },
+  "stage": "render",
+  "input": "/home/lainsaka/文档/MilnFish/.worktrees/firefish-port/.archify/architecture-cinderfish-overall/candidate.json",
+  "output": "/home/lainsaka/文档/MilnFish/.worktrees/firefish-port/.archify/architecture-cinderfish-overall/cinderfish-overall.html",
   "artifact": {
     "sha256": "8318fbfa5dbfd6e8a484f36cee8991f9a5287a016e851c08d7eca6d07153bfc0",
     "bytes": 873497
-  }
+  },
+  "error": "Architecture layout validation failed:\n- Sublabel \"入口 · 自动迁移 · 优雅关闭（另有 admin / media-migrate CLI）\" needs ~216px at the 6px legible minimum, but component \"main\" provides 182px — shorten the sublabel or widen size."
 }

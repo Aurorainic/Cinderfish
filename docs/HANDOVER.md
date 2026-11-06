@@ -3262,6 +3262,46 @@ cd web && pnpm build                    # exit 0
 - 账号信息页的实际渲染与统计失败时的降级。
 - `go test` 与浏览器走查未执行。
 
+## 12BH. 批次：实例 CSS 与邮件设置页（2026-11-06）
+
+**工作方式**：目标模式第四十四波，继续只写代码、验证到编译层。施工依据
+`docs/research/2026-11-06-firefish-port-wave44-contract.md`。
+
+### 12BH.1 落地清单
+
+| 层 | 文件 | 说明 |
+|----|------|------|
+| 实例设置 | `internal/httpapi/instance_settings.go` | `CustomCSS` 字段、`customCss` 键、`admin/update-meta` 接受（≤100 KiB）、`admin/meta` 返回 `customCss`/`emailServer` |
+| meta | `internal/httpapi/meta.go` | `customCss`；`enableEmail` 按配置计算；详细 meta 的 `emailServer` |
+| 前端注入 | `composables/use-custom-css.ts` | 实例级 `<style>`，排在账号级之前 |
+| 页面 | `pages/AdminCustomCss.vue`、`pages/AdminEmailSettings.vue` | 实例 CSS 编辑器；邮件状态只读页 |
+| 路由/菜单 | `router/routes.ts`、`pages/AdminIndex.vue` | `/admin/custom-css` 与两个菜单项 |
+| 类型 | `api/types.ts`、`api/endpoints.ts` | `MetaDetailed.customCss`/`emailServer`、`AdminInstanceMeta` 同名字段、`customCss` 请求参数 |
+
+### 12BH.2 有意的限制
+
+1. 实例 CSS 无语法校验、无版本历史。
+2. 实例 CSS 对未登录访客生效（已在页面警示）。
+3. 邮件设置只读，没有运行期 SMTP 重载。
+4. 未新增后端路由。
+
+### 12BH.3 验证证据（编译层）
+
+```
+gofmt -l internal/ cmd/                 # 空
+go vet ./...                            # exit 0
+cd web && pnpm exec vue-tsc --noEmit    # exit 0
+cd web && pnpm run check:port           # hardTotal 0（400 文件）
+cd web && pnpm build                    # exit 0
+```
+
+### 12BH.4 仍未验证
+
+- 实例 CSS 保存 → 下发 → 注入 → 账号样式覆盖的完整链路。
+- 100 KiB 上限与空串清除两个分支。
+- 邮件状态页在已配置/未配置两种实例下的呈现。
+- `go test` 与浏览器走查未执行。
+
 ## 13. 文档索引
 
 | 文档 | 内容 |
@@ -3331,6 +3371,7 @@ cd web && pnpm build                    # exit 0
 | `docs/research/2026-11-06-firefish-port-wave41-contract.md` | **第四十一波施工契约（编辑的联邦 Update），见 §12BE** |
 | `docs/research/2026-11-06-firefish-port-wave42-contract.md` | **第四十二波施工契约（按活动作者签名），见 §12BF** |
 | `docs/research/2026-11-06-firefish-port-wave43-contract.md` | **第四十三波施工契约（四个兼容端点），见 §12BG** |
+| `docs/research/2026-11-06-firefish-port-wave44-contract.md` | **第四十四波施工契约（实例 CSS 与邮件设置页），见 §12BH** |
 
 ## 14. 已知的未验证项
 
@@ -3393,6 +3434,7 @@ cd web && pnpm build                    # exit 0
 - **第四十一波未测（2026-11-06，见 §12BE.4）**：编辑的 Update 双向都只有编译层证据。
 - **第四十二波未测（2026-11-06，见 §12BF.4）**：按作者签名只有编译层证据，双实例未验证。
 - **第四十三波未测（2026-11-06，见 §12BG.4）**：四个兼容端点与账号信息页只有编译层证据。
+- **第四十四波未测（2026-11-06，见 §12BH.4）**：实例 CSS 链路与邮件状态页只有编译层证据。
 - **仍未移植的设置页**：邮箱、整合、导入导出、迁移、Webhook、插件、自定义 KaTeX、状态栏、
   删除账号、应用授权以外的账号操作；对应后端端点不存在或前端缺少依赖（见第五波契约 §3.3）。
 - **仍缺的 widgets**：rss、rss-ticker、server-metric、online-users、federation、job-queue、aiscript、

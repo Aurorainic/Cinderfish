@@ -73,10 +73,11 @@ func (s *Server) handleMeta(w http.ResponseWriter, r *http.Request) {
 		"clientOptions":                map[string]any{},
 		"ads":                          []any{},
 		"notesPerOneAd":                0,
-		"enableEmail":                  false,
+		"enableEmail":                  s.cfg.Mail.Enabled(),
 		"enableServiceWorker":          false,
 		"translatorAvailable":          false,
 		"serverRules":                  settings.ServerRules,
+		"customCss":                    settings.CustomCSS,
 		"policies":                     defaultPolicies(),
 		"sentryForFrontend":            nil,
 		"mediaProxy":                   "",
@@ -92,6 +93,10 @@ func (s *Server) handleMeta(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// The admin console shows whether a mail server is configured; the host is
+	// public knowledge (it appears in the Received headers of every message),
+	// the credentials are not and never leave config.toml.
+	meta["emailServer"] = s.cfg.Mail.Host
 	meta["cacheRemoteFiles"] = true
 	meta["cacheRemoteSensitiveFiles"] = false
 	meta["requireSetup"] = false

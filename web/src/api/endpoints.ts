@@ -776,6 +776,7 @@ export interface EndpointMap {
 			iconUrl?: string | null;
 			bannerUrl?: string | null;
 			themeColor?: string | null;
+			customCss?: string;
 		};
 		res: AdminInstanceMeta;
 	};

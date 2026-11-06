@@ -1,30 +1,33 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //
-// Applies the per-account custom CSS (`defaultStore.state.customCss`) to the
-// document. Firefish's settings page wrote a bare `customCss` localStorage key
-// and reloaded the page; Cinderfish keeps the value in the store (so it syncs
-// with the account) and applies it live through a single <style> element.
+// Applies custom CSS to the document: the per-account sheet from
+// `defaultStore.state.customCss`, and the instance-wide sheet an administrator
+// saved through `admin/update-meta`. Firefish's settings page wrote a bare
+// `customCss` localStorage key and reloaded the page; Cinderfish keeps the
+// account value in the store and applies both live through <style> elements.
 import { watch } from "vue";
+import { instance } from "@/instance";
 import { defaultStore } from "@/store";
 
 const STYLE_ID = "cinderfish-custom-css";
+const INSTANCE_STYLE_ID = "cinderfish-instance-custom-css";
 
 let initialized = false;
 
-function styleElement(): HTMLStyleElement {
-	const existing = document.getElementById(STYLE_ID);
+function styleElement(id = STYLE_ID): HTMLStyleElement {
+	const existing = document.getElementById(id);
 	if (existing instanceof HTMLStyleElement) return existing;
 
 	const style = document.createElement("style");
-	style.id = STYLE_ID;
+	style.id = id;
 	// Appended last so user rules win the cascade against the bundled sheets
 	// without needing `!important`.
 	document.head.appendChild(style);
 	return style;
 }
 
-function apply(css: string): void {
-	const style = styleElement();
+function apply(css: string, id = STYLE_ID): void {
+	const style = styleElement(id);
 	style.textContent = css;
 }
 
@@ -37,8 +40,18 @@ export function initCustomCss(): void {
 	initialized = true;
 
 	apply(defaultStore.reactiveState.customCss.value);
+	apply(instance.customCss ?? "", INSTANCE_STYLE_ID);
 
 	watch(defaultStore.reactiveState.customCss, (css) => {
 		apply(css);
 	});
+	watch(
+		() => instance.customCss,
+		(css) => {
+			apply(css ?? "", INSTANCE_STYLE_ID);
+		},
+	);
+
+	// The instance sheet arrives with `meta`, which main.ts fetches right after
+	// this runs; the cached copy is applied above so the first paint is right.
 }

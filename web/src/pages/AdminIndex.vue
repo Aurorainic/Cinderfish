@@ -157,6 +157,18 @@ const menuDef = computed<MkSuperMenuGroup[]>(() => [
 				to: "/admin/federation",
 				active: isActive("/admin/federation"),
 			},
+			{
+				icon: "ph-envelope-simple ph-bold ph-lg",
+				text: t("emailServer"),
+				to: "/admin/email-settings",
+				active: isActive("/admin/email-settings"),
+			},
+			{
+				icon: "ph-code ph-bold ph-lg",
+				text: "实例 CSS",
+				to: "/admin/custom-css",
+				active: isActive("/admin/custom-css"),
+			},
 		],
 	},
 ]);
