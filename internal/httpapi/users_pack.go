@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"time"
 
 	"github.com/Aurorainic/cinderfish/internal/account"
@@ -37,7 +38,33 @@ func packUserLite(u *account.User, host string, prof *account.Profile) map[strin
 		"onlineStatus":                "unknown",
 		"badgeRoles":                  []any{},
 		"instance":                    nil,
+		"movedToUri":                  nil,
+		"alsoKnownAs":                 knownAsField(u.AlsoKnownAs),
 	}
+}
+
+// knownAsField renders the alias list the way the schema wants it: null when
+// the account declares no alias, a JSON array otherwise.
+func knownAsField(uris []string) any {
+	if len(uris) == 0 {
+		return nil
+	}
+	return uris
+}
+
+// packMovedTo fills movedToUri on a packed user with the account it migrated
+// to. The target is stored as an actor URI and the client reads
+// movedToUri.host / .username (Firefish migrations.vue, user home), so the
+// row is looked up and packed as a UserLite.
+func (s *Server) packMovedTo(ctx context.Context, u *account.User, packed map[string]any) {
+	if u == nil || u.MovedToURI == "" || s.accounts == nil {
+		return
+	}
+	target, err := s.accounts.GetByURI(ctx, u.MovedToURI)
+	if err != nil || target == nil {
+		return
+	}
+	packed["movedToUri"] = packUserLite(target, "", loadProfile(ctx, s, target.ID))
 }
 
 // packUserDetailed renders a user in the UserDetailed schema. prof
@@ -47,8 +74,13 @@ func packUserDetailed(u *account.User, createdAt time.Time, isMe bool, prof *acc
 	packed := packUserLite(u, "", prof)
 	packed["url"] = ""
 	packed["uri"] = ""
+	// movedToUri is a packed user in Firefish's schema, so it can only be
+	// filled where a lookup is possible: packMovedTo does that for users/show
+	// and the i endpoints. Everything else reports null, as Firefish does for
+	// an account that has not moved.
+	packed["movedToUri"] = nil
 	packed["movedTo"] = nil
-	packed["alsoKnownAs"] = nil
+	packed["alsoKnownAs"] = knownAsField(u.AlsoKnownAs)
 	packed["createdAt"] = createdAt.UTC().Format(time.RFC3339Nano)
 	packed["updatedAt"] = nil
 	packed["lastFetchedAt"] = nil

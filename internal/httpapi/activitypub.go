@@ -326,6 +326,8 @@ func (s *Server) renderLocalActor(ctx context.Context, u *account.User) (federat
 		Description: desc,
 		PublicKey:   kp.PublicPEM,
 		CreatedAt:   u.CreatedAt,
+		MovedToURI:  u.MovedToURI,
+		AlsoKnownAs: u.AlsoKnownAs,
 	}), nil
 }
 

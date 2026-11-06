@@ -224,6 +224,7 @@ func (s *Server) handleI(w http.ResponseWriter, r *http.Request) {
 	// Misskey only includes secrets for native-token requests.
 	includeSecrets := info.Token == nil
 	packed := packMeDetailed(info.User, info.User.CreatedAt, includeSecrets, loadProfile(r.Context(), s, info.User.ID))
+	s.packMovedTo(r.Context(), info.User, packed)
 	s.applyUserCounts(r.Context(), info.User.ID, packed)
 	s.applyUnreadNotifications(r.Context(), info.User.ID, packed)
 	s.applyUnreadAnnouncements(r.Context(), info.User.ID, packed)
@@ -242,12 +243,35 @@ func (s *Server) handleUsersShow(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var body struct {
-		UserID   string `json:"userId"`
-		Username string `json:"username"`
-		Host     string `json:"host"`
+		UserID   string   `json:"userId"`
+		UserIDs  []string `json:"userIds"`
+		Username string   `json:"username"`
+		Host     string   `json:"host"`
 	}
 	if err := decodeOptionalJSON(r, &body); err != nil {
 		writeAPIError(w, err)
+		return
+	}
+
+	// userIds answers a batch, which is how Firefish's migration page
+	// resolves the aliases it stores. Misskey accepts ids there; Cinderfish
+	// also accepts actor URIs, because alsoKnownAs holds URIs and the client
+	// passes the list straight back in.
+	if len(body.UserIDs) > 0 {
+		out := make([]any, 0, len(body.UserIDs))
+		for _, id := range body.UserIDs {
+			u, err := s.accounts.GetByID(r.Context(), id)
+			if err != nil {
+				u, err = s.accounts.GetByURI(r.Context(), id)
+			}
+			if err != nil || u == nil {
+				continue
+			}
+			packed := packUserDetailed(u, u.CreatedAt, false, loadProfile(r.Context(), s, u.ID))
+			s.packMovedTo(r.Context(), u, packed)
+			out = append(out, packed)
+		}
+		writeJSON(w, http.StatusOK, out)
 		return
 	}
 
@@ -256,6 +280,12 @@ func (s *Server) handleUsersShow(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case body.UserID != "":
 		user, err = s.accounts.GetByID(r.Context(), body.UserID)
+		if err != nil {
+			// An actor URI is accepted here too: alsoKnownAs and
+			// moved_to_uri store URIs, and the client passes them back
+			// unchanged.
+			user, err = s.accounts.GetByURI(r.Context(), body.UserID)
+		}
 	case body.Username != "" && body.Host == "":
 		user, err = s.accounts.GetByUsername(r.Context(), body.Username)
 	default:
@@ -282,6 +312,7 @@ func (s *Server) handleUsersShow(w http.ResponseWriter, r *http.Request) {
 	}
 
 	packed := packUserDetailed(user, user.CreatedAt, false, loadProfile(r.Context(), s, user.ID))
+	s.packMovedTo(r.Context(), user, packed)
 	// users/show does not require credentials, but an authenticated viewer
 	// gets their relationship with the target filled in. A missing or bad
 	// token simply means anonymous, never a 401.

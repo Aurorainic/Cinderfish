@@ -75,8 +75,7 @@ func (s *Service) ListUsers(ctx context.Context, p UsersParams) ([]*User, error)
 
 	args = append(args, p.Limit, p.Offset)
 	query := `
-SELECT id, username, username_lower, host, COALESCE(password_hash, ''),
-       COALESCE(token, ''), is_admin, is_suspended, created_at
+SELECT ` + userColumns + `
 FROM users WHERE ` + strings.Join(conds, " AND ") +
 		fmt.Sprintf(" ORDER BY %s LIMIT $%d OFFSET $%d", order, len(args)-1, len(args))
 

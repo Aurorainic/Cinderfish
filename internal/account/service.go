@@ -38,7 +38,19 @@ type User struct {
 	IsAdmin       bool
 	IsSuspended   bool
 	CreatedAt     time.Time
+	// MovedToURI is the AP id of the account this one migrated to, empty
+	// when it has not moved.
+	MovedToURI string
+	// AlsoKnownAs lists the actor URIs this account declares as aliases of
+	// itself. The Move protocol reads it on the target side.
+	AlsoKnownAs []string
 }
+
+// userColumns is the projection scanUser expects. Queries that join the
+// users table alias it as u, so they spell the same list with a prefix.
+const userColumns = `id, username, username_lower, host, COALESCE(password_hash, ''),
+       COALESCE(token, ''), is_admin, is_suspended, created_at,
+       COALESCE(moved_to_uri, ''), COALESCE(also_known_as, '[]'::jsonb)`
 
 // RegistrationError describes why a signup was rejected.
 type RegistrationError struct {
@@ -225,8 +237,7 @@ func (s *Service) UsernameAvailable(ctx context.Context, username string) (bool,
 // GetByUsername loads a local user by username.
 func (s *Service) GetByUsername(ctx context.Context, username string) (*User, error) {
 	row := s.pool.QueryRow(ctx, `
-SELECT id, username, username_lower, host, password_hash, COALESCE(token, ''),
-       is_admin, is_suspended, created_at
+SELECT `+userColumns+`
 FROM users WHERE username_lower = $1 AND host IS NULL
 `, auth.NormalizeUsername(username))
 	return scanUser(row)
@@ -237,17 +248,30 @@ FROM users WHERE username_lower = $1 AND host IS NULL
 // a remote user must not fail.
 func (s *Service) GetByID(ctx context.Context, id string) (*User, error) {
 	row := s.pool.QueryRow(ctx, `
-SELECT id, username, username_lower, host, COALESCE(password_hash, ''), COALESCE(token, ''),
-       is_admin, is_suspended, created_at
+SELECT `+userColumns+`
 FROM users WHERE id = $1
 `, id)
+	return scanUser(row)
+}
+
+// GetByURI loads any user by its actor URI. The account migration flow
+// stores URIs (not ids) in also_known_as and moved_to_uri, so packing those
+// needs a lookup that accepts both a local and a remote actor.
+func (s *Service) GetByURI(ctx context.Context, uri string) (*User, error) {
+	if uri == "" {
+		return nil, ErrUserNotFound
+	}
+	row := s.pool.QueryRow(ctx, `
+SELECT `+userColumns+`
+FROM users WHERE uri = $1
+`, uri)
 	return scanUser(row)
 }
 
 func scanUser(row pgx.Row) (*User, error) {
 	var u User
 	err := row.Scan(&u.ID, &u.Username, &u.UsernameLower, &u.Host, &u.PasswordHash,
-		&u.Token, &u.IsAdmin, &u.IsSuspended, &u.CreatedAt)
+		&u.Token, &u.IsAdmin, &u.IsSuspended, &u.CreatedAt, &u.MovedToURI, &u.AlsoKnownAs)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrUserNotFound
 	}
@@ -302,8 +326,7 @@ func (s *Service) ListLocal(ctx context.Context, limit, offset int) ([]*User, er
 		offset = 0
 	}
 	rows, err := s.pool.Query(ctx, `
-SELECT id, username, username_lower, host, password_hash, COALESCE(token, ''),
-       is_admin, is_suspended, created_at
+SELECT `+userColumns+`
 FROM users WHERE host IS NULL
 ORDER BY is_admin DESC, created_at ASC
 LIMIT $1 OFFSET $2

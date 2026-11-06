@@ -89,8 +89,7 @@ func (s *Service) AdminList(ctx context.Context, p AdminUserParams) ([]*User, er
 
 	args = append(args, p.Limit, p.Offset)
 	query := `
-SELECT id, username, username_lower, host, COALESCE(password_hash, ''),
-       COALESCE(token, ''), is_admin, is_suspended, created_at
+SELECT ` + userColumns + `
 FROM users`
 	if len(conds) > 0 {
 		query += " WHERE " + strings.Join(conds, " AND ")
@@ -122,8 +121,7 @@ func (s *Service) UsersByIDs(ctx context.Context, ids []string) (map[string]*Use
 		return out, nil
 	}
 	rows, err := s.pool.Query(ctx, `
-SELECT id, username, username_lower, host, COALESCE(password_hash, ''),
-       COALESCE(token, ''), is_admin, is_suspended, created_at
+SELECT `+userColumns+`
 FROM users WHERE id = ANY($1)
 `, ids)
 	if err != nil {

@@ -63,6 +63,9 @@ func (s *Server) AttachFederation() {
 			s.streamBus.PublishTyped("notesStream", "note", map[string]any{"id": noteID, "userId": userID})
 		}
 	}
+	s.federationInbox.OnMoved = func(ctx context.Context, oldUserID, newUserID string) {
+		s.migrateFollowersOf(ctx, oldUserID, newUserID)
+	}
 
 	if s.pool != nil {
 		s.federationDeliver = federation.NewDeliverer(s.pool, s.federationStore, s.federationClient, s.federationPolicy)

@@ -56,6 +56,12 @@ type Profile struct {
 	IsLocked    bool
 	CreatedAt   time.Time
 	PublicKey   string
+
+	// MovedToURI and AlsoKnownAs carry the account migration state. Both are
+	// published so peers can validate a Move: the target actor must list the
+	// mover's URI in alsoKnownAs before anyone follows the move.
+	MovedToURI  string
+	AlsoKnownAs []string
 }
 
 // ProfileField is one PropertyValue on the actor document.
@@ -131,6 +137,15 @@ func (r *Renderer) RenderPerson(p Profile) Object {
 			})
 		}
 		person["attachment"] = attachments
+	}
+
+	// Account migration, as ApRendererService.renderPerson does: both fields
+	// are omitted when empty rather than sent as null.
+	if p.MovedToURI != "" {
+		person["movedTo"] = p.MovedToURI
+	}
+	if len(p.AlsoKnownAs) > 0 {
+		person["alsoKnownAs"] = p.AlsoKnownAs
 	}
 
 	return withContext(person)
@@ -360,6 +375,20 @@ func (r *Renderer) RenderUndo(activity Object, actorRef string) Object {
 		delete(undo, "id")
 	}
 	return withContext(undo)
+}
+
+// RenderMove announces that a local account migrated to the account at
+// targetRef. Both object and target are actor URIs; Firefish and Misskey
+// send the mover as object and the destination as target.
+func (r *Renderer) RenderMove(id, actorRef, objectRef, targetRef string) Object {
+	return withContext(Object{
+		"id":        id,
+		"type":      "Move",
+		"actor":     actorRef,
+		"object":    objectRef,
+		"target":    targetRef,
+		"published": time.Now().UTC().Format(time.RFC3339),
+	})
 }
 
 // RenderLike builds a Like activity carrying a Misskey reaction.

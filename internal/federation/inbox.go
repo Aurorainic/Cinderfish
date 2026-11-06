@@ -32,6 +32,10 @@ type Inbox struct {
 	// OnNotification fires after a stored notification so the host can push
 	// it to an open Streaming client.
 	OnNotification func(ctx context.Context, notificationID, recipientID string)
+	// OnMoved fires after a Move is accepted, with the old and new account
+	// ids, so the host can move local followers across. The inbox does not
+	// deliver follows itself: the host owns the outbound queue.
+	OnMoved func(ctx context.Context, oldUserID, newUserID string)
 }
 
 // NewInbox returns an inbox over the given dependencies.
@@ -95,6 +99,8 @@ func (i *Inbox) perform(ctx context.Context, actor *RemoteUser, activity Object)
 		return i.announce(ctx, actor, activity)
 	case activity.IsType("Update"):
 		return i.update(ctx, actor, activity)
+	case activity.IsType("Move"):
+		return i.move(ctx, actor, activity)
 	case activity.IsType("Block"):
 		return i.block(ctx, actor, activity)
 	}
@@ -490,6 +496,38 @@ func (i *Inbox) block(ctx context.Context, actor *RemoteUser, activity Object) (
 	return "ok", nil
 }
 
+// move handles an inbound Move: the actor migrated to the account named by
+// target. Firefish's kernel/move accepts the move only when the target
+// lists the actor's URI in its alsoKnownAs, then marks the old account as
+// moved and hands the local followers over to the host.
+func (i *Inbox) move(ctx context.Context, actor *RemoteUser, activity Object) (string, error) {
+	if object := activity.Ref("object"); object != "" && object != actor.URI {
+		return "skip: move object is not the actor", nil
+	}
+	targetURI := activity.Ref("target")
+	if targetURI == "" {
+		return "skip: move has no target", nil
+	}
+
+	// The target's alias list is what authorises the move, and it was
+	// written just before the activity was sent, so the actor document is
+	// fetched rather than read from a possibly stale row.
+	target, err := i.FetchActor(ctx, targetURI)
+	if err != nil {
+		return "", err
+	}
+	if !containsRef(target.AlsoKnownAs, actor.URI) {
+		return "skip: target does not list the actor in alsoKnownAs", nil
+	}
+	if err := i.store.MarkMoved(ctx, actor.ID, targetURI); err != nil {
+		return "", err
+	}
+	if i.OnMoved != nil {
+		i.OnMoved(ctx, actor.ID, target.ID)
+	}
+	return "ok", nil
+}
+
 // resolveActor loads the remote actor, fetching it when unknown.
 func (i *Inbox) resolveActor(ctx context.Context, uri string) (*RemoteUser, error) {
 	if u, err := i.store.UserByURI(ctx, uri); err == nil {
@@ -500,6 +538,40 @@ func (i *Inbox) resolveActor(ctx context.Context, uri string) (*RemoteUser, erro
 		return nil, fmt.Errorf("federation: resolve actor: %w", err)
 	}
 	return i.upsertActor(ctx, uri, obj)
+}
+
+// FetchActor loads an actor document unconditionally, refreshing the stored
+// row. Callers that must see the current actor state (a Move target's
+// alsoKnownAs, an alias added moments ago) use this instead of the cached
+// resolveActor path.
+func (i *Inbox) FetchActor(ctx context.Context, uri string) (*RemoteUser, error) {
+	if uri == "" {
+		return nil, fmt.Errorf("federation: empty actor uri")
+	}
+	obj, err := i.client.FetchObject(ctx, uri, uri)
+	if err != nil {
+		return nil, fmt.Errorf("federation: fetch actor: %w", err)
+	}
+	return i.upsertActor(ctx, uri, obj)
+}
+
+// ResolveAcct resolves a user@host handle to an actor, through WebFinger.
+// It is what i/known-as and i/move use to turn the handle a user typed into
+// the actor the protocol needs; a local handle is not resolved here because
+// those callers require a remote account.
+func (i *Inbox) ResolveAcct(ctx context.Context, user, host string) (*RemoteUser, error) {
+	if user == "" || host == "" {
+		return nil, fmt.Errorf("federation: %q is not a remote acct", user+"@"+host)
+	}
+	wf, err := i.client.ResolveWebFinger(ctx, user+"@"+host)
+	if err != nil {
+		return nil, err
+	}
+	self := wf.Self()
+	if self == "" {
+		return nil, fmt.Errorf("federation: webfinger for %s@%s has no self link", user, host)
+	}
+	return i.resolveActor(ctx, self)
 }
 
 // upsertActor stores an actor document.
@@ -535,6 +607,8 @@ func (i *Inbox) upsertActor(ctx context.Context, uri string, obj Object) (*Remot
 		IsBot:        obj.IsType("Service") || obj.IsType("Application"),
 		Name:         obj.String("name"),
 		Description:  obj.String("_misskey_summary"),
+		MovedToURI:   obj.Ref("movedTo"),
+		AlsoKnownAs:  obj.Refs("alsoKnownAs"),
 	}
 	if rem.Description == "" {
 		rem.Description = obj.String("summary")

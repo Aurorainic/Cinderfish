@@ -157,6 +157,10 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("POST /api/i/2fa/password-less", s.handleI2FAPasswordLess)
 	s.mux.HandleFunc("POST /api/i/pin", s.handleIPin)
 	s.mux.HandleFunc("POST /api/i/unpin", s.handleIUnpin)
+	// Account migration: the alias list a move is validated against, and the
+	// move itself.
+	s.mux.HandleFunc("POST /api/i/known-as", s.handleIKnownAs)
+	s.mux.HandleFunc("POST /api/i/move", s.handleIMove)
 	s.mux.HandleFunc("POST /api/users", s.handleUsers)
 	s.mux.HandleFunc("POST /api/users/show", s.handleUsersShow)
 	s.mux.HandleFunc("POST /api/users/search", s.handleUsersSearch)

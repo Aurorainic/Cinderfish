@@ -548,6 +548,20 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_email_challenges_code ON email_challenges 
 CREATE INDEX IF NOT EXISTS idx_email_challenges_user
     ON email_challenges (user_id, purpose, created_at DESC);
 `,
+
+	// v19: account migration. moved_to_uri marks an account that has moved to
+	// another actor (its AP id), also_known_as holds the actor URIs the
+	// account declares as aliases of itself — both are published in the actor
+	// document, and the Move flow validates the target's aliases against the
+	// mover's URI.
+	19: `
+ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS moved_to_uri TEXT,
+    ADD COLUMN IF NOT EXISTS also_known_as JSONB NOT NULL DEFAULT '[]'::jsonb;
+
+CREATE INDEX IF NOT EXISTS idx_users_moved_to_uri ON users (moved_to_uri)
+    WHERE moved_to_uri IS NOT NULL;
+`,
 }
 
 // Migrate applies pending migrations in order and returns the version

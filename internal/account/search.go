@@ -94,7 +94,8 @@ func (s *Service) SearchUsers(ctx context.Context, p UserSearchParams) ([]*User,
 	args = append(args, p.Limit, p.Offset)
 	query := `
 SELECT u.id, u.username, u.username_lower, u.host, COALESCE(u.password_hash, ''),
-       COALESCE(u.token, ''), u.is_admin, u.is_suspended, u.created_at
+       COALESCE(u.token, ''), u.is_admin, u.is_suspended, u.created_at,
+       COALESCE(u.moved_to_uri, ''), COALESCE(u.also_known_as, '[]'::jsonb)
 FROM users u LEFT JOIN user_profiles p ON p.user_id = u.id
 WHERE ` + strings.Join(conds, " AND ") + fmt.Sprintf(`
 ORDER BY u.id %s LIMIT $%d OFFSET $%d`, order, len(args)-1, len(args))

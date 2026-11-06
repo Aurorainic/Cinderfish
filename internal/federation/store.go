@@ -48,7 +48,12 @@ type RemoteUser struct {
 	IsLocked     bool
 	IsBot        bool
 	IsDeleted    bool
-	Fields       []ProfileField
+	// MovedToURI is the actor this one migrated to, if any.
+	MovedToURI string
+	// AlsoKnownAs lists the actor URIs this actor declares as aliases of
+	// itself; an account move is validated against it.
+	AlsoKnownAs []string
+	Fields      []ProfileField
 }
 
 // UpsertRemoteUser inserts or updates a remote actor keyed by its AP id.
@@ -68,11 +73,13 @@ func (s *Store) UpsertRemoteUser(ctx context.Context, u RemoteUser) (*RemoteUser
 		_, err = s.pool.Exec(ctx, `
 INSERT INTO users (id, username, username_lower, host, uri, inbox, shared_inbox,
                    followers_uri, featured_uri, key_id, public_key_pem,
-                   is_locked, is_bot, is_deleted, last_fetched_at, created_at)
-VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,now(),now())
+                   is_locked, is_bot, is_deleted, last_fetched_at, created_at,
+                   moved_to_uri, also_known_as)
+VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,now(),now(),$15,$16::jsonb)
 		`, id, u.Username, usernameLower, u.Host, u.URI, u.Inbox, u.SharedInbox,
 			u.FollowersURI, u.FeaturedURI, u.KeyID, u.PublicKeyPEM,
-			u.IsLocked, u.IsBot, u.IsDeleted)
+			u.IsLocked, u.IsBot, u.IsDeleted,
+			nullIfEmpty(u.MovedToURI), marshalStrings(u.AlsoKnownAs))
 		if err != nil {
 			return nil, fmt.Errorf("federation: insert remote user: %w", err)
 		}
@@ -82,10 +89,13 @@ VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,now(),now())
 		_, err = s.pool.Exec(ctx, `
 UPDATE users SET inbox = $2, shared_inbox = $3, followers_uri = $4, featured_uri = $5,
                  key_id = $6, public_key_pem = $7, is_locked = $8, is_bot = $9,
-                 is_deleted = $10, last_fetched_at = now()
+                 is_deleted = $10, last_fetched_at = now(),
+                 moved_to_uri = COALESCE($11, moved_to_uri),
+                 also_known_as = CASE WHEN $12::jsonb = '[]'::jsonb THEN also_known_as ELSE $12::jsonb END
 WHERE id = $1
 		`, id, u.Inbox, u.SharedInbox, u.FollowersURI, u.FeaturedURI,
-			u.KeyID, u.PublicKeyPEM, u.IsLocked, u.IsBot, u.IsDeleted)
+			u.KeyID, u.PublicKeyPEM, u.IsLocked, u.IsBot, u.IsDeleted,
+			nullIfEmpty(u.MovedToURI), marshalStrings(u.AlsoKnownAs))
 		if err != nil {
 			return nil, fmt.Errorf("federation: update remote user: %w", err)
 		}
@@ -116,12 +126,14 @@ SELECT u.id, u.username, COALESCE(u.host, ''), u.uri, COALESCE(u.inbox, ''),
        COALESCE(u.shared_inbox, ''), COALESCE(u.followers_uri, ''),
        COALESCE(u.featured_uri, ''), COALESCE(u.key_id, ''),
        COALESCE(u.public_key_pem, ''), p.name, p.description, p.avatar_url, p.banner_url,
-       u.is_locked, u.is_bot, u.is_deleted
+       u.is_locked, u.is_bot, u.is_deleted,
+       COALESCE(u.moved_to_uri, ''), COALESCE(u.also_known_as, '[]'::jsonb)
 FROM users u LEFT JOIN user_profiles p ON p.user_id = u.id
 WHERE u.uri = $1
 	`, uri).Scan(&u.ID, &u.Username, &u.Host, &u.URI, &u.Inbox, &u.SharedInbox,
 		&u.FollowersURI, &u.FeaturedURI, &u.KeyID, &u.PublicKeyPEM,
-		&name, &desc, &avatar, &banner, &u.IsLocked, &u.IsBot, &u.IsDeleted)
+		&name, &desc, &avatar, &banner, &u.IsLocked, &u.IsBot, &u.IsDeleted,
+		&u.MovedToURI, &u.AlsoKnownAs)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrRemoteNotFound
 	}
@@ -550,6 +562,65 @@ DELETE FROM followings WHERE follower_id = $1 AND followee_id = $2
 	return nil
 }
 
+// MarkMoved records that a remote actor migrated to targetURI, appending the
+// target to its alias list. The move itself is validated by the caller; this
+// only writes the state peers read back from the actor document.
+func (s *Store) MarkMoved(ctx context.Context, userID, targetURI string) error {
+	if targetURI == "" {
+		return fmt.Errorf("federation: empty move target")
+	}
+	var known json.RawMessage
+	if err := s.pool.QueryRow(ctx, `SELECT also_known_as FROM users WHERE id = $1`, userID).Scan(&known); err != nil {
+		return fmt.Errorf("federation: load known-as: %w", err)
+	}
+	var aliases []string
+	if len(known) > 0 {
+		if err := json.Unmarshal(known, &aliases); err != nil {
+			return fmt.Errorf("federation: decode known-as: %w", err)
+		}
+	}
+	found := false
+	for _, a := range aliases {
+		if a == targetURI {
+			found = true
+			break
+		}
+	}
+	if !found {
+		aliases = append(aliases, targetURI)
+	}
+	if _, err := s.pool.Exec(ctx, `
+UPDATE users SET moved_to_uri = $2, also_known_as = $3::jsonb WHERE id = $1
+	`, userID, targetURI, marshalStrings(aliases)); err != nil {
+		return fmt.Errorf("federation: mark moved: %w", err)
+	}
+	return nil
+}
+
+// LocalFollowerIDs returns the local accounts that follow userID. The
+// account migration moves them to the target account, and a remote follower
+// is the remote instance's business, so only local rows are returned.
+func (s *Store) LocalFollowerIDs(ctx context.Context, userID string) ([]string, error) {
+	rows, err := s.pool.Query(ctx, `
+SELECT f.follower_id FROM followings f JOIN users u ON u.id = f.follower_id
+WHERE f.followee_id = $1 AND u.host IS NULL
+ORDER BY f.created_at ASC
+	`, userID)
+	if err != nil {
+		return nil, fmt.Errorf("federation: local followers: %w", err)
+	}
+	defer rows.Close()
+	var out []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		out = append(out, id)
+	}
+	return out, rows.Err()
+}
+
 // followRequestColumns is the projection the follow request helpers scan.
 const followRequestColumns = `id, follower_id, followee_id, COALESCE(uri, ''), created_at`
 
@@ -768,11 +839,13 @@ func (s *Store) UserByID(ctx context.Context, id string) (*RemoteUser, error) {
 SELECT id, username, host, COALESCE(uri, ''), COALESCE(inbox, ''),
        COALESCE(shared_inbox, ''), COALESCE(followers_uri, ''),
        COALESCE(featured_uri, ''), COALESCE(key_id, ''), COALESCE(public_key_pem, ''),
-       is_locked, is_bot, is_deleted
+       is_locked, is_bot, is_deleted,
+       COALESCE(moved_to_uri, ''), COALESCE(also_known_as, '[]'::jsonb)
 FROM users WHERE id = $1
 	`, id).Scan(&u.ID, &u.Username, &host, &u.URI, &u.Inbox, &u.SharedInbox,
 		&u.FollowersURI, &u.FeaturedURI, &u.KeyID, &u.PublicKeyPEM,
-		&u.IsLocked, &u.IsBot, &u.IsDeleted)
+		&u.IsLocked, &u.IsBot, &u.IsDeleted,
+		&u.MovedToURI, &u.AlsoKnownAs)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrRemoteNotFound
 	}
