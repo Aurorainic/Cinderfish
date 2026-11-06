@@ -6740,3 +6740,31 @@ Firefish 的 `ui/_common_/common.vue` 在 `main` 频道上处理新通知：页�
   - 捕获到 `new Audio("/static-assets/sounds/syuilo/pope2.mp3")` 且 `play()` 一次；
   - 随后 `POST /api/notifications {markAsRead:false}` 中该 mention 已是 `isRead: true`。
   截图 `/tmp/w148-shots/notification-toast.png`（不入库）。
+
+## 12FM. 第一百四十九波：Deck 的「提及」列（2026-11-07）
+
+`DeckColumn.vue` 的注释把 `mentions` 列与 list/antenna/channel/direct 一起列为「后端无接口」，
+但 `notes/mentions` 早已实现。这一轮把该列接上。
+
+### 12FM.1 改动
+
+| 层 | 文件 | 内容 |
+|----|------|------|
+| 列内容 | `web/src/ui/layouts/DeckColumn.vue` | `column.type === 'mentions'` → `CfPagination` + `notes/mentions`（limit 10），空态与收藏列一致 |
+| 图标 | 同上 | 标题栏 `ph-at` |
+| 添加菜单 | `web/src/ui/layouts/DeckLayout.vue` | 「添加列」菜单加入「提及」项与图标 |
+| 注释 | `DeckColumn.vue` | 改为「mentions 已有接口；list/antenna/channel/direct 属首版范围外」 |
+
+### 12FM.2 有意的限制
+
+- 没有「只看关注的人」开关（`notes/mentions` 支持 `following`，界面未暴露）。
+- `direct` 列仍不提供：它对应 `notes/mentions?visibility=specified`，属于首版不做的私信范围。
+- 列的排序/折叠沿用 Deck 现有行为，没有单独改动。
+
+### 12FM.3 验证证据
+
+- `vue-tsc --noEmit`、`check:port`（hardTotal 0）、`pnpm build` 全绿；Go 侧未改动。
+- 真实二进制 + 无头浏览器（1400×900）：
+  - `localStorage.ui = "deck"` 进入 Deck，点「添加列」出现「提及」；
+  - 添加后列标题为「提及」，正文显示 bob 的 `@w149alice` 提及帖（`.deck` 内文本命中）。
+  截图 `/tmp/w149-shots/mentions-column.png`（不入库）。

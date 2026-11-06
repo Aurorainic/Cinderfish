@@ -4,8 +4,10 @@
   `ui/deck/column-core.vue`, `main-column.vue`, `tl-column.vue`,
   `notifications-column.vue` and `widgets-column.vue`: a deck column is a header
   plus one body, so one component covers them. The `favorites` kind is a
-  Cinderfish addition (`i/favorites` exists); the list/antenna/channel/mentions/
-  direct kinds have no backend endpoints and render the "not provided" notice.
+  Cinderfish addition (`i/favorites` exists), and `mentions` uses the existing
+  `notes/mentions` endpoint; list/antenna/channel/direct have no backend
+  endpoints (they are outside the first-release scope) and render the "not
+  provided" notice.
 -->
 <template>
 	<section
@@ -77,6 +79,25 @@
 				</template>
 			</CfPagination>
 
+			<CfPagination
+				v-else-if="column.type === 'mentions'"
+				class="mentions"
+				:pagination="mentionsPagination"
+			>
+				<template #empty>
+					<div class="_fullinfo">
+						<div>{{ t("noNotes") }}</div>
+					</div>
+				</template>
+				<template #default="{ items }">
+					<MkNote
+						v-for="note in noteItems(items)"
+						:key="note.id"
+						:note="note"
+					/>
+				</template>
+			</CfPagination>
+
 			<div v-else class="unsupported">
 				<CfInfo :warn="true">
 					<div class="unsupported-title">
@@ -91,7 +112,7 @@
 
 <script setup lang="ts">
 import { computed, defineAsyncComponent, ref } from "vue";
-import type { NoteFavorite } from "@/api/types";
+import type { Note, NoteFavorite } from "@/api/types";
 import {
 	CfInfo,
 	CfPagination,
@@ -170,6 +191,8 @@ const headerIcon = computed<string | null>(() => {
 			return "ph-browser ph-bold ph-lg";
 		case "favorites":
 			return "ph-star ph-bold ph-lg";
+		case "mentions":
+			return "ph-at ph-bold ph-lg";
 		default:
 			return null;
 	}
@@ -223,6 +246,15 @@ const favoritesPagination: Paging = {
 	endpoint: "i/favorites",
 	limit: 10,
 };
+
+const mentionsPagination: Paging = {
+	endpoint: "notes/mentions",
+	limit: 10,
+};
+
+function noteItems(items: readonly { id: string }[]): Note[] {
+	return items as Note[];
+}
 
 function favoriteItems(items: readonly { id: string }[]): NoteFavorite[] {
 	return items as NoteFavorite[];

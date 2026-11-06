@@ -259,6 +259,8 @@ function columnLabel(type: Column["type"]): string {
 			return t("_deck._columns.widgets");
 		case "favorites":
 			return t("favorites");
+		case "mentions":
+			return t("_deck._columns.mentions");
 	}
 	return type;
 }
@@ -281,6 +283,7 @@ function openAddMenu(ev: MouseEvent): void {
 		"notifications",
 		"widgets",
 		"favorites",
+		"mentions",
 	];
 	const icons: Partial<Record<Column["type"], string>> = {
 		main: "ph-columns ph-bold",
@@ -288,6 +291,7 @@ function openAddMenu(ev: MouseEvent): void {
 		notifications: "ph-bell ph-bold",
 		widgets: "ph-browser ph-bold",
 		favorites: "ph-star ph-bold",
+		mentions: "ph-at ph-bold",
 	};
 	const items: MenuItem[] = [
 		{ type: "label", text: t("_deck.addColumn") },
