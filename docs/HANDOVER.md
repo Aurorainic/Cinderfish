@@ -4437,8 +4437,8 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
   实例规则」，浏览器实测两个链接（外链 `_blank`、规则链到 `/about`）、移动端无溢出；清空配置后
   该行消失。仍未验证的：远端实例计数与大表统计耗时。
 - **第二十波已补验证（2026-11-07，见 §12CO）**：TOTP 的注册/启用/登录/注销与 `NO_SECURITY_KEY`
-  都已有 HTTP 用例，浏览器的两步验证登录也在 §12CC 跑通。仍未验证的：设置页开关的交互细节、
-  移动端布局；`qr` 为空串、安全密钥与备份码按设计未做。
+  都已有 HTTP 用例，浏览器的两步验证登录也在 §12CC 跑通；`/settings/security` 的 390 宽布局
+  已由 §12DB 覆盖。仍未验证的：2FA 设置区开关的交互细节；`qr` 为空串、安全密钥与备份码按设计未做。
 - **第二十一波已补验证（2026-11-06，见 §12AK.4）**：三个端点现在有数据库用例
   （`TestPasswordChange` 与 `TestRegenerateToken`），并且 2026-11-07 用真实二进制 + 浏览器走查了
   `/settings/security`：改密后页面提示「密码已更新」，旧密码登录 403、新密码 200；
@@ -4452,7 +4452,7 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
   静音后列表与未读数联动、显式 `includeTypes` 优先、未知类型 400、重复项去重与清空。
   用例暴露了缺陷：`GetProfile` 从不读取 `settings.mutingNotificationTypes`，所以静音写入后
   **完全没有效果**；已修复。设置页界面已于 2026-11-07 走查（§12CS）：关闭「提及」后
-  `i/update` 写入、API 列表为空、页面显示「没有通知」。
+  `i/update` 写入、API 列表为空、页面显示「没有通知」；390 宽无横向溢出（§12DB）。
 - **第二十四波的部分边角（2026-11-06，见 §12AN.4）**：编辑链路已由 `TestNotesEditAndHistory`
   覆盖（2026-11-07）：作者改文本/CW/可见性后回读一致，`notes/history` 记录一条修订，非作者
   编辑/读历史 403，缺 editId 400 `NEEDS_EDIT_ID`，未知 id 404，超长文本 400。
@@ -5386,4 +5386,25 @@ CINDERFISH_TEST_DATABASE_URL=... go test ./... -count=1         # 全绿
 说明：`DOM.setFileInputFiles` 在无头环境里不总会自动触发 `change`，本轮显式派发了一次；
 这是脚本行为，不是页面缺陷（真实点击文件框会正常触发）。
 
-仍未验证：导入失败的界面提示（坏 JSON 的后端分支已有用例）、移动端排版。
+导入页在 390 宽无横向溢出（§12DB）。仍未验证：导入失败的界面提示（坏 JSON 的后端分支已有用例）。
+
+## 12DB. 第八十九波：390 宽移动端排版复核（2026-11-07）
+
+多条 §14 条目都挂着「移动端未走查」。这一轮在 390×844（mobile=true）下逐页测量
+`document.documentElement.scrollWidth - clientWidth` 并收集 `Runtime.exceptionThrown`：
+
+| 路由 | 横向溢出 | JS 异常 |
+|------|----------|---------|
+| `/` | 0 | 无 |
+| `/settings/notifications` | 0 | 无 |
+| `/settings/drive` | 0 | 无 |
+| `/settings/import-export` | 0 | 无 |
+| `/explore` | 0 | 无 |
+| `/my/drive` | 0 | 无 |
+| `/notes/<id>` | 0 | 无 |
+| `/settings/security` | 0 | 无 |
+
+页面文本也确认渲染到位（配额文案、导出说明、用户列表、笔记正文、会话信息）。截图保存在
+`/tmp/w89-shots/*.png`（不入库）。
+
+仍未验证：更窄（320/360）与更宽的平板断点、Deck 布局、弹窗在移动端的滚动锁定。
