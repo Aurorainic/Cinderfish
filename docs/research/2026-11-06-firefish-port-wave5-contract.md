@@ -96,14 +96,17 @@
 
 ## 4. 验收口径
 
-本波按用户要求**只写代码，不跑测试与浏览器走查**。提交前只做编译级检查：
+代码提交只做编译级检查；用户确认后补齐了真实二进制与浏览器验证，结论见 HANDOVER §12U.3：
 
 ```
-gofmt -l internal/ cmd/
-go build ./...
-cd web && pnpm exec vue-tsc --noEmit
-cd web && pnpm run check:port
+gofmt -l internal/ cmd/                 # 空
+go vet ./...                            # exit 0
+CINDERFISH_TEST_DATABASE_URL=… go test -count=1 ./...   # 全绿
+cd web && pnpm exec vue-tsc --noEmit    # exit 0
+cd web && pnpm run check:port           # hardTotal 0
 ```
 
-真实二进制走查（静音后时间线消失、屏蔽后互相不可见、撤销令牌后请求 401、切换账号后资料变化、
-四个 widgets 渲染）留到用户确认后的验证轮。
+- API：静音/屏蔽使时间线按预期增减、屏蔽清空双向关注、实例静音按主机过滤且不影响他人、
+  撤销令牌后旧令牌 401；
+- 页面：五个设置页在 1440/390 两档无溢出无 JS 异常，实例静音保存与无障碍开关都完成真实交互；
+- widgets：四个 widget 在首页右栏渲染，幻灯片显示真实上传图片。

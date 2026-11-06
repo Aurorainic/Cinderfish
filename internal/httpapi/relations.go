@@ -173,6 +173,10 @@ func (s *Server) handleBlockingCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	packed := packUserDetailed(target, target.CreatedAt, false, loadProfile(r.Context(), s, target.ID))
+	// Misskey answers with the freshly blocked user; the viewer's own state
+	// is what `isBlocked` reports, so it is true here even though the generic
+	// packer defaults it to false.
+	packed["isBlocked"] = true
 	writeJSON(w, http.StatusOK, packed)
 }
 

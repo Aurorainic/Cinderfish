@@ -1480,25 +1480,46 @@ CINDERFISH_TEST_DATABASE_URL=… go test -count=1 ./...   # 全绿
 5. **button widget 不用 AiScript**：AiScript 不是依赖，改为打开 `url`，只允许 http(s)。
 6. **slideshow 不用文件夹选择器**：取网盘最新 24 张图片轮播，`folderId` 不提供。
 
-### 12U.3 检查记录（仅编译级）
+### 12U.3 验证证据
 
 ```
-gofmt -l internal/ cmd/            # 空
-go build ./...                     # exit 0
-cd web && pnpm exec vue-tsc --noEmit   # exit 0
-cd web && pnpm run check:port      # 398 文件，hardTotal 0
+gofmt -l internal/ cmd/                 # 空
+go vet ./...                            # exit 0
+CINDERFISH_TEST_DATABASE_URL=… go test -count=1 ./...   # 全绿
+cd web && pnpm exec vue-tsc --noEmit    # exit 0
+cd web && pnpm run check:port           # 398 文件，hardTotal 0
+cd web && pnpm build                    # exit 0
 ```
 
-### 12U.4 未验证（续作必读）
+真实二进制 `:3991`（开发库、`federation_mode=none`、`registration_mode=open`）+ curl + 无头 Helium 156
+（CDP，1440×900 / 390×844，独立 profile）：
 
-- 静音/屏蔽的**端到端行为**未在真实二进制上验证：时间线过滤 SQL、屏蔽清关注、`users/show` 标记、
-  设置页交互都只过编译。
-- `i/apps` / `i/revoke-token` 只验证编译；撤销后旧令牌是否 401、应用页列表是否即时变化未实测。
-- 多账号页的切换与新增登录未走查；`fetchMe` 失败时的占位行样式未看过。
-- 4 个新 widget 未在浏览器里渲染过；slideshow 的轮播、unix-clock 的毫秒闪烁、calendar 的进度条均未目视。
-- 实例静音的 `settings` JSONB 过滤条件（`?` 操作符）未在任何数据库上执行过；首次运行时要先确认
-  `user_profiles.settings` 没有该键时不会把时间线清空。
-- 无障碍页 6 个开关的实际样式与移动端换行未看。
+| 场景 | 证据 |
+|------|------|
+| 静音 | dana 的帖子在 admin 本地时间线 1 → `mute/create` 后 0；`mute/list` = ["w5dana"]、`users/show.isMuted=true`；`mute/delete` 后恢复 1 |
+| 屏蔽 | 先互相关注（2 行），`blocking/create` 后关注行 0；双方时间线互相看不到对方帖子；`blocking/list` 正确；解封后恢复可见；响应带 `isBlocked: true` |
+| 实例静音 | `[" Remote.Example "]` 规范化为 `remote.example`；远程帖子在 admin 全局时间线 1 → 0，dana 与匿名仍为 1；`null` 清空后回到 1 |
+| 令牌 | `miauth/gen-token` 签发的令牌可用；`i/apps` 列出 2 个应用（名称/权限/授权时间）；`i/revoke-token` 后旧令牌 `POST /api/i` 返回 401，原生 token 仍可用 |
+| 错误码 | `MUTEE_IS_YOURSELF` / `BLOCKEE_IS_YOURSELF` / `NO_SUCH_USER` / `AUTHENTICATION_FAILED` 与 Misskey 的 id 一致 |
+| 设置页 | `/settings/{mute-block,instance-mute,apps,accounts,accessibility}` 桌面与移动均渲染，`scrollWidth == clientWidth`，无 exception/console 错误；静音页切到屏蔽名单后仍显示 w5dana |
+| 实例静音页交互 | 文本框预填 `remote.example`；输入两行并点「保存」后 `POST /api/i` 回读 `["remote.example","second.example"]` |
+| 无障碍页交互 | 6 个开关；点击第一个后 `pizzax::base` = `{"animation":false}` |
+| 应用页 | 两个应用卡片显示名称、描述、授权时间、最近使用「从未使用」、权限计数与撤销按钮 |
+| 账号页 | w5admin 标「当前」，w5dana 显示「切换/移除」 |
+| widgets | 首页右栏 4 个 widget：按钮、日历（今天/本月/今年 73.5/19.1/84.9%）、UNIX 时钟、幻灯片显示真实上传的 `w5-photo.png`；移动端按设计不显示右栏 |
+| 设置菜单 | 基础设置组含无障碍/静音与屏蔽/服务器静音，其它组含账号/应用 |
+
+走查数据已清理：删除 w5admin、w5dana、远程测试用户与全部测试笔记，`mutes`/`blocks` 归零，用户数回到 23；
+`/tmp/w5-media`、`/tmp/w5-profile`、临时二进制与配置删除，服务停止。截图留在 `/tmp/w5-shots`（不入库）。
+
+### 12U.4 仍未验证
+
+- **UI 点击路径未覆盖**：应用页的「撤销」、账号页的「切换/移除/添加账号」只用 API 与列表渲染验证，
+  没有真的点下去；widget 的配置弹窗没有打开过。
+- **分页游标**：`mute/list` / `blocking/list` 的 `sinceId`/`untilId` 只按实现检查，没有构造多页数据实测。
+- **实例静音的非法主机校验**：`/`、`@`、超长项由 `parseMutedInstances` 拒绝，但只测了合法输入与去重。
+- **屏蔽的通知副作用**：Misskey 屏蔽后不投递对方通知；本实现未在通知层过滤（时间线与 `users/show` 已过滤）。
+- **无需登录的注册/登录表单**、emoji 文件上传点击路径、Streaming 实时插入仍是前几波遗留的未验证项。
 
 ## 13. 文档索引
 
@@ -1534,9 +1555,9 @@ cd web && pnpm run check:port      # 398 文件，hardTotal 0
 
 ## 14. 已知的未验证项
 
-- **第五波只做了编译级检查（2026-11-06，见 §12U.3）**：静音/屏蔽的端到端行为、时间线的
-  `mutedInstances` JSONB 过滤、`i/apps` 撤销后的 401、多账号切换、4 个新 widget 的渲染、
-  无障碍页样式全部未验证；按用户要求留到确认后的走查轮。
+- **第五波的 API 与页面渲染已验证（2026-11-06，见 §12U.3）**：静音/屏蔽/实例静音/令牌撤销都做了
+  真实二进制回读，五个设置页与四个 widget 在桌面/移动无头浏览器里走查过；仍未验证的是 UI 点击路径
+  （撤销、切换账号、widget 配置弹窗）、列表分页游标与实例静音非法输入，见 §12U.4。
 - **仍未移植的设置页**：邮箱、整合、安全（2FA）、导入导出、迁移、Webhook、插件、自定义 KaTeX、状态栏、
   删除账号、应用授权以外的账号操作；对应后端端点不存在或前端缺少依赖（见第五波契约 §3.3）。
 - **仍缺的 widgets**：rss、rss-ticker、server-metric、online-users、federation、job-queue、aiscript、
