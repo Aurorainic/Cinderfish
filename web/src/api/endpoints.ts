@@ -32,6 +32,8 @@ import type {
 	Note,
 	NoteCreateResponse,
 	NoteDetailed,
+	NoteEditEntry,
+	NoteEditResponse,
 	NoteFavorite,
 	NoteReaction,
 	Notification,
@@ -126,6 +128,8 @@ export const ENDPOINTS = {
 	// notes
 	notesCreate: "notes/create",
 	notesShow: "notes/show",
+	notesEdit: "notes/edit",
+	notesHistory: "notes/history",
 	notesDelete: "notes/delete",
 	notesReplies: "notes/replies",
 	notesMentions: "notes/mentions",
@@ -575,6 +579,20 @@ export interface EndpointMap {
 		res: NoteCreateResponse;
 	};
 	[ENDPOINTS.notesShow]: { req: NoteIdParams; res: NoteDetailed };
+	[ENDPOINTS.notesEdit]: {
+		req: {
+			editId: string;
+			text?: string | null;
+			cw?: string | null;
+			visibility?: NoteVisibility;
+			localOnly?: boolean;
+		};
+		res: NoteEditResponse;
+	};
+	[ENDPOINTS.notesHistory]: {
+		req: { noteId: string; limit?: number };
+		res: NoteEditEntry[];
+	};
 	[ENDPOINTS.notesDelete]: { req: NoteIdParams; res: EmptyResponse };
 	[ENDPOINTS.notesReplies]: { req: NoteListParams; res: NoteDetailed[] };
 	[ENDPOINTS.notesRenotes]: { req: NoteListParams; res: NoteDetailed[] };

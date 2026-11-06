@@ -3,8 +3,9 @@
 // Degradation: only entries whose endpoints exist in Cinderfish are rendered.
 // Dropped from the Firefish menu (no endpoint, see the capability matrix):
 // notes/state (so the favourite entry cannot know the current state and always
-// creates one), watch / thread mute, translate, edit, delete-and-edit, report
-// abuse, promote, clips, plugin actions and the user submenu.
+// creates one), watch / thread mute, translate, delete-and-edit, report
+// abuse, promote, clips, plugin actions and the user submenu. Edit and the
+// history page are Cinderfish's own additions.
 import type { Ref } from "vue";
 import type { Note, NoteDetailed } from "@/api/types";
 import { me } from "@/account";
@@ -12,6 +13,7 @@ import { url } from "@/config";
 import { t } from "@/i18n";
 import * as os from "@/os";
 import type { MenuItem } from "@/os";
+import { router } from "@/router";
 import copyToClipboard from "@/scripts/copy-to-clipboard";
 
 /** Firefish types the menu against the full note shape; the timeline projection is a subset. */
@@ -211,6 +213,20 @@ export function getNoteMenu(props: NoteMenuProps): NoteMenuItem[] {
 					text: t("unrenote"),
 					danger: true,
 					action: unrenote,
+			  }
+			: undefined,
+		isAppearAuthor
+			? {
+					icon: "ph-pencil-simple ph-bold ph-lg",
+					text: t("edit"),
+					action: () => void router.push(`/notes/${appearNote.id}/edit`),
+			  }
+			: undefined,
+		isAppearAuthor
+			? {
+					icon: "ph-clock-counter-clockwise ph-bold ph-lg",
+					text: "编辑历史",
+					action: () => void router.push(`/notes/${appearNote.id}/history`),
 			  }
 			: undefined,
 		isAppearAuthor

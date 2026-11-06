@@ -399,6 +399,19 @@ export interface SigninHistoryEntry {
 	success: boolean;
 }
 
+export interface NoteEditEntry {
+	id: string;
+	noteId: string;
+	text: string | null;
+	cw: string | null;
+	fileIds: string[];
+	createdAt: string;
+}
+
+export interface NoteEditResponse {
+	createdNote: NoteDetailed;
+}
+
 export interface MiAuthTokenResponse {
 	token: string;
 }

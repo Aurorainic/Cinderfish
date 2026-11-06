@@ -34,6 +34,7 @@ export const routes: RouteRecordRaw[] = [
   { path: "/@:acct/followers", component: page("UserFollowers") },
   { path: "/@:acct/:page?", name: "user", component: page("UserProfile") },
   { path: "/notes/:noteId", name: "note", component: page("Note") },
+  { path: "/notes/:noteId/edit", name: "note-edit", component: page("NoteEdit") },
   { path: "/notes/:noteId/history", name: "note-history", component: page("NoteHistory") },
   { path: "/clips/:clipId", component: page("Clip") },
   { path: "/user-info/:userId", component: page("UserInfo") },

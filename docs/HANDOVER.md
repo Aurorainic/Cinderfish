@@ -2521,6 +2521,46 @@ cd web && pnpm build                    # exit 0
 - 设置页开关的失败回滚与移动端布局。
 - `go test` 与浏览器走查未执行。
 
+## 12AN. 批次：笔记编辑与编辑历史（2026-11-06）
+
+**工作方式**：目标模式第二十四波，继续只写代码、验证到编译层。施工依据
+`docs/research/2026-11-06-firefish-port-wave24-contract.md`。
+
+### 12AN.1 落地清单
+
+| 层 | 文件 | 说明 |
+|----|------|------|
+| 迁移 | `internal/db/db.go` | v15：`notes.updated_at`、`note_edits` 表 |
+| 服务层 | `internal/note/edit.go`（新） | `Edit`（重算 tags/mentions、记录旧版本）、`Edits` |
+| 端点 | `internal/httpapi/note_edit.go`（新）、`server.go` | `notes/edit`（Firefish）、`notes/history`（自有） |
+| 前端类型 | `api/types.ts`、`endpoints.ts` | `NoteEditEntry`、`NoteEditResponse` |
+| 路由/页面 | `router/routes.ts`、`pages/NoteEdit.vue`（新）、`pages/NoteHistory.vue` | 编辑表单；历史列表替换占位说明 |
+| 菜单 | `scripts/get-note-menu.ts` | 作者菜单新增「编辑」「编辑历史」 |
+
+### 12AN.2 有意的限制
+
+1. 只能改正文、CW、可见性与 localOnly；附件/投票/回复目标不变。
+2. 不发 Streaming `updated`、不投递 ActivityPub `Update`，远端副本不更新。
+3. 响应不打包 `updatedAt`，没有「已编辑」标记。
+4. `notes/history` 是自有端点，Misskey 固定版本没有。
+
+### 12AN.3 验证证据（编译层）
+
+```
+gofmt -l internal/ cmd/                 # 空
+go vet ./...                            # exit 0
+cd web && pnpm exec vue-tsc --noEmit    # exit 0
+cd web && pnpm run check:port           # hardTotal 0
+cd web && pnpm build                    # exit 0
+```
+
+### 12AN.4 仍未验证
+
+- 编辑保存 → 历史出现旧文本 → 回读笔记的端到端流程。
+- 他人笔记 403、缺 `editId` 400、超长正文 400 的分支。
+- 菜单入口在时间线与详情页的实际点击路径、移动端布局。
+- `go test` 与浏览器走查未执行；`note_edits` 已加入测试库 TRUNCATE 列表。
+
 ## 13. 文档索引
 
 | 文档 | 内容 |
@@ -2570,6 +2610,7 @@ cd web && pnpm build                    # exit 0
 | `docs/research/2026-11-06-firefish-port-wave21-contract.md` | **第二十一波施工契约（改密、令牌重生成与登录历史），见 §12AK** |
 | `docs/research/2026-11-06-firefish-port-wave22-contract.md` | **第二十二波施工契约（资料扩展字段与推荐笔记开关），见 §12AL** |
 | `docs/research/2026-11-06-firefish-port-wave23-contract.md` | **第二十三波施工契约（通知类型静音与未读过滤），见 §12AM** |
+| `docs/research/2026-11-06-firefish-port-wave24-contract.md` | **第二十四波施工契约（笔记编辑与编辑历史），见 §12AN** |
 
 ## 14. 已知的未验证项
 
@@ -2610,6 +2651,8 @@ cd web && pnpm build                    # exit 0
   保存/回读、非法值分支与时间线表现未验证。
 - **第二十三波未测（2026-11-06，见 §12AM.4）**：通知静音只过了编译层，列表与未读计数的联动、
   非法类型分支与设置页交互未验证。
+- **第二十四波未测（2026-11-06，见 §12AN.4）**：笔记编辑与历史只过了编译层，编辑/历史/回读链路、
+  错误分支与菜单入口未验证；远端不接收 Update 是设计限制。
 - **仍未移植的设置页**：邮箱、整合、导入导出、迁移、Webhook、插件、自定义 KaTeX、状态栏、
   删除账号、应用授权以外的账号操作；对应后端端点不存在或前端缺少依赖（见第五波契约 §3.3）。
 - **仍缺的 widgets**：rss、rss-ticker、server-metric、online-users、federation、job-queue、aiscript、
