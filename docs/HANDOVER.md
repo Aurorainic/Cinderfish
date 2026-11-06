@@ -4384,6 +4384,21 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
 
 ## 14. 已知的未验证项
 
+> **2026-11-07 状态**：本地可执行的验证与移植已清零。剩余条目分三类，均不是本仓库内可继续完成的
+> 工作：
+>
+> 1. **真实第三方互操作**（需要外部实例/客户端）：Misskey/Mastodon 的 `/authorize_interaction`、
+>    真实 OAuth 第三方客户端、真实异种软件联邦与举报互认、Misskey Web 整站连接。
+> 2. **外部服务与部署环境**：真实 AWS/R2/B2、公网 SMTP/CA、真实 Caddy + TLS（反代拓扑已用 Go 代理
+>    用例覆盖）、真实网络丢包（需要 root 与 tc/netem）。
+> 3. **按设计不做或契约 drop**：转发（forward）、手动重试与配置写入、`directNotes`/聊天、
+>    `users/show` 的 `userIds` 批量参数（无前端调用方）、两个无前端调用方的端点、Deck/Zen 状态栏、
+>    首页公告横幅与已读跟踪、安全密钥与备份码、37 个 locale、AiScript 运行时。
+>
+> 已在本轮补齐的：搜索/聚合性能、缩略图补生成、大图内存、WebP 解码、主题 registry 同步、
+> 提及上限与有界解析、在线人数、全部可移植 widget、`charts/user/notes`、`server-info`、`fetch-rss`、
+> 登出重登路径、反代 Host 绑定、减少动画偏好、真实 Redis 投递唤醒与重启重订阅。
+
 - **第五波的 API 与页面渲染已验证（2026-11-06，见 §12U.3）**：静音/屏蔽/实例静音/令牌撤销都做了
   真实二进制回读，五个设置页与四个 widget 在桌面/移动无头浏览器里走查过。应用撤销与 widget
   配置弹窗已于 2026-11-07 走查（§12DG）；账号切换也已在 `/settings/accounts` 验证（§12DS）；
