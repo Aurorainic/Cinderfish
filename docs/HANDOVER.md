@@ -4438,7 +4438,8 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
   该行消失。仍未验证的：远端实例计数与大表统计耗时。
 - **第二十波已补验证（2026-11-07，见 §12CO）**：TOTP 的注册/启用/登录/注销与 `NO_SECURITY_KEY`
   都已有 HTTP 用例，浏览器的两步验证登录也在 §12CC 跑通；`/settings/security` 的 390 宽布局
-  已由 §12DB 覆盖。仍未验证的：2FA 设置区开关的交互细节；`qr` 为空串、安全密钥与备份码按设计未做。
+  已由 §12DB 覆盖；2FA 设置区的启用/停用交互已于 2026-11-07 走查（§12DD：UI 输入密码 →
+  读密钥 → 计算验证码 → 完成 → 停用），`qr` 为空串、安全密钥与备份码按设计未做。
 - **第二十一波已补验证（2026-11-06，见 §12AK.4）**：三个端点现在有数据库用例
   （`TestPasswordChange` 与 `TestRegenerateToken`），并且 2026-11-07 用真实二进制 + 浏览器走查了
   `/settings/security`：改密后页面提示「密码已更新」，旧密码登录 403、新密码 200；
@@ -5197,7 +5198,7 @@ CINDERFISH_TEST_DATABASE_URL=... go test ./... -count=1         # 全绿
 
 ### 12CS.2 仍未验证
 
-- 「将所有通知标为已读」与两个禁用按钮（未读笔记/消息）没有在本轮点击。
+- 「将所有通知标为已读」已在 §12DD 点击（未读数归零）；两个禁用按钮（未读笔记/消息）仍不可点。
 - 通知设置页在移动端断点下的排版。
 - 从时间线菜单进入编辑页后的保存流程（后端有 `TestNotesEditAndHistory`，界面只验证到入口）。
 
@@ -5440,3 +5441,18 @@ CINDERFISH_TEST_DATABASE_URL=... go test ./... -count=1         # 全绿
 - 浏览器里的反应图标渲染（前端 `MkReactionIcon` 从 `note.emojis` 取图；只验证了 API 形状）。
 - 同名但不同 host 的两个远端表情：`reactionEmojis` 与合并列表按名字去重，可能只保留其一。
 - `Undo(EmojiReact)` 后表情行保留（不影响渲染，但会长期留在 emojis 表）。
+
+## 12DD. 第九十一波：2FA 设置区与“全部已读”的界面交互（2026-11-07）
+
+两个此前只有登录页/API 证据的界面动作：
+
+| 动作 | 路径 | 结果 |
+|------|------|------|
+| 启用 TOTP | `/settings/security` 两步验证区填当前密码 →「注册身份验证器应用」→ 读出手动密钥 → 用 Node（base32 + HMAC-SHA1）算出 6 位码 →「完成设置」 | 页面显示「已启用」，`i.twoFactorEnabled=true` |
+| 停用 TOTP | 「停用两步验证」→ 再填密码 →「确认停用」 | 恢复「尚未启用两步验证」，`i.twoFactorEnabled=false` |
+| 全部已读 | 产生一条提及通知后，`/settings/notifications` 点「将所有通知标为已读」 | `i.unreadNotificationsCount` 变为 0 |
+
+说明：页面里多个 `input[type=password]`，脚本按「两步验证」标题所在 section 取输入框；
+无头环境需要显式触发 Vue 的 `input` 事件。均为脚本细节，不是应用缺陷。
+
+仍未验证：两步验证登录的移动端布局、备份码（按设计未做）。
