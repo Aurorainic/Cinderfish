@@ -4556,7 +4556,7 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
   公网 SMTP 的 TLS/Auth、真实客户端的模板显示。
 - **第四十九波已补验证（2026-11-07，见 §12BM.4）**：六个说明页在真实二进制下逐一走查，
   标题/已有项/缺口清单齐全，页内表单控件与按钮均为 0（无假控件），菜单分组包含全部六个入口。
-  仍未验证的：窄屏排版。
+  窄屏（280px）排版已由 §12EK 测量（六页均无横向溢出，说明区完整、无表单控件）。
 - **第五十波已补验证（2026-11-07，见 §12BN.4）**：状态栏在真实二进制下添加、着色、滚动与
   刷新保留均走查通过；期间发现固定条使用了不存在的 `block-end` 属性、导致贴在左上角，
   已修为 `inset-block-end`。仍未验证的：移动端/Deck/Zen、多条目叠加、减少动画偏好。
@@ -5899,3 +5899,12 @@ CINDERFISH_TEST_DATABASE_URL=... go test ./... -count=1         # 全绿
 - 截图 `/tmp/w120-shots/media-playback.png`。
 
 仍未验证：H.264/AAC 等专有编解码格式（开源 Chromium 未必支持，产品上依赖浏览器）；大文件缓冲。
+
+## 12EK. 第一百二十一波：六个说明页的 280px 排版（2026-11-07）
+
+`/admin/experiments`、`/admin/integrations`、`/admin/proxy-account`、`/admin/ads`、
+`/admin/security`、`/admin/other-settings` 在 280×600 下：
+
+- `scrollWidth - clientWidth` 全为 0；
+- `.cf-admin-unavailable` 存在，页内 `input/select/textarea/button` 计数为 0；
+- 无未捕获异常。
