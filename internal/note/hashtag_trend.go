@@ -51,6 +51,13 @@ func (s *HashtagService) Trend(ctx context.Context, limit int, hiddenTags []stri
 	// first of them; using "now - 7d" would leave the chart one day short.
 	since := time.Now().UTC().Truncate(24*time.Hour).AddDate(0, 0, -(TrendBuckets - 1))
 
+	// A nil slice travels to Postgres as NULL, and `x <> ALL(NULL)` is NULL for
+	// every row — the whole window would vanish. An empty array means "hide
+	// nothing" without that trap.
+	if hiddenTags == nil {
+		hiddenTags = []string{}
+	}
+
 	rows, err := s.pool.Query(ctx, `
 WITH exploded AS (
     SELECT lower(tag) AS tag, n.user_id,
@@ -59,7 +66,7 @@ WITH exploded AS (
     WHERE n.deleted_at IS NULL
       AND n.user_host IS NULL
       AND n.created_at >= $1
-      AND lower(tag) <> ALL($3)
+      AND lower(tag) <> ALL($3::text[])
 ), ranked AS (
     SELECT tag, count(DISTINCT user_id) AS users
     FROM exploded GROUP BY tag ORDER BY users DESC, tag ASC LIMIT $2
