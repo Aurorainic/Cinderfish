@@ -201,6 +201,10 @@ const baseDef = {
 	// ----- Cinderfish-only keys ---------------------------------------------
 	// deck is the shell switch read by main.ts (null = universal layout).
 	deck: { where: "deviceAccount", default: null as string | null },
+	// Firefish keeps custom CSS in a bare localStorage key; here it is a
+	// per-account store entry so several accounts on one browser do not share
+	// it. `composables/use-custom-css.ts` applies it live.
+	customCss: { where: "account", default: "" },
 
 	// Keys the first-wave port already shipped without an upstream counterpart
 	// in this snapshot. Kept so existing pages/settings keep compiling.

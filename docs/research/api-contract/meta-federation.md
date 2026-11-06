@@ -359,7 +359,7 @@
 
 ### 已知限制
 
-1. **`federation` 与 `features.globalTimeline` 读的是配置文件，不是运行时值。** 管理员通过 `POST /api/admin/federation/mode` 切换模式只写数据库 `instance_meta`（`internal/httpapi/federation_admin.go:66`–`72`），`meta` 的这两处仍用 `s.cfg`（`internal/httpapi/meta.go:78`、`92`），重启前一直报旧值。**而 AP 路由读的是数据库**（`internal/federation/policy.go:86`–`96`），两者会不一致。前端若要让“联邦状态”显示准确，应直接看 AP 路由是否 403，或等待修复。
+1. **`federation` 与 `features.globalTimeline` 读的是配置文件，不是运行时值。** 管理员通过 `POST /api/admin/federation/mode` 切换模式只写数据库 `instance_meta`（`internal/httpapi/federation_admin.go`），`meta` 的这两处仍用 `s.cfg`（`internal/httpapi/meta.go:78`、`92`），重启前一直报旧值。**而 AP 路由读的是数据库**（`internal/federation/policy.go:86`–`96`），两者会不一致。需要运行期值时应读 `GET /api/admin/federation/mode`（2026-11-06 新增，管理员端点）；普通客户端仍只能从 AP 路由是否 403 推断。
 2. **`policies` 只有 2 个键。** Misskey 的 `DEFAULT_POLICIES` 有 40 多个（`gtlAvailable`、`ltlAvailable`、`canPublicNote`、`pinLimit`、`driveCapacityMb`、`maxFileSizeMb`、`uploadableFileTypes` 等，见 `packages/backend/src/core/RoleService.ts:78`–`124`）。Firefish 客户端若读 `policies.canPublicNote` 之类会拿到 `undefined`，需要前端兜底默认值。
 3. **`version` 是 `"0.1.0"`，NodeInfo 的 `software.version` 是 `"0.0.1"`**，两处写死且不同。
 4. **`uri` 恒为 `https://`**，而 `baseURL()`（AP 用）在 localhost 下会降级成 `http://`。本地开发时 `meta.uri` 与 actor URI 的 scheme 不同。

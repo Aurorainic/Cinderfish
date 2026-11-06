@@ -13,6 +13,7 @@ import { computed, createApp, defineAsyncComponent, markRaw, type Component } fr
 import App from "./App.vue";
 import { me, refreshAccount, restoreSession } from "./account";
 import { install as installComponents } from "./components";
+import { initCustomCss } from "./composables/use-custom-css";
 import { initTheme } from "./composables/use-theme";
 import { install as installDirectives } from "./directives";
 import { updateInstance } from "./instance";
@@ -80,6 +81,10 @@ app.use(installComponents);
 app.provide(ShellKey, registry);
 app.use(router);
 app.mount("#app");
+
+// Per-account custom CSS is applied right after mount; the store may replace
+// the value again once the registry answers, and the watcher picks it up.
+initCustomCss();
 
 // Instance metadata (name / version / features) asynchronously; the reactive
 // object in @/instance starts from the cached copy so first paint is correct.

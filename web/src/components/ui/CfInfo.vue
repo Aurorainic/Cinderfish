@@ -1,7 +1,7 @@
 <template>
 	<div v-if="visible" class="info" :class="{ warn, card }">
 		<i :class="warn ? 'ph-bold ph-warning' : iconClass"></i>
-		<slot></slot>
+		<div class="content"><slot></slot></div>
 		<button
 			v-if="closeable"
 			class="_buttonIcon close"
@@ -49,13 +49,19 @@ function close(): void {
 <style lang="scss" scoped>
 .info {
 	display: flex;
-	align-items: center;
+	align-items: flex-start;
 	gap: 8px;
 	padding: 10px 14px;
 	border-radius: var(--radius);
 	background: var(--infoBg);
 	color: var(--infoFg);
 	font-size: 0.9em;
+
+	> .content {
+		flex: 1 1 auto;
+		min-width: 0;
+		line-height: 1.5;
+	}
 
 	&.warn {
 		background: var(--infoWarnBg);

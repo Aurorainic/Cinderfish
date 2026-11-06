@@ -1,13 +1,12 @@
+<!-- SPDX-License-Identifier: AGPL-3.0-only -->
 <template>
-	<div class="cf-page-placeholder">
-		<p>TODO: port pages/favorites.vue</p>
-	</div>
+	<Favorites />
 </template>
 
-<style scoped>
-.cf-page-placeholder {
-	padding: 48px 24px;
-	text-align: center;
-	color: var(--fgTransparentWeak);
-}
-</style>
+<script lang="ts" setup>
+// Alias for /my/favorites (wave-4 contract §3.6): renders the real Favorites
+// page so there is exactly one implementation, and no route or logic duplicate.
+import Favorites from "./Favorites.vue";
+
+defineOptions({ name: "CfPageMyFavorites" });
+</script>

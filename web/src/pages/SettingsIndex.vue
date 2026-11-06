@@ -6,7 +6,7 @@
 				<div v-if="!narrow || !hasChild" class="nav">
 					<MkSuperMenu :def="menuDef" :grid="narrow" />
 					<CfInfo class="missing">
-						邮箱、整合、主题、插件、导入导出等设置页尚未移植，菜单里只列出本波已实现的页面。
+						菜单只列出已有页面与端点的设置。邮箱、插件、导入导出、迁移、Webhook 等仍缺后端端点，未列入。
 					</CfInfo>
 				</div>
 				<section v-if="!(narrow && !hasChild)" class="main">
@@ -119,6 +119,24 @@ const menuDef = computed<MkSuperMenuGroup[]>(() => [
 				active: isActive("/settings/general"),
 			},
 			{
+				icon: "ph-palette ph-bold ph-lg",
+				text: t("theme"),
+				to: "/settings/theme",
+				active: isActive("/settings/theme"),
+			},
+			{
+				icon: "ph-brackets-curly ph-bold ph-lg",
+				text: t("customCss"),
+				to: "/settings/custom-css",
+				active: isActive("/settings/custom-css"),
+			},
+			{
+				icon: "ph-speaker-slash ph-bold ph-lg",
+				text: t("wordMute"),
+				to: "/settings/word-mute",
+				active: isActive("/settings/word-mute"),
+			},
+			{
 				icon: "ph-list ph-bold ph-lg",
 				text: t("navbar"),
 				to: "/settings/navbar",
@@ -136,6 +154,18 @@ const menuDef = computed<MkSuperMenuGroup[]>(() => [
 				to: "/settings/deck",
 				active: isActive("/settings/deck"),
 			},
+			{
+				icon: "ph-archive ph-bold ph-lg",
+				text: t("preferencesBackups"),
+				to: "/settings/preferences-backups",
+				active: isActive("/settings/preferences-backups"),
+			},
+			{
+				icon: "ph-terminal-window ph-bold ph-lg",
+				text: "API",
+				to: "/settings/api",
+				active: isActive("/settings/api"),
+			},
 		],
 	},
 	{
@@ -146,6 +176,12 @@ const menuDef = computed<MkSuperMenuGroup[]>(() => [
 				text: t("accountInfo"),
 				to: "/settings/account-info",
 				active: isActive("/settings/account-info"),
+			},
+			{
+				icon: "ph-database ph-bold ph-lg",
+				text: t("registry"),
+				to: "/registry",
+				active: isActive("/registry"),
 			},
 			{
 				icon: "ph-dots-three-outline ph-bold ph-lg",

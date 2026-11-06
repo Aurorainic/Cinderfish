@@ -14,6 +14,15 @@ export {
 	getDefaultTheme,
 	getTheme,
 } from "./builtin";
+export {
+	INSTALLED_THEMES_KEY,
+	findInstalledTheme,
+	installTheme,
+	listInstalledThemes,
+	reloadInstalledThemes,
+	uninstallTheme,
+} from "./installed";
+export { paletteThemes } from "./palettes";
 export { compileTheme, resolveTheme, themeVariableNames } from "./compile";
 export {
 	darken,

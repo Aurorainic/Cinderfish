@@ -209,47 +209,31 @@ const OVERFLOW_ENTRIES: NavEntry[] = [
 		authRequired: true,
 	},
 	{
-		id: "lists",
-		title: "lists",
-		icon: "ph-list-bullets ph-bold",
-		to: "/my/lists",
-		authRequired: true,
-	},
-	{
-		id: "antennas",
-		title: "antennas",
-		icon: "ph-flying-saucer ph-bold",
-		to: "/my/antennas",
-		authRequired: true,
-	},
-	{
-		id: "clips",
-		title: "clips",
-		icon: "ph-paperclip ph-bold",
-		to: "/my/clips",
-		authRequired: true,
-	},
-	{
-		id: "groups",
-		title: "groups",
-		icon: "ph-users-three ph-bold",
-		to: "/my/groups",
-		authRequired: true,
-	},
-	{ id: "pages", title: "pages", icon: "ph-file-text ph-bold", to: "/pages" },
-	{
-		id: "gallery",
-		title: "gallery",
-		icon: "ph-image-square ph-bold",
-		to: "/gallery",
-	},
-	{
 		id: "announcements",
 		title: "announcements",
 		icon: "ph-megaphone-simple ph-bold",
 		to: "/announcements",
 	},
+	{
+		id: "registry",
+		title: "registry",
+		icon: "ph-database ph-bold",
+		to: "/registry",
+		authRequired: true,
+	},
 ];
+
+/**
+ * First-release scope keeps chat / channels / clips / gallery / pages /
+ * antennas / lists as placeholder routes (Misskey API coverage register §5).
+ * The menu table still knows them so the store shape stays Firefish-compatible,
+ * but they are filtered out instead of leading to a dead end.
+ */
+const UNAVAILABLE_MENU: ReadonlySet<MenuOption> = new Set<MenuOption>([
+	"messaging",
+	"channels",
+	"search",
+]);
 
 const router = useRouter();
 const { t } = useLocale();
@@ -289,6 +273,7 @@ function isIndicated(id: string): boolean {
 
 const menu = computed<NavEntry[]>(() =>
 	store.state.menu
+		.filter((key) => !UNAVAILABLE_MENU.has(key))
 		.map((key) => NAV_ENTRIES[key])
 		.filter((entry) => entry != null)
 		.filter((entry) => entry.authRequired !== true || me.value != null)

@@ -10,51 +10,59 @@
 - 本实现的路由：`internal/httpapi/server.go` 及同包各 handler 文件里的 `"POST /api/…"` 注册。
 - 统计口径：按 Misskey 端点路径逐一比对（不含 HTTP 方法差异；Misskey 全部为 POST）。
 
-## 1. 总量
+## 1. 总量（2026-11-06 复核）
 
 | 指标 | 数量 |
 |------|------|
 | Misskey 端点总数 | 440 |
-| Cinderfish 已实现（同名路径） | 40 |
-| 未实现 | 400 |
-| 仅有 Cinderfish 侧别名/自有路径 | 5（`notifications`、`notifications/mark-all-as-read` 等别名） |
+| Cinderfish 已注册路由 | 71 |
+| 其中 Misskey 同名路径 | 68 |
+| 其中 Cinderfish 自有路径/别名 | 3（`notifications` 别名、`admin/federation/mode`、`admin/federation/allowlist`） |
+| 未实现（Misskey 同名） | 372 |
 
-## 2. 已实现（40）
+统计口径：`internal/httpapi/server.go` 里 `HandleFunc("METHOD /api/…")` 的去重路径；
+GET 与 POST 同名路径只算一个。
+
+## 2. 已实现（71 条注册路由）
 
 ```
-admin/accounts/create      admin/show-users          admin/suspend-user
-admin/unsuspend-user       drive/files              drive/files/create
-drive/files/delete         drive/files/show         following/create
-following/delete           following/requests/accept following/requests/cancel
-following/requests/list    following/requests/reject following/requests/sent
-i                          i/notifications          i/pin
-i/unpin                    i/update                 meta
-miauth/gen-token           notes/create             notes/delete
-notes/global-timeline      notes/hybrid-timeline    notes/local-timeline
-notes/reactions           hashtags/trend
-drive/folders             drive/folders/create     drive/folders/show
-drive/folders/update      drive/folders/delete
-emojis                    admin/emoji/list         admin/emoji/add
-admin/emoji/delete
-notes/polls/vote
-i/registry/set            i/registry/get           i/registry/get-detail
-i/registry/keys           i/registry/get-all       i/registry/remove
-i/registry/clear/create     notes/reactions           hashtags/trend
-drive/folders             drive/folders/create     drive/folders/show
-drive/folders/update      drive/folders/delete
-emojis                    admin/emoji/list         admin/emoji/add
-admin/emoji/delete
-notes/polls/vote
-i/registry/set            i/registry/get           i/registry/get-detail
-i/registry/keys           i/registry/get-all       i/registry/remove
-i/registry/clear/delete   notes/renotes
-notes/replies              notes/show               notes/timeline
-notifications/mark-all-as-read ping                 username/available
-users/followers            users/following          users/notes
-users/show
+admin/accounts/create       admin/emoji/add             admin/emoji/delete
+admin/emoji/list            admin/federation/allowlist* admin/federation/mode*
+admin/show-users            admin/suspend-user          admin/unsuspend-user
+drive/files                 drive/files/create          drive/files/delete
+drive/files/show            drive/folders               drive/folders/create
+drive/folders/delete        drive/folders/show          drive/folders/update
+emojis                      following/create            following/delete
+following/requests/accept    following/requests/cancel   following/requests/list
+following/requests/reject    following/requests/sent     hashtags/trend
+i                           i/favorites                 i/notifications
+i/pin                       i/registry/clear            i/registry/get
+i/registry/get-all          i/registry/get-detail       i/registry/keys
+i/registry/remove           i/registry/scopes           i/registry/set
+i/unpin                     i/update                    meta
+miauth/gen-token            notes/children              notes/conversation
+notes/create                notes/delete                notes/favorites/create
+notes/favorites/delete      notes/global-timeline       notes/hybrid-timeline
+notes/local-timeline        notes/polls/vote            notes/reactions
+notes/reactions/create      notes/reactions/delete      notes/renotes
+notes/replies               notes/show                  notes/timeline
+notifications*              notifications/mark-all-as-read
+ping                        signin                      signup
+username/available          users/followers             users/following
+users/notes                 users/show                  users/update
 ```
 
-另有 Cinderfish 自有别名：`POST /api/notifications`（Misskey 叫 `i/notifications`，两者都注册）。
+`*` 为 Cinderfish 自有路径/别名：`notifications` 是 `i/notifications` 的兼容别名
+（Misskey 客户端读 `i/notifications`）；`admin/federation/mode` 与
+`admin/federation/allowlist` 是本项目自有的运行期联邦开关（Misskey 没有同名端点）。
+`i/registry/scopes` 对应 Firefish 客户端的调用；Misskey `c05e844` 同位置是
+`i/registry/scopes-with-domain`，多一个 domain 分组。
+
+2026-11-04 之后新增（此前台账未记）：`i/favorites`、`notes/favorites/create|delete`、
+`notes/conversation`、`notes/children`、`notes/reactions/create|delete`、`i/registry/*`（全部）、
+`hashtags/trend`、`drive/folders*`、`emojis`、`admin/emoji/*`、`notes/polls/vote`、
+`following/requests/*`、`users/update`、`signin`、`signup`、`username/available`、
+`i/registry/scopes`，以及 `admin/federation/mode` 的 GET。
 
 ## 3. 缺口分布（按命名空间，未实现数）
 
@@ -76,6 +84,10 @@ users/show
 | `federation/*` / `hashtags/*` / `roles/*` / `invite/*` / `auth/*` / `sw/*` | 其余 | 视首版范围取舍 |
 
 ## 4. Tier 1（下一步要补，按依赖排序）
+
+> **2026-11-06 更新：Tier 1 的 1–9 项已全部实现**（见 §2：`users/update` 可见性、收藏、
+> 会话/子帖、反应名单、趋势、云盘文件夹、自定义表情、投票、`i/registry/*`）。
+> 下表保留为当时的需求记录与验收口径。
 
 这些是 Firefish 客户端页面直接依赖、且当前会降级或空白的端点。
 

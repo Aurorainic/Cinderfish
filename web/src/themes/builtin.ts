@@ -1,11 +1,18 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Port of the theme table in firefish@02c31e0:packages/client/src/scripts/theme.ts
 // (`getBuiltinThemes`) for the palettes Cinderfish ships.
+//
+// Built-in themes come from two sources: the two hand-ported defaults
+// (`l-rosepinedawn` / `d-rosepine`) and the 26 upstream palettes loaded from
+// their json5 sources by `palettes.ts`. Installed themes are looked up through
+// `installed.ts` after the built-ins, so a user theme can never shadow one.
 
 import { darkTheme } from "./dark";
 import { lightTheme } from "./light";
 import { rosePineDawnTheme } from "./builtin/l-rosepinedawn";
 import { rosePineTheme } from "./builtin/d-rosepine";
+import { findInstalledTheme } from "./installed";
+import { paletteThemes } from "./palettes";
 import type { Theme, ThemeMode } from "./types";
 
 /**
@@ -18,8 +25,23 @@ export const baseThemes: Readonly<Record<ThemeMode, Theme>> = {
   dark: darkTheme,
 };
 
-/** Selectable built-in themes, in picker order. */
-export const builtinThemes: Theme[] = [rosePineDawnTheme, rosePineTheme];
+function dedupeById(themes: Theme[]): Theme[] {
+  const seen = new Set<string>();
+  const out: Theme[] = [];
+  for (const theme of themes) {
+    if (seen.has(theme.id)) continue;
+    seen.add(theme.id);
+    out.push(theme);
+  }
+  return out;
+}
+
+/** Selectable built-in themes, in picker order (defaults first). */
+export const builtinThemes: Theme[] = dedupeById([
+  rosePineDawnTheme,
+  rosePineTheme,
+  ...paletteThemes,
+]);
 
 /**
  * Firefish's shipped defaults: Rosé Pine Dawn for light mode, Rosé Pine for
@@ -36,15 +58,14 @@ export const defaultThemeIds: Readonly<Record<ThemeMode, string>> = {
  * (`getTheme(resolvedMode)`) keeps working while real theme ids stay stable
  * slugs.
  */
-export const builtinThemeMap: Record<string, Theme> = {
-  [rosePineDawnTheme.id]: rosePineDawnTheme,
-  [rosePineTheme.id]: rosePineTheme,
-  [lightTheme.id]: rosePineDawnTheme,
-  [darkTheme.id]: rosePineTheme,
-};
+export const builtinThemeMap: Record<string, Theme> = Object.fromEntries(
+  builtinThemes.map((theme) => [theme.id, theme]),
+);
+builtinThemeMap[lightTheme.id] = rosePineDawnTheme;
+builtinThemeMap[darkTheme.id] = rosePineTheme;
 
 export function getTheme(idOrMode: string): Theme | undefined {
-  return builtinThemeMap[idOrMode];
+  return builtinThemeMap[idOrMode] ?? findInstalledTheme(idOrMode);
 }
 
 /** Name used by the ported theme controllers; same lookup as `getTheme`. */

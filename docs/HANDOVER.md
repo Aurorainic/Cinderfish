@@ -168,26 +168,28 @@ web/                        Vue 3 + TS + Vite 前端（Firefish 客户端整体�
 
 依赖方向单向：`httpapi → 领域包 → db/media(接口)`。`streaming` 只定义接口，实现由 `httpapi` 注入。
 
-### 8.1 前端目录（第二波之后）
+### 8.1 前端目录（第四波之后）
 
 ```
 web/src/
   api/            typed RPC（client/endpoints/types/errors/pagination/stream）—— 页面唯一允许的出网方式
   store/          pizzax 三作用域 store；base.ts 是唯一 defaultStore（store.ts 仅为 re-export shim）
-  composables/    usePagination / useNoteCapture / useTheme / useInterval
+  composables/    usePagination / useNoteCapture / useTheme / useInterval / use-custom-css
   os/             弹层总线（alert/confirm/popupMenu/…）与 os.api 别名
   account/        会话层（me/$i、登录注册、MiAuth、路由守卫）
-  themes/         主题引擎（值语言、色彩数学、light/dark 表、Rosé Pine）
+  themes/         主题引擎 + 28 个内置调色板（26 个 json5）+ 已安装主题（installed.ts，localStorage）
   styles/         全局 SCSS（reset/typography/utility/animations/scrollbar/mfm）
   ui/             四壳（universal/deck/zen/visitor）+ layouts
   router/         vue-router 表（Firefish 131 条路径全保留）
   components/     Mk* 移植组件 + global/ 15 个自动注册全局组件 + ui/ 21 个 Cf* 原子组件
-                  + form/ 8 个设置表单包装 + user/ 6 个个人页子视图 + MkPostForm/MkNavbar/MkWidgets 等
+                  + form/ 8 个设置表单包装 + user/ 6 个个人页子视图 + admin/ 管理台行组件
+                  + MkPostForm/MkNavbar/MkWidgets 等
   widgets/        12 个首版小组件 + WidgetCard/WidgetConfigDialog/index.ts
   directives/     size/appear/tooltip/user-preview/hotkey
   filters/        user/note/bytes/number
-  scripts/        第三波脚本（autocomplete/preprocess/emojilist/katex-macro/get-user-menu/langmap/…）
-  pages/          133 个页面文件：37 个已实装，其余为 TODO: port 占位
+  scripts/        前三波脚本（autocomplete/preprocess/emojilist/katex-macro/get-user-menu/langmap/…）
+  pages/          133 个页面文件：64 个已实装、69 个占位（首版范围外的 chat/channels/clips/gallery/
+                  pages/antennas 等与无端点的设置/管理页）
   i18n/           扁平键 t()（zh-CN / ja-JP），生成脚本 web/scripts/gen-locale.mjs
 ```
 
@@ -1367,6 +1369,88 @@ CINDERFISH_TEST_DATABASE_URL=… CINDERFISH_TEST_REDIS_URL=… go test -count=1 
 - `i/registry/*` 已被 deck 列与设置页使用；`notes/edit`、`i/change-password`、2FA、注销、改邮箱
   在后端不存在，页面按「未开放」显示。
 
+## 12T. 批次：前端第四波——管理台、主题体系、注册表与本地设置（2026-11-06）
+
+**工作方式**：Lead 先补两个后端缺口并提交（`714354a`：`i/registry/scopes`、`GET admin/federation/mode`），
+写施工契约 `docs/research/2026-11-06-firefish-port-wave4-contract.md`，自己实现主题引擎核心；
+再并行分派 7 个互不重叠的写作用域；最后 Lead 合并导航裁剪、修视觉缺陷、真实二进制走查并统一提交。
+
+### 12T.1 落地清单
+
+| 层 | 文件 | 说明 |
+|----|------|------|
+| 后端 | `internal/account/registry.go`、`internal/httpapi/registry.go`、`federation_admin.go`、`server.go`、两份测试 | `i/registry/scopes` 返回去重 scope；`admin/federation/mode` 支持 GET（读 `instance_meta` 运行期值，不读启动配置） |
+| 主题引擎 | `web/src/themes/installed.ts`（新）、`builtin.ts`、`index.ts`、`composables/use-theme.ts` | 已安装主题存 localStorage（`cinderfish.installedThemes`），内置+已安装统一查找；light/dark 双槽 + 旧单值键迁移；`setThemeForMode()` |
+| 调色板 | `web/src/themes/palettes.ts`（新）、`themes/builtin/*.json5`（26 个新文件） | 上游 26 个调色板原样复制，`?raw` + `parseJson5` 加载；id 用文件 slug，缺 author 补空串 |
+| 主题页 | `SettingsTheme.vue`、`SettingsThemeInstall.vue`、`SettingsThemeManage.vue`、`ThemeEditor.vue` | 模式切换、双主题选择、JSON5 安装、导出/卸载、8 个 token 的编辑器与实时预览 |
+| 管理台 | `AdminIndex.vue`、`AdminUsers.vue`、`AdminOverview.vue`、`components/admin/AdminUserRow.vue`（新） | 管理员守卫、offset 分页、冻结/解冻、创建账号、实例/联邦/最近用户概览 |
+| 管理内容 | `AdminEmojis.vue`、`AdminFederation.vue` | 表情搜索/新增/删除；联邦模式切换与白名单增删 |
+| 注册表 | `Registry.vue`、`RegistryKeys.vue`、`RegistryValue.vue` | scope 总览、键列表、JSON5 值编辑；路由 scope = `["system", ...path]` |
+| 本地设置 | `SettingsCustomCss.vue`、`SettingsWordMute.vue`、`SettingsPreferencesBackups.vue`、`SettingsApi.vue`、`composables/use-custom-css.ts`（新）、`store/base.ts`、`main.ts` | 自定义 CSS 即时生效；软过滤词表；偏好 JSON 导出/导入/重置；原生 token 展示与复制 |
+| 静态页 | `Welcome.vue`、`NotFound.vue`、`Empty.vue`、`ErrorPage.vue`、`NoGraze.vue`、`MyFavorites.vue`、`MyNotifications.vue`、`Follow.vue`、`FollowMe.vue`、`NoteHistory.vue` | 访客欢迎页复用账号层登录/注册弹窗；公开本地时间线；别名页直接渲染实现页；关注授权仅本地账号；笔记历史明示无端点 |
+| 导航 | `MkNavbar.vue`、`SettingsIndex.vue` | 侧栏过滤聊天/频道/搜索；更多菜单移除列表/天线/剪辑/分组/页面/画廊，加注册表；设置菜单补主题/CSS/文字过滤/备份/API/注册表 |
+
+### 12T.2 本波修掉的真实缺陷
+
+1. **`CfInfo` 把内联内容拆成散列单词**：`.info` 是 `display: flex`，slot 里的文本节点和 `<code>`/链接
+   各自成为 flex item，主题管理页的说明被排成竖列。改为 slot 包一层 `.content`（`flex: 1; min-width: 0`），
+   图标与关闭按钮保持固定，`align-items` 改为 `flex-start`。
+2. **导航指向未实装路由**：第三波遗留的聊天/频道/列表/天线/剪辑/分组/页面/画廊入口全部是 `TODO: port`；
+   本波按覆盖台账 §5 从导航移除，设置菜单只列已实现页。
+3. **主题安装/管理页无数据源**：第三波只有 4 个主题且没有安装存储；本波补齐 28 个可选主题、安装/
+   导出/卸载与 light/dark 双槽，旧 `cinderfish.themeId` 自动迁移。
+4. **管理台完全空白**：用户、表情、联邦、概览四页接真实端点；非管理员不发请求。
+
+### 12T.3 验证证据
+
+```
+cd web && pnpm exec vue-tsc --noEmit      # exit 0
+cd web && pnpm run check:port             # exit 0，394 文件，hardTotal 0
+cd web && pnpm build                      # exit 0
+gofmt -l internal/ cmd/                   # 空
+go vet ./...                              # exit 0
+CINDERFISH_TEST_DATABASE_URL=… go test -count=1 ./...   # 全绿
+```
+
+浏览器走查：无头 Helium 156（Chromium 156）+ CDP，真实 Go 二进制 `:3991`（开发库 schema v9、
+`federation_mode=none`、`registration_mode=open`、本地媒体目录），种子账号 `w4admin`（CLI 创建，管理员）
+与 `w4dana`；走查后账号、笔记、表情文件、白名单主机全部删除，用户数回到 23。桌面 1440×900、移动 390×844。
+
+| 场景 | 证据 |
+|------|------|
+| 桌面 20 条路由 | `/`、`/admin`→`/admin/users`、`/admin/{overview,emojis,federation}`、`/settings/theme{,/manage,/install}`、`/theme-editor`、`/registry`、`/registry/keys/system`、`/settings/{custom-css,word-mute,preferences-backups,api}`、`/follow-me`、`/my/favorites`、`/my/notifications`、`/notes/:id/history`、404：全部渲染，`scrollWidth == clientWidth`，`exceptionThrown` 与 `console.error` 均为 0 |
+| 移动 7 条路由 | `/`、`/admin/{users,emojis,federation}`、`/settings/theme`、`/registry`、404：无横向溢出、无 JS 异常 |
+| 访客 | `/` 欢迎页（实例名/简介/注册与登录入口/实例能力）、`/public/local` 公开本地时间线、受保护页跳转 `/?redirect=…` |
+| 导航 | 侧栏实际为「时间线/通知/关注请求/发现/书签/控制面板/更多/设置/帖子」，不再出现聊天、频道、搜索 |
+| 主题 | 写入 `cinderfish.themeId.dark=d-nord` 后 `data-theme=dark`、body 背景 `rgb(46,52,64)`；页面内安装 W4 测试主题、管理页可见并可卸载；编辑器保存后 `cinderfish.themeId.light` 指向新 id |
+| 自定义 CSS | 页面输入并保存后 `<style id="cinderfish-custom-css">` 出现，body outline 变为 `rgb(1,2,3)` |
+| 文字过滤 | 切到关键词组、添加「走查过滤词」，列表计数 0→1、显示「已保存」 |
+| 注册表 | UI 创建 `system/w4test = {hello:1}`，键页可见；值页改为 `{hello:2}` 后 `i/registry/get-detail` 回读 2 |
+| 管理台 | 用户列表分页；对 `w4dana` 点「冻结」→「好」后行显示「已冻结/解除冻结」，再解冻恢复；创建账号表单渲染可用 |
+| 联邦 | UI 切「仅白名单」→ `GET admin/federation/mode` = `allowlist`；添加 `w4-remote.example` 后 `allowlist` 回读包含；切回「关闭联邦」→ `none` |
+| 其他 | `/settings/api` 显示当前原生 token 且可复制；偏好备份「导出」真实下载 `cinderfish-preferences-*.json` |
+
+### 12T.4 已知降级与残留（续作必读）
+
+- **管理台只实装 4 页**：用户、概览、表情、联邦。队列、文件、公告、数据库、安全、Relay、整合、
+  实例屏蔽、代理账号、实验、对象存储、邮件、标签、举报、管理设置等仍无端点，路由保留占位且不再出现在导航。
+- **管理用户页只有 offset 分页**：`admin/show-users` 没有排序/状态/来源筛选、搜索与总数；页面不画无效控件。
+- **表情管理只能新增与删除**：`admin/emoji/update` 不存在，名称写错只能删后重加；没有批量/远程表情/打包导入。
+- **主题**：已安装主题只存在本浏览器 localStorage，不同步到账号或其它设备；编辑器只编辑 8 个常用 token，
+  其余继承基础主题；管理页「卸载」会清掉该主题在两种模式下的选中记录。
+- **剩余设置页仍是占位**：邮箱、整合、安全（2FA）、导入导出、迁移、Webhook、插件、自定义 KaTeX、
+  状态栏、静音/屏蔽、实例静音、删除账号、应用、账号切换等；菜单不列出。`mute/create`、`block/create`、
+  `i/export`、`i/import`、`i/apps` 等后端端点不存在，因此没有做假控件。
+- **本地设置的范围**：偏好备份只覆盖 `defaultStore`（不含 cold store / 声音 / 插件）；文字过滤是客户端
+  软过滤，没有服务器侧词表；自定义 CSS 按账号存进 base store 并即时注入。
+- **静态页**：远程账号不能从 `/authorize-follow` 关注（没有 `ap/show`），只提示到对方实例操作；
+  `notes/history` 不存在，历史页只说明；`ErrorPage.vue` 目前未被路由使用。
+- **未走查**：登录/注册表单的真实交互（仍用注入 localStorage 的方式进入）、emoji 新增的浏览器文件上传
+  点击路径（新增由 API 验证、列表由 UI 验证）、通知的 Streaming 实时插入、偏好导入与重置、主题的
+  26 个调色板只目视检查了 Nord；图片上传/投票/引用与转贴发帖仍沿用第三波状态。
+- **未实装（首版范围外）**：chat/channels/lists/antennas/clips/groups/gallery/pages、剩余约 10 个 widget、
+  其余 37 个 locale、实例级主题。
+
 ## 13. 文档索引
 
 | 文档 | 内容 |
@@ -1396,6 +1480,7 @@ CINDERFISH_TEST_DATABASE_URL=… CINDERFISH_TEST_REDIS_URL=… go test -count=1 
 | `.archify/architecture-cinderfish-overall/` | 项目整体结构图（Archify 产物，随里程碑更新） |
 | `docs/research/2026-11-05-firefish-port-wave2-contract.md` | **第二波施工契约（模块映射、降级清单、写作用域、验收口径）——续作移植任务的模板，见 §12R** |
 | `docs/research/2026-11-05-firefish-port-wave3-contract.md` | **第三波施工契约（发帖链路、个人页、设置、内容页、壳层/widgets 的模块映射与 13 个写作用域），见 §12S** |
+| `docs/research/2026-11-06-firefish-port-wave4-contract.md` | **第四波施工契约（管理台、主题体系、注册表、本地设置、静态页的模块映射与 7 个写作用域），见 §12T** |
 
 ## 14. 已知的未验证项
 
@@ -1406,8 +1491,9 @@ CINDERFISH_TEST_DATABASE_URL=… CINDERFISH_TEST_REDIS_URL=… go test -count=1 
   访客壳，以及构建产物（`web/dist` 经 Go 静态托管）仍未走查**，Streaming 只验证了首屏 REST 拉取，
   实时推送（新帖插入、通知红点）没有实测。
 - ~~**CfTab 选项卡标签不显示**~~：第三波已修（§12S.2 第 1 条），笔记详情页签实测可见。
-- **30 个 Firefish 内置主题只移植了 4 个**（light/dark 基础表 + 两个 Rosé Pine），
-  其余 26 个调色板未转。
+- ~~**30 个 Firefish 内置主题只移植了 4 个**~~：第四波移植了剩余 26 个调色板（`themes/builtin/*.json5`
+  经 `?raw` 加载），当前可选主题 28 个；只目视检查了 Nord，其余调色板仅验证了解析、校验与打包。
+- **主题安装只在本浏览器生效**：`cinderfish.installedThemes` 存 localStorage，没有走 `i/registry`，换设备不同步。
 - **i18n 只覆盖 zh-CN / ja-JP**，其余 37 个 locale 未生成；`yaml` devDependency 未装
   （重新生成 locale 前要先 `pnpm add -D yaml`）。
 - **S3 后端未做真实服务端验证**：只验证了编译、接口与 URL 生成逻辑。
@@ -1420,7 +1506,11 @@ CINDERFISH_TEST_DATABASE_URL=… CINDERFISH_TEST_REDIS_URL=… go test -count=1 
 - **前端移植第三波已完成的验证（2026-11-05，见 §12S.3）**：发帖链路、个人页五页签、关注/粉丝列表、
   12 个设置子页、收藏/探索/标签/搜索、导航壳、deck 列与 12 个 widget 已落地；桌面 18 条路由与
   移动 4 条路由实测无溢出、无 JS 异常，浏览器真实发帖与设置保存均回读 API 确认。
-- **第三波仍未验证/未实装（2026-11-05，逐条见 §12S.4）**：引用/转贴按钮点击后的实际发帖、图片上传的
-  浏览器交互、投票提交、关注按钮点击、设置页除 profile/navbar/deck 外的保存、Streaming 实时插入；
-  聊天/频道/列表/天线/剪辑/分组/画廊等导航入口仍是占位页；设置页还有约 18 页、widgets 还有约 10 个、
-  剩余 26 个主题、37 个 locale 未移植。
+- **前端移植第四波已完成的验证（2026-11-06，见 §12T.3）**：管理台 4 页、主题选择/安装/管理/编辑器、
+  注册表 3 页、自定义 CSS、文字过滤、偏好导出、API 页、欢迎页、公开本地时间线、404 已用真实二进制
+  在桌面 20 条 + 移动 7 条路由走查；冻结/解冻、联邦模式切换、白名单增删、注册表建键/改值、主题安装与
+  编辑器保存、偏好导出均完成真实 UI 交互并回读 API。
+- **第四波仍未验证/未实装（2026-11-06，逐条见 §12T.4）**：登录/注册表单真实交互、emoji 新增的文件上传
+  点击路径、Streaming 实时插入、偏好导入/重置、其余 25 个调色板的目视检查；管理台其余 20+ 页、设置页
+  约 18 页、widgets 约 10 个、37 个 locale 仍未移植；chat/channels/lists/antennas/clips/groups/gallery/pages
+  仍按首版范围不做，导航已不再指向它们。

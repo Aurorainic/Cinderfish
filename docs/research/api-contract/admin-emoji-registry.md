@@ -17,7 +17,8 @@
 | `/api/admin/show-users` | POST | 必须 | 是 | `internal/httpapi/admin_accounts.go:57` | 本地账号列表（limit/offset） |
 | `/api/admin/suspend-user` | POST | 必须 | 是 | `internal/httpapi/admin_accounts.go:92` | 冻结账号 |
 | `/api/admin/unsuspend-user` | POST | 必须 | 是 | `internal/httpapi/admin_accounts.go:96` | 解冻账号 |
-| `/api/admin/federation/mode` | POST | 必须 | 是 | `internal/httpapi/federation_admin.go:51` | 运行期切换联邦模式 |
+| `/api/admin/federation/mode` | GET | 必须 | 是 | `internal/httpapi/federation_admin.go` | 读取运行期联邦模式 |
+| `/api/admin/federation/mode` | POST | 必须 | 是 | `internal/httpapi/federation_admin.go` | 运行期切换联邦模式 |
 | `/api/admin/federation/allowlist` | GET | 必须 | 是 | `internal/httpapi/federation_admin.go:79` | 读取联邦白名单 |
 | `/api/admin/federation/allowlist` | POST | 必须 | 是 | `internal/httpapi/federation_admin.go:79` | 增删白名单主机 |
 | `/api/emojis` | POST | 匿名 | 否 | `internal/httpapi/emojis.go:53` | 本地自定义表情清单（公开） |
@@ -28,12 +29,14 @@
 | `/api/i/registry/get` | POST | 必须 | 否 | `internal/httpapi/registry.go:81` | 读取原始值 |
 | `/api/i/registry/get-detail` | POST | 必须 | 否 | `internal/httpapi/registry.go:105` | 读取值 + `updatedAt` |
 | `/api/i/registry/keys` | POST | 必须 | 否 | `internal/httpapi/registry.go:130` | 列出 scope 下的 key |
+| `/api/i/registry/scopes` | POST | 必须 | 否 | `internal/httpapi/registry.go` | 列出当前用户写过的 scope |
 | `/api/i/registry/get-all` | POST | 必须 | 否 | `internal/httpapi/registry.go:148` | 取出整个 scope |
 | `/api/i/registry/remove` | POST | 必须 | 否 | `internal/httpapi/registry.go:170` | 删除一个 key |
 | `/api/i/registry/clear` | POST | 必须 | 否 | `internal/httpapi/registry.go:187` | 清空一个 scope |
 
 不存在 GET 别名：`/api/emojis` 只有 POST（Misskey 允许 GET，见该节缺口）。`admin/federation/allowlist`
-是本文唯一一个有 GET + POST 双方法的路径，两者共用一个 handler。
+有 GET + POST 双方法（共用一个 handler）；`admin/federation/mode` 自 2026-11-06 起同样支持 GET（读运行期值）
+与 POST（切换）。
 
 ## 通用约定
 
@@ -274,16 +277,34 @@
 - 目标本来就是未冻结状态时也返回 200（幂等），客户端无法区分"刚解冻"与"本来就没冻结"。
 - 解冻后旧 token 立即恢复可用（因为 token 行从未删除）。
 
-## POST /api/admin/federation/mode
+## GET / POST /api/admin/federation/mode
 
-运行期切换联邦模式，写入 `instance_meta` 表，**下一个请求立即生效**，不需要重启；重启后数据库值
+`POST` 运行期切换联邦模式，写入 `instance_meta` 表，**下一个请求立即生效**，不需要重启；重启后数据库值
 仍然覆盖配置文件里的种子值（`ApplyFederationConfig`，`internal/httpapi/federation_admin.go:19`）。
+
+`GET` 读取**运行期值**（同一张表的 `federationMode` 行；行缺失时回落到配置文件），供管理台显示当前模式。
+`POST /api/meta` 的 `federation` 字段仍读启动配置，两者可能不同，前端应以本端点为准。
 
 这是 Cinderfish 自有端点，Misskey 没有同名路径（对照 `admin/federation/` 下只有 `update-instance` 等）。
 
-- 路由：`internal/httpapi/server.go:155`
-- 实现：`internal/httpapi/federation_admin.go:51`
+- 路由：`internal/httpapi/server.go`（GET 与 POST 两条）
+- 实现：`internal/httpapi/federation_admin.go`
 - 取值校验：`internal/federation/policy.go:32`（`ParseMode`）
+
+### GET 请求
+
+无 body。认证走 `Authorization: Bearer <token>`（与其他 GET 一致）。
+
+### GET 响应
+
+`200`：
+
+```json
+{"mode":"allowlist"}
+```
+
+`mode` 取值 `public` | `allowlist` | `none`，与 POST 入参同一词表，不是 Misskey 的
+`all`/`specified`/`none`。
 
 ### 请求
 
@@ -881,6 +902,38 @@ scope 归一化：去空串、去重、字典序排序（`normalizeScope`，`reg
   keys/keys-with-type/remove/scopes-with-domain/set）。本端点是 Cinderfish 保留的旧接口：
   调用它不会报错，但按 Misskey 契约实现的客户端不会调用它。
 - 没有"清空该用户全部 scope"的管理端点，也没有管理员删除他人 registry 的能力（合规删除只能靠删号级联）。
+
+## POST /api/i/registry/scopes
+
+列出当前用户写过的全部 scope（Firefish 时代 `i/registry/scopes`；Misskey `c05e844` 的同位置端点是
+`i/registry/scopes-with-domain`，多一个 `domain` 分组）。
+
+- 路由：`internal/httpapi/server.go`（2026-11-06 新增）
+- 实现：`internal/httpapi/registry.go`（`handleRegistryScopes`）
+- 读取：`internal/account/registry.go`（`RegistryService.Scopes`，`SELECT DISTINCT scope`）
+
+### 请求
+
+| 字段 | 类型 | 必填 | 默认 | 说明 |
+|------|------|------|------|------|
+| `domain` | string \| null | 否 | — | 忽略（与其余 registry 端点一致） |
+
+### 响应
+
+`200`，`string[][]`，按 scope 排序（PostgreSQL 数组排序）：
+
+```json
+[["base","client"],["system"]]
+```
+
+没有条目时返回 `[]`，不是 `null`。空 scope `[]` 与 `domain = ''` 的条目也会出现在结果里。
+
+### 错误
+
+| HTTP | code | 触发 |
+|------|------|------|
+| 401 | `AUTHENTICATION_FAILED` | 未认证 |
+| 503 / 500 | `INTERNAL_ERROR` | 服务未装配 / 读库失败 |
 
 ## 共享对象：UserDetailed
 
