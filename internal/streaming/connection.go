@@ -31,7 +31,7 @@ type Connection struct {
 	noteUnsubs map[string]func()
 
 	// Hooks installed by the Server.
-	onReadNotification func(userID string)
+	onReadNotification func(userID, notificationID string)
 	refreshViewer      func(*Connection)
 }
 
@@ -142,8 +142,16 @@ func (c *Connection) onMessage(data []byte) {
 		c.onUnsubscribeNote(env.Body)
 	case "readNotification":
 		if c.onReadNotification != nil {
-			if id := c.viewerSnapshot().UserID; id != "" {
-				c.onReadNotification(id)
+			if uid := c.viewerSnapshot().UserID; uid != "" {
+				var b struct {
+					ID *string `json:"id"`
+				}
+				_ = json.Unmarshal(env.Body, &b)
+				notificationID := ""
+				if b.ID != nil {
+					notificationID = *b.ID
+				}
+				c.onReadNotification(uid, notificationID)
 			}
 		}
 	}

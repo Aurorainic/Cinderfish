@@ -6699,3 +6699,44 @@ MP3 无头注可保留，来源记录在此。若分发本项目，仍须按 AGP
   `syuilo/up`、音量调到 1 后点试听，捕获到 `new Audio("/static-assets/sounds/syuilo/up.mp3")` 且
   `play()` 被调用一次；页面不再出现「未提供提示音资源」。
   截图 `/tmp/w147-shots/sounds.png`（不入库）。
+
+## 12FL. 第一百四十八波：全局通知 toast、提示音与单条已读（2026-11-07）
+
+Firefish 的 `ui/_common_/common.vue` 在 `main` 频道上处理新通知：页面可见时弹 toast 并把该条标记
+已读，同时播放 `notification` 提示音。本移植只有通知页内的列表刷新；而且服务端的 `readNotification`
+帧与 `notifications/mark-as-read` 都缺失，直接发送会误清全部未读。
+
+### 12FL.1 落地清单
+
+| 层 | 文件 | 内容 |
+|----|------|------|
+| 服务 | `internal/note/reaction.go` | 复用已有的 `MarkRead(ctx, userID, ids)` 做单条已读 |
+| Streaming | `internal/streaming/{server,connection}.go` | `readNotification` 帧解析可选 `id`：有 id 只标记该条，无 id 仍是「全部已读」 |
+| 接线 | `internal/httpapi/streaming.go` | 空 id → `markAllNotificationsRead`（含广播），否则单条 |
+| 端点 | `internal/httpapi/notifications.go`、`server.go` | `POST /api/notifications/mark-as-read {notificationId}` → 204 |
+| Toast | `web/src/components/MkNotificationToast.vue`（新） | 6 秒后淡出，复用 `MkNotification` |
+| Watcher | `web/src/components/CfNotificationWatcher.vue`（新） | 订阅 `main`：静音类型跳过；可见时发单条已读 + toast；始终播提示音 |
+| 布局 | `UniversalLayout.vue`、`DeckLayout.vue` | 挂载 watcher（Zen 保持无干扰，不挂） |
+| 台账 | `docs/research/2026-11-04-misskey-api-coverage.md` | 162 → 163 路由、154 → 155 同名、286 → 285 未实现 |
+
+### 12FL.2 有意的限制
+
+- toast 用固定定位与 6 秒超时，没有 Firefish 的 `claimZIndex` 弹窗栈；同时来多条会叠在一起。
+- `readNotification` 只更新数据库并（对空 id）广播 `readAllNotifications`；单条已读不广播，
+  其它标签页的下一条列表刷新才会看到。
+- 通知类型静音沿用 `me.mutingNotificationTypes`；隐藏页面只播声音、不弹 toast、不标记已读
+  （与 Firefish 一致）。
+- Zen 布局不挂 watcher，无通知弹窗与声音。
+
+### 12FL.3 验证证据
+
+- `go vet ./...`、含数据库的全量 `go test ./...` 全绿；`vue-tsc --noEmit`、`check:port`
+  （hardTotal 0）、`pnpm build` 全绿。
+- `TestNotificationsMarkAsRead`：两条 mention，标记其中一条 → 该条 `isRead=true`、另一条仍为 false；
+  缺 id 400；未知 id 204。
+- 真实二进制 + 无头浏览器（1400×900，Audio 探针）：
+  - bob 发「w148 hello @w148alice」后，alice 页面出现 `.mk-notification-toast`，内容含
+    `w148bob` 与正文；
+  - 捕获到 `new Audio("/static-assets/sounds/syuilo/pope2.mp3")` 且 `play()` 一次；
+  - 随后 `POST /api/notifications {markAsRead:false}` 中该 mention 已是 `isRead: true`。
+  截图 `/tmp/w148-shots/notification-toast.png`（不入库）。

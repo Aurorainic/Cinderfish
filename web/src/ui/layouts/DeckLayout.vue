@@ -1,6 +1,7 @@
 <!-- Ported from firefish@b425f61:packages/client/src/ui/deck.vue (AGPL-3.0-only) -->
 <template>
 	<div class="deck" :class="{ mobile: isMobile }">
+		<CfNotificationWatcher />
 		<XSidebar v-if="!isMobile" />
 
 		<div class="main">
@@ -162,6 +163,7 @@ import {
 	type Column,
 } from "@/store/deck";
 import DeckColumn from "./DeckColumn.vue";
+import CfNotificationWatcher from "@/components/CfNotificationWatcher.vue";
 import XSidebar from "./XSidebar.vue";
 
 interface ColumnGroup {

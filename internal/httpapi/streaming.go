@@ -18,9 +18,14 @@ func (s *Server) AttachStreaming(logf func(string, ...any)) *streaming.Bus {
 		followers = s
 	}
 
-	var markRead func(ctx context.Context, userID string) error
+	var markRead func(ctx context.Context, userID, notificationID string) error
 	if s.notifications != nil {
-		markRead = s.notifications.MarkAllRead
+		markRead = func(ctx context.Context, userID, notificationID string) error {
+			if notificationID == "" {
+				return s.markAllNotificationsRead(ctx, userID)
+			}
+			return s.notifications.MarkRead(ctx, userID, []string{notificationID})
+		}
 	}
 
 	var auth streaming.Authenticator
@@ -29,11 +34,11 @@ func (s *Server) AttachStreaming(logf func(string, ...any)) *streaming.Bus {
 	}
 
 	s.stream = streaming.New(streaming.Options{
-		Bus:         s.streamBus,
-		Auth:        auth,
-		Followers:   followers,
-		Logger:      logf,
-		MarkAllRead: markRead,
+		Bus:       s.streamBus,
+		Auth:      auth,
+		Followers: followers,
+		Logger:    logf,
+		MarkRead:  markRead,
 	})
 	return s.streamBus
 }

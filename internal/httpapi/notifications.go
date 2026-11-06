@@ -20,6 +20,39 @@ func (s *Server) markAllNotificationsRead(ctx context.Context, userID string) er
 	return nil
 }
 
+// handleNotificationsMarkAsRead implements POST /api/notifications/mark-as-read:
+// one notification of the caller is marked read (204, like Misskey).
+func (s *Server) handleNotificationsMarkAsRead(w http.ResponseWriter, r *http.Request) {
+	if s.notifications == nil {
+		writeAPIError(w, &APIError{
+			Message: "Not available.", Code: "INTERNAL_ERROR",
+			ID: errIDInternal, Kind: "server", Status: http.StatusServiceUnavailable,
+		})
+		return
+	}
+	var body struct {
+		NotificationID string `json:"notificationId"`
+	}
+	if err := decodeOptionalJSON(r, &body); err != nil {
+		writeAPIError(w, err)
+		return
+	}
+	info, err := s.authenticate(r.Context(), r, bodyAsMap(r))
+	if err != nil || info == nil {
+		writeAuthenticationError(w)
+		return
+	}
+	if body.NotificationID == "" {
+		writeAPIError(w, invalidParamError("notificationId is required"))
+		return
+	}
+	if err := s.notifications.MarkRead(r.Context(), info.User.ID, []string{body.NotificationID}); err != nil {
+		writeInternalServerError(w)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // applyUnreadNotifications fills the MeDetailed unread state from the
 // notification table (core/entities/UserEntityService.ts L612 and L614):
 // unreadNotificationsCount is the number of unread rows and

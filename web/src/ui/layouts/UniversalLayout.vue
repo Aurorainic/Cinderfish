@@ -1,6 +1,7 @@
 <!-- Ported from firefish@b425f61:packages/client/src/ui/universal.vue (AGPL-3.0-only) -->
 <template>
 	<div class="dkgtipfy" :class="{ isMobile, hasStatusbar: statusbars.length > 0 }">
+		<CfNotificationWatcher />
 		<XSidebar v-if="!isMobile" />
 
 		<main id="maincontent" class="contents">
@@ -92,6 +93,7 @@ import MkNavbar from "@/components/MkNavbar.vue";
 import MkWidgets from "@/components/MkWidgets.vue";
 import { post } from "@/os/post";
 import { defaultStore } from "@/store";
+import CfNotificationWatcher from "@/components/CfNotificationWatcher.vue";
 import XSidebar from "./XSidebar.vue";
 
 const DESKTOP_THRESHOLD = 1100;

@@ -49,8 +49,10 @@ type Options struct {
 	Auth      Authenticator
 	Followers ViewerLoader
 	Logger    func(string, ...any)
-	// MarkAllRead is called for the "readNotification" client frame.
-	MarkAllRead func(ctx context.Context, userID string) error
+	// MarkRead is called for the "readNotification" client frame: an empty
+	// notificationID means "mark everything read", which is what a frame
+	// without an id asks for.
+	MarkRead func(ctx context.Context, userID, notificationID string) error
 	// TokenHasReadAccount reports whether an app token carries the
 	// read:account permission. Misskey rejects the connection without it.
 	TokenHasReadAccount func(ctx context.Context, token string) (bool, error)
@@ -62,7 +64,7 @@ type Server struct {
 	auth      Authenticator
 	followers ViewerLoader
 	logf      func(string, ...any)
-	markRead  func(ctx context.Context, userID string) error
+	markRead  func(ctx context.Context, userID, notificationID string) error
 
 	upgrader websocket.Upgrader
 }
@@ -74,7 +76,7 @@ func New(opts Options) *Server {
 		auth:      opts.Auth,
 		followers: opts.Followers,
 		logf:      logfOr(opts.Logger),
-		markRead:  opts.MarkAllRead,
+		markRead:  opts.MarkRead,
 		// Misskey performs no origin check on the streaming endpoint.
 		upgrader: websocket.Upgrader{
 			ReadBufferSize:  1 << 10,
@@ -136,10 +138,10 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	conn := newConnection(r.Context(), newWSConn(ws), s.bus, viewer)
 	if user != nil && s.markRead != nil {
 		uid := user.ID
-		conn.onReadNotification = func(string) {
+		conn.onReadNotification = func(_ string, notificationID string) {
 			// Detached from the request context: the client may ask to
 			// mark notifications read while the connection is closing.
-			go func() { _ = s.markRead(context.Background(), uid) }()
+			go func() { _ = s.markRead(context.Background(), uid, notificationID) }()
 		}
 	}
 	if user != nil && s.followers != nil {

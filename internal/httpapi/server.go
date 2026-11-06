@@ -317,6 +317,7 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("POST /api/notifications", s.handleNotifications)
 	s.mux.HandleFunc("POST /api/i/notifications", s.handleNotifications)
 	s.mux.HandleFunc("POST /api/notifications/mark-all-as-read", s.handleNotificationsMarkAllAsRead)
+	s.mux.HandleFunc("POST /api/notifications/mark-as-read", s.handleNotificationsMarkAsRead)
 
 	// Instance announcements: public list plus the admin console.
 	s.mux.HandleFunc("POST /api/announcements", s.handleAnnouncements)
