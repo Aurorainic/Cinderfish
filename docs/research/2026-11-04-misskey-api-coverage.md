@@ -87,6 +87,8 @@ users/update
 2026-11-06 第十九波新增：`stats`（公开计数）；`admin/update-meta` 增加六个合规 URL 与
 `serverRules`（不是新路由）。
 
+2026-11-06 第二十六波新增：`admin/update-meta` 增加 `hiddenTags`（不是新路由），趋势查询按它过滤。
+
 2026-11-06 第二十五波新增：`drive/files/update`（重命名、描述、敏感标记、移入文件夹）。迁移 v16：`drive_files.comment`。
 
 2026-11-06 第二十四波新增：`notes/edit`（Misskey 同名）与 `notes/history`（Cinderfish 自有；Misskey 固定版本没有该端点）。迁移 v15：`notes.updated_at` 与 `note_edits` 表。

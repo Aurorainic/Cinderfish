@@ -39,7 +39,7 @@ func NewHashtagService(pool *pgxpool.Pool) *HashtagService {
 // deleted or carried only by remote actors are left out: a trend of what this
 // instance's users are talking about should not be steered by inbound
 // federation volume.
-func (s *HashtagService) Trend(ctx context.Context, limit int) ([]*HashtagTrend, error) {
+func (s *HashtagService) Trend(ctx context.Context, limit int, hiddenTags []string) ([]*HashtagTrend, error) {
 	if limit <= 0 {
 		limit = 10
 	}
@@ -59,6 +59,7 @@ WITH exploded AS (
     WHERE n.deleted_at IS NULL
       AND n.user_host IS NULL
       AND n.created_at >= $1
+      AND lower(tag) <> ALL($3)
 ), ranked AS (
     SELECT tag, count(DISTINCT user_id) AS users
     FROM exploded GROUP BY tag ORDER BY users DESC, tag ASC LIMIT $2
@@ -67,7 +68,7 @@ SELECT r.tag, e.day, count(DISTINCT e.user_id)
 FROM ranked r JOIN exploded e USING (tag)
 GROUP BY r.tag, e.day
 ORDER BY r.tag, e.day
-	`, since, limit)
+	`, since, limit, hiddenTags)
 	if err != nil {
 		return nil, fmt.Errorf("note: hashtag trend: %w", err)
 	}

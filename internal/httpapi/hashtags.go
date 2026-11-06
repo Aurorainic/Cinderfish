@@ -19,7 +19,7 @@ func (s *Server) handleHashtagsTrend(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	trends, err := s.hashtags.Trend(r.Context(), 10)
+	trends, err := s.hashtags.Trend(r.Context(), 10, s.liveInstanceSettings(r.Context()).HiddenTags)
 	if err != nil {
 		writeInternalServerError(w)
 		return

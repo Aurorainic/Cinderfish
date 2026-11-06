@@ -1201,3 +1201,13 @@ UserLite 部分也有简化：`name`/`avatarUrl` 只从 profile 行来，没有 
 | `serverRules` | 字符串数组，去空行、每条 ≤300、最多 20 条 |
 
 `meta` 同步返回这些字段（`serverRules` 恒为数组），关于页据此展示链接与规则。
+
+## 2026-11-06 增补：隐藏话题标签（admin/update-meta）
+
+`admin/meta` 新增 `hiddenTags: string[]`，`admin/update-meta` 接受同名字段：
+
+- 每行/每项去掉首尾空白与开头的 `#`，转小写，去重；
+- 单条 ≤100 字符、最多 200 条，超出 400 `INVALID_PARAM`；
+- 保存后 `hashtags/trend` 在 SQL 里用 `lower(tag) <> ALL($3)` 排除这些标签；
+- 只影响趋势，不隐藏标签页、搜索或笔记本身（与 Firefish 的说明一致）；
+- 公网 `meta` 不返回该字段，只有 `admin/meta` 可见。

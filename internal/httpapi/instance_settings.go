@@ -29,6 +29,7 @@ type instanceSettings struct {
 	InquiryURL       string
 	ImpressumURL     string
 	ServerRules      []string
+	HiddenTags       []string
 }
 
 // instanceMetaKey maps a settings field to its instance_meta key.
@@ -45,6 +46,7 @@ var instanceMetaKeys = map[string]string{
 	"inquiryUrl":       "inquiryUrl",
 	"impressumUrl":     "impressumUrl",
 	"serverRules":      "serverRules",
+	"hiddenTags":       "hiddenTags",
 }
 
 // liveInstanceSettings reads the runtime overrides, falling back to the
@@ -73,6 +75,7 @@ SELECT key, value FROM instance_meta WHERE key = ANY($1)
 		instanceMetaKeys["repositoryUrl"], instanceMetaKeys["feedbackUrl"],
 		instanceMetaKeys["inquiryUrl"], instanceMetaKeys["impressumUrl"],
 		instanceMetaKeys["serverRules"],
+		instanceMetaKeys["hiddenTags"],
 	})
 	if err != nil {
 		return out
@@ -86,6 +89,10 @@ SELECT key, value FROM instance_meta WHERE key = ANY($1)
 		}
 		if key == instanceMetaKeys["serverRules"] {
 			_ = json.Unmarshal(raw, &out.ServerRules)
+			continue
+		}
+		if key == instanceMetaKeys["hiddenTags"] {
+			_ = json.Unmarshal(raw, &out.HiddenTags)
 			continue
 		}
 		var value string
@@ -234,6 +241,7 @@ func (s *Server) handleAdminMeta(w http.ResponseWriter, r *http.Request) {
 		"inquiryUrl":       settings.InquiryURL,
 		"impressumUrl":     settings.ImpressumURL,
 		"serverRules":      settings.ServerRules,
+		"hiddenTags":       settings.HiddenTags,
 	})
 }
 
@@ -265,6 +273,7 @@ func (s *Server) handleAdminUpdateMeta(w http.ResponseWriter, r *http.Request) {
 		InquiryURL       *string   `json:"inquiryUrl"`
 		ImpressumURL     *string   `json:"impressumUrl"`
 		ServerRules      *[]string `json:"serverRules"`
+		HiddenTags       *[]string `json:"hiddenTags"`
 	}
 	if err := decodeOptionalJSON(r, &body); err != nil {
 		writeAPIError(w, err)
@@ -363,6 +372,42 @@ func (s *Server) handleAdminUpdateMeta(w http.ResponseWriter, r *http.Request) {
 		}
 		if _, err := s.pool.Exec(r.Context(), `
 INSERT INTO instance_meta (key, value) VALUES ('serverRules', $1::jsonb)
+ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
+`, payload); err != nil {
+			writeInternalServerError(w)
+			return
+		}
+	}
+
+	if body.HiddenTags != nil {
+		tags := make([]string, 0, len(*body.HiddenTags))
+		seen := map[string]struct{}{}
+		for _, tag := range *body.HiddenTags {
+			trimmed := strings.ToLower(strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(tag), "#")))
+			if trimmed == "" {
+				continue
+			}
+			if utf8.RuneCountInString(trimmed) > 100 {
+				writeAPIError(w, invalidParamError("each hidden tag is at most 100 characters"))
+				return
+			}
+			if _, ok := seen[trimmed]; ok {
+				continue
+			}
+			seen[trimmed] = struct{}{}
+			tags = append(tags, trimmed)
+		}
+		if len(tags) > 200 {
+			writeAPIError(w, invalidParamError("hiddenTags has at most 200 entries"))
+			return
+		}
+		payload, err := json.Marshal(tags)
+		if err != nil {
+			writeInternalServerError(w)
+			return
+		}
+		if _, err := s.pool.Exec(r.Context(), `
+INSERT INTO instance_meta (key, value) VALUES ('hiddenTags', $1::jsonb)
 ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
 `, payload); err != nil {
 			writeInternalServerError(w)

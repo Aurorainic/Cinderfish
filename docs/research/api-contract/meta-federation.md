@@ -319,7 +319,7 @@
 | `enableEmail` | bool | 恒 `false` |
 | `enableServiceWorker` | bool | 恒 `false` |
 | `translatorAvailable` | bool | 恒 `false` |
-| `serverRules` | array | 恒 `[]` |
+| `serverRules` | array | 运行时 `serverRules`（迁移 v13 后的实例设置），默认 `[]` |
 | `policies` | object | 只有 `canUseFederation: true`、`canCreateInstantNote: true` 两个键（`internal/httpapi/meta.go:121`–`126`） |
 | `sentryForFrontend` | null | 恒 `null` |
 | `mediaProxy` | string | 恒 `""` |
