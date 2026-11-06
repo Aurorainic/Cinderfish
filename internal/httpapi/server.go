@@ -68,6 +68,9 @@ type Server struct {
 	// what get-online-users-count reports.
 	activity *activityTracker
 
+	// rateLimiter enforces Misskey's per-endpoint write caps.
+	rateLimiter *rateLimiter
+
 	// ActivityPub. federationPolicy, fedRenderer and federationStore are
 	// populated by AttachFederation; the greenlet handlers check for nil.
 	federationPolicy  *federation.Policy
@@ -82,10 +85,11 @@ type Server struct {
 // endpoints that do not need persistence.
 func NewServer(cfg *config.Config) *Server {
 	s := &Server{
-		cfg:       cfg,
-		startedAt: time.Now(),
-		streamBus: streaming.NewBus(),
-		activity:  newActivityTracker(),
+		cfg:         cfg,
+		startedAt:   time.Now(),
+		streamBus:   streaming.NewBus(),
+		activity:    newActivityTracker(),
+		rateLimiter: newRateLimiter(),
 	}
 	if cfg != nil {
 		s.mail = mail.New(mail.Settings{

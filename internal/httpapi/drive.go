@@ -27,6 +27,10 @@ func (s *Server) handleDriveFilesCreate(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	if !s.checkRateLimit(w, info.User.ID, limitDriveCreate) {
+		return
+	}
+
 	if err := r.ParseMultipartForm(32 << 20); err != nil {
 		writeAPIError(w, invalidParamError(map[string]any{"reason": "expected a multipart upload"}))
 		return

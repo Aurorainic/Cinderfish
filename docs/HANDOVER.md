@@ -4397,7 +4397,8 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
 >
 > 已在本轮补齐的：搜索/聚合性能、缩略图补生成、大图内存、WebP 解码、主题 registry 同步、
 > 提及上限与有界解析、在线人数、全部可移植 widget、`charts/user/notes`、`server-info`、`fetch-rss`、
-> 登出重登路径、反代 Host 绑定、减少动画偏好、真实 Redis 投递唤醒与重启重订阅。
+> 登出重登路径、反代 Host 绑定、减少动画偏好、真实 Redis 投递唤醒与重启重订阅、S3 私有 CA/TLS、
+> 四处写操作限流（§12FH）。
 
 - **第五波的 API 与页面渲染已验证（2026-11-06，见 §12U.3）**：静音/屏蔽/实例静音/令牌撤销都做了
   真实二进制回读，五个设置页与四个 widget 在桌面/移动无头浏览器里走查过。应用撤销与 widget
@@ -6543,3 +6544,42 @@ Host。这一轮用 Go 的反向代理复现同一拓扑。
   `TestS3BackendValidation` 此前因 S3 env 未接线而是空跑，现在真正断言「缺 endpoint/bucket 报错、
   补齐后通过」。
 - 全量 `go test ./...` 与前端三项检查见本轮提交前的运行记录。
+
+## 12FH. 第一百四十四波：Misskey 的写操作限流（2026-11-07）
+
+代码里唯一的 Go TODO 是：`notes/favorites/create` 在 Misskey 限制 20 次/小时，本实现只写了注释。
+这一轮补上内存固定窗口限流器，并接入 Misskey 默认值最高的四个写端点。
+
+### 12FH.1 落地清单
+
+| 层 | 文件 | 内容 |
+|----|------|------|
+| 限流器 | `internal/httpapi/ratelimit.go`（新） | 每账号 × 每端点固定窗口；窗口到期重置；>4096 条目时清理 24 小时前的记录 |
+| 接线 | `internal/httpapi/server.go` | `Server.rateLimiter` 在 `NewServer` 初始化 |
+| 端点 | `notes.go`、`notes_favorites.go`、`drive.go`、`following.go` | `notes/create` 300/h、`notes/favorites/create` 20/h、`drive/files/create` 120/h、`following/create` 100/h |
+| 错误 | 同上 | 429 + `Retry-After` 秒数 + `RATE_LIMIT_EXCEEDED`（复用 `errIDRateLimited`），与 Misskey 的 `ApiCallService` 行为一致 |
+| 注释 | `notes_favorites.go` | 去掉「limiter 落地后再强制」的 TODO |
+
+取值来自 Misskey 端点的 `meta.limit`（`notes/favorites/create` 20/h、`notes/create` 300/h、
+`drive/files/create` 120/h、`following/create` 100/h）。
+
+### 12FH.2 有意的限制
+
+- 限流状态在内存里：重启清零、多进程各自计数。Misskey 用 Redis 共享；单进程部署（默认）不需要，
+  多进程部署下的准确计数没有验证。
+- 只接这四个端点；Misskey 对 reactions、reports、apps 等还有更细的 `limit` 块与
+  `BRIEF_REQUEST_INTERVAL`（最小请求间隔），本实现没有逐一对齐。
+- 没有按角色 `rateLimitFactor` 调整（本实现没有角色系统）。
+- 被拒绝的请求会计数吗？不会：只有通过窗口的请求才自增，拒绝不会延长窗口。
+
+### 12FH.3 验证证据
+
+- `go vet ./...`、含数据库的全量 `go test ./...` 全绿。
+- `TestRateLimiterWindow`：2 次通过、第 3 次拒绝且返回剩余时间；另一账号/另一端点不受影响；
+  窗口到期后恢复。
+- `TestFavoritesCreateRateLimit`：同一账号前 20 次不返回 429，第 21 次 429 且带 `Retry-After`，
+  错误码 `RATE_LIMIT_EXCEEDED`；另一账号仍可收藏。
+- 真实二进制：`notes/favorites/create` 第 20 次 200，第 21 次
+  `HTTP/1.1 429`、`Retry-After: 3600`、
+  `{"code":"RATE_LIMIT_EXCEEDED", … "message":"Rate limit exceeded. Please try again later."}`。
+- 前端无需改动：现有 `api` shim 会把 429 的 message 显示为错误对话框（§12EQ 已验证同一条路径）。

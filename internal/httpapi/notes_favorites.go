@@ -11,8 +11,7 @@ import (
 // handleNotesFavoritesCreate implements POST /api/notes/favorites/create.
 //
 // Misskey caps this endpoint at 20 calls an hour and answers with the packed
-// NoteFavorite; Cinderfish has no rate limiter yet, so the cap is noted here
-// rather than enforced (TODO when the limiter lands).
+// NoteFavorite; checkRateLimit enforces the same window.
 func (s *Server) handleNotesFavoritesCreate(w http.ResponseWriter, r *http.Request) {
 	if s.favorites == nil || s.notes == nil {
 		writeAPIError(w, &APIError{
@@ -32,6 +31,10 @@ func (s *Server) handleNotesFavoritesCreate(w http.ResponseWriter, r *http.Reque
 	info, err := s.authenticate(r.Context(), r, bodyAsMap(r))
 	if err != nil || info == nil {
 		writeAuthenticationError(w)
+		return
+	}
+
+	if !s.checkRateLimit(w, info.User.ID, limitFavoritesCreate) {
 		return
 	}
 	if body.NoteID == "" {

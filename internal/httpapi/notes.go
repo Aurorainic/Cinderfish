@@ -70,6 +70,10 @@ func (s *Server) handleNotesCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !s.checkRateLimit(w, info.User.ID, limitNotesCreate) {
+		return
+	}
+
 	fileIDs := body.FileIDs
 	if len(fileIDs) == 0 {
 		fileIDs = body.MediaIDs

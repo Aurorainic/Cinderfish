@@ -35,6 +35,10 @@ func (s *Server) handleFollowingCreate(w http.ResponseWriter, r *http.Request) {
 		writeAuthenticationError(w)
 		return
 	}
+
+	if !s.checkRateLimit(w, info.User.ID, limitFollowingCreate) {
+		return
+	}
 	if body.UserID == "" {
 		writeAPIError(w, invalidParamError("userId is required"))
 		return
