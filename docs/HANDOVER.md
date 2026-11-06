@@ -1956,6 +1956,69 @@ cd web && pnpm build                    # exit 0
 - 大 schema（数百表/索引）下的页面滚动与渲染性能没有测试（无分页）。
 - `vacuum`、索引维护与表清理按设计未做。
 
+## 12AC. 批次：前端第十三波——运行时实例设置（2026-11-06）
+
+**工作方式**：目标模式第十三波，一轮完成运行时设置存储、两个管理端点、meta/nodeinfo 接线、
+管理页、测试、真实二进制与浏览器走查、文档与提交。施工依据
+`docs/research/2026-11-06-firefish-port-wave13-contract.md`。
+
+### 12AC.1 落地清单
+
+| 层 | 文件 | 说明 |
+|----|------|------|
+| 运行时设置 | `internal/httpapi/instance_settings.go`（新） | `liveInstanceSettings`、`liveRegistrationMode`、`saveInstanceSetting` |
+| 端点 | 同上、`server.go` | `admin/meta`、`admin/update-meta`（五个字段，其余忽略） |
+| 接线 | `meta.go`、`account.go`、`activitypub.go` | 名称/简介/维护者/注册模式/`disableRegistration`/nodeinfo 读运行时值 |
+| 页面 | `web/src/pages/AdminSettings.vue` | 名称、简介、维护者、邮箱、注册模式表单；保存提示刷新 |
+| 菜单 | `AdminIndex.vue` | 管理组新增「实例设置」 |
+| 接口层 | `endpoints.ts`、`types.ts` | 两个端点与 `AdminInstanceMeta` |
+| 测试 | `internal/httpapi/instance_settings_test.go`（新，3 个用例） | 设置回读、运行时注册模式切换、校验与权限 |
+
+### 12AC.2 有意的限制
+
+1. 只覆盖五个字段；数据库、媒体、联邦策略等仍在 `config.toml`，页面写明。
+2. `admin/update-meta` 忽略未列出的上游字段，不假装保存。
+3. 没有审计日志。
+4. `invite` 模式依赖邀请码库存，没有邀请码时 signup 失败。
+
+### 12AC.3 验证证据
+
+```
+gofmt -l internal/ cmd/                 # 空
+go vet ./...                            # exit 0
+CINDERFISH_TEST_DATABASE_URL=… go test -count=1 ./...   # 全绿（新增 3 个用例）
+cd web && pnpm exec vue-tsc --noEmit    # exit 0
+cd web && pnpm run check:port           # 398 文件，hardTotal 0
+cd web && pnpm build                    # exit 0
+```
+
+真实二进制 `:3991`（开发库）：
+
+| 场景 | 结果 |
+|------|------|
+| `admin/meta` 初始 | `name=Cinderfish`、`registrationMode=open` |
+| 管理页改为「W13 实例」+ 简介 + 「仅管理员创建」并保存 | 页面显示已保存 |
+| `POST /api/meta` | `name=W13 实例`、简介一致、`disableRegistration=true` |
+| 切到 admin 模式后 signup | 400 |
+| 切回开放注册后 signup | 200 |
+| 管理菜单 | 出现「实例设置」 |
+| 移动端 `/admin/settings` | 表单正常换行，无横向溢出 |
+
+无头 Helium 156：无 JS 异常。截图在 `/tmp/w13-shots`（不入库）。
+
+测试还暴露并修掉一个隔离问题：`instance_meta` 未加入测试库 TRUNCATE，导致运行时注册模式跨用例
+泄漏；已加入，httpapi 全包恢复全绿。
+
+走查数据已清理：w13admin/w13guest 删除，`instance_meta` 中本次写入的五个键删除（实例恢复
+默认名称与配置模式），用户数回到 23；临时二进制、配置、媒体目录、profile 与服务停止。
+
+### 12AC.4 仍未验证
+
+- 邀请码模式下用有效邀请码完成注册没有走查（需要 CLI 生成邀请码）。
+- 并发保存、审计日志、设置变更后的缓存失效（公开页需手动刷新）没有处理。
+- 上游 `admin/update-meta` 其余字段按设计忽略；Firefish 管理页若直连本实例会显示“保存成功但多数
+  字段未生效”，这一点只在契约里记录。
+
 ## 13. 文档索引
 
 | 文档 | 内容 |
@@ -1994,6 +2057,7 @@ cd web && pnpm build                    # exit 0
 | `docs/research/2026-11-06-firefish-port-wave10-contract.md` | **第十波施工契约（举报表 v11、三个举报端点、用户菜单入口与管理页），见 §12Z** |
 | `docs/research/2026-11-06-firefish-port-wave11-contract.md` | **第十一波施工契约（webhooks 表 v12、五个端点、异步投递与设置页），见 §12AA** |
 | `docs/research/2026-11-06-firefish-port-wave12-contract.md` | **第十二波施工契约（admin/get-table-stats、admin/get-index-stats 与数据库页），见 §12AB** |
+| `docs/research/2026-11-06-firefish-port-wave13-contract.md` | **第十三波施工契约（运行时实例设置、admin/meta 与 update-meta 子集），见 §12AC** |
 
 ## 14. 已知的未验证项
 
@@ -2012,6 +2076,8 @@ cd web && pnpm build                    # exit 0
   未产生的事件类型没有实测。
 - **第十二波未测边角（2026-11-06，见 §12AB.4）**：reltuples 估算与实际行数的偏差、大 schema 渲染性能
   未验证；vacuum 与索引维护按设计未做。
+- **第十三波未测边角（2026-11-06，见 §12AC.4）**：邀请码注册未走查、没有审计日志、公开页缓存需刷新；
+  上游 update-meta 的其余字段按设计忽略。
 - **仍未移植的设置页**：邮箱、整合、安全（2FA）、导入导出、迁移、Webhook、插件、自定义 KaTeX、状态栏、
   删除账号、应用授权以外的账号操作；对应后端端点不存在或前端缺少依赖（见第五波契约 §3.3）。
 - **仍缺的 widgets**：rss、rss-ticker、server-metric、online-users、federation、job-queue、aiscript、

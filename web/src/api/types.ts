@@ -471,3 +471,12 @@ export interface IndexStat {
 	tablespace: string | null;
 	indexdef: string;
 }
+
+/** The subset of instance settings `admin/meta` exposes. */
+export interface AdminInstanceMeta {
+	name: string;
+	description: string;
+	maintainerName: string;
+	maintainerEmail: string;
+	registrationMode: "open" | "invite" | "admin";
+}

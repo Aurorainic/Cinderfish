@@ -8,6 +8,7 @@
 import type {
 	AbuseReport,
 	AdminDriveFile,
+	AdminInstanceMeta,
 	Announcement,
 	AdminEmoji,
 	AuthorizedApp,
@@ -135,6 +136,8 @@ export const ENDPOINTS = {
 	// notifications
 	announcements: "announcements",
 	adminAbuseReports: "admin/abuse-user-reports",
+	adminMeta: "admin/meta",
+	adminUpdateMeta: "admin/update-meta",
 	adminTableStats: "admin/get-table-stats",
 	adminIndexStats: "admin/get-index-stats",
 	adminResolveAbuseReport: "admin/resolve-abuse-user-report",
@@ -592,6 +595,21 @@ export interface EndpointMap {
 		req: { userId: string; comment: string };
 		res: EmptyResponse;
 	};
+	[ENDPOINTS.adminMeta]: {
+		req: Record<string, never>;
+		res: AdminInstanceMeta;
+	};
+	[ENDPOINTS.adminUpdateMeta]: {
+		req: {
+			name?: string;
+			description?: string;
+			maintainerName?: string;
+			maintainerEmail?: string;
+			registrationMode?: "open" | "invite" | "admin";
+		};
+		res: AdminInstanceMeta;
+	};
+
 	[ENDPOINTS.adminTableStats]: {
 		req: Record<string, never>;
 		res: Record<string, TableStat>;

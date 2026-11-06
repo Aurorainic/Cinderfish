@@ -81,6 +81,12 @@ const menuDef = computed<MkSuperMenuGroup[]>(() => [
 				active: isActive("/admin/users"),
 			},
 			{
+				icon: "ph-sliders-horizontal ph-bold ph-lg",
+				text: "实例设置",
+				to: "/admin/settings",
+				active: isActive("/admin/settings"),
+			},
+			{
 				icon: "ph-gauge ph-bold ph-lg",
 				text: t("overview"),
 				to: "/admin/overview",
