@@ -4543,7 +4543,8 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
   顺带修复原图直链回 `octet-stream` 的缺口。仍未验证的：透明通道、历史文件补生成、大图内存峰值。
 - **第四十七波已补验证（2026-11-07，见 §12BK.4）**：锁推的「关注 → 待审 → 接受」从
   `following/create` 到界面全链路走查通过；`receiveFollowRequest` 与 `follow` 两类通知落库并在
-  通知页渲染。仍未验证的：远程关注者的锁推入站路径、取消请求的回执、其余六个隐私开关的界面回读。
+  通知页渲染。远程关注者的锁推入站路径已由 §12CN 覆盖；入站 Reject 撤回待审请求也已有用例
+  （§12DN）。仍未验证的：其余六个隐私开关的界面回读。
 - **第四十八波已补验证（2026-11-07，见 §12BL.4）**：四类通知邮件与公告群发由本地 SMTP 用例
   真实收信验证，未验证/未订阅两种静默分支也在内；邮箱设置页开关的保存与回读走查通过。
   仍未验证的：公网 SMTP 的 TLS/Auth、公告失败隔离、真实客户端的模板显示。
@@ -5616,3 +5617,22 @@ CINDERFISH_TEST_DATABASE_URL=... go test ./... -count=1         # 全绿
 
 仍未验证：统计请求失败时页面隐藏计数块的降级（需要让 `users/stats` 返回错误）、
 真实音视频文件的播放。
+
+## 12DN. 第一百零一波：入站 Reject 撤回待审请求（2026-11-07）
+
+`TestInboundRejectClearsPendingRequest`（双实例）：
+
+1. alpha 通过 `ap/show` 解析 beta 的 bob，得到自己的远端副本行；
+2. 构造一条「alice → 远端 bob」的待审请求，`requests/sent` 能看到；
+3. beta 的 bob 发签名 `Reject`，内嵌最初那条 `Follow`（actor=alice，object=bob）；
+4. 入站处理按 `Unfollow(alice, bob)` 同时删除 `follow_requests` 行；
+5. `requests/sent` 为空，`users/following` 为空。
+
+共享测试库里要先用 `ap/show` 建立远端副本，否则 Reject 的 actor URI 会解析成另一行 id
+（生产库中 alice 关注的本来就是同一行）。
+
+```
+gofmt -l internal/ cmd/                                        # 空
+go vet ./...                                                   # exit 0
+CINDERFISH_TEST_DATABASE_URL=... go test ./... -count=1         # 全绿
+```
