@@ -629,6 +629,19 @@ export interface FederationInstance {
 	isNotResponding: boolean;
 }
 
+/** `charts/user/notes`: parallel arrays, oldest first. */
+export interface UserNotesChart {
+	total: number[];
+	inc: number[];
+	dec: number[];
+	diffs: {
+		normal: number[];
+		reply: number[];
+		renote: number[];
+		withFile: number[];
+	};
+}
+
 /** Counters from `stats`. */
 export interface InstanceStats {
 	usersCount: number;

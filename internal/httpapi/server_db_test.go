@@ -47,6 +47,12 @@ RESTART IDENTITY CASCADE`); err != nil {
 }
 
 func newTestServer(t *testing.T, mode string) *httptest.Server {
+	ts, _ := newTestServerWithPool(t, mode)
+	return ts
+}
+
+// newTestServerWithPool is newTestServer for tests that also backdate rows.
+func newTestServerWithPool(t *testing.T, mode string) (*httptest.Server, *pgxpool.Pool) {
 	t.Helper()
 	pool := testPool(t)
 	cfg := &config.Config{
@@ -63,7 +69,7 @@ func newTestServer(t *testing.T, mode string) *httptest.Server {
 
 	ts := httptest.NewServer(srv)
 	t.Cleanup(ts.Close)
-	return ts
+	return ts, pool
 }
 
 func post(t *testing.T, ts *httptest.Server, path string, body any) (*http.Response, map[string]any) {

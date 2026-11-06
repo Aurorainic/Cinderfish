@@ -4680,10 +4680,10 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
   `#app` 有内容后再交互；真实用户不受影响。
 - **仍未移植的设置页**：邮箱、整合、导入导出、迁移、Webhook、插件、自定义 KaTeX、状态栏、
   删除账号、应用授权以外的账号操作；对应后端端点不存在或前端缺少依赖（见第五波契约 §3.3）。
-- **仍缺的 widgets（2026-11-07 更新）**：online-users、federation、instance-cloud 已补上（§12EY，
-  后两者依赖 `federation/instances`，不画 `charts/instance`）；仍缺 rss、rss-ticker（需服务端 RSS
-  抓取代理）、server-metric（需系统指标端点）、job-queue（需队列内省）、aiscript（运行时按契约
-  drop），以及 activity 的子图表。
+- **仍缺的 widgets（2026-11-07 更新）**：online-users、federation、instance-cloud 与 activity 的
+  30 天子图表已补上（§12EY/§12EZ，后两者分别依赖 `federation/instances` 与新增的
+  `charts/user/notes`；不画 `charts/instance` 的请求图）；仍缺 rss、rss-ticker（需服务端 RSS 抓取
+  代理）、server-metric（需系统指标端点）、job-queue（需队列内省）、aiscript（运行时按契约 drop）。
 
 - ~~**浏览器可视化走查（Task 8 波次）未做**~~：2026-10-31 的那一轮确实没能执行，但后续波次已用
   无头 Chromium/CDP 与真实二进制覆盖了登录态视觉复核与溢出实测：§12CB（1440 与 390，42 张截图）、
@@ -6267,3 +6267,38 @@ localStorage，而且缓存键不区分账号。
   「1 人在线」，联邦 widget 列出 `remote.example` 与 `other.example`，实例云显示两个主机 chip；
   `POST /api/get-online-users-count` 同步返回 `{"count":1}`。截图
   `/tmp/w135-shots/widgets.png`（不入库）。
+
+## 12EZ. 第一百三十六波：charts/user/notes 与 activity 子图表（2026-11-07）
+
+activity widget 此前只显示账号累计计数，注释写明缺 `charts/user/notes`。该端点的数据完全来自
+`notes` 表，本轮补上，并把 widget 改成 30 天堆叠柱状图。
+
+### 12EZ.1 落地清单
+
+| 层 | 文件 | 内容 |
+|----|------|------|
+| 端点 | `internal/httpapi/charts.go`（新） | `POST/GET /api/charts/user/notes`：span day/hour、limit 1–500、offset、userId |
+| 响应 | 同上 | `total/inc/dec` 与 `diffs.{normal,reply,renote,withFile}`，并行数组、最旧在前，与 Misskey 的图表实体一致 |
+| 客户端 | `web/src/api/endpoints.ts`、`types.ts` | `chartsUserNotes` 与 `UserNotesChart` |
+| widget | `web/src/widgets/activity.vue` | 30 天堆叠柱（normal/reply/renote）+ 图例 + 原有累计计数 |
+| 台账 | `docs/research/2026-11-04-misskey-api-coverage.md` | 156 → 158 路由、148 → 150 同名、292 → 290 未实现 |
+
+### 12EZ.2 有意的限制
+
+- `span=hour` 支持，但 widget 只用 day；没有 `charts/user/reactions|following|drive|pv`。
+- 分桶按 UTC；`total` 是「创建减删除」的累计值，`inc`/`dec` 是每个桶内的创建/删除数。被删除的笔记
+  仍计入其创建桶的 diffs（与 Misskey 的 inc/dec 语义一致）。
+- 没有按时间跨度做预聚合：每次请求扫描窗口内的 notes 行（个人实例量级足够，30 天窗口）。
+- offset 传毫秒时间戳，最后一个桶是 offset 所在的桶，与 Misskey 的 `getChart` 一致。
+
+### 12EZ.3 验证证据
+
+- `gofmt`/`go vet`/含数据库的全量 `go test ./...` 全绿；`vue-tsc --noEmit`、`check:port`（hardTotal 0）、
+  `pnpm build` 全绿。
+- `TestChartsUserNotes`：把普通帖/回复/转贴回填到前 2 天、昨天、今天，删除一条今天的普通帖后，
+  5 个日桶得到 `normal=[0,0,1,0,1]`、`reply=[0,0,0,1,0]`、`renote=[0,0,0,0,1]`、
+  `inc=[0,0,1,1,2]`、`dec=[0,0,0,0,1]`、`total=[0,0,1,2,3]`；`span=hour` 返回 3 个桶；
+  `span=week` 与缺 `userId` 均 400。
+- 真实二进制 + 无头浏览器：添加 activity widget 后渲染 30 根柱，其中 3 根非零，图例显示
+  帖子/回复/转发；`charts/user/notes {span:day,limit:5}` 返回 `normal=[0,0,1,1,1]`、
+  `total=[0,0,1,2,3]`。截图 `/tmp/w136-shots/activity.png`（不入库）。

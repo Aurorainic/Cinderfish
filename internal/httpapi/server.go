@@ -142,6 +142,8 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("POST /api/stats", s.handleStats)
 	s.mux.HandleFunc("POST /api/get-online-users-count", s.handleGetOnlineUsersCount)
 	s.mux.HandleFunc("GET /api/get-online-users-count", s.handleGetOnlineUsersCount)
+	s.mux.HandleFunc("POST /api/charts/user/notes", s.handleChartsUserNotes)
+	s.mux.HandleFunc("GET /api/charts/user/notes", s.handleChartsUserNotes)
 	s.mux.HandleFunc("POST /api/ping", s.handlePing)
 	s.mux.HandleFunc("GET /api/ping", s.handlePing)
 
