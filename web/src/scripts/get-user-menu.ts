@@ -2,10 +2,10 @@
 //
 // Degradations versus Firefish, all driven by missing backend endpoints
 // (docs/research/api-contract/): lists (`users/lists/*`), groups
-// (`users/groups/*`), mute (`mute/*`), renote-mute, block (`blocking/*`),
-// silence (`admin/silence-user`), following/invalidate, report abuse,
-// RSS/Atom/JSON feed notifications and `userActions` plugin entries are all
-// dropped. "Send message" is dropped too: Firefish opens the post form with
+// (`users/groups/*`), renote-mute, silence (`admin/silence-user`),
+// following/invalidate, RSS/Atom/JSON feed notifications and `userActions`
+// plugin entries are all dropped. Mute/block and abuse reporting have since
+// been ported and are offered again. "Send message" is dropped too: Firefish opens the post form with
 // `{ specified: user }`, and the Cinderfish `os.post` contract has no
 // `specified` / `visibleUserIds` field yet.
 //
@@ -21,6 +21,23 @@ import * as os from "@/os";
 import type { MenuItem } from "@/os";
 import { router } from "@/router";
 import copyToClipboard from "@/scripts/copy-to-clipboard";
+
+async function reportAbuse(user: UserDetailed): Promise<void> {
+	const handle = user.host == null ? `@${user.username}` : `@${user.username}@${user.host}`;
+	const { canceled, result } = await os.inputParagraph({
+		title: t("reportAbuse"),
+		text: handle,
+		placeholder: "请说明发生了什么（对方的行为、时间或帖子链接）",
+	});
+	const comment = String(result ?? "").trim();
+	if (canceled || comment === "") return;
+	try {
+		await os.apiWithDialog("users/report-abuse", { userId: user.id, comment });
+		os.toast(t("abuseReported"), "success");
+	} catch {
+		// apiWithDialog already showed the server error.
+	}
+}
 
 function confirmed(text: string): Promise<boolean> {
 	return os
@@ -96,7 +113,21 @@ export function getUserMenu(
 				},
 			},
 		);
-	} else if (current?.isAdmin === true) {
+	} else if (current != null && current.isAdmin !== true) {
+		items.push(
+			{ separator: true },
+			{
+				icon: "ph-warning-octagon ph-bold ph-lg",
+				text: t("reportAbuse"),
+				danger: true,
+				action: () => {
+					void reportAbuse(user);
+				},
+			},
+		);
+	}
+
+	if (current?.isAdmin === true && !isSelf) {
 		items.push(
 			{ separator: true },
 			{

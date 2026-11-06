@@ -1780,6 +1780,66 @@ cd web && pnpm build                    # exit 0
 - 导入、邮件、2FA、Webhook、迁移等仍无端点。
 - 注销后媒体对象是否真的从磁盘消失，只验证了行删除与 404，没有检查存储目录。
 
+## 12Z. 批次：前端第十波——举报与处理（2026-11-06）
+
+**工作方式**：目标模式第十波，一轮完成迁移、端点、菜单入口、管理页、测试、真实二进制与浏览器走查、
+文档与提交。施工依据 `docs/research/2026-11-06-firefish-port-wave10-contract.md`。
+
+### 12Z.1 落地清单
+
+| 层 | 文件 | 说明 |
+|----|------|------|
+| 迁移 | `internal/db/db.go`（v11） | `abuse_reports` 表 + 未处理索引；双方外键级联 |
+| 服务 | `internal/report/service.go`（新） | `Create` / `List`（state 与双方来源）/ `Resolve` / `Get` |
+| 端点 | `internal/httpapi/reports.go`（新）、`server.go` | `users/report-abuse`、`admin/abuse-user-reports`、`admin/resolve-abuse-user-report` |
+| 用户入口 | `web/src/scripts/get-user-menu.ts` | 非管理员对他人显示「举报」，`os.inputParagraph` 收集说明 |
+| 管理页 | `web/src/pages/AdminAbuses.vue` | 占位页改为列表：筛选、双方信息、说明、标记已处理、加载更多 |
+| 管理菜单 | `web/src/pages/AdminIndex.vue` | 内容组新增「举报」 |
+| 接口层 | `web/src/api/endpoints.ts`、`types.ts` | 三个端点与 `AbuseReport` |
+| 测试 | `internal/httpapi/reports_test.go`（新，2 个用例） | 生命周期与筛选、校验与权限 |
+
+### 12Z.2 有意的降级
+
+1. 不转发到远端实例，`forwarded` 恒为 false，页面注明。
+2. 不通知管理员（没有邮件/推送）。
+3. 只针对账号：帖子举报归到作者账号，不记录 noteId。
+4. 标记已处理只是状态位，不自动冻结；处置仍用冻结按钮。
+
+### 12Z.3 验证证据
+
+```
+gofmt -l internal/ cmd/                 # 空
+go vet ./...                            # exit 0
+CINDERFISH_TEST_DATABASE_URL=… go test -count=1 ./...   # 全绿（新增 2 个用例）
+cd web && pnpm exec vue-tsc --noEmit    # exit 0
+cd web && pnpm run check:port           # 398 文件，hardTotal 0
+cd web && pnpm build                    # exit 0
+```
+
+真实二进制 `:3991`（开发库，`federation_mode=none`）：
+
+| 场景 | 结果 |
+|------|------|
+| 匿名举报 / 自举报 | 401 / 400 |
+| w10dana 在用户页菜单点「举报」并填写说明 | 菜单出现「举报」，对话框提交成功 |
+| 管理台 `/admin/abuses` | 显示「w10dana 举报 w10admin」与说明文字；状态默认「未处理」 |
+| 点「标记已处理」 | 徽标变为「已处理」；`state=unresolved` 再查为 0、`resolved` 为 1（测试覆盖） |
+| `reporterOrigin=remote` | 0（双方均为本地） |
+| 非管理员访问举报列表 | 403（测试覆盖） |
+
+无头 Helium 156（1440×900 / 390×844）：管理页筛选栏与举报卡片无横向溢出、无 JS 异常；移动端
+处理后列表为空并显示空态。截图在 `/tmp/w10-shots`（不入库）。
+
+走查数据已清理：举报行与 w10admin/w10dana 删除，用户数回到 23；临时二进制、配置、媒体目录、
+profile 与服务停止。
+
+### 12Z.4 仍未验证
+
+- 远端用户举报与 `targetUserOrigin=remote` 过滤没有数据（实例不联邦）。
+- 举报分页 `untilId` 没有构造多页。
+- 举报成功后的 toast 只在浏览器里看到「好」按钮关闭对话框，没有逐字核对提示文案。
+- 转发、通知与自动处置按设计未做。
+
 ## 13. 文档索引
 
 | 文档 | 内容 |
@@ -1815,6 +1875,7 @@ cd web && pnpm build                    # exit 0
 | `docs/research/2026-11-06-firefish-port-wave7-contract.md` | **第七波施工契约（admin/show-users 筛选、admin/drive/files 与用户/文件管理页），见 §12W** |
 | `docs/research/2026-11-06-firefish-port-wave8-contract.md` | **第八波施工契约（公告表 v10、四个公告端点、公告页与管理页），见 §12X** |
 | `docs/research/2026-11-06-firefish-port-wave9-contract.md` | **第九波施工契约（i/export、i/delete-account、导出页与注销页），见 §12Y** |
+| `docs/research/2026-11-06-firefish-port-wave10-contract.md` | **第十波施工契约（举报表 v11、三个举报端点、用户菜单入口与管理页），见 §12Z** |
 
 ## 14. 已知的未验证项
 
@@ -1827,6 +1888,8 @@ cd web && pnpm build                    # exit 0
   远端文件没有构造数据；`state=silenced` 仅在实现层面为空集。
 - **第八波未测的边角（2026-11-06，见 §12X.4）**：公告图片渲染、`untilId` 多页、`limit` 上限、
   浏览器内过期隐藏均未构造数据；已读跟踪与首页横幅按设计未做。
+- **第十波未测边角（2026-11-06，见 §12Z.4）**：远端举报、分页游标与 toast 文案未验证；转发、
+  通知与自动处置按设计未做。
 - **仍未移植的设置页**：邮箱、整合、安全（2FA）、导入导出、迁移、Webhook、插件、自定义 KaTeX、状态栏、
   删除账号、应用授权以外的账号操作；对应后端端点不存在或前端缺少依赖（见第五波契约 §3.3）。
 - **仍缺的 widgets**：rss、rss-ticker、server-metric、online-users、federation、job-queue、aiscript、

@@ -431,3 +431,14 @@ export interface Announcement {
 	expiresAt: string | null;
 	isRead: boolean;
 }
+
+/** One abuse report from `admin/abuse-user-reports`. */
+export interface AbuseReport {
+	id: string;
+	targetUser: UserDetailed;
+	reporter: UserDetailed;
+	comment: string;
+	resolved: boolean;
+	createdAt: string;
+	forwarded: boolean;
+}

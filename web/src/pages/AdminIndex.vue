@@ -92,6 +92,12 @@ const menuDef = computed<MkSuperMenuGroup[]>(() => [
 		title: "内容",
 		items: [
 			{
+				icon: "ph-warning-octagon ph-bold ph-lg",
+				text: t("abuseReports"),
+				to: "/admin/abuses",
+				active: isActive("/admin/abuses"),
+			},
+			{
 				icon: "ph-megaphone-simple ph-bold ph-lg",
 				text: t("announcements"),
 				to: "/admin/announcements",

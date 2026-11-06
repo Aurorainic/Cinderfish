@@ -6,6 +6,7 @@
 // so `EndpointName` can drive `api()`'s typing.
 
 import type {
+	AbuseReport,
 	AdminDriveFile,
 	Announcement,
 	AdminEmoji,
@@ -67,6 +68,7 @@ export const ENDPOINTS = {
 	// users
 	usersShow: "users/show",
 	usersSearch: "users/search",
+	usersReportAbuse: "users/report-abuse",
 	usersNotes: "users/notes",
 	usersFollowers: "users/followers",
 	usersFollowing: "users/following",
@@ -124,6 +126,8 @@ export const ENDPOINTS = {
 
 	// notifications
 	announcements: "announcements",
+	adminAbuseReports: "admin/abuse-user-reports",
+	adminResolveAbuseReport: "admin/resolve-abuse-user-report",
 	adminAnnouncementsCreate: "admin/announcements/create",
 	adminAnnouncementsList: "admin/announcements/list",
 	adminAnnouncementsDelete: "admin/announcements/delete",
@@ -355,6 +359,15 @@ export interface AdminAccountsCreateParams {
 	password: string;
 }
 
+export interface AbuseReportsParams {
+	limit?: number;
+	sinceId?: string;
+	untilId?: string;
+	state?: "resolved" | "unresolved" | null;
+	reporterOrigin?: "combined" | "local" | "remote";
+	targetUserOrigin?: "combined" | "local" | "remote";
+}
+
 export interface AnnouncementsParams {
 	limit?: number;
 	untilId?: string;
@@ -535,6 +548,19 @@ export interface EndpointMap {
 		req: NotificationsParams;
 		res: Notification[];
 	};
+	[ENDPOINTS.usersReportAbuse]: {
+		req: { userId: string; comment: string };
+		res: EmptyResponse;
+	};
+	[ENDPOINTS.adminAbuseReports]: {
+		req: AbuseReportsParams;
+		res: AbuseReport[];
+	};
+	[ENDPOINTS.adminResolveAbuseReport]: {
+		req: { reportId: string };
+		res: EmptyResponse;
+	};
+
 	[ENDPOINTS.announcements]: {
 		req: AnnouncementsParams;
 		res: Announcement[];
