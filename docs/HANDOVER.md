@@ -1,11 +1,12 @@
 # Cinderfish 交接说明
 
-- 最后更新：2026-11-06（目标模式第五十一至五十九波：账号迁移、KaTeX 宏页与集成说明页、
+- 最后更新：2026-11-06（目标模式第五十一至六十波：账号迁移、KaTeX 宏页与集成说明页、
   OAuth 交互式同意页、`ap/show` 与远程互动页、第三方应用授权全流程（`app/*` 与 `auth/session/*`，
-  schema v20）、关注关系设置与其消费方（schema v21）、入站反应修复与 `EmojiReact`、入站 `Flag`。
+  schema v20）、关注关系设置与其消费方（schema v21）、入站反应修复与 `EmojiReact`、入站 `Flag`、
+  范围内占位页清零（24 个剩余占位页全部在首版范围外）。
   恢复目标模式时先补了 §12BO.3 的验证债，
   `go test ./...`（含数据库）已全绿，
-  详见 §12BP–§12BX。浏览器走查仍待用户手动确认后执行）
+  详见 §12BP–§12BY。浏览器走查仍待用户手动确认后执行）
 - 项目名 **Cinderfish**（2026-10-28 定名，Go module `github.com/Aurorainic/cinderfish`）
 - 仓库：当前目录 `/home/lainsaka/文档/MilnFish`，分支 `main`；远程 `origin` 为
   `https://github.com/Aurorainic/Cinderfish.git`（GitHub 仓库已更名，本地目录改名待办）
@@ -3960,6 +3961,40 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
 - 没有对真实 Misskey/Firefish 实例验证远端举报。
 - 管理台重复举报、笔记级目标的展示没有走查。
 
+## 12BY. 第六十波：范围内占位页清零（2026-11-06）
+
+契约见 `docs/research/2026-11-06-firefish-port-wave60-contract.md`。
+
+### 12BY.1 落地清单
+
+| 文件 | 内容 |
+|------|------|
+| `web/src/components/CfFeatureGap.vue` | 新增：说明页共享组件（title / summary / available / missing） |
+| `web/src/pages/SignupComplete.vue` | 说明「无邮箱确认注册模式」+ 登录/注册入口 |
+| `web/src/pages/SettingsPlugin.vue` | 说明「无 AiScript 运行时」+ 自定义 CSS / KaTeX / API 入口 |
+| `web/src/pages/SettingsPluginInstall.vue` | 说明「不接受 .aiscript 上传」 |
+
+占位页从 30 个降到 **24 个**，全部属于用户已裁决的首版范围外页面；**范围内占位页 = 0**。
+
+### 12BY.2 有意的限制
+
+- 这三页都不是功能，只是把缺口写清楚：不伪造安装表单、不伪造注册确认。
+- 插件页没有加入设置菜单（与第四十九波的管理台说明页一致，未链接）。
+- `SignupComplete` 不做 `code` 参数校验：没有对应的后端流程，校验也无从谈起。
+
+### 12BY.3 验证证据
+
+- `vue-tsc --noEmit` 通过。
+- `check:port`：hardTotal 0，`unresolvedComponents` / `missingKeys` 均为空。
+- `pnpm build` 成功。
+- 本波只改前端；后端测试沿用第五十九波的全绿结果。
+
+### 12BY.4 仍未验证
+
+- 三个说明页**没有浏览器走查**：窄屏排版、外链跳转、组件复用后的样式都只过了编译。
+- 占位页清单的「24 个全部在范围外」是按 `grep cf-page-placeholder` 与 §12BO.1 的范围清单
+  对照得出的，没有逐页复核用户裁决记录。
+
 
 
 
@@ -4048,6 +4083,7 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
 | `docs/research/2026-11-06-firefish-port-wave57-contract.md` | **第五十七波施工契约（接线 notify / withReplies），见 §12BV** |
 | `docs/research/2026-11-06-firefish-port-wave58-contract.md` | **第五十八波施工契约（入站反应修复与 EmojiReact），见 §12BW** |
 | `docs/research/2026-11-06-firefish-port-wave59-contract.md` | **第五十九波施工契约（入站 Flag），见 §12BX** |
+| `docs/research/2026-11-06-firefish-port-wave60-contract.md` | **第六十波施工契约（范围内占位页清零），见 §12BY** |
 
 ## 14. 已知的未验证项
 
@@ -4135,6 +4171,8 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
   远端自定义表情未解析；`Question` 入站仍未实现。
 - **第五十九波未测（2026-11-06，见 §12BX.4）**：远端举报没有对真实实例验证；重复举报与笔记级目标
   的展示未走查。
+- **第六十波未测（2026-11-06，见 §12BY.4）**：三个说明页未走查；「24 个占位页全部在范围外」未经
+  逐页复核。
 - **仍未移植的设置页**：邮箱、整合、导入导出、迁移、Webhook、插件、自定义 KaTeX、状态栏、
   删除账号、应用授权以外的账号操作；对应后端端点不存在或前端缺少依赖（见第五波契约 §3.3）。
 - **仍缺的 widgets**：rss、rss-ticker、server-metric、online-users、federation、job-queue、aiscript、
