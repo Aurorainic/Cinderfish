@@ -150,7 +150,7 @@ function openPost(): void {
 	> .statusbar {
 		position: fixed;
 		inset-inline: 0;
-		block-end: 0;
+		inset-block-end: 0;
 		z-index: 90;
 	}
 
