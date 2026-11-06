@@ -4574,7 +4574,8 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
   `Question` 入站已在第六十六波补上（§12CE）；笔记正文的远端自定义表情已在第七十一波解析并渲染
   （§12CJ）。仍未验证的：真实异种软件互投、反应里的自定义表情。
 - **第五十九波部分补验证（2026-11-07 对账 §12CC）**：`/admin/abuses` 的举报者、被举报者、内容与
-  「标记已处理」按钮已走查。仍未验证的：远端举报没有对真实实例验证；重复举报与笔记级目标的展示。
+  「标记已处理」按钮已走查。笔记级目标（入站 Flag 的 note URI）在评论里保留，已加断言（§12DL）；
+  仍未验证的：远端举报对真实实例的互认；重复举报没有去重（与 Misskey 一致，后台会看到多条）。
 - **第六十波部分补验证（2026-11-07 对账 §12CB）**：三个说明页与 `SignupComplete` 的结构与文案
   已走查。「24 个占位页全部在范围外」已于 2026-11-07 逐页复核（§12CZ）：25 个含 `TODO: port`
   的文件中，`SettingsIndex.vue` 只是注释，其余 24 个全部属于首版范围外功能。
@@ -5537,8 +5538,8 @@ CINDERFISH_TEST_DATABASE_URL=... go test ./... -count=1         # 全绿
 - 1.5 秒后 `drive/files/show` 的 `folderId` 等于目标文件夹 id；
 - 根目录刷新后不再显示该文件，文件夹内可见。
 
-仍未验证：拖拽文件夹到另一个文件夹（`moveFolderInto` 的实现路径相同，但没有单独走查）、
-触屏设备上的替代交互。
+文件夹到文件夹的拖拽也已于 2026-11-07 补测（同一轮的 §12DL）：拖「文件夹甲」到「文件夹乙」后
+`drive/folders/show` 的 `parentId` 变为乙。仍未验证：触屏设备上的替代交互。
 
 ## 12DI. 第九十六波：i/move 的双实例投递（2026-11-07）
 
@@ -5584,3 +5585,24 @@ CINDERFISH_TEST_DATABASE_URL=... go test ./... -count=1         # 全绿
 4. `localStorage.cinderfish.token` 写入，页面进入首页时间线，无横向溢出。
 
 仍未验证：安全密钥与备份码（按设计未做）。
+
+## 12DL. 第九十九波：文件夹拖拽与 Flag 的笔记目标（2026-11-07）
+
+### 12DL.1 文件夹到文件夹
+
+`/my/drive` 里建「文件夹甲」「文件夹乙」，构造 `mk_drive_folder` 的 DataTransfer 拖甲到乙：
+`drive/folders/show` 的 `parentId` 变为乙的 id。与文件拖拽共用同一组事件处理器。
+
+### 12DL.2 Flag 的笔记 URI
+
+`TestInboundFlagCreatesReport` 的 object 数组现在同时包含被举报账号与一条笔记 URI；
+入站处理把整个数组以 JSON 追加进 `comment`，用例断言评论里同时出现账号与笔记 URI。
+后台举报页展示的就是这段 comment，因此笔记级目标不会丢失。
+
+重复举报不去重（Misskey 也没有去重），后台会看到多条；已写入 §14 的说明。
+
+```
+gofmt -l internal/ cmd/                                        # 空
+go vet ./...                                                   # exit 0
+CINDERFISH_TEST_DATABASE_URL=... go test ./... -count=1         # 全绿
+```

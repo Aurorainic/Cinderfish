@@ -36,12 +36,13 @@ func TestInboundFlagCreatesReport(t *testing.T) {
 	}
 
 	target := "https://alpha.example/users/" + adminID
+	noteURI := "https://alpha.example/notes/flagged"
 	flag := federation.Object{
 		"@context": federation.Context,
 		"id":       bobActor + "#flags/1",
 		"type":     "Flag",
 		"actor":    bobActor,
-		"object":   []any{target},
+		"object":   []any{target, noteURI},
 		"content":  "spam from this account",
 	}
 	if resp, body := postSigned(t, a.ts, "/inbox", flag, keyID, priv); resp.StatusCode != http.StatusAccepted {
@@ -56,6 +57,9 @@ func TestInboundFlagCreatesReport(t *testing.T) {
 	comment, _ := report["comment"].(string)
 	if !strings.Contains(comment, "spam from this account") {
 		t.Errorf("comment = %q, want the Flag content", comment)
+	}
+	if !strings.Contains(comment, noteURI) {
+		t.Errorf("comment = %q, want the flagged note URI kept", comment)
 	}
 	if !strings.Contains(comment, target) {
 		t.Errorf("comment = %q, want the target URI", comment)
