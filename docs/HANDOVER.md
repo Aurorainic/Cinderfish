@@ -4543,13 +4543,13 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
   横幅（含本地目标的 `MkMention` 多余 `@` 修复）都已走查。仍未验证的：`i/move` 的真实双实例投递
   （只到入队）、跨实例「关注者改关」的端到端、`users/show` 的 `userIds` 批量参数没有前端调用方。
 - **第五十二至五十三波部分补验证（2026-11-07 对账 §12CB）**：KaTeX 宏页的保存/解析、`/oauth/authorize`
-  同意页与授权码落库、`/auth/<token>` 应用名与权限都已走查。仍未验证的：`GET /oauth/authorize`
-  在无凭据且无前端构建时的 401 分支没有用例；没有真实第三方客户端跑完整 OAuth 登录。
+  同意页与授权码落库、`/auth/<token>` 应用名与权限都已走查。仍未验证的：没有真实第三方客户端跑完整 OAuth 登录
+  （`GET /oauth/authorize` 无凭据且无前端构建时的 401 分支已在 §12CK 补用例）。
 - **第五十四波部分补验证（2026-11-07 对账 §12CB）**：`/authorize_interaction` 在远端不可达时的
   错误态与外链已走查。仍未验证的：`ImportObject` 的拒绝路径没有对端用例；真实 Mastodon/Misskey 的
   `/authorize_interaction` 链接未实测。
 - **第五十五波部分补验证（2026-11-07 对账 §12CB）**：`Auth.vue` 已在 `/auth/<token>` 走查。
-  仍未验证的：真实第三方客户端没跑过这条授权流程；`app/show` 返回 secret 的所有者分支没有用例。
+  仍未验证的：真实第三方客户端没跑过这条授权流程（`app/show` 的 secret 所有者分支已在 §12CK 补用例）。
 - **第五十六波已补验证（2026-11-07，见 §12CC/§12CF）**：「移除关注者」菜单、确认框与行删除已走查；
   `following/list` 与 `users/following|followers` 的 `sinceDate`/`untilDate` 已实现并有用例。
 - **第五十七波部分补验证（2026-11-07 对账 §12CB）**：`follow` 与 `note` 两类通知在通知页渲染已走查。
@@ -4930,3 +4930,31 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
 - 真实 Misskey / Firefish 的 Emoji tag 形状差异（有的实现把 `name` 写成不带冒号）。
 - emoji 别名、敏感 emoji 与远端 emoji 缓存。
 - 反应里的自定义表情渲染。
+
+## 12CK. 第七十二波：OAuth 无凭据分支与 app/show secret 用例（2026-11-07）
+
+第五十二/五十五波留下的两个具体缺口：`GET /oauth/authorize` 在没有前端构建且无凭据时的
+401 分支没有用例；`app/show` 只向所有者返回 secret 的分支也没有用例。
+
+### 12CK.1 落地
+
+- `internal/httpapi/oauth_app_test.go` 的 `TestOAuthAuthorizeWithoutSession`：
+  构造合法的 PKCE 查询串（`client_id`/`redirect_uri`/`response_type=code`/`S256` 挑战），
+  不带凭据 GET `/oauth/authorize`，断言 401 与 `text/html`（不是 JSON 错误或 302）。
+- 同文件的 `TestAppShowSecretOwnerOnly`：alice 用 `app/create` 建应用后，
+  - alice 的原生 token 调 `app/show` 能看到 secret；
+  - bob 的 token 与匿名调用都看不到；
+  - 未知 appId → 404 `NO_SUCH_APP`。
+
+### 12CK.2 验证证据
+
+```
+gofmt -l internal/ cmd/                                        # 空
+go vet ./...                                                   # exit 0
+CINDERFISH_TEST_DATABASE_URL=... go test ./... -count=1         # 全绿
+```
+
+### 12CK.3 仍未验证
+
+- 真实第三方客户端（Misskey Web、misskey-js 之外的实现）跑完整 OAuth 登录。
+- `includeSecret` 在通过 access token（而非原生 token）调用时的行为只用代码阅读确认。
