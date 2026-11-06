@@ -37,13 +37,13 @@
 						</CfKeyValue>
 						<CfInfo class="note">
 							<template v-if="configured">
-								验证邮件与密码重置链接会经由这台服务器发出。端口、账号、密码、
+								验证、密码重置与通知邮件都会经由这台服务器发出。端口、账号、密码、
 								发件人与 TLS 模式都在实例的
 								<code>config.toml</code> 的 <code>[mail]</code> 段里，不在本页面编辑——
 								这些是启动配置，改完需要重启服务。
 							</template>
 							<template v-else>
-								没有配置 SMTP 主机，验证邮件与密码重置链接不会真的投递，
+								没有配置 SMTP 主机，验证、密码重置与通知邮件不会真的投递，
 								而是整封写进服务日志（<code>[mail] host</code> 为空时的日志模式）。
 								要让邮件真正发出，请在 <code>config.toml</code> 的
 								<code>[mail]</code> 段填写 <code>host</code>、<code>from</code> 等字段后重启。
@@ -63,8 +63,9 @@
 								<code>reset-password</code> 用链接里的 token 设置新密码。
 							</li>
 							<li>
-								<strong>通知邮件</strong>：尚未实现——<code>i/update</code> 不存储
-								<code>emailNotificationTypes</code>，所以实例里没有可发的通知邮件。
+								<strong>通知邮件</strong>：用户可在「邮箱设置」页勾选提及、回复、关注、
+								关注请求四类（<code>i/update</code> 的 <code>emailNotificationTypes</code>），
+								事件发生时按用户的选择投递。
 							</li>
 						</ul>
 					</section>

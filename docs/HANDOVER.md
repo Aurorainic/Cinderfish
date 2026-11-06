@@ -3297,7 +3297,7 @@ CINDERFISH_TEST_DATABASE_URL=... go test ./... -count=1         # 全绿
 
 ## 12BH. 批次：实例 CSS 与邮件设置页（2026-11-06）
 
-**工作方式**：目标模式第四十四波，继续只写代码、验证到编译层。施工依据
+**工作方式**：目标模式第四十四波，先只写代码验证到编译层，2026-11-07 补齐数据库用例与浏览器走查。施工依据
 `docs/research/2026-11-06-firefish-port-wave44-contract.md`。
 
 ### 12BH.1 落地清单
@@ -3328,12 +3328,38 @@ cd web && pnpm run check:port           # hardTotal 0（400 文件）
 cd web && pnpm build                    # exit 0
 ```
 
-### 12BH.4 仍未验证
+### 12BH.4 补验证（2026-11-07）
 
-- 实例 CSS 保存 → 下发 → 注入 → 账号样式覆盖的完整链路。
-- 100 KiB 上限与空串清除两个分支。
-- 邮件状态页在已配置/未配置两种实例下的呈现。
-- `go test` 与浏览器走查未执行。
+新增 `internal/httpapi/instance_css_test.go` 的 `TestInstanceCustomCSS`：
+
+- `admin/update-meta` 写入后 `admin/meta` 立即返回同一字符串，公开 `meta` 也携带它。
+- 正好 100 KiB（102400 字节）接受；多 1 字节返回 400 `INVALID_PARAM`，且已存值不被覆盖。
+- 空串清除，之后公开 `meta` 的 `customCss` 为空串。
+- 只改 `name` 的更新不会动 `customCss`。
+
+真实二进制 + 无头浏览器（Helium/CDP，端口 3999，用户 `w44admin`）：
+
+- `/admin/custom-css` 输入并点「保存」，状态显示「已保存」，`POST /api/meta` 回读同一段 CSS。
+- 新开一个**无登录态**标签页加载首页，`#cinderfish-instance-custom-css` 存在且内容一致，
+  证明实例样式对访客生效（截图 `/tmp/w44-shots/home-with-instance-css.png`）。
+- `/admin/email-settings` 显示「未配置 /（未设置）」与正确的解释文案。
+
+走查同时修掉一处过期文案：`AdminEmailSettings.vue` 原写「通知邮件尚未实现」，而
+第四十八波已实现四类邮件通知（`emailNotificationTypes` 的存储与投递），页面现按实际行为描述。
+
+```
+gofmt -l internal/ cmd/                                        # 空
+go vet ./...                                                   # exit 0
+CINDERFISH_TEST_DATABASE_URL=... go test ./... -count=1         # 全绿
+cd web && pnpm exec vue-tsc --noEmit                           # exit 0
+cd web && pnpm run check:port                                  # hardTotal 0
+cd web && pnpm build                                           # exit 0
+```
+
+### 12BH.5 仍未验证
+
+- 已配置 SMTP 时的邮件状态页（需要真实 SMTP 实例，走查环境 `[mail] host` 为空）。
+- 账号级 CSS 覆盖实例级 CSS 的视觉结果未单独截图（代码顺序：实例先写、账号后写）。
 
 ## 12BI. 批次：管理台文件详情（2026-11-06）
 
@@ -3590,7 +3616,7 @@ cd web && pnpm build                    # exit 0
 | 41 | 编辑的双向 `Update` | 编译层 |
 | 42 | **按活动作者签名**（原为固定管理员密钥） | 编译层 |
 | 43 | `users/stats`、`hashtags/search`、`registry/keys-with-type`、`notes/featured` | 端点用例（§12BG.4） |
-| 44 | 实例级自定义 CSS + 邮件状态页 | 编译层 |
+| 44 | 实例级自定义 CSS + 邮件状态页 | 用例 + 浏览器走查（§12BH.4） |
 | 45 | `admin/drive/show-file` + 管理台文件详情 | 编译层 |
 | 46 | 缩略图生成管道（`thumbnailUrl` 不再恒 null） | 编译层 |
 | 47 | 锁推生效 + 关注类通知落库 + 隐私页七个真开关 | 编译层 |
@@ -4320,7 +4346,9 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
 - **第四十三波已补验证（2026-11-07，见 §12BG.4）**：四个兼容端点的返回值均有用例覆盖
   （计数一致性、标签排序与 limit/offset、推荐排序与可见性过滤、registry 类型推断）。
   仍未验证的：账号信息页的实际渲染与统计失败时的降级。
-- **第四十四波未测（2026-11-06，见 §12BH.4）**：实例 CSS 链路与邮件状态页只有编译层证据。
+- **第四十四波已补验证（2026-11-07，见 §12BH.4）**：实例 CSS 的保存→下发→注入链路用
+  `TestInstanceCustomCSS` 与无头浏览器走查覆盖（含 100 KiB 边界、空串清除、访客生效）；
+  邮件状态页在未配置实例下走查通过。仍未验证的：已配置 SMTP 的页面呈现与账号级覆盖截图。
 - **第四十五波未测（2026-11-06，见 §12BI.4）**：文件详情的四类预览与 `user: null` 分支未走查。
 - **第四十六波未测（2026-11-06，见 §12BJ.4）**：缩略图生成与删除只有编译层证据。
 - **第四十七波未测（2026-11-06，见 §12BK.4）**：锁推与关注通知只有编译层证据。

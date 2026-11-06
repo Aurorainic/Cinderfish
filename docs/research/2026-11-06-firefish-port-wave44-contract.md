@@ -22,8 +22,9 @@
 `enableEmail` 改为按 `[mail] host` 计算，不再是常量 `false`。
 
 `pages/AdminEmailSettings.vue` 显示：是否已配置、SMTP 主机、三种邮件流程（验证、重置、通知
-——并注明通知邮件尚未实现）、以及可用环境变量。**不渲染可编辑字段**：端口、账号、密码、
-发件人、TLS 都在 `config.toml`，改完要重启，做成输入框只会静默失效。
+——通知邮件四类在第四十八波已实现，页面文案于 2026-11-07 修正）、以及可用环境变量。
+**不渲染可编辑字段**：端口、账号、密码、发件人、TLS 都在 `config.toml`，改完要重启，
+做成输入框只会静默失效。
 
 ## 3. 有意的限制
 
@@ -42,4 +43,4 @@ cd web && pnpm run check:port           # hardTotal 0
 cd web && pnpm build                    # exit 0
 ```
 
-未执行 `go test`、数据库测试与浏览器走查。
+浏览器走查于 2026-11-07 补齐（`TestInstanceCustomCSS` + Helium 走查，见 HANDOVER §12BH.4）。
