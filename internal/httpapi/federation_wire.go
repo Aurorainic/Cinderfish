@@ -216,6 +216,39 @@ func (s *Server) deliveryInboxes(ctx context.Context, n *note.Note) []string {
 			targets = append(targets, inboxes...)
 		}
 	}
+	// Misskey adds a direct recipe for the author of the note being replied
+	// to (NoteCreateService, the data.reply branch), so a reply reaches the
+	// original author's instance without a follow in that direction.
+	if n.ReplyID != nil {
+		if target, err := s.notes.Get(ctx, *n.ReplyID); err == nil && target != nil && target.UserHost != nil {
+			if user, err := s.federationStore.UserByID(ctx, target.UserID); err == nil && user != nil {
+				inbox := user.SharedInbox
+				if inbox == "" {
+					inbox = user.Inbox
+				}
+				if inbox != "" {
+					targets = append(targets, inbox)
+				}
+			}
+		}
+	}
+	// Misskey adds a direct recipe for the original author when renoting a
+	// remote note (NoteCreateService, the data.renote branch), so the home
+	// instance learns about the renote even when it does not follow the
+	// renoter.
+	if n.RenoteID != nil {
+		if target, err := s.notes.Get(ctx, *n.RenoteID); err == nil && target != nil && target.UserHost != nil {
+			if user, err := s.federationStore.UserByID(ctx, target.UserID); err == nil && user != nil {
+				inbox := user.SharedInbox
+				if inbox == "" {
+					inbox = user.Inbox
+				}
+				if inbox != "" {
+					targets = append(targets, inbox)
+				}
+			}
+		}
+	}
 	return targets
 }
 
@@ -227,6 +260,10 @@ func (s *Server) objectRef(n *note.Note) string {
 	}
 	if n.URI != nil && *n.URI != "" {
 		return *n.URI
+	}
+	// Inbound notes keep their ActivityPub id in ap_id and leave uri empty.
+	if n.APID != nil && *n.APID != "" {
+		return *n.APID
 	}
 	return ""
 }

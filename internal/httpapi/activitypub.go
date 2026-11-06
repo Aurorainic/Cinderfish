@@ -555,11 +555,17 @@ func (s *Server) renderNote(ctx context.Context, n *note.Note) (federation.Objec
 	if n.CW != nil {
 		data.CW = *n.CW
 	}
+	// The target may be a remote copy: its ActivityPub id is the original
+	// URL, not the local /notes/<id> path.
 	if n.ReplyID != nil {
-		data.InReplyTo = s.fedRenderer.NoteRef(*n.ReplyID)
+		if target, err := s.notes.Get(ctx, *n.ReplyID); err == nil && target != nil {
+			data.InReplyTo = s.objectRef(target)
+		}
 	}
 	if n.RenoteID != nil {
-		data.QuoteURL = s.fedRenderer.NoteRef(*n.RenoteID)
+		if target, err := s.notes.Get(ctx, *n.RenoteID); err == nil && target != nil {
+			data.QuoteURL = s.objectRef(target)
+		}
 	}
 	for _, id := range n.Mentions {
 		data.MentionRefs = append(data.MentionRefs, s.fedRenderer.ActorRef(id))

@@ -4504,8 +4504,8 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
 - **第四十波已补验证（2026-11-06，见 §12BD.4）**：`TestTwoInstanceNoteDelivery` 用真实 HTTP 证明
   出站链路——bob 在 beta 关注 alpha 的 alice，投递 worker 把 alice 的新帖 Create 送到 beta 并落库，
   `deliver_queue` 留下已投递行；`TestNotesUnrenote` 覆盖取消转贴（纯转贴删除、幂等、引用转贴不受影响、
-  缺参数 400、匿名 401）（2026-11-07）。仍未验证的：Announce（纯转帖）在真实双实例下的投递，
-  以及投递失败后的重试窗口。
+  缺参数 400、匿名 401）（2026-11-07）。Announce（纯转帖）的双实例投递已在 §12CM 补上；
+  仍未验证的：投递失败后的重试窗口。
 - **第四十一波已补验证（2026-11-06，见 §12BE.4）**：`TestTwoInstanceNoteUpdate` 用真实 HTTP 覆盖
   出站方向：bob 关注 alice，alice 发帖再编辑，beta 的副本收到 `Update` 并把文本更新为编辑后的
   Markdown（含 `**bold**` 与换行）。用例还暴露并修掉一个缺陷：入站 `Update` 原先取的是 `content`
@@ -4988,3 +4988,38 @@ CINDERFISH_TEST_DATABASE_URL=... go test ./... -count=1         # 全绿
 
 - 连接建立后再修改 withReplies 是否立即生效（当前在连接时取快照）。
 - renote 与 withFiles 组合、mute/block 过滤的端到端。
+
+## 12CM. 第七十四波：回帖/转帖的跨实例投递目标（2026-11-07）
+
+补第四十波留下的 Announce 双实例验证时，暴露出三个同源的联邦缺陷。本波一起修掉。
+
+### 12CM.1 修复
+
+1. **回帖不发给原帖作者**：`deliveryInboxes` 只加了关注者与提及，漏掉 Misskey
+   `NoteCreateService` 的 `data.reply` 直接投递。远端作者回本地帖时，本地实例收不到
+   （除非对方恰好是关注者）。
+2. **纯转帖不发给原作者**：同一处的 `data.renote` 分支也缺失，Announce 只发给转帖者的关注者。
+3. **远端目标的 URL 生成错误**：
+   - `objectRef` 对远端副本只读 `notes.uri`，而入站笔记把 URL 存在 `notes.ap_id`，导致
+     Announce 直接 `return` 不投递；`Note` 现在带 `APID`，`objectRef` 回退到它。
+   - `renderNote` 的 `inReplyTo` / `quoteUrl` 一律用本地 `/notes/<id>`，回复/引用远端副本时
+     对端无法匹配原帖；现在先加载目标并用 `objectRef`。
+   - 入站笔记的 `inReplyTo` 是本地帖的 ActivityPub URL，`ap_id/uri` 都查不到；新增
+     `resolveLocalTargets`（`NoteIDByAPIDOrURL`）填充 `ReplyLocalID`/`QuoteLocalID`，
+     插入时优先使用。
+
+### 12CM.2 验证证据
+
+- `TestTwoInstanceAnnounceReachesOriginalAuthor`：alice 关注 bob → bob 的帖到达 alpha →
+  alice 纯转帖（不写 `text`，否则会变成引用）→ beta 落库一条 `user_host=alpha.example` 且
+  `renote_id` 指向 bob 本地帖的转帖；alpha 的 `deliver_queue` 有已投递的 beta 行。
+- `TestInboundReplyToLocalNote`：bob 关注 alice → alice 发帖 → bob 回复 alpha 上的副本 →
+  alpha 落库的回复 `reply_id` 等于 alice 的本地帖 id，alice 收到 `reply` 通知
+  （notifier 是 `betabob@beta.example` 的远端副本）。
+- `gofmt -l internal/ cmd/` 无输出；`go vet ./...` 通过；全量 `go test ./...`（含数据库）全绿。
+
+### 12CM.3 仍未验证
+
+- 投递失败后的重试窗口（队列 `attempts < 12`）尚未构造真实失败。
+- 引用转帖（quote）到远端帖的对端渲染没有单独走查。
+- 回帖通知的 Streaming 推送仍只有单元断言覆盖。

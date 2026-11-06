@@ -53,6 +53,7 @@ type Note struct {
 	Name           *string
 	URL            *string
 	URI            *string
+	APID           *string
 	Tags           []string
 	Mentions       []string
 	// RemoteMentions holds user@host acct strings for mentioned remote
@@ -438,7 +439,7 @@ const noteSelect = `
 SELECT n.id, n.user_id, n.user_host, n.visibility, n.local_only, n.cw, n.text, n.file_ids,
        (SELECT id FROM polls WHERE polls.id = n.id) AS poll_id,
        n.reply_id, n.reply_user_id, n.renote_id, n.renote_user_id, n.renote_user_host,
-       n.name, n.url, n.uri, n.tags, n.mentions, n.remote_mentions, n.emojis,
+       n.name, n.url, n.uri, n.ap_id, n.tags, n.mentions, n.remote_mentions, n.emojis,
        n.renote_count, n.replies_count, n.clipped_count, n.is_sensitive, n.reaction_acceptance,
        n.created_at, n.updated_at, n.deleted_at
 FROM notes n`
@@ -448,7 +449,7 @@ func scanNote(row pgx.Row) (*Note, error) {
 	var tags, mentions, remoteMentions, emojis []byte
 	err := row.Scan(&n.ID, &n.UserID, &n.UserHost, &n.Visibility, &n.LocalOnly, &n.CW, &n.Text,
 		&n.FileIDs, &n.PollID, &n.ReplyID, &n.ReplyUserID, &n.RenoteID, &n.RenoteUserID, &n.RenoteUserHost,
-		&n.Name, &n.URL, &n.URI, &tags, &mentions, &remoteMentions, &emojis,
+		&n.Name, &n.URL, &n.URI, &n.APID, &tags, &mentions, &remoteMentions, &emojis,
 		&n.RenoteCount, &n.RepliesCount, &n.ClippedCount, &n.IsSensitive, &n.ReactionAcceptance,
 		&n.CreatedAt, &n.UpdatedAt, &n.DeletedAt)
 	if errors.Is(err, pgx.ErrNoRows) {

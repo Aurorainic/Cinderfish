@@ -354,10 +354,15 @@ type RemoteNote struct {
 	CW          string
 	ReplyAPID   string
 	QuoteAPID   string
-	Tags        []string
-	Emojis      []EmojiRef
-	Sensitive   bool
-	CreatedAt   time.Time
+	// ReplyLocalID/QuoteLocalID carry an already resolved local note id when
+	// the target is a local note addressed by its ActivityPub URL; the
+	// stored row only knows ap_id/uri for remote notes.
+	ReplyLocalID string
+	QuoteLocalID string
+	Tags         []string
+	Emojis       []EmojiRef
+	Sensitive    bool
+	CreatedAt    time.Time
 	// Poll is set for an inbound Question: the choices, whether more than one
 	// may be picked, and an optional closing time. Empty means a plain note.
 	PollChoices   []string
@@ -371,13 +376,21 @@ func (s *Store) InsertRemoteNote(ctx context.Context, n RemoteNote) (string, err
 	id := idgen.New()
 
 	var replyID, renoteID, renoteUserID *string
-	if n.ReplyAPID != "" {
+	if n.ReplyLocalID != "" {
+		replyID = &n.ReplyLocalID
+	} else if n.ReplyAPID != "" {
 		var rid string
 		if err := s.pool.QueryRow(ctx, "SELECT id FROM notes WHERE ap_id = $1 OR uri = $1", n.ReplyAPID).Scan(&rid); err == nil {
 			replyID = &rid
 		}
 	}
-	if n.QuoteAPID != "" {
+	if n.QuoteLocalID != "" {
+		var ruid string
+		if err := s.pool.QueryRow(ctx, "SELECT user_id FROM notes WHERE id = $1", n.QuoteLocalID).Scan(&ruid); err == nil {
+			rid := n.QuoteLocalID
+			renoteID, renoteUserID = &rid, &ruid
+		}
+	} else if n.QuoteAPID != "" {
 		var rid, ruid string
 		if err := s.pool.QueryRow(ctx, "SELECT id, user_id FROM notes WHERE ap_id = $1 OR uri = $1", n.QuoteAPID).Scan(&rid, &ruid); err == nil {
 			renoteID, renoteUserID = &rid, &ruid

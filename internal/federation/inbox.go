@@ -284,6 +284,7 @@ func (i *Inbox) create(ctx context.Context, actor *RemoteUser, activity Object) 
 
 	data := NoteDataFromAP(note, actor, i.renderer)
 	data.ActivityURI = activity.Ref("id")
+	i.resolveLocalTargets(ctx, &data)
 	storedID, err := i.store.InsertRemoteNote(ctx, data)
 	if err != nil {
 		return "", err
@@ -470,6 +471,22 @@ func (i *Inbox) like(ctx context.Context, actor *RemoteUser, activity Object) (s
 	return "ok", nil
 }
 
+// resolveLocalTargets fills ReplyLocalID/QuoteLocalID when the target is a
+// local note addressed by its ActivityPub URL, which the stored row cannot be
+// found by through ap_id/uri alone.
+func (i *Inbox) resolveLocalTargets(ctx context.Context, data *RemoteNote) {
+	if data.ReplyAPID != "" {
+		if id, err := i.store.NoteIDByAPIDOrURL(ctx, data.ReplyAPID, i.renderer.BaseURL); err == nil {
+			data.ReplyLocalID = id
+		}
+	}
+	if data.QuoteAPID != "" {
+		if id, err := i.store.NoteIDByAPIDOrURL(ctx, data.QuoteAPID, i.renderer.BaseURL); err == nil {
+			data.QuoteLocalID = id
+		}
+	}
+}
+
 // announce handles Announce (a renote).
 func (i *Inbox) announce(ctx context.Context, actor *RemoteUser, activity Object) (string, error) {
 	id := activity.Ref("id")
@@ -496,6 +513,7 @@ func (i *Inbox) announce(ctx context.Context, actor *RemoteUser, activity Object
 		QuoteAPID:   targetID,
 		CreatedAt:   publishedOrNow(activity),
 	}
+	i.resolveLocalTargets(ctx, &data)
 	storedID, err := i.store.InsertRemoteNote(ctx, data)
 	if err != nil {
 		return "", err
