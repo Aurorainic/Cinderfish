@@ -171,6 +171,7 @@ export const ENDPOINTS = {
 	adminResolveAbuseReport: "admin/resolve-abuse-user-report",
 	adminAnnouncementsCreate: "admin/announcements/create",
 	adminAnnouncementsList: "admin/announcements/list",
+	adminAnnouncementsUpdate: "admin/announcements/update",
 	adminAnnouncementsDelete: "admin/announcements/delete",
 
 	notifications: "notifications",
@@ -768,6 +769,17 @@ export interface EndpointMap {
 	[ENDPOINTS.adminAnnouncementsCreate]: {
 		req: AdminAnnouncementsCreateParams;
 		res: Announcement;
+	};
+	[ENDPOINTS.adminAnnouncementsUpdate]: {
+		req: {
+			id: string;
+			title?: string;
+			text?: string;
+			imageUrl?: string | null;
+			isActive?: boolean;
+			expiresAt?: number | null;
+		};
+		res: EmptyResponse;
 	};
 	[ENDPOINTS.adminAnnouncementsDelete]: {
 		req: { id: string };

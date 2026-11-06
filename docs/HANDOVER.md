@@ -2994,6 +2994,42 @@ cd web && pnpm build                    # exit 0
 - 匿名列表仍为 `isRead:false`。
 - `go test` 与浏览器走查未执行。
 
+## 12BA. 批次：公告编辑（2026-11-06）
+
+**工作方式**：目标模式第三十七波，继续只写代码、验证到编译层。施工依据
+`docs/research/2026-11-06-firefish-port-wave37-contract.md`。
+
+### 12BA.1 落地清单
+
+| 层 | 文件 | 说明 |
+|----|------|------|
+| 服务层 | `internal/announcement/service.go` | `UpdateParams`（`SetExpiry` 区分「保持 / 显式 null」）与 `Update`：读-合并-整行写回 |
+| 端点 | `internal/httpapi/announcements.go`、`server.go` | `admin/announcements/update`；`imageUrl`/`expiresAt` 三态；404 `NO_SUCH_ANNOUNCEMENT` |
+| 前端 | `api/endpoints.ts`、`pages/AdminAnnouncements.vue` | 表单双模式、编辑回填、列表「编辑」按钮、`.itemActions` 布局 |
+| 文档 | `admin-emoji-registry.md`、台账 | update 端点契约（125/118/322） |
+
+### 12BA.2 有意的限制
+
+1. 保存后重拉列表，不做乐观更新。
+2. UI 不暴露 `isActive`（后端已支持，等将来加开关）。
+3. `expiresAt` 后端不校验「晚于现在」，过去时间等于立即过期；UI 侧拦住了。
+
+### 12BA.3 验证证据（编译层）
+
+```
+gofmt -l internal/ cmd/                 # 空
+go vet ./...                            # exit 0
+cd web && pnpm exec vue-tsc --noEmit    # exit 0
+cd web && pnpm run check:port           # hardTotal 0（400 文件）
+cd web && pnpm build                    # exit 0
+```
+
+### 12BA.4 仍未验证
+
+- 编辑保存后的回读、清空 `imageUrl`/`expiresAt` 的实际效果。
+- 404 `NO_SUCH_ANNOUNCEMENT` 与 403 分支。
+- `go test` 与浏览器走查未执行。
+
 ## 13. 文档索引
 
 | 文档 | 内容 |
@@ -3056,6 +3092,7 @@ cd web && pnpm build                    # exit 0
 | `docs/research/2026-11-06-firefish-port-wave34-contract.md` | **第三十四波施工契约（notes/state 与收藏菜单），见 §12AX** |
 | `docs/research/2026-11-06-firefish-port-wave35-contract.md` | **第三十五波施工契约（从 URL 上传），见 §12AY** |
 | `docs/research/2026-11-06-firefish-port-wave36-contract.md` | **第三十六波施工契约（公告已读状态），见 §12AZ** |
+| `docs/research/2026-11-06-firefish-port-wave37-contract.md` | **第三十七波施工契约（公告编辑），见 §12BA** |
 
 ## 14. 已知的未验证项
 
@@ -3111,6 +3148,7 @@ cd web && pnpm build                    # exit 0
 - **第三十四波未测（2026-11-06，见 §12AX.4）**：notes/state 与菜单只过了编译层，状态切换与失败回退未验证。
 - **第三十五波未测（2026-11-06，见 §12AY.4）**：从 URL 上传只过了编译层，SSRF 拒绝与下载分支未验证。
 - **第三十六波未测（2026-11-06，见 §12AZ.4）**：公告已读只过了编译层，写入/回读与角标联动未验证。
+- **第三十七波未测（2026-11-06，见 §12BA.4）**：公告编辑只过了编译层，保存回读与清空语义未验证。
 - **仍未移植的设置页**：邮箱、整合、导入导出、迁移、Webhook、插件、自定义 KaTeX、状态栏、
   删除账号、应用授权以外的账号操作；对应后端端点不存在或前端缺少依赖（见第五波契约 §3.3）。
 - **仍缺的 widgets**：rss、rss-ticker、server-metric、online-users、federation、job-queue、aiscript、

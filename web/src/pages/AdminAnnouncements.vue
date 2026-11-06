@@ -12,8 +12,8 @@
 				</CfInfo>
 			</div>
 			<div v-else class="cf-admin-announcements">
-				<form class="createCard" @submit.prevent="create">
-					<h2 class="title">新建公告</h2>
+				<form class="createCard" @submit.prevent="submit">
+					<h2 class="title">{{ editingId === null ? "新建公告" : "编辑公告" }}</h2>
 					<CfInput v-model="title" class="field" :disabled="saving">
 						<template #label>标题</template>
 						<template #caption>最多 256 个字符。</template>
@@ -53,7 +53,14 @@
 					</CfInfo>
 					<div class="actions">
 						<CfButton type="submit" primary :disabled="saving">
-							{{ saving ? "发布中…" : "发布" }}
+							{{ saving ? "保存中…" : editingId === null ? "发布" : "保存" }}
+						</CfButton>
+						<CfButton
+							v-if="editingId !== null"
+							:disabled="saving"
+							@click="cancelEdit()"
+						>
+							取消
 						</CfButton>
 					</div>
 				</form>
@@ -79,13 +86,18 @@
 								</span>
 							</div>
 						</div>
-						<CfButton
-							mini
-							:disabled="deletingId === item.id"
-							@click="remove(item)"
-						>
-							{{ deletingId === item.id ? "删除中…" : "删除" }}
-						</CfButton>
+						<div class="itemActions">
+							<CfButton mini :disabled="saving" @click="beginEdit(item)">
+								编辑
+							</CfButton>
+							<CfButton
+								mini
+								:disabled="deletingId === item.id"
+								@click="remove(item)"
+							>
+								{{ deletingId === item.id ? "删除中…" : "删除" }}
+							</CfButton>
+						</div>
 					</li>
 				</ul>
 
@@ -99,9 +111,8 @@
 
 <script setup lang="ts">
 // Firefish's admin announcements page edits rows through
-// `admin/announcements/{create,update,delete}`. This port implements create,
-// list and delete; editing an existing notice would need `update`, so the list
-// is read + delete only (delete and re-create is the documented workflow).
+// `admin/announcements/{create,update,delete}`; all three exist now, and the
+// same form switches between create and edit modes.
 //
 // Expiry uses the native datetime-local input because CfInput has no such
 // type; the value is converted to Unix milliseconds on submit.
@@ -131,6 +142,7 @@ const loading = ref(false);
 const loadError = ref<string | null>(null);
 const actionError = ref<string | null>(null);
 const deletingId = ref<string | null>(null);
+const editingId = ref<string | null>(null);
 
 const title = ref<string | number | null>("");
 const text = ref("");
@@ -162,7 +174,36 @@ function isExpired(item: Announcement): boolean {
 	return item.expiresAt !== null && new Date(item.expiresAt).getTime() < Date.now();
 }
 
-async function create(): Promise<void> {
+function resetForm(): void {
+	editingId.value = null;
+	title.value = "";
+	text.value = "";
+	imageUrl.value = "";
+	expiresLocal.value = "";
+	formError.value = null;
+}
+
+function cancelEdit(): void {
+	resetForm();
+}
+
+function beginEdit(item: Announcement): void {
+	editingId.value = item.id;
+	title.value = item.title;
+	text.value = item.text;
+	imageUrl.value = item.imageUrl ?? "";
+	expiresLocal.value =
+		item.expiresAt === null ? "" : toLocalInput(item.expiresAt);
+	formError.value = null;
+}
+
+function toLocalInput(iso: string): string {
+	const date = new Date(iso);
+	const pad = (n: number) => String(n).padStart(2, "0");
+	return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+async function submit(): Promise<void> {
 	if (saving.value) return;
 	formError.value = null;
 	const titleText = String(title.value ?? "").trim();
@@ -187,16 +228,23 @@ async function create(): Promise<void> {
 	const image = String(imageUrl.value ?? "").trim();
 	saving.value = true;
 	try {
-		await api("admin/announcements/create", {
-			title: titleText,
-			text: bodyText,
-			...(image !== "" ? { imageUrl: image } : {}),
-			...(expiresAt !== null ? { expiresAt } : {}),
-		});
-		title.value = "";
-		text.value = "";
-		imageUrl.value = "";
-		expiresLocal.value = "";
+		if (editingId.value === null) {
+			await api("admin/announcements/create", {
+				title: titleText,
+				text: bodyText,
+				...(image !== "" ? { imageUrl: image } : {}),
+				...(expiresAt !== null ? { expiresAt } : {}),
+			});
+		} else {
+			await api("admin/announcements/update", {
+				id: editingId.value,
+				title: titleText,
+				text: bodyText,
+				imageUrl: image === "" ? null : image,
+				expiresAt,
+			});
+		}
+		resetForm();
 		await load();
 	} catch (cause) {
 		formError.value = errorText(cause);
@@ -332,6 +380,12 @@ onMounted(() => {
 		display: flex;
 		gap: 6px;
 		flex-wrap: wrap;
+	}
+
+	.itemActions {
+		display: flex;
+		gap: 8px;
+		flex-shrink: 0;
 	}
 }
 
