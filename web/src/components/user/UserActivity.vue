@@ -6,6 +6,11 @@
 			<span>{{ t("activity") }}</span>
 		</header>
 		<div class="body">
+			<CfLoading v-if="fetching && chart == null" />
+			<CfInfo v-else-if="failed" warn>
+				活动统计加载失败，稍后会自动重试。
+			</CfInfo>
+			<NotesChart v-else :chart="chart" class="chart" />
 			<div class="stats">
 				<div class="stat">
 					<b><MkNumber :value="user.notesCount" /></b>
@@ -20,27 +25,52 @@
 					<span>{{ t("followers") }}</span>
 				</div>
 			</div>
-			<CfInfo warn class="notice">
-				活动图表需要 charts/user/notes 接口，后端尚未提供，因此这里只显示
-				users/show 可直接读到的计数，不绘制折线或柱状图。
-			</CfInfo>
 		</div>
 	</div>
 </template>
 
 <script lang="ts" setup>
-// Firefish renders <MkChart src="per-user-notes"> (chart.js). Cinderfish has no
-// `charts/*` endpoint and chart.js is not a dependency, so the panel keeps the
-// real counters from `users/show` and states plainly what is missing instead of
-// drawing a fake chart (contract §2 / completion criterion 4).
-import type { UserDetailed } from "@/api/types";
+// Firefish renders <MkChart src="per-user-notes"> (chart.js). chart.js is not a
+// dependency here, so the shared NotesChart component draws the same
+// `charts/user/notes` arrays as stacked bars.
+import { onMounted, ref, watch } from "vue";
+import type { UserDetailed, UserNotesChart } from "@/api/types";
+import { api } from "@/api/client";
 import CfInfo from "@/components/ui/CfInfo.vue";
+import CfLoading from "@/components/ui/CfLoading.vue";
 import MkNumber from "@/components/MkNumber.vue";
+import NotesChart from "@/components/NotesChart.vue";
 import { t } from "@/i18n";
 
-defineProps<{
+const props = defineProps<{
 	user: UserDetailed;
 }>();
+
+const chart = ref<UserNotesChart | null>(null);
+const fetching = ref(false);
+const failed = ref(false);
+
+function load(): void {
+	fetching.value = true;
+	failed.value = false;
+	api<UserNotesChart>("charts/user/notes", {
+		span: "day",
+		limit: 30,
+		userId: props.user.id,
+	})
+		.then((result) => {
+			chart.value = result;
+		})
+		.catch(() => {
+			failed.value = true;
+		})
+		.finally(() => {
+			fetching.value = false;
+		});
+}
+
+onMounted(load);
+watch(() => props.user.id, load);
 </script>
 
 <style lang="scss" scoped>
@@ -60,10 +90,13 @@ defineProps<{
 		padding: 16px;
 	}
 
+	.chart {
+		margin-bottom: 16px;
+	}
+
 	.stats {
 		display: flex;
 		gap: 16px;
-		margin-bottom: 16px;
 
 		> .stat {
 			flex: 1;
@@ -80,10 +113,6 @@ defineProps<{
 				opacity: 0.7;
 			}
 		}
-	}
-
-	> .body > .notice {
-		font-size: 0.85em;
 	}
 }
 </style>

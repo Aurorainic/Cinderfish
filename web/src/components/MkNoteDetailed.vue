@@ -260,11 +260,9 @@ useNoteCapture({
 
 function reply(_viaKeyboard = false): void {
 	pleaseLogin();
-	// Degradation: the composer (MkPostForm) is not part of this wave.
-	void os.alert({
-		type: "info",
-		text: "回复发帖待实现（本波未移植 PostForm）",
-	});
+	// Firefish passes `animation: !viaKeyboard` too; the dialog owns its own
+	// transition in this port.
+	void os.post({ reply: note.value as unknown as NoteDetailed });
 }
 
 function react(_viaKeyboard = false): void {

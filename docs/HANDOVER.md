@@ -6583,3 +6583,36 @@ Host。这一轮用 Go 的反向代理复现同一拓扑。
   `HTTP/1.1 429`、`Retry-After: 3600`、
   `{"code":"RATE_LIMIT_EXCEEDED", … "message":"Rate limit exceeded. Please try again later."}`。
 - 前端无需改动：现有 `api` shim 会把 429 的 message 显示为错误对话框（§12EQ 已验证同一条路径）。
+
+## 12FI. 第一百四十五波：详情页回复与用户主页活动图表（2026-11-07）
+
+两处前端占位已经过期：
+
+- `MkNoteDetailed.vue` 的回复按钮仍弹「回复发帖待实现（本波未移植 PostForm）」，但
+  `os.post({ reply })` 早已存在，`MkNote`/`MkNoteSub` 都在用；
+- `UserActivity.vue` 仍写「charts/user/notes 后端尚未提供」，而 §12EZ 已实现该端点。
+
+### 12FI.1 改动
+
+| 层 | 文件 | 内容 |
+|----|------|------|
+| 回复 | `web/src/components/MkNoteDetailed.vue` | `reply()` 改为 `os.post({ reply })`，与列表/子帖路径一致 |
+| 图表 | `web/src/components/NotesChart.vue`（新） | 把 activity widget 里的 30 天堆叠柱抽成共享组件（normal/reply/renote + 图例） |
+| widget | `web/src/widgets/activity.vue` | 改用 `NotesChart`，只保留取数与计数 |
+| 主页 | `web/src/components/user/UserActivity.vue` | 按 `user.id` 拉 `charts/user/notes`（day × 30）并渲染 `NotesChart`，失败时提示 |
+
+### 12FI.2 有意的限制
+
+- 图表仍是堆叠柱而非 chart.js 折线/热力图（没有 chart.js 依赖），与 activity widget 一致。
+- 主页活动页每次进入拉一次；没有定时刷新（Firefish 也没有）。
+- `charts/user/notes` 只统计笔记创建/删除，不含回应与关注曲线（Misskey 的其它 charts 端点未实现）。
+
+### 12FI.3 验证证据
+
+- `vue-tsc --noEmit`、`check:port`（hardTotal 0）、`pnpm build` 全绿。
+- 真实二进制 + 无头浏览器（1400×900）：
+  - 打开 `/notes/<id>`，点回复按钮 → 编辑器出现 → 填入「w145 reply body」→ 提交 →
+    `users/notes` 返回一条 `replyId` 等于原帖 id 的笔记；
+  - 打开 `/@w145alice/activity` → `.activity .chart .bar` 为 30 根（1 根非零），
+    计数「2 帖子 / 0 关注中 / 0 关注者」，页面不再出现「后端尚未提供」。
+- 截图：`/tmp/w145-shots/reply-and-activity.png`（不入库）。
