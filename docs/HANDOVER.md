@@ -4187,8 +4187,10 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
   `TestAllowlistGatesInboundInbox` 覆盖（2026-11-07）：未列出的主机连签名都无法验证（401），
   列出后同一 Follow 得到 202 并落库；签名拒绝本身有 `TestInboxRejects*` 三件套。
   子域匹配的**运维体验**（真实反代下的配置）仍未验证。
-- **第十五波未测边角（2026-11-06，见 §12AE.4）**：未登录授权衔接、callback 跳转未走查；OAuth 同意页、
-  拒绝回执、scope 强制按设计未做。
+- **第十五波的部分边角（2026-11-06，见 §12AE.4）**：MiAuth 的未登录衔接与回调已在
+  2026-11-07 走查（`/miauth/<session>` 未登录时内嵌登录 → 登录后出现「查看账号信息」授权页 →
+  接受后跳到 `https://…/cb?session=<session>`，`access_tokens` 出现 session 绑定的令牌）。
+  OAuth 同意页见 §12CB。拒绝回执与 scope 强制按设计未做。
 - **第十六波未测边角（2026-11-06，见 §12AF.4）**：远端提及、流式推送下的未读实时插入、directNotes
   与类型过滤组合未验证。
 - **第十七波未测边角（2026-11-06，见 §12AG.4）**：远程目录、hostname、`state=admin` 与未登录视角
