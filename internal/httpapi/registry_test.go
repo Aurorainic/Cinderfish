@@ -122,3 +122,52 @@ func TestRegistryIsolationAndErrors(t *testing.T) {
 		t.Errorf("anonymous get = %d, want 401", resp.StatusCode)
 	}
 }
+
+// TestRegistryKeysWithType proves keys-with-type reports the JSON type of
+// every stored value and stays scoped.
+func TestRegistryKeysWithType(t *testing.T) {
+	ts := newTestServer(t, "open")
+	_, token := createUser(t, ts, uniqueName(t))
+	scope := []string{"client", "w3"}
+
+	values := map[string]any{
+		"theme":  "dark",
+		"count":  3,
+		"ratio":  0.5,
+		"on":     true,
+		"config": map[string]any{"accent": "#86b300"},
+		"list":   []any{1, 2},
+	}
+	for key, value := range values {
+		if resp, out := post(t, ts, "/api/i/registry/set", map[string]any{
+			"i": token, "key": key, "scope": scope, "value": value,
+		}); resp.StatusCode != http.StatusOK {
+			t.Fatalf("set %s: %d %v", key, resp.StatusCode, out)
+		}
+	}
+
+	_, out := post(t, ts, "/api/i/registry/keys-with-type", map[string]any{"i": token, "scope": scope})
+	want := map[string]string{
+		"theme": "string", "count": "number", "ratio": "number",
+		"on": "boolean", "config": "object", "list": "array",
+	}
+	if len(out) != len(want) {
+		t.Fatalf("keys-with-type = %v, want %d entries", out, len(want))
+	}
+	for key, typ := range want {
+		if got, _ := out[key].(string); got != typ {
+			t.Errorf("%s type = %v, want %s", key, out[key], typ)
+		}
+	}
+
+	// Another scope, and another user, see nothing.
+	_, empty := post(t, ts, "/api/i/registry/keys-with-type", map[string]any{"i": token, "scope": []string{"other"}})
+	if len(empty) != 0 {
+		t.Errorf("other scope = %v, want empty", empty)
+	}
+	_, bobToken := createUser(t, ts, uniqueName(t)+"b")
+	_, bobs := post(t, ts, "/api/i/registry/keys-with-type", map[string]any{"i": bobToken, "scope": scope})
+	if len(bobs) != 0 {
+		t.Errorf("bob keys = %v, want empty", bobs)
+	}
+}

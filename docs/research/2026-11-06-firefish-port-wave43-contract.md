@@ -53,7 +53,8 @@ pollVotesCount, pollVotedCount}`。三个笔记桶互斥：`notesCount` 只数�
 1. `hashtags/search` 忽略 `sort`。
 2. `notes/featured` 有 30 天窗口，老笔记不会出现。
 3. `i/registry/keys-with-type` 的类型是推断值，不是写入时记录的。
-4. 四个端点都没有新增测试。
+4. 四个端点没有新增测试（2026-11-07 补：见 `internal/httpapi/compat_endpoints_test.go`
+   与 `registry_test.go` 的 `TestRegistryKeysWithType`）。
 
 ## 7. 验收
 
@@ -65,4 +66,4 @@ cd web && pnpm run check:port           # hardTotal 0
 cd web && pnpm build                    # exit 0
 ```
 
-未执行 `go test`、数据库测试与浏览器走查。
+未执行浏览器走查（端点用例见 2026-11-07 补的 `compat_endpoints_test.go`）。

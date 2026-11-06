@@ -3234,7 +3234,7 @@ go vet ./...              # exit 0
 
 ## 12BG. 批次：四个兼容端点（2026-11-06）
 
-**工作方式**：目标模式第四十三波，继续只写代码、验证到编译层。施工依据
+**工作方式**：目标模式第四十三波，先只写代码验证到编译层，2026-11-07 补齐端点用例。施工依据
 `docs/research/2026-11-06-firefish-port-wave43-contract.md`。
 
 ### 12BG.1 落地清单
@@ -3252,7 +3252,8 @@ go vet ./...              # exit 0
 1. `hashtags/search` 忽略 `sort`。
 2. `notes/featured` 有 30 天窗口。
 3. `keys-with-type` 的类型是读时推断。
-4. 四个端点均未新增测试。
+4. 四个端点的返回值由 `compat_endpoints_test.go` 与 `registry_test.go` 的
+   `TestRegistryKeysWithType` 覆盖（§12BG.4）。
 
 ### 12BG.3 验证证据（编译层）
 
@@ -3264,10 +3265,34 @@ cd web && pnpm run check:port           # hardTotal 0（400 文件）
 cd web && pnpm build                    # exit 0
 ```
 
-### 12BG.4 仍未验证
+### 12BG.4 端点用例（2026-11-07 补）
 
-- 四个端点的返回值（计数一致性、标签排序、类型推断、推荐排序）。
-- 账号信息页的实际渲染与统计失败时的降级。
+新增 `internal/httpapi/compat_endpoints_test.go` 与 `registry_test.go` 的
+`TestRegistryKeysWithType`，四个端点的返回值不再只有编译证据：
+
+- `users/stats`（`TestUsersStats`）：一条普通笔记、一条回复、一条转贴分别计入
+  `notesCount`/`repliesCount`/`renotesCount`；被回复者 `repliedCount` 与
+  `renotedCount` 各 1；空 `userId` 带凭据回落到调用者；匿名空 `userId` 400；
+  未知 `userId` 404 `NO_SUCH_USER`；`pollVotesCount`/`pollVotedCount` 始终存在。
+- `hashtags/search`（`TestHashtagsSearch`）：空 query 按使用量排序（并列按标签名）；
+  `query: "go"` 子串命中 `go`/`golang`；`limit` 与 `offset` 生效。
+- `notes/featured`（`TestNotesFeatured`）：两条公开笔记中带两个反应加一条回复的排第一；
+  home 回复与 followers 笔记不进入列表；`limit: 1` 只返回一条；`sinceId` 过滤旧笔记。
+- `i/registry/keys-with-type`（`TestRegistryKeysWithType`）：string/number/boolean/
+  object/array 六种值读回正确类型；其他 scope 与其他用户为空。
+
+```
+gofmt -l internal/ cmd/                                        # 空
+go vet ./...                                                   # exit 0
+CINDERFISH_TEST_DATABASE_URL=... go test ./... -count=1         # 全绿
+```
+
+### 12BG.5 仍未验证
+
+- 账号信息页的实际渲染与统计失败时的降级只有编译证据（页面走查见邮箱三页那一批之外的
+  剩余界面清单）。
+- `hashtags/search` 的 `sort` 仍按文档化限制忽略；`notes/featured` 的 30 天窗口边界
+  （刚好 30 天前后的笔记）未单测。
 - `go test` 与浏览器走查未执行。
 
 ## 12BH. 批次：实例 CSS 与邮件设置页（2026-11-06）
@@ -3564,7 +3589,7 @@ cd web && pnpm build                    # exit 0
 | 40 | **修复出站投递从未接线** + `notes/unrenote` | 编译层，双实例未验证 |
 | 41 | 编辑的双向 `Update` | 编译层 |
 | 42 | **按活动作者签名**（原为固定管理员密钥） | 编译层 |
-| 43 | `users/stats`、`hashtags/search`、`registry/keys-with-type`、`notes/featured` | 编译层 |
+| 43 | `users/stats`、`hashtags/search`、`registry/keys-with-type`、`notes/featured` | 端点用例（§12BG.4） |
 | 44 | 实例级自定义 CSS + 邮件状态页 | 编译层 |
 | 45 | `admin/drive/show-file` + 管理台文件详情 | 编译层 |
 | 46 | 缩略图生成管道（`thumbnailUrl` 不再恒 null） | 编译层 |
@@ -4292,7 +4317,9 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
 - **第四十二波已补验证（2026-11-06，见 §12BF.4）**：`TestTwoInstanceAuthorSigning` 让 alpha 先有一个
   管理员（实例兜底密钥不是 alice 的），再让 alice 发帖；`deliver_queue.key_id` 断言为 alice 的
   `#main-key`，且 beta 按 actor 公钥验签后接收并落库（若用兜底密钥会被拒）（2026-11-07）。
-- **第四十三波未测（2026-11-06，见 §12BG.4）**：四个兼容端点与账号信息页只有编译层证据。
+- **第四十三波已补验证（2026-11-07，见 §12BG.4）**：四个兼容端点的返回值均有用例覆盖
+  （计数一致性、标签排序与 limit/offset、推荐排序与可见性过滤、registry 类型推断）。
+  仍未验证的：账号信息页的实际渲染与统计失败时的降级。
 - **第四十四波未测（2026-11-06，见 §12BH.4）**：实例 CSS 链路与邮件状态页只有编译层证据。
 - **第四十五波未测（2026-11-06，见 §12BI.4）**：文件详情的四类预览与 `user: null` 分支未走查。
 - **第四十六波未测（2026-11-06，见 §12BJ.4）**：缩略图生成与删除只有编译层证据。
