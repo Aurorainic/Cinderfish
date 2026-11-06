@@ -4665,9 +4665,11 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
   （重新生成 locale 前要先 `pnpm add -D yaml`）。
 - **S3 后端未做真实服务端验证**：只验证了编译、接口与 URL 生成逻辑。
 - ~~**缩略图/WebP 生成未实现**~~：第四十六波实现了缩略图（≤512px，JPEG/PNG）；WebP 仍未做。
-- **前端没有真实第三方客户端联调**：页面已在构建产物上用浏览器走查，但没有用 misskey-js 或 Misskey Web 前端连过本实例。
+- **前端没有真实第三方客户端联调**：页面已在构建产物上用浏览器走查；2026-11-07 起已用官方
+  `misskey-js`（2026.10.2-alpha.0）连过本实例（见 §12CG），仍未用 Misskey Web 前端整站连接。
 - **Redis 只对 miniredis 验证过**：本机没有 `redis-server`，跨进程中继的单元测试与双进程 smoke 都用 miniredis；没有对真实 Redis 做过持久化/认证/网络闪断验证。
-- **Streaming 未做真实 Misskey 客户端联调**：已用自写 WebSocket 客户端验证（握手、`connect`、`connected`、笔记投递全部通过），但**没有**用 misskey-js 或 Misskey Web 前端实际连过。
+- **Streaming 未做真实 Misskey 客户端联调**：已用自写 WebSocket 客户端验证；2026-11-07 起
+  也用 `misskey-js` 的 `Stream` 验证了 `localTimeline` 与 `main` 频道（§12CG）。仍未用 Misskey Web 整站连接。
 - **联邦没有任何第三方联调**：只跑了本实现的双实例测试（真签名、真 HTTP、真库），没有对 Mastodon / GoToSocial / 真实 Misskey 实例互通。这是 M5 之后最该补的验证。
 - **Streaming 多进程中继只手测了单连接的 LISTEN/NOTIFY 往返**，没有做真正的双进程联调。
 - **前端移植第三波已完成的验证（2026-11-05，见 §12S.3）**：发帖链路、个人页五页签、关注/粉丝列表、
@@ -4787,3 +4789,34 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
 
 - 大表（万级标签/关注）下的聚合与分页耗时。
 - 日期边界（恰好等于 createdAt 的毫秒）没有单独断言，只有窗口两侧的用例。
+
+## 12CG. 第六十八波：官方 misskey-js 客户端联调（2026-11-07）
+
+此前所有「真实客户端」证据都来自自写 HTTP/WebSocket 脚本。这一轮用官方 `misskey-js`
+（npm `2026.10.2-alpha.0`，安装在 `/tmp/w68-client`，**未加入仓库依赖**）对真实二进制走了一遍。
+
+### 12CG.1 结果
+
+| 能力 | 调用 | 结果 |
+|------|------|------|
+| 注册 | `signup` ×2 | 返回 id + token |
+| 实例信息 | `meta` | 名称 `Cinderfish`、版本 `0.1.0` |
+| 会话 | `i` | 返回当前用户 |
+| 发帖 + 投票 | `notes/create`（带 `poll`） | `createdNote.poll` 两个选项 |
+| 读帖 | `notes/show` | 文本与选项一致 |
+| 时间线 | `notes/local-timeline` | 10 条内包含新帖 |
+| Streaming | `Stream` + `localTimeline` | 另一账号发帖后收到 `note` 事件，id 匹配 |
+| Streaming 通知 | `Stream` + `main` | alice 关注 bob 后 bob 收到 `notification`，`type: follow` |
+| 投票 | `notes/polls/vote` + `notes/show` | `no` 选项 1 票且 `isVoted: true` |
+
+### 12CG.2 说明
+
+- `misskey-js` 只作为外部验证工具，仓库的 `package.json` 与锁文件没有改动。
+- SDK 新版导出 `api.APIClient` 与 `Stream`（没有旧的 `Misskey` 类）；`stream.close()` 断开。
+- 这次没有覆盖 Misskey Web 前端整站（需要构建上游前端并解决其 WebSocket/HTTP 假设）。
+
+### 12CG.3 仍未验证
+
+- Misskey Web 整站连接（登录、页面渲染、Streaming 重连）。
+- 多标签页/重连后的频道恢复。
+- 并发大量事件时的顺序与丢失率。
