@@ -446,6 +446,20 @@ CREATE TABLE IF NOT EXISTS announcements (
 CREATE INDEX IF NOT EXISTS idx_announcements_created ON announcements (created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_announcements_active ON announcements (is_active, expires_at);
 `,
+
+	// v11: abuse reports. A report targets a user (Misskey's contract); the
+	// resolved flag is the administrator's handling state.
+	11: `
+CREATE TABLE IF NOT EXISTS abuse_reports (
+    id             TEXT PRIMARY KEY,
+    reporter_id    TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    target_user_id TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    comment        TEXT NOT NULL,
+    resolved       BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_abuse_reports_unresolved ON abuse_reports (resolved, created_at DESC);
+`,
 }
 
 // Migrate applies pending migrations in order and returns the version

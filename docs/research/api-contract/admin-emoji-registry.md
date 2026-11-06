@@ -1066,3 +1066,33 @@ UserLite 部分也有简化：`name`/`avatarUrl` 只从 profile 行来，没有 
 ### POST /api/admin/announcements/delete（管理员）
 
 `{ id }`，返回 204；不存在的 id 也是 204（幂等）。
+
+## 2026-11-06 增补：举报（report-abuse）
+
+迁移 v11 新增 `abuse_reports`（举报者、被举报者、说明、resolved、时间）。
+
+### POST /api/users/report-abuse（登录）
+
+| 参数 | 校验 |
+|------|------|
+| `userId` | 必填；不存在 404；等于自己 400 |
+| `comment` | 必填，去空白后 1–2048 字符 |
+
+返回 204。管理员也可以调用，但用户菜单对管理员不显示举报项（管理员用冻结入口）。
+
+### POST /api/admin/abuse-user-reports（管理员）
+
+| 参数 | 说明 |
+|------|------|
+| `limit` | 默认 10，上限 100 |
+| `sinceId` / `untilId` | 举报 id 游标 |
+| `state` | `resolved` / `unresolved` / `null`（全部） |
+| `reporterOrigin` / `targetUserOrigin` | combined / local / remote |
+
+返回数组：`{ id, targetUser, reporter, comment, resolved, createdAt, forwarded: false }`，
+用户为 `UserDetailed`。`state` 非法 400，非管理员 403。
+
+### POST /api/admin/resolve-abuse-user-report（管理员）
+
+`{ reportId }`，标记 `resolved = TRUE` 并返回 204；未知 id 也是 204（幂等）。
+`forward` 未实现，请求里带 `forward` 也不会转发。

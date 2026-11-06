@@ -18,6 +18,7 @@ import (
 	"github.com/Aurorainic/cinderfish/internal/federation"
 	"github.com/Aurorainic/cinderfish/internal/media"
 	"github.com/Aurorainic/cinderfish/internal/note"
+	"github.com/Aurorainic/cinderfish/internal/report"
 	"github.com/Aurorainic/cinderfish/internal/streaming"
 )
 
@@ -41,6 +42,7 @@ type Server struct {
 	emojis        *media.EmojiService
 	registry      *account.RegistryService
 	announcements *announcement.Service
+	reports       *report.Service
 
 	storage media.Storage
 	drive   *media.DriveService
@@ -93,6 +95,7 @@ func NewServerWithDB(cfg *config.Config, pool *pgxpool.Pool) *Server {
 	s.emojis = media.NewEmojiService(pool)
 	s.registry = account.NewRegistryService(pool)
 	s.announcements = announcement.NewService(pool)
+	s.reports = report.NewService(pool)
 	return s
 }
 
@@ -124,6 +127,7 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("POST /api/i/unpin", s.handleIUnpin)
 	s.mux.HandleFunc("POST /api/users/show", s.handleUsersShow)
 	s.mux.HandleFunc("POST /api/users/search", s.handleUsersSearch)
+	s.mux.HandleFunc("POST /api/users/report-abuse", s.handleReportAbuse)
 	s.mux.HandleFunc("POST /api/users/notes", s.handleUsersNotes)
 	s.mux.HandleFunc("POST /api/users/followers", s.handleUsersFollowers)
 	s.mux.HandleFunc("POST /api/users/following", s.handleUsersFollowing)
@@ -211,6 +215,10 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("POST /api/admin/announcements/create", s.handleAdminAnnouncementsCreate)
 	s.mux.HandleFunc("POST /api/admin/announcements/list", s.handleAdminAnnouncementsList)
 	s.mux.HandleFunc("POST /api/admin/announcements/delete", s.handleAdminAnnouncementsDelete)
+
+	// Abuse reports: users file them, administrators resolve them.
+	s.mux.HandleFunc("POST /api/admin/abuse-user-reports", s.handleAdminAbuseReports)
+	s.mux.HandleFunc("POST /api/admin/resolve-abuse-user-report", s.handleAdminResolveAbuseReport)
 
 	s.mux.HandleFunc("POST /api/drive/files/create", s.handleDriveFilesCreate)
 	s.mux.HandleFunc("POST /api/drive/folders", s.handleDriveFolders)

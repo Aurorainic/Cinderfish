@@ -15,18 +15,19 @@
 | 指标 | 数量 |
 |------|------|
 | Misskey 端点总数 | 440 |
-| Cinderfish 已注册路由 | 89 |
-| 其中 Misskey 同名路径 | 86 |
+| Cinderfish 已注册路由 | 92 |
+| 其中 Misskey 同名路径 | 89 |
 | 其中 Cinderfish 自有路径/别名 | 3（`notifications` 别名、`admin/federation/mode`、`admin/federation/allowlist`） |
-| 未实现（Misskey 同名） | 351 |
+| 未实现（Misskey 同名） | 348 |
 
 统计口径：`internal/httpapi/server.go` 里 `HandleFunc("METHOD /api/…")` 的去重路径；
 GET 与 POST 同名路径只算一个。
 
-## 2. 已实现（89 条注册路由）
+## 2. 已实现（92 条注册路由）
 
 ```
 admin/accounts/create       admin/announcements/create  admin/announcements/delete
+admin/abuse-user-reports    admin/resolve-abuse-user-report
 admin/announcements/list    admin/drive/files           admin/emoji/add
 admin/emoji/delete          admin/emoji/list            admin/federation/allowlist*
 admin/federation/mode*      admin/show-users            admin/suspend-user
@@ -55,7 +56,8 @@ notes/replies               notes/show                  notes/timeline
 notifications*              notifications/mark-all-as-read
 ping                        signin                      signup
 username/available          users/followers             users/following
-users/notes                 users/search                users/show
+users/notes                 users/report-abuse          users/search
+users/show
 users/update
 ```
 
@@ -70,6 +72,9 @@ users/update
 `hashtags/trend`、`drive/folders*`、`emojis`、`admin/emoji/*`、`notes/polls/vote`、
 `following/requests/*`、`users/update`、`signin`、`signup`、`username/available`、
 `i/registry/scopes`，以及 `admin/federation/mode` 的 GET。
+
+2026-11-06 第十波新增：`users/report-abuse`、`admin/abuse-user-reports`、
+`admin/resolve-abuse-user-report`（迁移 v11）。
 
 2026-11-06 第九波新增：`i/export`（自有 JSON 格式，非 Misskey zip）、`i/delete-account`。
 
