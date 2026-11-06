@@ -4430,8 +4430,9 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
   `CfSignup` 在管理员配置了 `tosUrl` / `serverRules` 时显示「注册即表示你同意 本实例的服务条款与
   实例规则」，浏览器实测两个链接（外链 `_blank`、规则链到 `/about`）、移动端无溢出；清空配置后
   该行消失。仍未验证的：远端实例计数与大表统计耗时。
-- **第二十波未测（2026-11-06，见 §12AJ.4）**：按用户指示本轮只写代码，TOTP 端到端登录（空码/错码/
-  正确码）、设置页交互、移动端布局与数据库用例都未执行；`qr` 为空串、安全密钥与备份码按设计未做。
+- **第二十波已补验证（2026-11-07，见 §12CO）**：TOTP 的注册/启用/登录/注销与 `NO_SECURITY_KEY`
+  都已有 HTTP 用例，浏览器的两步验证登录也在 §12CC 跑通。仍未验证的：设置页开关的交互细节、
+  移动端布局；`qr` 为空串、安全密钥与备份码按设计未做。
 - **第二十一波已补验证（2026-11-06，见 §12AK.4）**：三个端点现在有数据库用例
   （`TestPasswordChange` 与 `TestRegenerateToken`），并且 2026-11-07 用真实二进制 + 浏览器走查了
   `/settings/security`：改密后页面提示「密码已更新」，旧密码登录 403、新密码 200；
@@ -4556,8 +4557,8 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
   已走查；`homeTimeline` 的 withReplies 过滤新增了真实 WebSocket 端到端用例。仍未验证的：
   远端导入触发通知的双实例用例。
 - **第五十八波仍未验证**：没有对真实 Misskey/Firefish 验证 `EmojiReact`；远端自定义表情未解析；
-  `Question` 入站已在第六十六波补上（§12CE）；远端自定义表情已在第七十一波解析并渲染（§12CJ）；
-  仍未验证真实异种软件互投。
+  `Question` 入站已在第六十六波补上（§12CE）；笔记正文的远端自定义表情已在第七十一波解析并渲染
+  （§12CJ）。仍未验证的：真实异种软件互投、反应里的自定义表情。
 - **第五十九波部分补验证（2026-11-07 对账 §12CC）**：`/admin/abuses` 的举报者、被举报者、内容与
   「标记已处理」按钮已走查。仍未验证的：远端举报没有对真实实例验证；重复举报与笔记级目标的展示。
 - **第六十波部分补验证（2026-11-07 对账 §12CB）**：三个说明页与 `SignupComplete` 的结构与文案
@@ -5055,3 +5056,35 @@ CINDERFISH_TEST_DATABASE_URL=... go test ./... -count=1         # 全绿
 - 拒绝（Reject）的跨实例回执（队列断言已有，对端处理没有单独用例）。
 - alpha 在批准前重启，待审请求与通知是否保留（数据库持久，理论上保留）。
 - 远端关注者的通知邮件（`receiveFollowRequest`）在锁推 + 邮件订阅组合下未实测。
+
+## 12CO. 第七十六波：TOTP 两因素全链路用例（2026-11-07）
+
+第二十波只写了代码，浏览器走查（§12CC）补了登录界面，但端点层一直没有自动化用例。
+
+### 12CO.1 用例
+
+`internal/httpapi/two_factor_test.go` 的 `TestTwoFactorLifecycle`：
+
+1. 未注册时 `i/2fa/done` → 400 `TWO_FACTOR_NOT_STARTED`；
+2. `i/2fa/register` 密码错误 → 403；正确 → `secret` 与 `url`，`qr` 为空串（按设计）；
+3. `i/2fa/done` 错码 → 400 `TOTP_TOKEN_INVALID`；`auth.TOTPCode(secret, now)` → 204，
+   `i` 回读 `twoFactorEnabled: true`；
+4. `signin` 仅密码 → 200 空对象（客户端据此显示验证码框）；错码 → 403；正确码 → 200
+   `finished: true`；
+5. `i/2fa/unregister` 密码错误 → 403；正确 → 204，`twoFactorEnabled` 变 false，
+   之后仅密码登录直接 `finished: true`；
+6. `i/2fa/password-less` 开启 → 400 `NO_SECURITY_KEY`，关闭 → 204。
+
+### 12CO.2 验证证据
+
+```
+gofmt -l internal/ cmd/                                        # 空
+go vet ./...                                                   # exit 0
+CINDERFISH_TEST_DATABASE_URL=... go test ./... -count=1         # 全绿
+```
+
+### 12CO.3 仍未验证
+
+- 设置页安全区开关的交互（浏览器里只走查了登录提示）。
+- 移动端的两因素登录布局。
+- 备份码与安全密钥（按设计未做）。
