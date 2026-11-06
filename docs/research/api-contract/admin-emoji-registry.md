@@ -1211,3 +1211,14 @@ UserLite 部分也有简化：`name`/`avatarUrl` 只从 profile 行来，没有 
 - 保存后 `hashtags/trend` 在 SQL 里用 `lower(tag) <> ALL($3)` 排除这些标签；
 - 只影响趋势，不隐藏标签页、搜索或笔记本身（与 Firefish 的说明一致）；
 - 公网 `meta` 不返回该字段，只有 `admin/meta` 可见。
+
+## 2026-11-06 增补：实例图标、横幅与主题色（admin/update-meta）
+
+`admin/meta` 新增 `iconUrl` / `bannerUrl` / `themeColor`（未设置时 `null`），
+`admin/update-meta` 接受同名字段：
+
+- `iconUrl` / `bannerUrl`：空串或 `http(s)`，≤300；`admin/meta` 空时返回 `null`；
+- `themeColor`：空串或 `#rrggbb`，空串表示使用默认 `#86b300`；
+- 公网 `meta` 同步返回：`iconUrl`/`bannerUrl` 空串、`themeColor` 回落到默认值。
+
+实例图标被 `MkInstanceTicker`、关于页与 favicon 使用；横幅显示在欢迎页等位置。

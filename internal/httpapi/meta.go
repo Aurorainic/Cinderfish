@@ -4,6 +4,14 @@ import (
 	"net/http"
 )
 
+// themeColorOrDefault keeps the historical default when no colour is set.
+func themeColorOrDefault(value string) string {
+	if value == "" {
+		return "#86b300"
+	}
+	return value
+}
+
 // handleMeta answers POST /api/meta. It mirrors Misskey's
 // MetaEntityService.pack / packDetailed: `detail` (default true) selects
 // the detailed variant, which additionally carries `features`,
@@ -50,13 +58,13 @@ func (s *Server) handleMeta(w http.ResponseWriter, r *http.Request) {
 		"enableTestcaptcha":            false,
 		"googleAnalyticsMeasurementId": "",
 		"swPublickey":                  "",
-		"themeColor":                   "#86b300",
+		"themeColor":                   themeColorOrDefault(settings.ThemeColor),
 		"mascotImageUrl":               "/assets/ai.png",
-		"bannerUrl":                    "",
+		"bannerUrl":                    settings.BannerURL,
 		"infoImageUrl":                 "",
 		"serverErrorImageUrl":          "",
 		"notFoundImageUrl":             "",
-		"iconUrl":                      "",
+		"iconUrl":                      settings.IconURL,
 		"backgroundImageUrl":           "",
 		"logoImageUrl":                 "",
 		"maxNoteTextLength":            3000,

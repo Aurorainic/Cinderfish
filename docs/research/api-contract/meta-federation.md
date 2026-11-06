@@ -301,13 +301,13 @@
 | `enableTestcaptcha` | bool | 恒 `false` |
 | `googleAnalyticsMeasurementId` | string | 恒 `""` |
 | `swPublickey` | string | 恒 `""` |
-| `themeColor` | string | 恒 `"#86b300"` |
+| `themeColor` | string | 运行时 `themeColor`，未设置为 `"#86b300"` |
 | `mascotImageUrl` | string | 恒 `"/assets/ai.png"` |
-| `bannerUrl` | string | 恒 `""` |
+| `bannerUrl` | string | 运行时 `bannerUrl`，未设置为 `""` |
 | `infoImageUrl` | string | 恒 `""` |
 | `serverErrorImageUrl` | string | 恒 `""` |
 | `notFoundImageUrl` | string | 恒 `""` |
-| `iconUrl` | string | 恒 `""` |
+| `iconUrl` | string | 运行时 `iconUrl`，未设置为 `""` |
 | `backgroundImageUrl` | string | 恒 `""` |
 | `logoImageUrl` | string | 恒 `""` |
 | `maxNoteTextLength` | number | 恒 `3000` |

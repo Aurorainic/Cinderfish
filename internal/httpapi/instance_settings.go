@@ -30,6 +30,9 @@ type instanceSettings struct {
 	ImpressumURL     string
 	ServerRules      []string
 	HiddenTags       []string
+	IconURL          string
+	BannerURL        string
+	ThemeColor       string
 }
 
 // instanceMetaKey maps a settings field to its instance_meta key.
@@ -47,6 +50,9 @@ var instanceMetaKeys = map[string]string{
 	"impressumUrl":     "impressumUrl",
 	"serverRules":      "serverRules",
 	"hiddenTags":       "hiddenTags",
+	"iconUrl":          "iconUrl",
+	"bannerUrl":        "bannerUrl",
+	"themeColor":       "themeColor",
 }
 
 // liveInstanceSettings reads the runtime overrides, falling back to the
@@ -76,6 +82,8 @@ SELECT key, value FROM instance_meta WHERE key = ANY($1)
 		instanceMetaKeys["inquiryUrl"], instanceMetaKeys["impressumUrl"],
 		instanceMetaKeys["serverRules"],
 		instanceMetaKeys["hiddenTags"],
+		instanceMetaKeys["iconUrl"], instanceMetaKeys["bannerUrl"],
+		instanceMetaKeys["themeColor"],
 	})
 	if err != nil {
 		return out
@@ -124,6 +132,12 @@ SELECT key, value FROM instance_meta WHERE key = ANY($1)
 			out.InquiryURL = value
 		case instanceMetaKeys["impressumUrl"]:
 			out.ImpressumURL = value
+		case instanceMetaKeys["iconUrl"]:
+			out.IconURL = value
+		case instanceMetaKeys["bannerUrl"]:
+			out.BannerURL = value
+		case instanceMetaKeys["themeColor"]:
+			out.ThemeColor = value
 		}
 	}
 	return out
@@ -242,6 +256,9 @@ func (s *Server) handleAdminMeta(w http.ResponseWriter, r *http.Request) {
 		"impressumUrl":     settings.ImpressumURL,
 		"serverRules":      settings.ServerRules,
 		"hiddenTags":       settings.HiddenTags,
+		"iconUrl":          nilIfEmpty(settings.IconURL),
+		"bannerUrl":        nilIfEmpty(settings.BannerURL),
+		"themeColor":       nilIfEmpty(settings.ThemeColor),
 	})
 }
 
@@ -274,6 +291,9 @@ func (s *Server) handleAdminUpdateMeta(w http.ResponseWriter, r *http.Request) {
 		ImpressumURL     *string   `json:"impressumUrl"`
 		ServerRules      *[]string `json:"serverRules"`
 		HiddenTags       *[]string `json:"hiddenTags"`
+		IconURL          *string   `json:"iconUrl"`
+		BannerURL        *string   `json:"bannerUrl"`
+		ThemeColor       *string   `json:"themeColor"`
 	}
 	if err := decodeOptionalJSON(r, &body); err != nil {
 		writeAPIError(w, err)
@@ -379,6 +399,35 @@ ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
 		}
 	}
 
+	for _, item := range []struct {
+		field string
+		value *string
+		url   bool
+	}{
+		{"iconUrl", body.IconURL, true},
+		{"bannerUrl", body.BannerURL, true},
+	} {
+		if item.value == nil {
+			continue
+		}
+		value := strings.TrimSpace(*item.value)
+		if value != "" {
+			if len(value) > 300 || (!strings.HasPrefix(value, "https://") && !strings.HasPrefix(value, "http://")) {
+				writeAPIError(w, invalidParamError(item.field+" must be an http(s) URL of at most 300 characters"))
+				return
+			}
+		}
+		updates[item.field] = value
+	}
+	if body.ThemeColor != nil {
+		color := strings.TrimSpace(*body.ThemeColor)
+		if color != "" && !validThemeColor(color) {
+			writeAPIError(w, invalidParamError("themeColor must be #rrggbb"))
+			return
+		}
+		updates["themeColor"] = color
+	}
+
 	if body.HiddenTags != nil {
 		tags := make([]string, 0, len(*body.HiddenTags))
 		seen := map[string]struct{}{}
@@ -430,4 +479,19 @@ ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
 	}
 
 	s.handleAdminMeta(w, r)
+}
+
+// validThemeColor accepts a six-digit hex colour.
+func validThemeColor(value string) bool {
+	if len(value) != 7 || value[0] != '#' {
+		return false
+	}
+	for _, r := range value[1:] {
+		switch {
+		case r >= '0' && r <= '9', r >= 'a' && r <= 'f', r >= 'A' && r <= 'F':
+		default:
+			return false
+		}
+	}
+	return true
 }
