@@ -2777,6 +2777,42 @@ cd web && pnpm build                    # exit 0
 - 非法格式与超大文件的 400 分支。
 - `go test` 与浏览器走查未执行。
 
+## 12AU. 批次：实例图标、横幅与主题色（2026-11-06）
+
+**工作方式**：目标模式第三十一波，继续只写代码、验证到编译层。施工依据
+`docs/research/2026-11-06-firefish-port-wave31-contract.md`。
+
+### 12AU.1 落地清单
+
+| 层 | 文件 | 说明 |
+|----|------|------|
+| 实例设置 | `internal/httpapi/instance_settings.go` | 三个新键、admin/meta 回读、update-meta 校验 |
+| 公开 meta | `internal/httpapi/meta.go` | iconUrl/bannerUrl/themeColor 改用运行时值 |
+| 前端 | `api/types.ts`、`endpoints.ts`、`pages/AdminSettings.vue` | 三个输入与保存 |
+| 文档 | `admin-emoji-registry.md`、`meta-federation.md` | 字段契约 |
+
+### 12AU.2 有意的限制
+
+1. 只接受 URL，不做上传/裁剪。
+2. 主题色不改变前端主题选择。
+3. 其余图片字段仍为常量。
+
+### 12AU.3 验证证据（编译层）
+
+```
+gofmt -l internal/ cmd/                 # 空
+go vet ./...                            # exit 0
+cd web && pnpm exec vue-tsc --noEmit    # exit 0
+cd web && pnpm run check:port           # hardTotal 0
+cd web && pnpm build                    # exit 0
+```
+
+### 12AU.4 仍未验证
+
+- 保存后 `meta`/`admin/meta` 的回读与实例图标/横幅的显示。
+- 非法 URL/颜色的 400 分支。
+- `go test` 与浏览器走查未执行。
+
 ## 13. 文档索引
 
 | 文档 | 内容 |
@@ -2833,6 +2869,7 @@ cd web && pnpm build                    # exit 0
 | `docs/research/2026-11-06-firefish-port-wave28-contract.md` | **第二十八波施工契约（网盘用量端点与设置页接线），见 §12AR** |
 | `docs/research/2026-11-06-firefish-port-wave29-contract.md` | **第二十九波施工契约（关于页），见 §12AS** |
 | `docs/research/2026-11-06-firefish-port-wave30-contract.md` | **第三十波施工契约（账号导入），见 §12AT** |
+| `docs/research/2026-11-06-firefish-port-wave31-contract.md` | **第三十一波施工契约（实例图标/横幅/主题色），见 §12AU** |
 
 ## 14. 已知的未验证项
 
@@ -2882,6 +2919,7 @@ cd web && pnpm build                    # exit 0
 - **第二十八波未测（2026-11-06，见 §12AR.4）**：网盘用量只过了编译层，数值一致性、容量 0 展示与两个敏感开关未验证。
 - **第二十九波未测（2026-11-06，见 §12AS.4）**：关于页只过了编译层，布局与外链未走查。
 - **第三十波未测（2026-11-06，见 §12AT.4）**：账号导入只过了编译层，导出→导入往返、冲突与非法格式未验证。
+- **第三十一波未测（2026-11-06，见 §12AU.4）**：实例图标/横幅/主题色只过了编译层，保存与展示未验证。
 - **仍未移植的设置页**：邮箱、整合、导入导出、迁移、Webhook、插件、自定义 KaTeX、状态栏、
   删除账号、应用授权以外的账号操作；对应后端端点不存在或前端缺少依赖（见第五波契约 §3.3）。
 - **仍缺的 widgets**：rss、rss-ticker、server-metric、online-users、federation、job-queue、aiscript、

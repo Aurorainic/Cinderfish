@@ -713,6 +713,9 @@ export interface EndpointMap {
 			impressumUrl?: string;
 			serverRules?: string[];
 			hiddenTags?: string[];
+			iconUrl?: string | null;
+			bannerUrl?: string | null;
+			themeColor?: string | null;
 		};
 		res: AdminInstanceMeta;
 	};

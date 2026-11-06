@@ -542,6 +542,9 @@ export interface AdminInstanceMeta {
 	impressumUrl: string;
 	serverRules: string[];
 	hiddenTags: string[];
+	iconUrl: string | null;
+	bannerUrl: string | null;
+	themeColor: string | null;
 }
 
 export interface DriveUsage {

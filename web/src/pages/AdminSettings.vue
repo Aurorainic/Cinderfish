@@ -31,6 +31,18 @@
 					<CfInput v-model="maintainerName" class="_formBlock" :disabled="saving">
 						<template #label>维护者名称</template>
 					</CfInput>
+					<CfInput v-model="iconUrl" class="_formBlock" type="url" :disabled="saving">
+						<template #label>实例图标 URL</template>
+						<template #caption>方形图片，≤300 字符；留空使用默认图标。</template>
+					</CfInput>
+					<CfInput v-model="bannerUrl" class="_formBlock" type="url" :disabled="saving">
+						<template #label>实例横幅 URL</template>
+						<template #caption>显示在欢迎页等位置；留空表示没有横幅。</template>
+					</CfInput>
+					<CfInput v-model="themeColor" class="_formBlock" :disabled="saving">
+						<template #label>主题色</template>
+						<template #caption><code>#rrggbb</code>；留空使用默认的 <code>#86b300</code>。</template>
+					</CfInput>
 					<CfInput
 						v-model="maintainerEmail"
 						class="_formBlock"
@@ -136,6 +148,9 @@ const name = ref<string | number | null>("");
 const description = ref("");
 const maintainerName = ref<string | number | null>("");
 const maintainerEmail = ref<string | number | null>("");
+const iconUrl = ref<string | number | null>("");
+const bannerUrl = ref<string | number | null>("");
+const themeColor = ref<string | number | null>("");
 const registrationMode = ref("open");
 const tosUrl = ref<string | number | null>("");
 const privacyPolicyUrl = ref<string | number | null>("");
@@ -159,6 +174,9 @@ function apply(meta: AdminInstanceMeta): void {
 	description.value = meta.description;
 	maintainerName.value = meta.maintainerName;
 	maintainerEmail.value = meta.maintainerEmail;
+	iconUrl.value = meta.iconUrl ?? "";
+	bannerUrl.value = meta.bannerUrl ?? "";
+	themeColor.value = meta.themeColor ?? "";
 	registrationMode.value = meta.registrationMode;
 	tosUrl.value = meta.tosUrl ?? "";
 	privacyPolicyUrl.value = meta.privacyPolicyUrl ?? "";
@@ -193,6 +211,9 @@ async function save(): Promise<void> {
 			description: description.value.trim(),
 			maintainerName: String(maintainerName.value ?? "").trim(),
 			maintainerEmail: String(maintainerEmail.value ?? "").trim(),
+			iconUrl: String(iconUrl.value ?? "").trim(),
+			bannerUrl: String(bannerUrl.value ?? "").trim(),
+			themeColor: String(themeColor.value ?? "").trim(),
 			registrationMode: registrationMode.value as
 				| "open"
 				| "invite"
