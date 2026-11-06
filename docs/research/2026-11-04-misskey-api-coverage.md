@@ -15,15 +15,15 @@
 | 指标 | 数量 |
 |------|------|
 | Misskey 端点总数 | 440 |
-| Cinderfish 已注册路由 | 119 |
-| 其中 Misskey 同名路径 | 112 |
+| Cinderfish 已注册路由 | 120 |
+| 其中 Misskey 同名路径 | 113 |
 | 其中 Cinderfish 自有路径/别名 | 7（`notifications` 别名、`admin/federation/mode`、`admin/federation/allowlist`、`miauth/{session}/check`、`admin/object-storage`、`admin/deliver-queue`、`notes/history`） |
-| 未实现（Misskey 同名） | 328 |
+| 未实现（Misskey 同名） | 327 |
 
 统计口径：`internal/httpapi/server.go` 里 `HandleFunc("METHOD /api/…")` 的去重路径；
 GET 与 POST 同名路径只算一个。
 
-## 2. 已实现（119 条注册路由）
+## 2. 已实现（120 条注册路由）
 
 ```
 admin/accounts/create       admin/announcements/create  admin/announcements/delete
@@ -45,7 +45,7 @@ following/create            following/delete
 following/requests/accept    following/requests/cancel   following/requests/list
 following/requests/reject    following/requests/sent     hashtags/trend
 i                           i/apps                      i/delete-account
-i/export                    i/favorites
+i/export                    i/favorites                 i/import
 i/2fa/done                  i/2fa/password-less         i/2fa/register
 i/2fa/unregister            i/change-password           i/regenerate-token
 i/signin-history
@@ -88,6 +88,8 @@ users/update
 
 2026-11-06 第十九波新增：`stats`（公开计数）；`admin/update-meta` 增加六个合规 URL 与
 `serverRules`（不是新路由）。
+
+2026-11-06 第三十波新增：`i/import`（读取本站 `cinderfish-account-export@1` 格式）。
 
 2026-11-06 第二十八波新增：`drive`（容量/用量/文件数；未配置配额时 capacity=0）。
 
@@ -145,7 +147,7 @@ note/reply/renote 事件）。
 
 | 命名空间 | 缺口 | 说明 |
 |----------|------|------|
-| `i/*` | 43 | 账号设置、导入、应用授权等 |
+| `i/*` | 42 | 账号设置、导入、应用授权等 |
 | `users/*` | 28 | 列表、搜索、反应、推荐、关注请求、更新资料字段 |
 | `notes/*` | 23 | 会话/子帖、提及、投票、收藏、搜索、翻译、草稿 |
 | `chat/*` | 25 | 私聊（首版可选） |

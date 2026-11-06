@@ -1300,3 +1300,25 @@ OAuth 2.0 授权码端点（仅 PKCE `S256`）。认证：**需要登录**，且
 
 冻结账号不返回。返回 `UserDetailed[]`（含三个计数）。非法 `state`/`origin` 400。
 **分页只支持 offset**：`sinceId`/`untilId` 会被忽略。
+
+## 2026-11-06 增补：账号导入（POST /api/i/import）
+
+需登录。请求体 `{fileId}`：文件必须是当前账号云盘里的 JSON，且 `format` 为
+`cinderfish-account-export@1`（`i/export` 的输出）。文件上限定为 32 MiB。
+
+行为（单事务）：
+
+1. **笔记**：保留原 id；已存在同 id 时跳过；`replyId`/`renoteId` 只在目标已在库中或本次已导入时保留，
+   否则置空；正文、标签、附件 id 与 `createdAt` 按导出恢复。
+2. **关注**：按 `username + host` 查找本库用户，找不到则跳过；已关注不重复。
+3. **收藏**：笔记存在才写入，重复收藏不重复。
+
+响应 200（Misskey 返回空体，这里额外给计数）：
+
+```json
+{ "notes": 12, "followings": 3, "favorites": 5,
+  "skipped": 1, "skippedFollowings": 0, "skippedFavorites": 2 }
+```
+
+错误：`NO_SUCH_FILE`（文件不存在/不属于自己）、`INVALID_PARAM`（不是 JSON、格式不符、缺 `fileId`）、
+`AUTHENTICATION_FAILED`。导入是增量操作，不删除任何现有数据；没有限流。

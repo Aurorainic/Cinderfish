@@ -148,6 +148,7 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("POST /api/i/apps", s.handleApps)
 	s.mux.HandleFunc("POST /api/i/revoke-token", s.handleRevokeToken)
 	s.mux.HandleFunc("POST /api/i/export", s.handleIExport)
+	s.mux.HandleFunc("POST /api/i/import", s.handleIImport)
 	s.mux.HandleFunc("POST /api/i/delete-account", s.handleIDeleteAccount)
 	s.mux.HandleFunc("POST /api/i/webhooks/create", s.handleWebhookCreate)
 	s.mux.HandleFunc("POST /api/i/webhooks/list", s.handleWebhookList)
