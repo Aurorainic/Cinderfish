@@ -4494,9 +4494,9 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
   看到铅笔图标与提示「于 2026/11/7 01:28:35 编辑」，移动端无溢出（2026-11-07）。
 - **第三十四波的部分边角（2026-11-06，见 §12AX.4）**：`TestNotesState` 覆盖收藏与置顶两个标志
   随真实行变化、取消后归零、`isMutedThread` 恒 false（线程静音未实现）、未知笔记 404、缺参数 400、
-  匿名 401（2026-11-07）。菜单失败回退仍记为未验证：2026-11-07 用 CDP 拦截
-  `notes/favorites/create` 时请求确实失败（Fetch 日志 1 次），但随后仍出现收藏行且未见错误弹窗，
-  怀疑是脚本的重放点击绕过了拦截；尝试不构成稳定证据，未写成已验证。
+  匿名 401（2026-11-07）。菜单失败回退已由 §12EQ 验证：替换 `window.fetch` 让
+  `notes/favorites/create` 失败后，页面弹出「Failed to fetch / NETWORK_ERROR」对话框，
+  `notes/state.isFavorited` 保持 false。
 - **第三十五波的部分边角（2026-11-06，见 §12AY.4）**：`TestDriveUploadFromURLRejectsUnsafeTargets`
   覆盖 SSRF 守卫的每条拒绝路径（非 http(s)、无主机、回环、localhost、私网、无法解析）、
   缺 url 400、匿名 401 与他人文件夹被拒（2026-11-07）。下载成功与 `FETCH_FAILED` 分支已于
@@ -5979,3 +5979,13 @@ CINDERFISH_TEST_DATABASE_URL=... go test ./... -count=1         # 全绿
   不传 `host` 返回全部；`notes/search-by-tag` 也能查到该远端标签。
 
 至此 §14 里只剩减少动画偏好一项无法在无头环境确认；Deck/Zen 状态栏按设计不挂载。
+
+## 12EQ. 第一百二十七波：笔记菜单收藏失败的回退（2026-11-07）
+
+用 `window.fetch` 包装（而不是 CDP `Fetch`）精确地让 `notes/favorites/create` 失败：
+
+- 调用计数 1 次，请求以 `TypeError: Failed to fetch` 拒绝；
+- 页面出现 `.cf-modal`，文案「Failed to fetch / NETWORK_ERROR」，确认按钮「好」；
+- `notes/state` 的 `isFavorited` 保持 `false`，没有乐观写入。
+
+此前用 CDP 拦截时同样失败了一次但随后仍出现收藏行（疑似重放点击），改用 fetch 包装后行为稳定可复现。
