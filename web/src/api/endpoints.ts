@@ -132,6 +132,10 @@ export const ENDPOINTS = {
 	followingRequestsAccept: "following/requests/accept",
 	followingRequestsReject: "following/requests/reject",
 	followingRequestsCancel: "following/requests/cancel",
+	followingList: "following/list",
+	followingUpdate: "following/update",
+	followingUpdateAll: "following/update-all",
+	followingInvalidate: "following/invalidate",
 
 	// mutes and blocks
 	muteCreate: "mute/create",
@@ -655,6 +659,19 @@ export interface EndpointMap {
 
 	[ENDPOINTS.followingCreate]: { req: { userId: string }; res: UserLite };
 	[ENDPOINTS.followingDelete]: { req: { userId: string }; res: UserLite };
+	[ENDPOINTS.followingList]: {
+		req: { notification?: boolean; limit?: number; sinceId?: string; untilId?: string };
+		res: Following[];
+	};
+	[ENDPOINTS.followingUpdate]: {
+		req: { userId: string; notify?: "normal" | "none"; withReplies?: boolean };
+		res: UserLite;
+	};
+	[ENDPOINTS.followingUpdateAll]: {
+		req: { notify?: "normal" | "none"; withReplies?: boolean };
+		res: EmptyResponse;
+	};
+	[ENDPOINTS.followingInvalidate]: { req: { userId: string }; res: UserLite };
 	[ENDPOINTS.followingRequestsList]: {
 		req: FollowingRequestsParams;
 		res: FollowRequest[];

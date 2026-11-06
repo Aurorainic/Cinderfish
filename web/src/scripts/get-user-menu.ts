@@ -3,8 +3,8 @@
 // Degradations versus Firefish, all driven by missing backend endpoints
 // (docs/research/api-contract/): lists (`users/lists/*`), groups
 // (`users/groups/*`), renote-mute, silence (`admin/silence-user`),
-// following/invalidate, RSS/Atom/JSON feed notifications and `userActions`
-// plugin entries are all dropped. Mute/block and abuse reporting have since
+// RSS/Atom/JSON feed notifications and `userActions` plugin entries are all
+// dropped. Mute/block and abuse reporting have since
 // been ported and are offered again. "Send message" is dropped too: Firefish opens the post form with
 // `{ specified: user }`, and the Cinderfish `os.post` contract has no
 // `specified` / `visibleUserIds` field yet.
@@ -34,6 +34,16 @@ async function reportAbuse(user: UserDetailed): Promise<void> {
 	try {
 		await os.apiWithDialog("users/report-abuse", { userId: user.id, comment });
 		os.toast(t("abuseReported"), "success");
+	} catch {
+		// apiWithDialog already showed the server error.
+	}
+}
+
+async function invalidateFollow(user: UserDetailed): Promise<void> {
+	if (!(await confirmed(t("breakFollowConfirm")))) return;
+	try {
+		await os.apiWithDialog("following/invalidate", { userId: user.id });
+		user.isFollowed = false;
 	} catch {
 		// apiWithDialog already showed the server error.
 	}
@@ -122,6 +132,22 @@ export function getUserMenu(
 				danger: true,
 				action: () => {
 					void reportAbuse(user);
+				},
+			},
+		);
+	}
+
+	// A follower can be removed without their consent; Firefish offers this on
+	// the profile of someone who follows you.
+	if (!isSelf && user.isFollowed) {
+		items.push(
+			{ separator: true },
+			{
+				icon: "ph-user-minus ph-bold ph-lg",
+				text: t("breakFollow"),
+				danger: true,
+				action: () => {
+					void invalidateFollow(user);
 				},
 			},
 		);

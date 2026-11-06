@@ -1,9 +1,10 @@
 # Cinderfish 交接说明
 
-- 最后更新：2026-11-06（目标模式第五十一至五十五波：账号迁移、KaTeX 宏页与集成说明页、
+- 最后更新：2026-11-06（目标模式第五十一至五十六波：账号迁移、KaTeX 宏页与集成说明页、
   OAuth 交互式同意页、`ap/show` 与远程互动页、第三方应用授权全流程（`app/*` 与 `auth/session/*`，
-  schema v20）。恢复目标模式时先补了 §12BO.3 的验证债，`go test ./...`（含数据库）已全绿，
-  详见 §12BP–§12BT。浏览器走查仍待用户手动确认后执行）
+  schema v20）、关注关系设置（schema v21）。恢复目标模式时先补了 §12BO.3 的验证债，
+  `go test ./...`（含数据库）已全绿，
+  详见 §12BP–§12BU。浏览器走查仍待用户手动确认后执行）
 - 项目名 **Cinderfish**（2026-10-28 定名，Go module `github.com/Aurorainic/cinderfish`）
 - 仓库：当前目录 `/home/lainsaka/文档/MilnFish`，分支 `main`；远程 `origin` 为
   `https://github.com/Aurorainic/Cinderfish.git`（GitHub 仓库已更名，本地目录改名待办）
@@ -3826,6 +3827,41 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
 - 真实第三方客户端（第三方 Misskey 客户端 / Firefish 的 auth.vue）没有跑过这条流程。
 - 应用所有者的 `app/show` 才返回 secret 这条分支没有用例（匿名注册的应用没有所有者）。
 
+## 12BU. 第五十六波：关注关系设置（2026-11-06）
+
+契约见 `docs/research/2026-11-06-firefish-port-wave56-contract.md`。
+
+### 12BU.1 落地清单
+
+| 层 | 内容 |
+|----|------|
+| 迁移 | v21：`followings.notify`、`followings.with_replies` |
+| 账号 | `Follow.Notify/WithReplies`；`UpdateFollowing`、`UpdateAllFollowing`（动态 SET 与参数一起构造） |
+| 端点 | `following/list`（`notification` 过滤）、`following/update`、`following/update-all`、`following/invalidate` |
+| 前端 | 用户菜单「移除关注者」（`following/invalidate`），同步删掉该文件的降级注释条目 |
+| 台账 | 151 路由 / 143 同名 / 297 未实现 |
+
+### 12BU.2 有意的限制
+
+- `notify` / `withReplies` **只落库、未消费**：Streaming 不向关注者 main 频道扇出新帖，
+  也没有 `type: note` 通知，所以本波没有给这两个开关做 UI（避免假控件）。接线排在下一波。
+- `following/invalidate` 不向远端投递 Undo（需要被移除者的私钥），本地关注者收到 unfollow 事件。
+
+### 12BU.3 验证证据
+
+- `gofmt -l internal/ cmd/` 无输出；`go vet ./...` 通过。
+- `CINDERFISH_TEST_DATABASE_URL=… go test ./...` 全绿，含 `TestFollowingListAndUpdate`
+  （默认不序列化 `withReplies`、update 回读、notification 过滤、update-all 清空、非关注 400）
+  与 `TestFollowingInvalidate`（移除后关系消失、再次移除 400）。
+- `vue-tsc --noEmit`、`check:port`（hardTotal 0、missingKeys 0）、`pnpm build` 全绿。
+
+### 12BU.4 仍未验证
+
+- 「移除关注者」菜单项**没有浏览器走查**：出现条件（`isFollowed`）、确认对话框、置位回写都只过了编译。
+- `following/list` 的 `sinceDate`/`untilDate` 参数没有实现（台账里未列，但 Misskey 的 paramDef 有）：
+  只支持 id 游标。
+- 远端关注者在 `following/invalidate` 之后不会收到任何协议信号，只有本地状态改变。
+
 
 
 
@@ -3910,6 +3946,7 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
 | `docs/research/2026-11-06-firefish-port-wave53-contract.md` | **第五十三波施工契约（OAuth 同意页），见 §12BR** |
 | `docs/research/2026-11-06-firefish-port-wave54-contract.md` | **第五十四波施工契约（ap/show 与远程互动），见 §12BS** |
 | `docs/research/2026-11-06-firefish-port-wave55-contract.md` | **第五十五波施工契约（应用授权 app/* 与 auth/session/*），见 §12BT** |
+| `docs/research/2026-11-06-firefish-port-wave56-contract.md` | **第五十六波施工契约（关注关系设置），见 §12BU** |
 
 ## 14. 已知的未验证项
 
@@ -3989,6 +4026,8 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
   没有对端用例；真实 Mastodon/Misskey 的 `/authorize_interaction` 链接未实测。
 - **第五十五波未测（2026-11-06，见 §12BT.4）**：`Auth.vue` 未走查；真实第三方客户端没跑过这条
   授权流程；`app/show` 返回 secret 的所有者分支没有用例。
+- **第五十六波未测（2026-11-06，见 §12BU.4）**：「移除关注者」未走查；`following/list` 没有
+  `sinceDate`/`untilDate`；`notify`/`withReplies` 尚无消费方。
 - **仍未移植的设置页**：邮箱、整合、导入导出、迁移、Webhook、插件、自定义 KaTeX、状态栏、
   删除账号、应用授权以外的账号操作；对应后端端点不存在或前端缺少依赖（见第五波契约 §3.3）。
 - **仍缺的 widgets**：rss、rss-ticker、server-metric、online-users、federation、job-queue、aiscript、
