@@ -128,6 +128,12 @@ const menuDef = computed<MkSuperMenuGroup[]>(() => [
 				active: isActive("/admin/files"),
 			},
 			{
+				icon: "ph-prohibit ph-bold ph-lg",
+				text: "实例屏蔽",
+				to: "/admin/instance-block",
+				active: isActive("/admin/instance-block"),
+			},
+			{
 				icon: "ph-planet ph-bold ph-lg",
 				text: t("federation"),
 				to: "/admin/federation",

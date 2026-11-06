@@ -2019,6 +2019,63 @@ cd web && pnpm build                    # exit 0
 - 上游 `admin/update-meta` 其余字段按设计忽略；Firefish 管理页若直连本实例会显示“保存成功但多数
   字段未生效”，这一点只在契约里记录。
 
+## 12AD. 批次：前端第十四波——实例屏蔽（2026-11-06）
+
+**工作方式**：目标模式第十四波，一轮完成策略层、入站检查、管理接口扩展、管理页、测试、真实二进制
+与浏览器走查、文档与提交。施工依据 `docs/research/2026-11-06-firefish-port-wave14-contract.md`。
+
+### 12AD.1 落地清单
+
+| 层 | 文件 | 说明 |
+|----|------|------|
+| 策略 | `internal/federation/policy.go` | `HostBlocked` / `BlockedHosts` / `SetBlockedHosts`，带 TTL 缓存与立即失效；`IsAllowed` 先查屏蔽 |
+| 入站 | `internal/httpapi/activitypub.go` | inbox 在签名验证后按 actor 主机拒绝（403） |
+| 管理接口 | `internal/httpapi/instance_settings.go` | `admin/meta` 返回 `blockedHosts`（恒为数组）；`admin/update-meta` 接受并校验 |
+| 页面 | `web/src/pages/AdminInstanceBlock.vue` | 多行主机列表、去重预览、保存与数量提示、精确匹配说明 |
+| 菜单 | `AdminIndex.vue` | 内容组新增「实例屏蔽」 |
+| 测试 | `internal/federation/policy_test.go`、`internal/httpapi/instance_settings_test.go` | 精确匹配/大小写；blockedHosts 规范化、回读、非法值 400 |
+
+### 12AD.2 有意的限制
+
+1. 精确匹配：`bad.example` 不自动覆盖子域，页面提示逐条列出。
+2. 不删除已收到的内容、不取消已有关注；只阻止之后的收发。
+3. 入站仍不做 allowlist 检查（保持既有行为），只新增屏蔽检查。
+4. 没有 `silencedHosts`、没有转发屏蔽。
+
+### 12AD.3 验证证据
+
+```
+gofmt -l internal/ cmd/                 # 空
+go vet ./...                            # exit 0
+CINDERFISH_TEST_DATABASE_URL=… go test -count=1 ./...   # 全绿
+cd web && pnpm exec vue-tsc --noEmit    # exit 0
+cd web && pnpm run check:port           # 398 文件，hardTotal 0
+cd web && pnpm build                    # exit 0
+```
+
+真实二进制 `:3991`（`federation_mode=public`）：
+
+| 场景 | 结果 |
+|------|------|
+| `admin/meta` 初始 | `blockedHosts: []` |
+| API 写入 `["Bad.Example","bad.example","sub.bad.example"]` | 规范化并排序为 `["bad.example","sub.bad.example"]` |
+| 管理页写入三行（含重复大小写） | 保存成功，显示「共 3 个被屏蔽实例」 |
+| 再读 `admin/meta` | `["bad.example","spam.example","sub.bad.example"]` |
+| 管理菜单 | 出现「实例屏蔽」 |
+| 移动端 | 文本域与说明正常换行，无横向溢出 |
+
+无头 Helium 156：无 JS 异常。截图在 `/tmp/w14-shots`（不入库）。
+
+顺带修正：`admin/meta` 的 `blockedHosts` 在空列表时返回 `[]` 而不是 `null`。
+
+走查数据已清理：w14admin 与 `instance_meta.blockedHosts` 删除，用户数回到 23；服务与临时文件停止。
+
+### 12AD.4 仍未验证
+
+- 真实入站拒绝没有构造签名请求，只验证了策略与页面；出站拒绝由既有 `client.go` 路径保证。
+- 与 allowlist 模式组合、子域精确匹配的运维体验没有走查。
+- 已收到的远端内容不会清理，按设计保留。
+
 ## 13. 文档索引
 
 | 文档 | 内容 |
@@ -2058,6 +2115,7 @@ cd web && pnpm build                    # exit 0
 | `docs/research/2026-11-06-firefish-port-wave11-contract.md` | **第十一波施工契约（webhooks 表 v12、五个端点、异步投递与设置页），见 §12AA** |
 | `docs/research/2026-11-06-firefish-port-wave12-contract.md` | **第十二波施工契约（admin/get-table-stats、admin/get-index-stats 与数据库页），见 §12AB** |
 | `docs/research/2026-11-06-firefish-port-wave13-contract.md` | **第十三波施工契约（运行时实例设置、admin/meta 与 update-meta 子集），见 §12AC** |
+| `docs/research/2026-11-06-firefish-port-wave14-contract.md` | **第十四波施工契约（blockedHosts、策略与入站拒绝、实例屏蔽页），见 §12AD** |
 
 ## 14. 已知的未验证项
 
@@ -2078,6 +2136,8 @@ cd web && pnpm build                    # exit 0
   未验证；vacuum 与索引维护按设计未做。
 - **第十三波未测边角（2026-11-06，见 §12AC.4）**：邀请码注册未走查、没有审计日志、公开页缓存需刷新；
   上游 update-meta 的其余字段按设计忽略。
+- **第十四波未测边角（2026-11-06，见 §12AD.4）**：真实入站签名请求的拒绝、与 allowlist 组合、
+  子域匹配的运维体验未验证。
 - **仍未移植的设置页**：邮箱、整合、安全（2FA）、导入导出、迁移、Webhook、插件、自定义 KaTeX、状态栏、
   删除账号、应用授权以外的账号操作；对应后端端点不存在或前端缺少依赖（见第五波契约 §3.3）。
 - **仍缺的 widgets**：rss、rss-ticker、server-metric、online-users、federation、job-queue、aiscript、

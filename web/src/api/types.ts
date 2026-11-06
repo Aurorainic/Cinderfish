@@ -479,4 +479,5 @@ export interface AdminInstanceMeta {
 	maintainerName: string;
 	maintainerEmail: string;
 	registrationMode: "open" | "invite" | "admin";
+	blockedHosts: string[];
 }
