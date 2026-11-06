@@ -4533,7 +4533,8 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
   仍未验证的：账号信息页的实际渲染与统计失败时的降级。
 - **第四十四波已补验证（2026-11-07，见 §12BH.4）**：实例 CSS 的保存→下发→注入链路用
   `TestInstanceCustomCSS` 与无头浏览器走查覆盖（含 100 KiB 边界、空串清除、访客生效）；
-  邮件状态页在未配置实例下走查通过。仍未验证的：已配置 SMTP 的页面呈现与账号级覆盖截图。
+  邮件状态页在未配置实例下走查通过。账号级 CSS 覆盖已在 2026-11-07 走查并修掉插入顺序相反的
+  缺陷（§12DO，账号样式现在确实覆盖实例样式）。仍未验证的：已配置 SMTP 的页面呈现。
 - **第四十五波已补验证（2026-11-07，见 §12BI.4）**：`admin/drive/show-file` 有端点用例；
   文件详情的四类预览、字段与「详情」入口均走查通过；敏感文件的模糊预览也已验证
   （§12DM：`blur(24px)`）。仍未验证的：真实音视频播放。`user: null` 分支因外键级联
@@ -5636,3 +5637,28 @@ gofmt -l internal/ cmd/                                        # 空
 go vet ./...                                                   # exit 0
 CINDERFISH_TEST_DATABASE_URL=... go test ./... -count=1         # 全绿
 ```
+
+## 12DO. 第一百零二波：账号 CSS 覆盖实例 CSS（2026-11-07）
+
+复核第四十四波的注入顺序时发现真实缺陷：`initCustomCss` 先应用账号样式、再应用实例样式，
+于是 `#cinderfish-instance-custom-css` 排在 `#cinderfish-custom-css` 之后，同优先级下实例规则
+反而覆盖账号规则——与契约「实例先写、账号后写」相反。
+
+修复：把两次 `apply` 的顺序调换（先实例、后账号）。`styleElement` 只在首次创建时 append，
+之后 watcher 仅更新 textContent，所以顺序在首屏就固定正确。
+
+浏览器验证（管理员设置实例样式 `body{background:rgb(10,20,30)}`，账号样式
+`body{background:rgb(1,2,3)}`）：
+
+- `<head>` 中 style id 顺序为 `cinderfish-instance-custom-css` → `cinderfish-custom-css`；
+- `getComputedStyle(document.body).backgroundColor` 为 `rgb(1, 2, 3)`，账号规则生效；
+- 两个 style 的 textContent 与保存值一致。
+
+```
+gofmt -l internal/ cmd/                                        # 空
+go vet ./...                                                   # exit 0
+CINDERFISH_TEST_DATABASE_URL=... go test ./... -count=1         # 全绿
+cd web && vue-tsc --noEmit / check:port / build                 # 全绿
+```
+
+仍未验证：已配置 SMTP 的邮件设置页呈现（需要带 `[mail] host` 启动的实例）。

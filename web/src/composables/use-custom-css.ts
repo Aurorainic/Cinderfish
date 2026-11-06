@@ -39,8 +39,11 @@ export function initCustomCss(): void {
 	if (initialized) return;
 	initialized = true;
 
-	apply(defaultStore.reactiveState.customCss.value);
+	// Instance first, account second: later <style> elements win at equal
+	// specificity, so the per-account sheet must be appended after the
+	// instance-wide one.
 	apply(instance.customCss ?? "", INSTANCE_STYLE_ID);
+	apply(defaultStore.reactiveState.customCss.value);
 
 	watch(defaultStore.reactiveState.customCss, (css) => {
 		apply(css);
