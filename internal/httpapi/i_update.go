@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"github.com/Aurorainic/cinderfish/internal/account"
@@ -75,6 +76,22 @@ func (s *Server) handleIUpdate(w http.ResponseWriter, r *http.Request) {
 		// mutedInstances takes a JSON array of hosts; null or [] clears it.
 		// RawMessage keeps "absent" distinguishable from "cleared".
 		MutedInstances json.RawMessage `json:"mutedInstances"`
+		// Profile metadata, stored in user_profiles.settings.
+		Location nullableField   `json:"location"`
+		Birthday nullableField   `json:"birthday"`
+		Lang     nullableField   `json:"lang"`
+		Fields   json.RawMessage `json:"fields"`
+		// Boolean profile switches. Pointers keep "absent" distinct from false.
+		NoCrawle           *bool `json:"noCrawle"`
+		PreventAiLearning  *bool `json:"preventAiLearning"`
+		IsExplorable       *bool `json:"isExplorable"`
+		HideOnlineStatus   *bool `json:"hideOnlineStatus"`
+		PublicReactions    *bool `json:"publicReactions"`
+		AlwaysMarkNsfw     *bool `json:"alwaysMarkNsfw"`
+		AutoSensitive      *bool `json:"autoSensitive"`
+		CarefulBot         *bool `json:"carefulBot"`
+		AutoAcceptFollowed *bool `json:"autoAcceptFollowed"`
+		InjectFeaturedNote *bool `json:"injectFeaturedNote"`
 	}
 	if err := decodeOptionalJSON(r, &body); err != nil {
 		writeAPIError(w, err)
@@ -128,6 +145,27 @@ func (s *Server) handleIUpdate(w http.ResponseWriter, r *http.Request) {
 		mutedInstances = hosts
 	}
 
+	details, apiErr := parseProfileDetails(body.Location, body.Birthday, body.Lang, body.Fields)
+	if apiErr != nil {
+		writeAPIError(w, apiErr)
+		return
+	}
+	details.NoCrawle = body.NoCrawle
+	details.PreventAiLearning = body.PreventAiLearning
+	details.IsExplorable = body.IsExplorable
+	details.HideOnlineStatus = body.HideOnlineStatus
+	details.PublicReactions = body.PublicReactions
+	details.AlwaysMarkNsfw = body.AlwaysMarkNsfw
+	details.AutoSensitive = body.AutoSensitive
+	details.CarefulBot = body.CarefulBot
+	details.AutoAcceptFollowed = body.AutoAcceptFollowed
+	details.InjectFeaturedNote = body.InjectFeaturedNote
+
+	if err := s.accounts.UpdateProfileDetails(r.Context(), info.User.ID, details); err != nil {
+		writeInternalServerError(w)
+		return
+	}
+
 	if avatarID := body.AvatarID.asUpdatePointer(); avatarID != nil && *avatarID != "" {
 		if err := s.checkOwnAvatarFile(r, info.User.ID, *avatarID); err != nil {
 			writeAPIError(w, err)
@@ -168,6 +206,92 @@ func (s *Server) handleIUpdate(w http.ResponseWriter, r *http.Request) {
 // maxMutedInstances caps the list so a crafted request cannot grow the
 // profile row without bound.
 const maxMutedInstances = 200
+
+// Profile metadata limits, following Misskey's user schema.
+const (
+	maxProfileLocationLength = 50
+	maxProfileLangLength     = 16
+	maxProfileFields         = 16
+	maxProfileFieldName      = 255
+	maxProfileFieldValue     = 1024
+)
+
+// parseProfileDetails validates the metadata fields of i/update. Empty
+// strings clear a value; `fields` accepts an array or null.
+func parseProfileDetails(location, birthday, lang nullableField, rawFields json.RawMessage) (account.ProfileDetailsPatch, *APIError) {
+	var out account.ProfileDetailsPatch
+	if location.provided() {
+		value := ""
+		if v := location.asUpdatePointer(); v != nil {
+			value = strings.TrimSpace(*v)
+		}
+		if utf8.RuneCountInString(value) > maxProfileLocationLength {
+			return out, invalidParamError("location is too long")
+		}
+		out.Location = &value
+	}
+	if birthday.provided() {
+		value := ""
+		if v := birthday.asUpdatePointer(); v != nil {
+			value = strings.TrimSpace(*v)
+		}
+		if value != "" {
+			if _, err := time.Parse("2006-01-02", value); err != nil {
+				return out, invalidParamError("birthday must be YYYY-MM-DD")
+			}
+		}
+		out.Birthday = &value
+	}
+	if lang.provided() {
+		value := ""
+		if v := lang.asUpdatePointer(); v != nil {
+			value = strings.TrimSpace(*v)
+		}
+		if value != "" {
+			if len(value) > maxProfileLangLength || !validLangTag(value) {
+				return out, invalidParamError("lang is not a valid language tag")
+			}
+		}
+		out.Lang = &value
+	}
+	if len(rawFields) > 0 {
+		fields := []account.ProfileField{}
+		if string(rawFields) != "null" {
+			if err := json.Unmarshal(rawFields, &fields); err != nil {
+				return out, invalidParamError("fields must be an array of {name, value}")
+			}
+		}
+		if len(fields) > maxProfileFields {
+			return out, invalidParamError("fields has too many entries")
+		}
+		clean := make([]account.ProfileField, 0, len(fields))
+		for _, f := range fields {
+			name := strings.TrimSpace(f.Name)
+			if name == "" {
+				continue
+			}
+			value := strings.TrimSpace(f.Value)
+			if utf8.RuneCountInString(name) > maxProfileFieldName || utf8.RuneCountInString(value) > maxProfileFieldValue {
+				return out, invalidParamError("a profile field is too long")
+			}
+			clean = append(clean, account.ProfileField{Name: name, Value: value})
+		}
+		out.Fields = &clean
+	}
+	return out, nil
+}
+
+// validLangTag accepts BCP-47-ish tags such as "ja", "zh-CN" or "en-US".
+func validLangTag(value string) bool {
+	for _, r := range value {
+		switch {
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9', r == '-':
+		default:
+			return false
+		}
+	}
+	return true
+}
 
 // parseMutedInstances turns the `mutedInstances` request value into a clean
 // host list. Hosts are lowercased and trimmed; a scheme, a path or a space is

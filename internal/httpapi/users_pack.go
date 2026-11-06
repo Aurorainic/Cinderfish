@@ -74,6 +74,18 @@ func packUserDetailed(u *account.User, createdAt time.Time, isMe bool, prof *acc
 	packed["birthday"] = nil
 	packed["lang"] = nil
 	packed["fields"] = []any{}
+	packed["publicReactions"] = false
+	if prof != nil {
+		packed["location"] = nilIfEmpty(prof.Location)
+		packed["birthday"] = nilIfEmpty(prof.Birthday)
+		packed["lang"] = nilIfEmpty(prof.Lang)
+		fields := make([]any, 0, len(prof.Fields))
+		for _, f := range prof.Fields {
+			fields = append(fields, map[string]any{"name": f.Name, "value": f.Value})
+		}
+		packed["fields"] = fields
+		packed["publicReactions"] = prof.PublicReactions
+	}
 	packed["verifiedLinks"] = []any{}
 	packed["followersCount"] = 0
 	packed["followingCount"] = 0
@@ -82,7 +94,6 @@ func packUserDetailed(u *account.User, createdAt time.Time, isMe bool, prof *acc
 	packed["pinnedNotes"] = []any{}
 	packed["pinnedPageId"] = nil
 	packed["pinnedPage"] = nil
-	packed["publicReactions"] = false
 	packed["followersVisibility"] = visibilityOrDefault(prof, true)
 	packed["followingVisibility"] = visibilityOrDefault(prof, false)
 	packed["chatScope"] = "followers"
@@ -126,20 +137,20 @@ func packMeDetailed(u *account.User, createdAt time.Time, includeSecrets bool, p
 	packed["followedMessage"] = nil
 	packed["isModerator"] = u.IsAdmin
 	packed["isAdmin"] = u.IsAdmin
-	packed["injectFeaturedNote"] = false
+	packed["injectFeaturedNote"] = prof != nil && prof.InjectFeaturedNote
 	packed["receiveAnnouncementEmail"] = false
-	packed["alwaysMarkNsfw"] = false
-	packed["autoSensitive"] = false
-	packed["carefulBot"] = false
-	packed["autoAcceptFollowed"] = false
+	packed["alwaysMarkNsfw"] = prof != nil && prof.AlwaysMarkNsfw
+	packed["autoSensitive"] = prof != nil && prof.AutoSensitive
+	packed["carefulBot"] = prof != nil && prof.CarefulBot
+	packed["autoAcceptFollowed"] = prof != nil && prof.AutoAcceptFollowed
 	packed["followApprovalLocalSeconds"] = 0
 	packed["followApprovalRemoteSeconds"] = 0
-	packed["noCrawle"] = false
-	packed["preventAiLearning"] = false
-	packed["isExplorable"] = true
+	packed["noCrawle"] = prof != nil && prof.NoCrawle
+	packed["preventAiLearning"] = prof != nil && prof.PreventAiLearning
+	packed["isExplorable"] = prof == nil || prof.IsExplorable
 	packed["isDeleted"] = false
 	packed["twoFactorBackupCodesStock"] = "none"
-	packed["hideOnlineStatus"] = false
+	packed["hideOnlineStatus"] = prof != nil && prof.HideOnlineStatus
 	packed["hasUnreadSpecifiedNotes"] = false
 	packed["hasUnreadMentions"] = false
 	packed["hasUnreadChatMessages"] = false

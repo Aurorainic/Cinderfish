@@ -32,6 +32,29 @@ type Profile struct {
 	// can be registered yet, so it always reads false.
 	TwoFactorEnabled     bool
 	UsePasswordLessLogin bool
+	// Profile metadata. These live in `user_profiles.settings` as JSON so the
+	// table does not grow a column per Misskey field.
+	Location string
+	Birthday string
+	Lang     string
+	Fields   []ProfileField
+	// Boolean profile switches, also stored in `settings`.
+	NoCrawle           bool
+	PreventAiLearning  bool
+	IsExplorable       bool
+	HideOnlineStatus   bool
+	PublicReactions    bool
+	AlwaysMarkNsfw     bool
+	AutoSensitive      bool
+	CarefulBot         bool
+	AutoAcceptFollowed bool
+	InjectFeaturedNote bool
+}
+
+// ProfileField is one row of Misskey's "fields" (profile metadata) list.
+type ProfileField struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
 }
 
 // ErrNoSuchAvatarFile is returned when an avatar file id does not name
@@ -63,10 +86,29 @@ FROM user_profiles WHERE user_id = $1
 		return nil, fmt.Errorf("account: get profile: %w", err)
 	}
 	var stored struct {
-		MutedInstances []string `json:"mutedInstances"`
+		MutedInstances     []string       `json:"mutedInstances"`
+		Location           string         `json:"location"`
+		Birthday           string         `json:"birthday"`
+		Lang               string         `json:"lang"`
+		Fields             []ProfileField `json:"fields"`
+		NoCrawle           bool           `json:"noCrawle"`
+		PreventAiLearning  bool           `json:"preventAiLearning"`
+		IsExplorable       *bool          `json:"isExplorable"`
+		HideOnlineStatus   bool           `json:"hideOnlineStatus"`
+		PublicReactions    bool           `json:"publicReactions"`
+		AlwaysMarkNsfw     bool           `json:"alwaysMarkNsfw"`
+		AutoSensitive      bool           `json:"autoSensitive"`
+		CarefulBot         bool           `json:"carefulBot"`
+		AutoAcceptFollowed bool           `json:"autoAcceptFollowed"`
+		InjectFeaturedNote bool           `json:"injectFeaturedNote"`
 	}
 	if len(settings) > 0 {
 		_ = json.Unmarshal(settings, &stored)
+	}
+	// Misskey's default is explorable; only an explicit false turns it off.
+	isExplorable := true
+	if stored.IsExplorable != nil {
+		isExplorable = *stored.IsExplorable
 	}
 	return &Profile{
 		Name:                 derefString(name),
@@ -77,6 +119,20 @@ FROM user_profiles WHERE user_id = $1
 		MutedInstances:       stored.MutedInstances,
 		TwoFactorEnabled:     twoFactorEnabled,
 		UsePasswordLessLogin: usePasswordLessLogin,
+		Location:             stored.Location,
+		Birthday:             stored.Birthday,
+		Lang:                 stored.Lang,
+		Fields:               stored.Fields,
+		NoCrawle:             stored.NoCrawle,
+		PreventAiLearning:    stored.PreventAiLearning,
+		IsExplorable:         isExplorable,
+		HideOnlineStatus:     stored.HideOnlineStatus,
+		PublicReactions:      stored.PublicReactions,
+		AlwaysMarkNsfw:       stored.AlwaysMarkNsfw,
+		AutoSensitive:        stored.AutoSensitive,
+		CarefulBot:           stored.CarefulBot,
+		AutoAcceptFollowed:   stored.AutoAcceptFollowed,
+		InjectFeaturedNote:   stored.InjectFeaturedNote,
 	}, nil
 }
 

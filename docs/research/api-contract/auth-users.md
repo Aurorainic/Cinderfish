@@ -166,10 +166,10 @@ token 解析（`internal/account/tokens.go:88`）：
 | `isSilenced` | boolean | 恒为 `false` |
 | `isSuspended` | boolean | `users.is_suspended` |
 | `description` | string \| null | 资料简介；空则 `null` |
-| `location` | null | 恒为 `null` |
-| `birthday` | null | 恒为 `null` |
-| `lang` | null | 恒为 `null` |
-| `fields` | array | 恒为 `[]`（不读 `user_profiles.fields`） |
+| `location` | string \| null | `settings.location`；空则 `null` |
+| `birthday` | string \| null | `settings.birthday`（`YYYY-MM-DD`）；空则 `null` |
+| `lang` | string \| null | `settings.lang`；空则 `null` |
+| `fields` | array | `settings.fields`，元素 `{name,value}`；默认 `[]` |
 | `verifiedLinks` | array | 恒为 `[]` |
 | `followersCount` | number | 来自 `users.followers_count`（由关注流程重算，`internal/federation/store.go:542`）；无 DB 时保持 0 |
 | `followingCount` | number | 同上 |
@@ -178,7 +178,7 @@ token 解析（`internal/account/tokens.go:88`）：
 | `pinnedNotes` | Note[] | 上述 id 打包后的完整笔记；加载失败的单条会被跳过；默认 `[]` |
 | `pinnedPageId` | null | 恒为 `null` |
 | `pinnedPage` | null | 恒为 `null` |
-| `publicReactions` | boolean | 恒为 `false` |
+| `publicReactions` | boolean | `settings.publicReactions`，默认 `false` |
 | `followersVisibility` | string | `"public"` / `"followers"` / `"private"`；无资料行或空值读作 `"public"`（`internal/httpapi/users_pack.go:98`） |
 | `followingVisibility` | string | 同上 |
 | `twoFactorEnabled` | boolean | `user_profiles.two_factor_enabled`；登录框据此决定是否显示验证码输入框 |
@@ -204,20 +204,20 @@ token 解析（`internal/account/tokens.go:88`）：
 | `avatarId` | null | 恒为 `null`（**即使刚用 `avatarId` 设过头像**） |
 | `bannerId` | null | 恒为 `null` |
 | `followedMessage` | null | 恒为 `null` |
-| `injectFeaturedNote` | boolean | `false` |
+| `injectFeaturedNote` | boolean | `settings.injectFeaturedNote`，默认 `false` |
 | `receiveAnnouncementEmail` | boolean | `false` |
-| `alwaysMarkNsfw` | boolean | `false` |
-| `autoSensitive` | boolean | `false` |
-| `carefulBot` | boolean | `false` |
-| `autoAcceptFollowed` | boolean | `false` |
+| `alwaysMarkNsfw` | boolean | `settings.alwaysMarkNsfw`，默认 `false` |
+| `autoSensitive` | boolean | `settings.autoSensitive`，默认 `false` |
+| `carefulBot` | boolean | `settings.carefulBot`，默认 `false` |
+| `autoAcceptFollowed` | boolean | `settings.autoAcceptFollowed`，默认 `false` |
 | `followApprovalLocalSeconds` | number | `0` |
 | `followApprovalRemoteSeconds` | number | `0` |
-| `noCrawle` | boolean | `false` |
-| `preventAiLearning` | boolean | `false` |
-| `isExplorable` | boolean | `true` |
+| `noCrawle` | boolean | `settings.noCrawle`，默认 `false` |
+| `preventAiLearning` | boolean | `settings.preventAiLearning`，默认 `false` |
+| `isExplorable` | boolean | `settings.isExplorable`，缺省 `true` |
 | `isDeleted` | boolean | `false` |
 | `twoFactorBackupCodesStock` | string | `"none"` |
-| `hideOnlineStatus` | boolean | `false` |
+| `hideOnlineStatus` | boolean | `settings.hideOnlineStatus`，默认 `false` |
 | `hasUnreadSpecifiedNotes` | boolean | `false` |
 | `hasUnreadMentions` | boolean | `false` |
 | `hasUnreadChatMessages` | boolean | `false` |
@@ -642,7 +642,7 @@ token 解析（`internal/account/tokens.go:88`）：
 ### 与 Misskey 的差异 / 已知缺口
 
 - `avatarId`、`bannerId` 恒为 `null`，前端不能靠 `i.avatarId` 反查头像文件；只能用 `avatarUrl`。
-- 大量设置字段是常量（见 `MeDetailed` 表）：`isExplorable` 恒 `true`、`noCrawle` 恒 `false`、`mutedWords` 恒 `[]` 等。把这些字段写回 `i/update` 不会报错，但也不会保存。
+- 部分设置字段仍是常量（见 `MeDetailed` 表）：`mutedWords` 恒 `[]`、`followApproval*Seconds` 恒 `0` 等。把这些字段写回 `i/update` 不会报错，但也不会保存。
 - `hasPendingReceivedFollowRequest` 恒 `false`（关注请求列表由 `following/requests/list` 提供）。
 
 代码位置：`internal/httpapi/account.go:200`。
@@ -668,8 +668,13 @@ token 解析（`internal/account/tokens.go:88`）：
 | `avatarId` | string \| null | 否 | 非空时必须是**调用者自己的** drive 文件：不存在 → 400 `NO_SUCH_FILE`，不是自己的 → 403 `ACCESS_DENIED` | 把该文件的 `url` 写入 `user_profiles.avatar_url`；`""`/`null` 清空为 NULL |
 | `followersVisibility` | string \| null | 否 | 仅接受 `public` \| `followers` \| `private`，否则 400（`info`: `"followersVisibility must be public, followers or private"`） | `user_profiles.followers_visibility` |
 | `followingVisibility` | string \| null | 否 | 同上（`info` 里换成 `followingVisibility`） | `user_profiles.following_visibility` |
+| `location` | string \| null | 否 | 字符数 ≤ 50，超出 400 | `settings.location` |
+| `birthday` | string \| null | 否 | `YYYY-MM-DD` 或不带值的日期，否则 400 | `settings.birthday` |
+| `lang` | string \| null | 否 | ≤ 16 字符且只含字母/数字/`-` | `settings.lang` |
+| `fields` | array \| null | 否 | 最多 16 条 `{name,value}`；name ≤ 255、value ≤ 1024；空 name 丢弃 | `settings.fields` |
+| `noCrawle` / `preventAiLearning` / `isExplorable` / `hideOnlineStatus` / `publicReactions` / `alwaysMarkNsfw` / `autoSensitive` / `carefulBot` / `autoAcceptFollowed` / `injectFeaturedNote` | boolean | 否 | 无 | `settings.<字段名>`，读回时 `isExplorable` 缺省为 `true` |
 
-**被静默忽略的字段**（Firefish 的设置页会发）：`bannerId`、`fields`、`location`、`birthday`、`lang`、`followedMessage`、`isBot`、`isCat`、`speakAsCat`、`isLocked`、`isExplorable`、`hideOnlineStatus`、`publicReactions`、`carefulBot`、`autoAcceptFollowed`、`noCrawle`、`preventAiLearning`、`requireSigninToViewContents`、`mutedWords`、`mutedInstances`、`mutingNotificationTypes`、`notificationRecieveConfig`、`emailNotificationTypes`、`alsoKnownAs`、`avatarDecorations`、`chatScope`、`pinnedPageId` 等。它们不会报错，也不会保存。
+**被静默忽略的字段**（Firefish 的设置页会发）：`bannerId`、`followedMessage`、`isBot`、`isCat`、`speakAsCat`、`isLocked`、`requireSigninToViewContents`、`mutedWords`、`mutingNotificationTypes`、`notificationRecieveConfig`、`emailNotificationTypes`、`alsoKnownAs`、`avatarDecorations`、`chatScope`、`pinnedPageId` 等。它们不会报错，也不会保存。`mutedInstances` 单独处理（见 §`i/update` 的 `mutedInstances`）。
 
 ### 响应 200
 
@@ -690,11 +695,10 @@ token 解析（`internal/account/tokens.go:88`）：
 
 ### 与 Misskey 的差异 / 已知缺口
 
-- 只支持 5 个字段（name、description、avatarId、两个 visibility）。Misskey 的 `i/update` 有 40+ 个参数，其余全部无效。
+- 支持 name、description、avatarId、两个 visibility，以及 location/birthday/lang/fields 与 10 个布尔开关；Misskey 的其余 30+ 个参数仍然无效。
 - 没有 `bannerId`：横幅完全不可设置，`bannerUrl` 恒为 `null`。
-- 没有 `fields`（资料自定义字段）、`location`、`birthday`、`lang`。
-- 没有 `isLocked`（锁推）与关注审批：`users.is_locked` 列存在但不被读取/写入，`isLocked` 恒 `false`。
-- 没有密码修改、邮箱修改、`i/update-email`。
+- `isLocked`（锁推）、关注审批、`isBot`/`isCat` 与发言猫语仍无写入路径。
+- 没有邮箱修改与 `i/update-email`；改密见 `i/change-password`（第二十一波）。
 - `avatarId` 回读问题：设置成功后响应里的 `avatarId` 仍是 `null`，Firefish 头像裁剪后 `me.avatarId = i.avatarId` 会拿到 `null`（`packages/client/src/pages/settings/profile.vue:254`），但 `avatarUrl` 是正确的，头像显示不受影响。
 
 代码位置：`internal/httpapi/i_update.go:66`、`internal/account/profile.go:65`、`:112`、`internal/httpapi/i_update.go:159`。
