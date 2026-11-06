@@ -1456,9 +1456,9 @@ CINDERFISH_TEST_DATABASE_URL=… go test -count=1 ./...   # 全绿
   软过滤，没有服务器侧词表；自定义 CSS 按账号存进 base store 并即时注入。
 - **静态页**：远程账号不能从 `/authorize-follow` 关注（没有 `ap/show`），只提示到对方实例操作；
   `notes/history` 不存在，历史页只说明；`ErrorPage.vue` 目前未被路由使用。
-- **已补/未走查**：登录/注册表单（§12CV/§12DK）、emoji 新增的文件上传（§12EE）与通知的 Streaming
-  实时插入（§12CW）均已补验证；仍未走查的是偏好导入与重置、主题的
-  26 个调色板的 Nord 浅/深两版已在 §12DX 实际切换；图片上传与引用/转贴发帖已由 §12EC 走查。
+- **已补验证**：登录/注册表单（§12CV/§12DK）、emoji 新增的文件上传（§12EE）、Streaming 实时插入
+  （§12CW）、偏好导入与重置（§12EL）、图片上传与引用/转贴发帖（§12EC）、Nord 浅/深主题（§12DX）。
+  仍未目视检查的是其余 26 个调色板。
 - **未实装（首版范围外）**：chat/channels/lists/antennas/clips/groups/gallery/pages、剩余约 10 个 widget、
   其余 37 个 locale、实例级主题。
 
@@ -4708,10 +4708,9 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
   注册表 3 页、自定义 CSS、文字过滤、偏好导出、API 页、欢迎页、公开本地时间线、404 已用真实二进制
   在桌面 20 条 + 移动 7 条路由走查；冻结/解冻、联邦模式切换、白名单增删、注册表建键/改值、主题安装与
   编辑器保存、偏好导出均完成真实 UI 交互并回读 API。
-- **第四波仍未验证/未实装（2026-11-06，逐条见 §12T.4）**：登录/注册表单真实交互、emoji 新增的文件上传
-  点击路径、Streaming 实时插入、偏好导入/重置、其余 25 个调色板的目视检查；管理台其余 20+ 页、设置页
-  约 18 页、widgets 约 10 个、37 个 locale 仍未移植；chat/channels/lists/antennas/clips/groups/gallery/pages
-  仍按首版范围不做，导航已不再指向它们。
+- **第四波遗留（2026-11-07 更新）**：登录/注册表单、emoji 文件上传、Streaming 实时插入、偏好导入/重置
+  均已在后续波次补验证（§12CV/§12DK/§12EE/§12CW/§12EL）；仍未目视检查的是其余调色板。
+  管理台/设置页/widgets 中，首版范围外的部分与 37 个 locale 仍不做，导航已不再指向它们。
 
 ## 12CD. 第六十五波：远端 @提及（2026-11-07）
 
@@ -5908,3 +5907,15 @@ CINDERFISH_TEST_DATABASE_URL=... go test ./... -count=1         # 全绿
 - `scrollWidth - clientWidth` 全为 0；
 - `.cf-admin-unavailable` 存在，页内 `input/select/textarea/button` 计数为 0；
 - 无未捕获异常。
+
+## 12EL. 第一百二十二波：偏好备份的导出、导入与重置（2026-11-07）
+
+`/settings/preferences-backups`（桌面壳）：
+
+1. 点「导出」→ 下载目录出现 `cinderfish-preferences-<时间戳>.json`，内容为
+   `{type:"cinderfish.preferences", version:1, base:{…}}`；
+2. 把 `base.showPreviewByDefault` 改成 `true`，通过隐藏的 file input 导入并确认 →
+   `localStorage['pizzax::base::<uid>'].showPreviewByDefault` 变为 `true`；
+3. 点「重置为默认值」并确认 → 同一键回到 `false`（定义里的默认值）。
+
+仍未验证：未知键被忽略时的列表展示、导入非法 JSON 的错误文案（后端/解析层已有理由字符串）。
