@@ -1175,3 +1175,18 @@ OAuth 2.0 授权码端点（仅 PKCE `S256`）。认证：**需要登录**，且
 
 会话字符串本身就是能力凭据，端点只应答一次；迁移 v13 的 `access_tokens.fetched` 保证第二次轮询
 不会再次泄露 token。
+
+## 2026-11-06 增补：公开用户目录（POST /api/users）
+
+匿名可读；带凭据时每行补 `isFollowing` / `isFollowed`。
+
+| 参数 | 取值 | 说明 |
+|------|------|------|
+| `limit` / `offset` | | 默认 10 / 0，上限 100 |
+| `sort` | `+follower` `-follower` `+createdAt` `-createdAt` `+updatedAt` `-updatedAt` | `+` 为倒序 |
+| `state` | `all` `alive` `admin` `moderator` `adminOrModerator` | 无 moderator 标记，按 admin 处理 |
+| `origin` | `combined` `local` `remote` | 缺省 local |
+| `hostname` | string | 精确匹配 |
+
+冻结账号不返回。返回 `UserDetailed[]`（含三个计数）。非法 `state`/`origin` 400。
+**分页只支持 offset**：`sinceId`/`untilId` 会被忽略。

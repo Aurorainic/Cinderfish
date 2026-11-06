@@ -15,15 +15,15 @@
 | 指标 | 数量 |
 |------|------|
 | Misskey 端点总数 | 440 |
-| Cinderfish 已注册路由 | 103 |
-| 其中 Misskey 同名路径 | 99 |
+| Cinderfish 已注册路由 | 104 |
+| 其中 Misskey 同名路径 | 100 |
 | 其中 Cinderfish 自有路径/别名 | 4（`notifications` 别名、`admin/federation/mode`、`admin/federation/allowlist`、`miauth/{session}/check`） |
-| 未实现（Misskey 同名） | 341 |
+| 未实现（Misskey 同名） | 340 |
 
 统计口径：`internal/httpapi/server.go` 里 `HandleFunc("METHOD /api/…")` 的去重路径；
 GET 与 POST 同名路径只算一个。
 
-## 2. 已实现（103 条注册路由）
+## 2. 已实现（104 条注册路由）
 
 ```
 admin/accounts/create       admin/announcements/create  admin/announcements/delete
@@ -61,7 +61,8 @@ notes/replies               notes/show                  notes/timeline
 notifications*              notifications/mark-all-as-read
 ping                        signin                      signup
 username/available          users/followers             users/following
-users/notes                 users/report-abuse          users/search
+users                       users/notes                 users/report-abuse
+users/search
 users/show
 users/update
 ```
@@ -77,6 +78,8 @@ users/update
 `hashtags/trend`、`drive/folders*`、`emojis`、`admin/emoji/*`、`notes/polls/vote`、
 `following/requests/*`、`users/update`、`signin`、`signup`、`username/available`、
 `i/registry/scopes`，以及 `admin/federation/mode` 的 GET。
+
+2026-11-06 第十七波新增：`users`（公开目录；只支持 offset 分页）。
 
 2026-11-06 第十六波新增：`notes/mentions`；`i/notifications` 增加 `unreadOnly` 参数（不是新路由）。
 台账计数按「440 − 同名已实现」重新对齐（此前累计漂移）。

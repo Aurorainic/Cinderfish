@@ -128,6 +128,7 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("POST /api/users/update", s.handleIUpdate)
 	s.mux.HandleFunc("POST /api/i/pin", s.handleIPin)
 	s.mux.HandleFunc("POST /api/i/unpin", s.handleIUnpin)
+	s.mux.HandleFunc("POST /api/users", s.handleUsers)
 	s.mux.HandleFunc("POST /api/users/show", s.handleUsersShow)
 	s.mux.HandleFunc("POST /api/users/search", s.handleUsersSearch)
 	s.mux.HandleFunc("POST /api/users/report-abuse", s.handleReportAbuse)
