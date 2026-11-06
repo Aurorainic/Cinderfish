@@ -1841,5 +1841,6 @@
 	"remindMeLater": "稍后再说",
 	"removeQuote": "移除引用",
 	"removeRecipient": "移除接收者",
-	"removeMember": "移除成员"
+	"removeMember": "移除成员",
+	"_notification.newNote": "发布了新笔记"
 }

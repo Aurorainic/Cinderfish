@@ -29,6 +29,17 @@
 					v-else-if="notification.type === 'quote'"
 					class="ph-quotes ph-bold"
 				></i>
+				<i
+					v-else-if="
+						notification.type === 'follow' ||
+						notification.type === 'receiveFollowRequest'
+					"
+					class="ph-user-plus ph-bold"
+				></i>
+				<i
+					v-else-if="notification.type === 'note'"
+					class="ph-note-pencil ph-bold"
+				></i>
 				<MkReactionIcon
 					v-else-if="
 						showEmojiReactions && notification.type === 'reaction'
@@ -106,6 +117,26 @@
 			>
 				<Mfm :text="summary" :plain="true" :nowrap="!full" />
 			</MkA>
+			<MkA
+				v-if="notification.type === 'note' && notification.note != null"
+				class="text"
+				:to="notePage(notification.note)"
+				:title="summary"
+			>
+				<Mfm :text="summary" :plain="true" :nowrap="!full" />
+			</MkA>
+			<span
+				v-if="notification.type === 'follow'"
+				class="text"
+				style="opacity: 0.7"
+				>{{ t("_notification.youWereFollowed") }}</span
+			>
+			<span
+				v-if="notification.type === 'receiveFollowRequest'"
+				class="text"
+				style="opacity: 0.7"
+				>{{ t("_notification.youReceivedFollowRequest") }}</span
+			>
 			<!-- Cinderfish keeps the note row only while it still exists, so a
 			     pruned or soft-deleted target degrades to the bare phrase. -->
 			<span

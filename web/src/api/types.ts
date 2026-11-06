@@ -12,7 +12,10 @@ export type NotificationType =
 	| "reply"
 	| "renote"
 	| "quote"
-	| "reaction";
+	| "reaction"
+	| "note"
+	| "follow"
+	| "receiveFollowRequest";
 
 export type FollowVisibility = "public" | "followers" | "private";
 

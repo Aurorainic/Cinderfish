@@ -43,13 +43,16 @@ import { t } from "@/i18n";
 import { CfModal } from "@/os";
 
 // Upstream builds this list from `firefish-js`'s notificationTypes. Cinderfish
-// produces only the five kinds below, and its API has no `unreadOnly` switch.
+// produces the eight kinds below, and its API has no `unreadOnly` switch.
 const notificationTypes: NotificationType[] = [
 	"mention",
 	"reply",
 	"renote",
 	"quote",
 	"reaction",
+	"note",
+	"follow",
+	"receiveFollowRequest",
 ];
 
 const emit = defineEmits<{
@@ -82,6 +85,9 @@ const typesMap = reactive<Record<NotificationType, boolean>>({
 	renote: false,
 	quote: false,
 	reaction: false,
+	note: false,
+	follow: false,
+	receiveFollowRequest: false,
 });
 
 for (const ntype of notificationTypes) {
