@@ -4746,7 +4746,8 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
 ### 12CD.4 仍未验证
 
 - 真实跨实例（不同软件）的提及互认没有验证。
-- 大文本里大量提及的解析开销没有测。
+- ~~大文本里大量提及的解析开销没有测。~~ 2026-11-07 补了 `BenchmarkParseMentions`：满长 3000 字节
+  笔记的解析为 0.08–0.12 ms；远端提及的**解析上限与有界解析**见 §12ES。
 
 ## 12CE. 第六十六波：入站与出站投票（Question，2026-11-07）
 
@@ -6012,3 +6013,50 @@ CINDERFISH_TEST_DATABASE_URL=... go test ./... -count=1         # 全绿
 
 测量数据已清理：`DELETE FROM notes WHERE id LIKE 'iperf%'`、`DELETE FROM users WHERE
 username_lower LIKE 'iperfu%'`，再 `ANALYZE notes`；临时服务已停止。
+
+## 12ES. 第一百二十九波：提及上限与有界远端解析（2026-11-07）
+
+复核 §14 时发现一个此前没有记录的缺口：`notes/create` 在返回前同步调用 `DeliverNote`，
+其中 `renderNote` 与 `deliveryInboxes` 会对每条远端提及做 WebFinger + Actor 抓取，客户端超时
+15 s 且串行，而笔记的提及数没有任何上限。一条带几十个首次出现的远端 `@user@host` 的帖子会让发帖
+请求阻塞数分钟。
+
+### 12ES.1 对照 Misskey
+
+- `RoleService` 的默认策略 `mentionLimit: 20`；`NoteCreateService` 在写库前比较解析后的提及数，
+  超出抛 `IdentifiableError('9f466dab-c856-48cd-9e65-ff90ff750580', 'Note contains too many mentions')`。
+  端点把该 id 映射为 `meta.errors.containsTooManyMentions`。
+- Misskey 的远端提及解析同样发生在创建服务里（`extractMentionedUsers`），所以同步解析本身是
+  上游行为；差别在上游有每主机限流与缓存，本实现此前两者都没有。
+
+### 12ES.2 落地清单
+
+| 层 | 文件 | 内容 |
+|----|------|------|
+| 领域 | `internal/note/service.go` | `MaxMentions = 20`；解析后按「已解析本地用户 + 去重远端 acct」计数，超出返回 `ErrTooManyMentions` |
+| 端点 | `internal/httpapi/notes.go` | 400 `TOO_MANY_MENTIONS`，沿用 Misskey 的错误 id |
+| 解析 | `internal/httpapi/activitypub.go` | `remoteMentionCache` + `resolveRemoteMentions`：4 并发、总预算 10 s、失败缓存为 nil |
+| 投递 | `internal/httpapi/federation_wire.go` | `DeliverNote`/`DeliverUpdate` 只解析一次，渲染与收件人计算共享结果 |
+
+### 12ES.3 有意的限制
+
+- 计数只含文本里的提及；`replyId` 的目标作者与 `visibleUserIds` 不计入（Misskey 会把它们补进
+  `mentionedUsers` 再比较）。本实现的回复目标本来就不进 `mentions`，保持现状。
+- 没有按角色配置的策略层：本实例的账号没有角色，`MaxMentions` 是常量。
+- 解析预算耗尽时，未解析的提及会被渲染与投递跳过（记日志），笔记本身仍然发出；这是有意的降级。
+- 没有对 10 s 预算做自动化用例——要构造一个挂起的对端，测试会固定慢 10 s；预算行为只在代码层固定。
+
+### 12ES.4 验证证据
+
+- `gofmt -l internal/ cmd/` 无输出；`go vet ./...` 通过；
+  `CINDERFISH_TEST_DATABASE_URL=… go test ./... -count=1` 全绿（httpapi 47.5 s，note 47.8 s）。
+- `TestNotesCreateMentionLimit`：20 条远端提及返回 200 且时间线 1 条；21 条返回 400
+  `TOO_MANY_MENTIONS`，时间线仍为 1 条（未写库）。
+- `BenchmarkParseMentions`（满长 3000 字节）：无提及时 0.115 ms/op，166 条不重复远端提及
+  0.079 ms/op、269 allocs/40 KB；解析本身相对数据库与网络可忽略。
+- 真实二进制 `/tmp/cf-w63`：`notes/create` 20 条提及 200 并返回 `createdNote.id`；21 条返回 400，
+  错误体 `{"code":"TOO_MANY_MENTIONS","id":"9f466dab-…","kind":"client","message":"Note contains too many mentions."}`。
+- 无头浏览器（1400×900，Helium/CDP）：发帖框填入 21 条提及后提交，出现错误对话框
+  「Note contains too many mentions. / 9f466dab-c856-48cd-9e65-ff90ff750580 / 好」，
+  `users/notes` 对该用户返回 0 条；截图 `/tmp/w128-shots/too-many-mentions.png`（不入库）。
+  前端显示的是 `cause.message` 与 `cause.errorId`，不显示 `code` 字段。

@@ -35,6 +35,9 @@ const (
 // MaxTextLength matches Misskey's MAX_NOTE_TEXT_LENGTH.
 const MaxTextLength = 3000
 
+// MaxMentions matches the default of Misskey's role policy mentionLimit.
+const MaxMentions = 20
+
 // Note is a stored note.
 type Note struct {
 	ID             string
@@ -131,12 +134,16 @@ var (
 	// its audience is never widened (core/NoteCreateService.ts L388-390).
 	ErrCannotWidenSpecifiedReply = errors.New("note: a specified note can only be answered by a specified note")
 	ErrEmptyNote                 = errors.New("note: a note needs text, files or a poll")
-	ErrTextTooLong               = errors.New("note: text is too long")
-	ErrInvalidVisibility         = errors.New("note: invalid visibility")
-	ErrPollExpired               = errors.New("note: poll is already expired")
-	ErrNoPoll                    = errors.New("note: the note has no poll")
-	ErrAlreadyVoted              = errors.New("note: already voted in this poll")
-	ErrChoiceOutOfRange          = errors.New("note: poll choice is out of range")
+	// Mirrors Misskey's role policy mentionLimit (default 20): a note that
+	// addresses more people than that is rejected before it is stored
+	// (core/NoteCreateService.ts "Note contains too many mentions").
+	ErrTooManyMentions   = errors.New("note: too many mentions")
+	ErrTextTooLong       = errors.New("note: text is too long")
+	ErrInvalidVisibility = errors.New("note: invalid visibility")
+	ErrPollExpired       = errors.New("note: poll is already expired")
+	ErrNoPoll            = errors.New("note: the note has no poll")
+	ErrAlreadyVoted      = errors.New("note: already voted in this poll")
+	ErrChoiceOutOfRange  = errors.New("note: poll choice is out of range")
 )
 
 // Create stores a new note.
@@ -270,6 +277,13 @@ SELECT id FROM users WHERE username_lower = lower($1) AND host IS NULL
 			`, mention.Username).Scan(&id); err == nil {
 				mentions = append(mentions, id)
 			}
+		}
+		// Misskey rejects the note before storing it when the addressed
+		// users outnumber mentionLimit; counting resolved users means an
+		// unknown local handle does not count, the same way it does not
+		// become a mentionedUsers entry upstream.
+		if len(mentions)+len(remoteMentions) > MaxMentions {
+			return nil, ErrTooManyMentions
 		}
 	}
 

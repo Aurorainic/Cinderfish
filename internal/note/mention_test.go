@@ -1,7 +1,9 @@
 package note
 
 import (
+	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -27,6 +29,31 @@ func TestParseMentions(t *testing.T) {
 			got := ParseMentions(c.text)
 			if !reflect.DeepEqual(got, c.want) {
 				t.Errorf("ParseMentions(%q) = %#v, want %#v", c.text, got, c.want)
+			}
+		})
+	}
+}
+
+// BenchmarkParseMentions measures the parse cost on the largest note the
+// service accepts, so the mention limit can be judged against a worst case
+// the text length allows rather than a guess.
+func BenchmarkParseMentions(b *testing.B) {
+	noMention := strings.Repeat("hello world ", MaxTextLength/12)
+
+	var mentions strings.Builder
+	for i := 0; mentions.Len() < MaxTextLength; i++ {
+		fmt.Fprintf(&mentions, "@user%d@remote.example ", i)
+	}
+
+	cases := map[string]string{
+		"no-mentions":  noMention[:MaxTextLength],
+		"dense-remote": mentions.String()[:MaxTextLength],
+	}
+	for name, text := range cases {
+		b.Run(name, func(b *testing.B) {
+			b.SetBytes(int64(len(text)))
+			for i := 0; i < b.N; i++ {
+				ParseMentions(text)
 			}
 		})
 	}

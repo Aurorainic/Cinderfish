@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/Aurorainic/cinderfish/internal/account"
@@ -537,6 +538,13 @@ func (s *Server) handleNoteActivity(w http.ResponseWriter, r *http.Request) {
 
 // renderNote renders a stored local note as an ActivityPub Note.
 func (s *Server) renderNote(ctx context.Context, n *note.Note) (federation.Object, error) {
+	return s.renderNoteWithMentions(ctx, n, s.resolveRemoteMentions(ctx, n.RemoteMentions))
+}
+
+// renderNoteWithMentions renders a note using actors the caller already
+// resolved. Delivery resolves once and shares the result with deliveryInboxes,
+// so one note never repeats a WebFinger lookup for the same account.
+func (s *Server) renderNoteWithMentions(ctx context.Context, n *note.Note, cache *remoteMentionCache) (federation.Object, error) {
 	u, err := s.accounts.GetByID(ctx, n.UserID)
 	if err != nil || u == nil {
 		return nil, err
@@ -574,10 +582,8 @@ func (s *Server) renderNote(ctx context.Context, n *note.Note) (federation.Objec
 	// them in to/cc and the tag list, which is what makes the target instance
 	// notify its user.
 	for _, acct := range n.RemoteMentions {
-		if user, err := s.resolveRemoteMention(ctx, acct); err == nil && user.URI != "" {
+		if user := cache.get(acct); user != nil && user.URI != "" {
 			data.MentionRefs = appendUniqueString(data.MentionRefs, user.URI)
-		} else if err != nil {
-			log.Printf("httpapi: resolve remote mention %s: %v", acct, err)
 		}
 	}
 	// Local custom emoji in the text travel as Emoji tags so peers show the
@@ -607,6 +613,77 @@ func (s *Server) renderNote(ctx context.Context, n *note.Note) (federation.Objec
 		}
 	}
 	return s.fedRenderer.RenderNote(data), nil
+}
+
+// remoteMentionCache holds the actors one rendering or delivery resolved.
+// A note addresses at most note.MaxMentions accounts, but seeing one for the
+// first time costs two network requests (WebFinger plus the actor document),
+// and the peer may be unreachable; resolution is therefore bounded in time
+// and parallelism rather than trusting the client timeout per mention.
+type remoteMentionCache struct {
+	users map[string]*federation.RemoteUser
+}
+
+func (c *remoteMentionCache) get(acct string) *federation.RemoteUser {
+	if c == nil {
+		return nil
+	}
+	return c.users[acct]
+}
+
+const (
+	// remoteMentionBudget is the total time one rendering or delivery may
+	// spend resolving handles.
+	remoteMentionBudget = 10 * time.Second
+	// remoteMentionWorkers bounds the concurrent lookups, so a note full of
+	// mentions cannot open a host-sized burst of connections.
+	remoteMentionWorkers = 4
+)
+
+// resolveRemoteMentions resolves every distinct handle in accts, caching
+// failures as nil: a handle that could not be resolved here is not retried by
+// deliveryInboxes later in the same request.
+func (s *Server) resolveRemoteMentions(ctx context.Context, accts []string) *remoteMentionCache {
+	cache := &remoteMentionCache{users: make(map[string]*federation.RemoteUser, len(accts))}
+	if len(accts) == 0 || s.federationInbox == nil {
+		return cache
+	}
+	// Claim each handle before starting workers so a duplicate acct (the
+	// column is deduplicated, but the cache should not depend on that) is
+	// resolved once.
+	unique := make([]string, 0, len(accts))
+	for _, acct := range accts {
+		if _, seen := cache.users[acct]; seen {
+			continue
+		}
+		cache.users[acct] = nil
+		unique = append(unique, acct)
+	}
+	ctx, cancel := context.WithTimeout(ctx, remoteMentionBudget)
+	defer cancel()
+
+	var (
+		mu  sync.Mutex
+		wg  sync.WaitGroup
+		sem = make(chan struct{}, remoteMentionWorkers)
+	)
+	for _, acct := range unique {
+		wg.Add(1)
+		sem <- struct{}{}
+		go func(acct string) {
+			defer wg.Done()
+			defer func() { <-sem }()
+			user, err := s.resolveRemoteMention(ctx, acct)
+			if err != nil {
+				log.Printf("httpapi: resolve remote mention %s: %v", acct, err)
+			}
+			mu.Lock()
+			cache.users[acct] = user
+			mu.Unlock()
+		}(acct)
+	}
+	wg.Wait()
+	return cache
 }
 
 // resolveRemoteMention turns a user@host mention into a stored actor, reusing

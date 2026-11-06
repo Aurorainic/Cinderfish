@@ -180,6 +180,10 @@ func (s *Server) deliverable(n *note.Note) bool {
 // note. A direct note must not reach followers, or its recipients would learn
 // it exists.
 func (s *Server) deliveryInboxes(ctx context.Context, n *note.Note) []string {
+	return s.deliveryInboxesWithMentions(ctx, n, s.resolveRemoteMentions(ctx, n.RemoteMentions))
+}
+
+func (s *Server) deliveryInboxesWithMentions(ctx context.Context, n *note.Note, cache *remoteMentionCache) []string {
 	var targets []string
 	if n.Visibility != "specified" {
 		if inboxes, err := s.federationStore.InboxesForUser(ctx, n.UserID, false); err == nil {
@@ -197,9 +201,8 @@ func (s *Server) deliveryInboxes(ctx context.Context, n *note.Note) []string {
 	// resolved to an inbox, which also gives the peer the Mention tag it uses
 	// to notify the account.
 	for _, acct := range n.RemoteMentions {
-		user, err := s.resolveRemoteMention(ctx, acct)
-		if err != nil || user == nil {
-			log.Printf("httpapi: resolve mention %s for delivery: %v", acct, err)
+		user := cache.get(acct)
+		if user == nil {
 			continue
 		}
 		inbox := user.SharedInbox
@@ -284,6 +287,7 @@ func (s *Server) DeliverNote(ctx context.Context, n *note.Note) {
 		return
 	}
 	actor := s.fedRenderer.ActorRef(u.ID)
+	mentions := s.resolveRemoteMentions(ctx, n.RemoteMentions)
 
 	var activity federation.Object
 	if n.IsPureRenote() {
@@ -298,7 +302,7 @@ func (s *Server) DeliverNote(ctx context.Context, n *note.Note) {
 		}
 		activity = s.fedRenderer.RenderAnnounce(n.ID, actor, object, n.CreatedAt)
 	} else {
-		doc, err := s.renderNote(ctx, n)
+		doc, err := s.renderNoteWithMentions(ctx, n, mentions)
 		if err != nil {
 			log.Printf("httpapi: render note for delivery: %v", err)
 			return
@@ -307,7 +311,7 @@ func (s *Server) DeliverNote(ctx context.Context, n *note.Note) {
 	}
 
 	seen := map[string]bool{}
-	for _, inbox := range s.deliveryInboxes(ctx, n) {
+	for _, inbox := range s.deliveryInboxesWithMentions(ctx, n, mentions) {
 		if seen[inbox] {
 			continue
 		}
@@ -328,7 +332,8 @@ func (s *Server) DeliverUpdate(ctx context.Context, n *note.Note) {
 	if err != nil || u == nil {
 		return
 	}
-	doc, err := s.renderNote(ctx, n)
+	mentions := s.resolveRemoteMentions(ctx, n.RemoteMentions)
+	doc, err := s.renderNoteWithMentions(ctx, n, mentions)
 	if err != nil {
 		log.Printf("httpapi: render note for update: %v", err)
 		return
@@ -340,7 +345,7 @@ func (s *Server) DeliverUpdate(ctx context.Context, n *note.Note) {
 	activity := s.fedRenderer.RenderUpdate(doc, n.ID, s.fedRenderer.ActorRef(u.ID), published)
 
 	seen := map[string]bool{}
-	for _, inbox := range s.deliveryInboxes(ctx, n) {
+	for _, inbox := range s.deliveryInboxesWithMentions(ctx, n, mentions) {
 		if seen[inbox] {
 			continue
 		}
