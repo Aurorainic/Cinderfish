@@ -20,6 +20,7 @@
 | `POST /api/notes/delete` | 必需（仅作者） | `noteId` | `{}` | `internal/httpapi/notes.go:313` |
 | `POST /api/notes/edit` | 必需（仅作者） | `editId`、`text`、`cw`、`visibility`、`localOnly` | `{"createdNote": Note}` | `internal/httpapi/note_edit.go:26` |
 | `POST /api/notes/history` | 必需（仅作者） | `noteId`、`limit` | `NoteEdit[]`（自有端点） | `internal/httpapi/note_edit.go:96` |
+| `POST /api/notes/state` | 必需 | `noteId` | `{isFavorited, isPinned, isMutedThread}` | `internal/httpapi/note_state.go:13` |
 | `POST /api/notes/replies` | 可选（弱认证） | `noteId`、`limit`、`sinceId`、`untilId` | `NoteDetailed[]` | `internal/httpapi/notes.go:370` |
 | `POST /api/notes/renotes` | 可选（弱认证） | 同上 | `NoteDetailed[]` | `internal/httpapi/notes.go:376` |
 | `POST /api/notes/conversation` | 可选（弱认证） | `noteId`、`limit`、`offset` | `Note[]`（非 detail） | `internal/httpapi/notes_thread.go:13` |
@@ -510,6 +511,19 @@
 只有作者能读：他人笔记返回 403 `YOU_ARE_NOT_THE_AUTHOR`，不存在的笔记返回 404 `NO_SUCH_NOTE`。
 
 ---
+
+## POST /api/notes/state
+
+需登录；请求 `{noteId}`。返回：
+
+```json
+{ "isFavorited": true, "isPinned": false, "isMutedThread": false }
+```
+
+- `isFavorited` 查 `note_favorites`，`isPinned` 查 `user_profiles.pinned_note_ids`；
+- `isMutedThread` 恒 `false`（线程静音未实现）；
+- 笔记不存在/已删除 404 `NO_SUCH_NOTE`，缺 `noteId` 400 `INVALID_PARAM`。
+- 前端笔记菜单先调它，再决定显示「收藏」还是「取消收藏」、置顶还是取消置顶。
 
 ## POST /api/notes/replies
 

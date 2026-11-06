@@ -15,15 +15,15 @@
 | 指标 | 数量 |
 |------|------|
 | Misskey 端点总数 | 440 |
-| Cinderfish 已注册路由 | 121 |
-| 其中 Misskey 同名路径 | 114 |
+| Cinderfish 已注册路由 | 122 |
+| 其中 Misskey 同名路径 | 115 |
 | 其中 Cinderfish 自有路径/别名 | 7（`notifications` 别名、`admin/federation/mode`、`admin/federation/allowlist`、`miauth/{session}/check`、`admin/object-storage`、`admin/deliver-queue`、`notes/history`） |
-| 未实现（Misskey 同名） | 326 |
+| 未实现（Misskey 同名） | 325 |
 
 统计口径：`internal/httpapi/server.go` 里 `HandleFunc("METHOD /api/…")` 的去重路径；
 GET 与 POST 同名路径只算一个。
 
-## 2. 已实现（121 条注册路由）
+## 2. 已实现（122 条注册路由）
 
 ```
 admin/accounts/create       admin/announcements/create  admin/announcements/delete
@@ -65,7 +65,7 @@ notes/local-timeline        notes/mentions              notes/polls/vote
 notes/reactions
 notes/reactions/create      notes/reactions/delete      notes/renotes
 notes/search                notes/search-by-tag
-notes/replies               notes/show                  notes/timeline
+notes/replies               notes/show                  notes/state                 notes/timeline
 notifications*              notifications/mark-all-as-read
 ping                        signin                      signup                        stats
 username/available          users/followers             users/following
@@ -89,6 +89,8 @@ users/update
 
 2026-11-06 第十九波新增：`stats`（公开计数）；`admin/update-meta` 增加六个合规 URL 与
 `serverRules`（不是新路由）。
+
+2026-11-06 第三十四波新增：`notes/state`（收藏/置顶状态；线程静音恒 false）。
 
 2026-11-06 第三十二波新增：`federation/instances`（按库内 users.host 聚合，不联网）。
 
@@ -152,7 +154,7 @@ note/reply/renote 事件）。
 |----------|------|------|
 | `i/*` | 42 | 账号设置、导入、应用授权等 |
 | `users/*` | 28 | 列表、搜索、反应、推荐、关注请求、更新资料字段 |
-| `notes/*` | 23 | 会话/子帖、提及、投票、收藏、搜索、翻译、草稿 |
+| `notes/*` | 22 | 会话/子帖、提及、投票、收藏、搜索、翻译、草稿 |
 | `chat/*` | 25 | 私聊（首版可选） |
 | `drive/*` | 14 | URL 上传、去重、批量移动 |
 | `channels/*` | 16 | 频道（首版可选） |
