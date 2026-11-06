@@ -357,6 +357,11 @@ type RemoteNote struct {
 	Tags        []string
 	Sensitive   bool
 	CreatedAt   time.Time
+	// Poll is set for an inbound Question: the choices, whether more than one
+	// may be picked, and an optional closing time. Empty means a plain note.
+	PollChoices   []string
+	PollMultiple  bool
+	PollExpiresAt *time.Time
 }
 
 // InsertRemoteNote stores a received note. Reply and renote targets are
@@ -383,16 +388,35 @@ func (s *Store) InsertRemoteNote(ctx context.Context, n RemoteNote) (string, err
 		tags = []string{}
 	}
 
-	_, err := s.pool.Exec(ctx, `
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return "", fmt.Errorf("federation: begin remote note: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	if _, err := tx.Exec(ctx, `
 INSERT INTO notes (id, user_id, user_host, visibility, local_only, cw, text,
                    reply_id, renote_id, renote_user_id, ap_id, activity_uri,
                    tags, mentions, emojis, is_sensitive, created_at)
 VALUES ($1,$2,$3,$4,FALSE,$5,$6,$7,$8,$9,$10,$11,$12,'[]'::jsonb,'[]'::jsonb,$13,$14)
 	`, id, n.UserID, n.UserHost, n.Visibility, nullIfEmpty(n.CW), nullIfEmpty(n.Text),
 		replyID, renoteID, renoteUserID, n.APID, n.ActivityURI,
-		marshalStrings(tags), n.Sensitive, n.CreatedAt)
-	if err != nil {
+		marshalStrings(tags), n.Sensitive, n.CreatedAt); err != nil {
 		return "", fmt.Errorf("federation: insert remote note: %w", err)
+	}
+
+	// A Question stores its poll in the same table local polls use, so the
+	// existing note packing and vote endpoints render and accept it without
+	// a second code path.
+	if len(n.PollChoices) >= 2 {
+		if _, err := tx.Exec(ctx, `
+INSERT INTO polls (id, choices, multiple, expires_at) VALUES ($1,$2,$3,$4)
+`, id, marshalStrings(n.PollChoices), n.PollMultiple, n.PollExpiresAt); err != nil {
+			return "", fmt.Errorf("federation: insert remote poll: %w", err)
+		}
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return "", fmt.Errorf("federation: commit remote note: %w", err)
 	}
 	return id, nil
 }

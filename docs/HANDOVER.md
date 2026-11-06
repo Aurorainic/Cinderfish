@@ -995,7 +995,8 @@ POST /inbox                            POST /users/{id}/inbox
   当前已实现 35、未实现 405，并给出 Tier 1 的顺序（关注请求、隐私字段、收藏、会话串、反应名单、趋势、
   云盘文件夹、自定义表情、投票、注册表）。
 - 联邦侧盘点：`internal/federation/inbox.go` 已处理入站 `Follow`/`Accept`/`Reject`/`Undo`/`Create`/
-  `Delete`/`Like`/`Announce`/`Update`/`Block`；未覆盖 `Move`、`Flag`、`Question`、`EmojiReact`。
+  `Delete`/`Like`/`Announce`/`Update`/`Block`；当时未覆盖 `Move`、`Flag`、`Question`、`EmojiReact`
+  （后续波次已全部补上，`Question` 见 §12CE）。
 - 前端冻结时的状态：工作树干净，最后提交 `2700334`；上一轮未提交的两处前端微调（MkPagination 的
   `transition` 去掉 `mode="out-in"`、通知行间距对齐）已按"非后端工作全废"的要求回退，未纳入提交。
 
@@ -4139,7 +4140,7 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
 
 - 出站反应仍是 `Like` + `content`（与 Misskey `renderLike` 一致），没有改发 `EmojiReact`。
 - 不处理 `EmojiReact` 的 `tag` 自定义表情定义（还没有远端 emoji 表）。
-- `Flag`、`Question`（投票）仍未处理。
+- `Flag`、`Question`（投票）当时仍未处理（`Flag` 见第五十九波，`Question` 见 §12CE）。
 
 ### 12BW.3 验证证据
 
@@ -4152,7 +4153,7 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
 
 - 没有对真实 Misskey / Firefish 实例验证 `EmojiReact` 的收发。
 - 自定义表情反应（`:name:` 形式）没有远端 emoji 解析，仅按文本存库。
-- `Flag`（举报）与 `Question`（投票）入站仍未实现（`Flag` 已在第五十九波补上）。
+- `Flag`（举报）与 `Question`（投票）入站当时未实现（`Flag` 第五十九波、`Question` §12CE 已补）。
 
 ## 12BX. 第五十九波：入站 Flag（2026-11-06）
 
@@ -4164,7 +4165,7 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
 |----|------|
 | 联邦 | `Inbox.flag`：`object` 中第一个 `<baseURL>/users/<id>` 作为举报对象，`content` + 目标 URI 列表写入评论 |
 | 存储 | `Store.RecordReport` 插入 `abuse_reports`，reporter 是远端账号行 |
-| 台账 | 入站活动清单更新，只剩 `Question`（投票）未覆盖 |
+| 台账 | 入站活动清单更新；`Question` 当时仍缺，已在 §12CE 补上 |
 
 ### 12BX.2 有意的限制
 
@@ -4554,7 +4555,7 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
 - **第五十七波部分补验证（2026-11-07 对账 §12CB）**：`follow` 与 `note` 两类通知在通知页渲染已走查。
   仍未验证的：远端导入触发通知无双实例用例；`homeTimeline` 的 WS 过滤只有单元断言。
 - **第五十八波仍未验证**：没有对真实 Misskey/Firefish 验证 `EmojiReact`；远端自定义表情未解析；
-  `Question` 入站仍未实现。
+  `Question` 入站已在第六十六波补上（§12CE）；仍未验证真实异种软件互投。
 - **第五十九波部分补验证（2026-11-07 对账 §12CC）**：`/admin/abuses` 的举报者、被举报者、内容与
   「标记已处理」按钮已走查。仍未验证的：远端举报没有对真实实例验证；重复举报与笔记级目标的展示。
 - **第六十波部分补验证（2026-11-07 对账 §12CB）**：三个说明页与 `SignupComplete` 的结构与文案
@@ -4711,3 +4712,43 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
 
 - 真实跨实例（不同软件）的提及互认没有验证。
 - 大文本里大量提及的解析开销没有测。
+
+## 12CE. 第六十六波：入站与出站投票（Question，2026-11-07）
+
+台账最后一项联邦缺口是入站 `Question`：远端投票此前被当作纯文本笔记存储，选项丢失。本波同时补上
+出站渲染，使本地投票在双实例间往返。
+
+### 12CE.1 落地清单
+
+| 层 | 文件 | 内容 |
+|----|------|------|
+| 解析 | `internal/federation/convert.go` | `pollOf`：`oneOf`（单选）/`anyOf`（多选）、`endTime`（RFC3339 与纳秒两种）、选项去空白、最多 10 个、少于 2 个不建投票 |
+| 存储 | `internal/federation/store.go` | `RemoteNote` 增加 poll 字段；`InsertRemoteNote` 改为事务，在同一事务里写 `polls` 行 |
+| 渲染 | `internal/federation/render.go` | `NoteData` 增加 poll 字段；有选项时 type 改 `Question`，选项包成 `{type:Note,name,replies:Collection}`，`endTime` 输出 RFC3339 |
+| 接线 | `internal/httpapi/activitypub.go` | `renderNote` 读取 `notes.Poll` 填入 `NoteData` |
+| 兼容 | `internal/federation/apobject.go` | `Objects()` 同时接受 `Object` 与 `map[string]any`（渲染结果在本进程内是 `Object`） |
+
+### 12CE.2 有意的限制
+
+- 投票数与本地投票不参与联邦（Misskey 也不在 Question 里带票数）；对端投票只保存在各自实例。
+- 入站 `Update` 只改文本与 CW，不更新选项或截止时间。
+- 远端自定义表情作为选项文本时按纯文本渲染。
+- 没有 `Question` 的 `replies` 计数/`votersCount` 扩展。
+
+### 12CE.3 验证证据
+
+- `gofmt -l internal/ cmd/` 无输出；`go vet ./...` 通过；`CINDERFISH_TEST_DATABASE_URL=… go test ./...` 全绿。
+- `TestNoteDataFromAPQuestion`：oneOf/anyOf、多选标志、带毫秒的 endTime、单选项拒绝、15 项裁剪到 10、
+  普通 Note 不长出投票。
+- `TestRenderNoteQuestion`：单选输出 `oneOf`、多选输出 `anyOf`、`endTime` 格式。
+- `TestTwoInstancePollDelivery`：alpha 的 alice 发 3 选项投票 → beta 落库 → `notes/show` 的
+  `poll.choices` 为 red/blue、`multiple: true`、`expiresAt` 在未来；beta 的 bob 投票后
+  `votes: 1` 且 `isVoted: true`。
+- 真实二进制 + Helium：`/notes/<id>` 显示三个选项与「总票数 0 · 显示结果 · 59 分后截止」，
+  点选并确认后变为「咖啡(1 票) … 已投票」，截图 `/tmp/w66-shots/note-poll-voted.png`。
+
+### 12CE.4 仍未验证
+
+- 与真实 Misskey / Firefish 实例互投投票（全部证据来自本实现的双实例）。
+- 多选投票在界面上的多勾选交互（只验证了单选）。
+- `Question` 的入站 `Update` 与远端投票关闭后的展示。

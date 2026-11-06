@@ -141,10 +141,15 @@ func (o Object) Objects(key string) []Object {
 	switch t := v.(type) {
 	case map[string]any:
 		return []Object{t}
+	case Object:
+		return []Object{t}
 	case []any:
 		out := make([]Object, 0, len(t))
 		for _, item := range t {
-			if m, ok := item.(map[string]any); ok {
+			switch m := item.(type) {
+			case map[string]any:
+				out = append(out, m)
+			case Object:
 				out = append(out, m)
 			}
 		}

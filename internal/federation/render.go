@@ -184,6 +184,10 @@ type NoteData struct {
 	Attachments []Object
 	Sensitive   bool
 	CreatedAt   time.Time
+	// Poll makes the note a Question. Empty choices keep it a Note.
+	PollChoices   []string
+	PollMultiple  bool
+	PollExpiresAt *time.Time
 }
 
 // RenderNote builds the ActivityPub representation of a note.
@@ -267,6 +271,28 @@ func (r *Renderer) RenderNote(n NoteData) Object {
 		// whole, which is what peers use to gate the media.
 		if n.Sensitive {
 			note["sensitive"] = true
+		}
+	}
+
+	// A poll federates as a Question. Misskey wraps each choice in a Note
+	// with an empty replies collection; Mastodon reads the same shape.
+	if len(n.PollChoices) >= 2 {
+		note["type"] = "Question"
+		choices := make([]any, 0, len(n.PollChoices))
+		for _, choice := range n.PollChoices {
+			choices = append(choices, Object{
+				"type":    "Note",
+				"name":    choice,
+				"replies": Object{"type": "Collection", "totalItems": 0},
+			})
+		}
+		if n.PollMultiple {
+			note["anyOf"] = choices
+		} else {
+			note["oneOf"] = choices
+		}
+		if n.PollExpiresAt != nil {
+			note["endTime"] = n.PollExpiresAt.UTC().Format(time.RFC3339)
 		}
 	}
 

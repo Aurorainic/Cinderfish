@@ -2,6 +2,7 @@ package federation
 
 import (
 	"strings"
+	"time"
 )
 
 // NoteDataFromAP converts a received ActivityPub note into the data the
@@ -13,6 +14,7 @@ import (
 // public; otherwise followers-only when the audience is the author's
 // followers collection, and specified when it is a list of users.
 func NoteDataFromAP(note Object, actor *RemoteUser, r *Renderer) RemoteNote {
+	poll := pollOf(note)
 	text := note.String("_misskey_content")
 	if text == "" {
 		if src := note.Object("source"); src != nil {
@@ -47,19 +49,64 @@ func NoteDataFromAP(note Object, actor *RemoteUser, r *Renderer) RemoteNote {
 	}
 
 	return RemoteNote{
-		APID:       note.Ref("id"),
-		UserID:     actor.ID,
-		UserHost:   actor.Host,
-		Visibility: visibility,
-		Text:       text,
-		CW:         note.String("summary"),
-		ReplyAPID:  note.Ref("inReplyTo"),
-		QuoteAPID:  quoteOf(note),
-		Tags:       tags,
-		Sensitive:  note.Bool("sensitive"),
-		CreatedAt:  publishedOrNow(note),
+		APID:          note.Ref("id"),
+		UserID:        actor.ID,
+		UserHost:      actor.Host,
+		Visibility:    visibility,
+		Text:          text,
+		CW:            note.String("summary"),
+		ReplyAPID:     note.Ref("inReplyTo"),
+		QuoteAPID:     quoteOf(note),
+		Tags:          tags,
+		Sensitive:     note.Bool("sensitive"),
+		CreatedAt:     publishedOrNow(note),
+		PollChoices:   poll.PollChoices,
+		PollMultiple:  poll.PollMultiple,
+		PollExpiresAt: poll.PollExpiresAt,
 	}
 }
+
+// pollOf extracts a Misskey/Mastodon Question: its choices, whether it allows
+// several answers, and the closing time. A Question with fewer than two usable
+// choices is stored as a plain note instead of an unusable poll.
+func pollOf(note Object) RemoteNote {
+	if !note.IsType("Question") {
+		return RemoteNote{}
+	}
+	items := note.Objects("oneOf")
+	multiple := false
+	if len(items) == 0 {
+		items = note.Objects("anyOf")
+		multiple = len(items) > 0
+	}
+	choices := make([]string, 0, len(items))
+	for _, item := range items {
+		name := strings.TrimSpace(item.String("name"))
+		if name != "" {
+			choices = append(choices, name)
+		}
+	}
+	// Misskey renders at most ten choices; trimming here keeps a hostile
+	// peer from storing a thousand-row poll.
+	if len(choices) > maxRemotePollChoices {
+		choices = choices[:maxRemotePollChoices]
+	}
+	if len(choices) < 2 {
+		return RemoteNote{}
+	}
+	var expiresAt *time.Time
+	if end := note.String("endTime"); end != "" {
+		if t, err := time.Parse(time.RFC3339, end); err == nil {
+			expiresAt = &t
+		} else if t, err := time.Parse(time.RFC3339Nano, end); err == nil {
+			expiresAt = &t
+		}
+	}
+	return RemoteNote{PollChoices: choices, PollMultiple: multiple, PollExpiresAt: expiresAt}
+}
+
+// maxRemotePollChoices mirrors Misskey's ten-choice limit.
+const maxRemotePollChoices = 10
 
 // quoteOf returns the quoted note URL, preferring Misskey's own
 // extension over the Mastodon-compatible one.

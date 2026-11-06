@@ -246,7 +246,9 @@ i/registry/clear` + 投票创建 | 投票功能 | 只读、表单隐藏入口 |
 
 `internal/federation/inbox.go` 已处理入站 `Follow` / `Accept` / `Reject` / `Undo` /
 `Create` / `Delete` / `Like` / `EmojiReact` / `EmojiReaction` / `Announce` / `Update` /
-`Move` / `Block` / `Flag`，出站 `Follow` 走 `following/create` 投递。未覆盖：`Question`（投票）。
+`Move` / `Block` / `Flag` / `Question`，出站 `Follow` 走 `following/create` 投递。
+2026-11-07 第六十六波补齐 `Question`：入站把 `oneOf`/`anyOf` 存进 `polls`，出站把本地投票渲染为
+`Question`（见 HANDOVER §12CE）。
 
 2026-11-06 第五十八波修复：入站反应原先只按 `notes.ap_id/uri` 找笔记，而本地笔记这两列为空，
 远端用户对本地笔记的 `Like` 一直返回「target note not found」；现在本地笔记按

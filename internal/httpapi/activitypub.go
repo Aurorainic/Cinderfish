@@ -573,6 +573,14 @@ func (s *Server) renderNote(ctx context.Context, n *note.Note) (federation.Objec
 			log.Printf("httpapi: resolve remote mention %s: %v", acct, err)
 		}
 	}
+	// A poll travels with the note so peers store the same choices.
+	if n.PollID != nil && s.notes != nil {
+		if poll, err := s.notes.Poll(ctx, n.ID); err == nil && len(poll.Choices) >= 2 {
+			data.PollChoices = poll.Choices
+			data.PollMultiple = poll.Multiple
+			data.PollExpiresAt = poll.ExpiresAt
+		}
+	}
 	return s.fedRenderer.RenderNote(data), nil
 }
 
