@@ -3589,11 +3589,45 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
 4. KaTeX 自定义宏（需引 `katex`）；
 5. `SettingsIntegration` 等无后端页转说明页（与第四十九波同法）。
 
-### 12BO.4 恢复方式
+### 12BO.4 接手清单（给下一个 agent 的第一小时）
 
-用户在会话中重新授权后，按「从 `docs/HANDOVER.md` 的未验证清单继续」即可；每波仍走
-代码 → 编译检查 → 提交 → 更新契约与本节记录的流程。若用户要求开始执行测试/浏览器走查，
-先把 §12BO.3 的验证欠账补完再开新波。
+按顺序做完这几步，就能在不需要历史对话的情况下继续：
+
+1. **读三份文件**（其余可选）：本文件 §12BO 与「已知未验证/未移植」清单、`AGENTS.md`（项目
+   规约、参考源码版本、代理与命名规则）、`docs/research/2026-11-04-misskey-api-coverage.md`
+   （API 台账，判定「还缺什么」只认这张表）。
+2. **确认环境**：Go 1.26；PostgreSQL 18；`GOPROXY=https://mirrors.aliyun.com/goproxy/,direct`；
+   访问 GitHub 需代理 `127.0.0.1:19823`。数据库测试用
+   `CINDERFISH_TEST_DATABASE_URL="postgres://cinderfish:cinderfish@localhost:5432/cinderfish_test"`
+   开启，未设置时数据库用例自动跳过（**这会让「测试通过」成为假象，务必设置**）。
+3. **先补验证债**，不要先写新代码：
+   ```bash
+   go vet ./... && go test ./...
+   CINDERFISH_TEST_DATABASE_URL="postgres://cinderfish:cinderfish@localhost:5432/cinderfish_test" \
+     go test ./...
+   cd web && pnpm exec vue-tsc --noEmit && pnpm run check:port && pnpm build
+   ```
+   预期：编译层三项（vet / vue-tsc / check:port / build）应当全绿；**`go test` 是未知数**——
+   第三十七至五十波只做了编译层验证，数据库用例很可能出问题（迁移到 v18、`i/update` 增字段、
+   通知落库、缩略图写入、签名参数变化都可能撞到旧断言）。把失败逐个修掉，或至少记录清楚。
+4. **手工走查**（用户此前要求暂停，接手时按需执行）：起真实二进制 + 无头浏览器，重点看
+   §12BO.3 列出的高风险点；`docs/HANDOVER.md` §12R/§12S/§12T 有现成的走查方法。
+5. **参考源码**：`tmp/refcheck/` 当前只有 `firefish-full`（前端参考）与 `miuno`（**私有实现，
+   不得作为实现参考**，AGENTS.md 已禁止）。Misskey 契约源码**不在本地**，需要按 `AGENTS.md`
+   里的 clone 命令（带代理）重建，否则只能依赖 `docs/research/api-contract/` 里已记录的契约。
+6. **动手前记住三条硬规则**：迁移版本不可回改（当前 v18，新改动开 v19）；每波结束必须
+   `go vet` + 测试 + `vue-tsc` + `check:port` + `build` 全绿再提交；不得为没有后端的控件造页面
+   （做法见 §12BM：说明页 + 缺口清单）。
+
+### 12BO.5 恢复方式
+
+本节点是为**交接给另一个 agent** 写的，不是为原会话续跑写的。接手方从 §12BO.4 的第一条开始
+即可，不需要历史对话：判定缺什么只看 API 台账与本文档的「仍未验证/未移植」清单，判定某处行为
+只看 `docs/research/api-contract/`。
+
+继续推进时仍按项目既有节奏：每波一个主题 → 代码 → 五道检查全绿 → 独立提交 → 更新契约与本
+文件（新增一节 §12BP …，并把未验证项写进去）。若用户要求先执行测试/浏览器走查，先把
+§12BO.3 的验证欠账补完再开新波。
 
 ## 13. 文档索引
 
