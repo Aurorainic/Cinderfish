@@ -258,3 +258,41 @@ func TestDriveSaveCorruptImageKeepsUpload(t *testing.T) {
 		t.Errorf("original missing: %v", err)
 	}
 }
+
+// TestGenerateThumbnailKeepsAlpha proves a transparent PNG stays transparent:
+// the thumbnail is PNG, not a flattened JPEG.
+func TestGenerateThumbnailKeepsAlpha(t *testing.T) {
+	img := image.NewNRGBA(image.Rect(0, 0, 600, 600))
+	for y := 0; y < 600; y++ {
+		for x := 0; x < 600; x++ {
+			if x < 300 {
+				img.Set(x, y, color.NRGBA{R: 255, G: 0, B: 0, A: 0})
+			} else {
+				img.Set(x, y, color.NRGBA{R: 0, G: 0, B: 255, A: 255})
+			}
+		}
+	}
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, img); err != nil {
+		t.Fatalf("encode: %v", err)
+	}
+	thumb, ext, err := GenerateThumbnail(buf.Bytes(), "image/png")
+	if err != nil {
+		t.Fatalf("thumbnail: %v", err)
+	}
+	if ext != ".png" {
+		t.Fatalf("extension = %q, want .png", ext)
+	}
+	decoded, err := png.Decode(bytes.NewReader(thumb))
+	if err != nil {
+		t.Fatalf("decode thumbnail: %v", err)
+	}
+	_, _, _, a := decoded.At(10, 10).RGBA()
+	if a != 0 {
+		t.Errorf("alpha at a transparent pixel = %d, want 0", a)
+	}
+	_, _, _, a = decoded.At(500, 10).RGBA()
+	if a != 0xffff {
+		t.Errorf("alpha at an opaque pixel = %d, want 65535", a)
+	}
+}

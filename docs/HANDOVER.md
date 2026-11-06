@@ -4533,15 +4533,16 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
   仍未验证的：账号信息页的实际渲染与统计失败时的降级。
 - **第四十四波已补验证（2026-11-07，见 §12BH.4）**：实例 CSS 的保存→下发→注入链路用
   `TestInstanceCustomCSS` 与无头浏览器走查覆盖（含 100 KiB 边界、空串清除、访客生效）；
-  邮件状态页在未配置实例下走查通过。账号级 CSS 覆盖已在 2026-11-07 走查并修掉插入顺序相反的
-  缺陷（§12DO，账号样式现在确实覆盖实例样式）。仍未验证的：已配置 SMTP 的页面呈现。
+  邮件状态页在未配置实例下走查通过；已配置 SMTP 的页面呈现也在 2026-11-07 走查（§12DP：
+  「已配置 / smtp.example」）。账号级 CSS 覆盖见 §12DO（修掉插入顺序相反的缺陷）。
 - **第四十五波已补验证（2026-11-07，见 §12BI.4）**：`admin/drive/show-file` 有端点用例；
   文件详情的四类预览、字段与「详情」入口均走查通过；敏感文件的模糊预览也已验证
   （§12DM：`blur(24px)`）。仍未验证的：真实音视频播放。`user: null` 分支因外键级联
   在正常流程下不可达，仅作防御保留。
 - **第四十六波已补验证（2026-11-07，见 §12BJ.4）**：缩略图生成/跳过/删除与 `/media` 的
   Content-Type 都有用例；真实 PNG/JPEG 上传得到 512 长边缩略图并在 `/my/drive` 实际加载。
-  顺带修复原图直链回 `octet-stream` 的缺口。仍未验证的：透明通道、历史文件补生成、大图内存峰值。
+  顺带修复原图直链回 `octet-stream` 的缺口；透明通道由 §12DP 的用例固定。仍未验证的：
+  历史文件补生成（没有离线任务）、大图内存峰值。
 - **第四十七波已补验证（2026-11-07，见 §12BK.4）**：锁推的「关注 → 待审 → 接受」从
   `following/create` 到界面全链路走查通过；`receiveFollowRequest` 与 `follow` 两类通知落库并在
   通知页渲染。远程关注者的锁推入站路径已由 §12CN 覆盖；入站 Reject 撤回待审请求也已有用例
@@ -5662,3 +5663,24 @@ cd web && vue-tsc --noEmit / check:port / build                 # 全绿
 ```
 
 仍未验证：已配置 SMTP 的邮件设置页呈现（需要带 `[mail] host` 启动的实例）。
+
+## 12DP. 第一百零三波：缩略图透明通道与已配置 SMTP 页面（2026-11-07）
+
+### 12DP.1 透明通道
+
+`TestGenerateThumbnailKeepsAlpha`：600×600 的 NRGBA PNG，左半透明、右半不透明；生成的缩略图
+扩展名 `.png`，解码后透明像素 alpha=0、不透明像素 alpha=65535。证明没有压平到 JPEG。
+
+### 12DP.2 已配置 SMTP 的页面
+
+用带 `[mail] host = "smtp.example"` 的配置在 3990 启动第二个实例（`meta.enableEmail = true`），
+管理员打开 `/admin/email-settings`：显示「已配置」「SMTP 主机 smtp.example」，并说明验证、
+密码重置与通知邮件都走这台服务器；端口/账号/密码/发件人/TLS 仍只来自 `config.toml`。
+
+```
+gofmt -l internal/ cmd/                                        # 空
+go vet ./...                                                   # exit 0
+CINDERFISH_TEST_DATABASE_URL=... go test ./... -count=1         # 全绿
+```
+
+仍未验证：真实邮件服务商、历史文件补生成缩略图、大图生成的内存峰值。
