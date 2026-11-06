@@ -15,15 +15,15 @@
 | 指标 | 数量 |
 |------|------|
 | Misskey 端点总数 | 440 |
-| Cinderfish 已注册路由 | 118 |
-| 其中 Misskey 同名路径 | 111 |
+| Cinderfish 已注册路由 | 119 |
+| 其中 Misskey 同名路径 | 112 |
 | 其中 Cinderfish 自有路径/别名 | 7（`notifications` 别名、`admin/federation/mode`、`admin/federation/allowlist`、`miauth/{session}/check`、`admin/object-storage`、`admin/deliver-queue`、`notes/history`） |
-| 未实现（Misskey 同名） | 329 |
+| 未实现（Misskey 同名） | 328 |
 
 统计口径：`internal/httpapi/server.go` 里 `HandleFunc("METHOD /api/…")` 的去重路径；
 GET 与 POST 同名路径只算一个。
 
-## 2. 已实现（118 条注册路由）
+## 2. 已实现（119 条注册路由）
 
 ```
 admin/accounts/create       admin/announcements/create  admin/announcements/delete
@@ -38,9 +38,9 @@ admin/unsuspend-user        announcements               blocking/create
 blocking/delete             blocking/list               drive/files
 drive/files/create          drive/files/delete          drive/files/show
 drive/files/update
-drive/folders               drive/folders/create        drive/folders/delete
-drive/folders/show          drive/folders/update        emojis
-federation/show-instance
+drive                       drive/folders               drive/folders/create
+drive/folders/delete        drive/folders/show          drive/folders/update
+emojis                      federation/show-instance
 following/create            following/delete
 following/requests/accept    following/requests/cancel   following/requests/list
 following/requests/reject    following/requests/sent     hashtags/trend
@@ -88,6 +88,8 @@ users/update
 
 2026-11-06 第十九波新增：`stats`（公开计数）；`admin/update-meta` 增加六个合规 URL 与
 `serverRules`（不是新路由）。
+
+2026-11-06 第二十八波新增：`drive`（容量/用量/文件数；未配置配额时 capacity=0）。
 
 2026-11-06 第二十七波新增：`federation/show-instance`（本地取运行时设置与计数，远端只聚合库内数据，不联网抓取）。
 
@@ -147,7 +149,7 @@ note/reply/renote 事件）。
 | `users/*` | 28 | 列表、搜索、反应、推荐、关注请求、更新资料字段 |
 | `notes/*` | 23 | 会话/子帖、提及、投票、收藏、搜索、翻译、草稿 |
 | `chat/*` | 25 | 私聊（首版可选） |
-| `drive/*` | 15 | URL 上传、去重、批量移动 |
+| `drive/*` | 14 | URL 上传、去重、批量移动 |
 | `channels/*` | 16 | 频道（首版可选） |
 | `charts/*` | 12 | 统计图表（可用 SQL 聚合实现） |
 | `clips/*` | 11 | 剪贴（首版可选） |

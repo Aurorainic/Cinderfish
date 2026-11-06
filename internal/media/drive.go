@@ -345,3 +345,15 @@ func (s *DriveService) Update(ctx context.Context, userID, fileID string, p File
 	}
 	return s.Get(ctx, fileID)
 }
+
+// Usage returns the total bytes and file count of a user's drive.
+func (s *DriveService) Usage(ctx context.Context, userID string) (int64, int, error) {
+	var bytes int64
+	var files int
+	if err := s.pool.QueryRow(ctx, `
+SELECT COALESCE(sum(size), 0), count(*) FROM drive_files WHERE user_id = $1
+`, userID).Scan(&bytes, &files); err != nil {
+		return 0, 0, fmt.Errorf("media: drive usage: %w", err)
+	}
+	return bytes, files, nil
+}

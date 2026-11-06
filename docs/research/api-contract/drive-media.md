@@ -16,6 +16,7 @@ handler 与服务层代码，不是从 Misskey 文档反推；与 Misskey `c05e8
 
 | 方法与路径 | 用途 | 鉴权 | Handler |
 |---|---|---|---|
+| `POST /api/drive` | 容量、用量与文件数（`capacity=0` 表示未配置配额） | 必须登录 | `internal/httpapi/drive_usage.go:11` |
 | `POST /api/drive/files` | 列出调用者云盘里的文件（按文件夹分层，`folderId` 缺省为根） | 必须登录 | `internal/httpapi/drive.go:103` |
 | `POST /api/drive/files/create` | `multipart/form-data` 上传一个文件 | 必须登录（token 只能走请求头） | `internal/httpapi/drive.go:13` |
 | `POST /api/drive/files/show` | 按 id 读取单个文件的元数据 | **匿名可读** | `internal/httpapi/drive.go:152` |
@@ -197,6 +198,17 @@ token（查 `users.token`），其余查 `access_tokens`（miAuth / OAuth 签发
 
 与 Misskey `EmojiSimple` 的差异：Misskey 只在为真时输出 `localOnly` / `isSensitive`，并可能带
 `roleIdsThatCanBeUsedThisEmojiAsReaction`；这里两个布尔**恒输出**，且**没有** `roleIds...` 字段。
+
+## POST /api/drive
+
+需登录。返回：
+
+```json
+{ "capacity": 0, "usage": 123456, "filesCount": 12 }
+```
+
+`usage` = `sum(drive_files.size)`，`filesCount` 是 Misskey 没有的额外字段（设置页显示用）。
+Cinderfish 没有实例配额，`capacity` 恒为 `0`，客户端应读作“无限制”。
 
 ## POST /api/drive/files
 
