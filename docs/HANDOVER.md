@@ -4682,8 +4682,9 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
   删除账号、应用授权以外的账号操作；对应后端端点不存在或前端缺少依赖（见第五波契约 §3.3）。
 - **仍缺的 widgets（2026-11-07 更新）**：online-users、federation、instance-cloud 与 activity 的
   30 天子图表已补上（§12EY/§12EZ，后两者分别依赖 `federation/instances` 与新增的
-  `charts/user/notes`；不画 `charts/instance` 的请求图）；仍缺 rss、rss-ticker（需服务端 RSS 抓取
-  代理）、server-metric（需系统指标端点）、job-queue（需队列内省）、aiscript（运行时按契约 drop）。
+  `charts/user/notes`；不画 `charts/instance` 的请求图）；job-queue 也已补上（§12FA，改为轮询
+  `admin/deliver-queue`）。仍缺 rss、rss-ticker（需服务端 RSS 抓取代理）、server-metric（需系统
+  指标端点）、aiscript（运行时按契约 drop）。
 
 - ~~**浏览器可视化走查（Task 8 波次）未做**~~：2026-10-31 的那一轮确实没能执行，但后续波次已用
   无头 Chromium/CDP 与真实二进制覆盖了登录态视觉复核与溢出实测：§12CB（1440 与 390，42 张截图）、
@@ -6302,3 +6303,31 @@ activity widget 此前只显示账号累计计数，注释写明缺 `charts/user
 - 真实二进制 + 无头浏览器：添加 activity widget 后渲染 30 根柱，其中 3 根非零，图例显示
   帖子/回复/转发；`charts/user/notes {span:day,limit:5}` 返回 `normal=[0,0,1,1,1]`、
   `total=[0,0,1,2,3]`。截图 `/tmp/w136-shots/activity.png`（不入库）。
+
+## 12FA. 第一百三十七波：job-queue widget（2026-11-07）
+
+Firefish 的 job-queue widget 订阅 `queueStats` Streaming 频道，展示 inbox / deliver 等每个队列的
+积压。Cinderfish 只有一张 PostgreSQL `deliver_queue`，也没有 `queueStats` 频道，所以本轮换成轮询
+已有的 `admin/deliver-queue`，用真实队列数据渲染同样的三档计数与最近条目。
+
+### 12FA.1 落地清单
+
+| 层 | 文件 | 内容 |
+|----|------|------|
+| widget | `web/src/widgets/job-queue.vue`（新） | 30 秒轮询 `admin/deliver-queue`：待投递 / 到期可投 / 已放弃 + 最近 5 条（主机、尝试次数、最后错误） |
+| 注册 | `web/src/widgets/index.ts` | 选择器加入 `jobQueue`（19 项） |
+| 权限 | 同上 | 403 `FORBIDDEN` 显示「需要管理员权限」，不虚构数据 |
+
+### 12FA.2 有意的限制
+
+- 只有一个队列（出站投递），没有 inbox/job 等多队列视图；上游的 queueStats 频道不存在。
+- 没有「队列堵塞」提示音（上游播放 `syuilo/queue-jammed`，本项目没有音频资源）。
+- 最近条目只来自接口返回的 20 条（这里展示前 5 条）。
+
+### 12FA.3 验证证据
+
+- `vue-tsc --noEmit`、`check:port`（hardTotal 0）、`pnpm build` 全绿；Go 侧未改动。
+- 真实二进制：管理员调用 `admin/deliver-queue` 得到 `pending=1, dueNow=1`；非管理员 403
+  `FORBIDDEN`。无头浏览器添加 jobQueue widget 后显示「待投递 1 / 到期可投 0 / 已放弃 0」与
+  `remote.example` 最近条目（投递 worker 已把该行重新排期，所以 dueNow 回落为 0）。截图
+  `/tmp/w137-shots/job-queue.png`（不入库）。
