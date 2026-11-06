@@ -14,7 +14,7 @@
 					</p>
 					<p class="caption">
 						这是 Cinderfish 自己的备份格式（<code>cinderfish-account-export@1</code>），
-						不是 Misskey/Firefish 的 zip；对应的导入端点尚未实现。
+						不是 Misskey/Firefish 的 zip；同一格式可以从本页导入。
 					</p>
 					<CfButton primary :disabled="exporting" @click="exportData">
 						<i class="ph-download-simple ph-bold"></i>
