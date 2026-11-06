@@ -14,6 +14,9 @@ func TestNotesEditAndHistory(t *testing.T) {
 	_, bobToken := createUser(t, ts, uniqueName(t)+"b")
 
 	noteID := createNote(t, ts, aliceToken, map[string]any{"text": "before edit"})
+	if _, before := postWithToken(t, ts, "/api/notes/show", aliceToken, map[string]any{"noteId": noteID}); before["updatedAt"] != nil {
+		t.Errorf("a fresh note has updatedAt = %v, want null", before["updatedAt"])
+	}
 
 	resp, out := post(t, ts, "/api/notes/edit", map[string]any{
 		"i": aliceToken, "editId": noteID,
@@ -32,6 +35,10 @@ func TestNotesEditAndHistory(t *testing.T) {
 	_, shown := post(t, ts, "/api/notes/show", map[string]any{"i": aliceToken, "noteId": noteID})
 	if shown["text"] != "after edit" {
 		t.Errorf("notes/show text = %v", shown["text"])
+	}
+	// The edited marker the client renders is driven by updatedAt.
+	if shown["updatedAt"] == nil {
+		t.Error("notes/show updatedAt is null after an edit")
 	}
 
 	// The edit is recorded as a revision.
