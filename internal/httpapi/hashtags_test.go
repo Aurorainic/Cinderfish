@@ -68,3 +68,78 @@ func TestHashtagsTrendEmptyState(t *testing.T) {
 		t.Errorf("empty instance trends = %v, want none", trends)
 	}
 }
+
+// TestHashtagsShowAndList covers hashtags/show (counts for one tag) and
+// hashtags/list (the same aggregation, ranked).
+func TestHashtagsShowAndList(t *testing.T) {
+	f := newFederationServer(t, "public")
+	aliceToken, _ := f.registerUser(t, "alice")
+	bobToken, _ := f.registerUser(t, "bob")
+
+	createNote(t, f.ts, aliceToken, map[string]any{"text": "about #golang"})
+	createNote(t, f.ts, bobToken, map[string]any{"text": "more #golang"})
+	createNote(t, f.ts, bobToken, map[string]any{"text": "and #cats"})
+
+	resp, show := post(t, f.ts, "/api/hashtags/show", map[string]any{"tag": "#golang"})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("hashtags/show = %d %v", resp.StatusCode, show)
+	}
+	if show["tag"] != "golang" {
+		t.Errorf("tag = %v, want golang", show["tag"])
+	}
+	if show["mentionedUsersCount"] != float64(2) {
+		t.Errorf("mentionedUsersCount = %v, want 2", show["mentionedUsersCount"])
+	}
+	if show["mentionedLocalUsersCount"] != float64(2) {
+		t.Errorf("mentionedLocalUsersCount = %v, want 2", show["mentionedLocalUsersCount"])
+	}
+	if show["attachedUsersCount"] != float64(0) {
+		t.Errorf("attachedUsersCount = %v, want 0", show["attachedUsersCount"])
+	}
+
+	// An unknown tag is a 404 with Misskey's code.
+	resp, missing := post(t, f.ts, "/api/hashtags/show", map[string]any{"tag": "nothing-here"})
+	if resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("unknown tag = %d %v, want 404", resp.StatusCode, missing)
+	}
+	if missing["error"].(map[string]any)["code"] != "NO_SUCH_HASHTAG" {
+		t.Errorf("error = %v", missing["error"])
+	}
+
+	list := postListWithToken(t, f.ts, "/api/hashtags/list", "", map[string]any{"sort": "+mentionedUsers"})
+	if len(list) != 2 {
+		t.Fatalf("hashtags/list = %v, want two tags", list)
+	}
+	first, _ := list[0].(map[string]any)
+	if first["tag"] != "golang" {
+		t.Errorf("first tag = %v, want golang", first["tag"])
+	}
+	// Ascending order puts the less used tag first.
+	list = postListWithToken(t, f.ts, "/api/hashtags/list", "", map[string]any{"sort": "-mentionedUsers"})
+	first, _ = list[0].(map[string]any)
+	if first["tag"] != "cats" {
+		t.Errorf("ascending first tag = %v, want cats", first["tag"])
+	}
+
+	// Attached-only filters have no matches: Cinderfish does not model
+	// profile tags.
+	list = postListWithToken(t, f.ts, "/api/hashtags/list", "", map[string]any{
+		"sort": "+mentionedUsers", "attachedToUserOnly": true,
+	})
+	if len(list) != 0 {
+		t.Errorf("attached filter = %v, want none", list)
+	}
+}
+
+// TestHashtagsUsersIsEmpty documents the honest answer: the endpoint lists
+// profile tags, which Cinderfish does not store.
+func TestHashtagsUsersIsEmpty(t *testing.T) {
+	f := newFederationServer(t, "public")
+	aliceToken, _ := f.registerUser(t, "alice")
+	createNote(t, f.ts, aliceToken, map[string]any{"text": "about #golang"})
+
+	list := postListWithToken(t, f.ts, "/api/hashtags/users", "", map[string]any{"tag": "golang", "sort": "+follower"})
+	if len(list) != 0 {
+		t.Errorf("hashtags/users = %v, want none", list)
+	}
+}
