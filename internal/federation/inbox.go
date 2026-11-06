@@ -546,8 +546,15 @@ func (i *Inbox) updateNote(ctx context.Context, actor *RemoteUser, note Object) 
 			updatedAt = parsed
 		}
 	}
+	// Prefer the Markdown source: `content` is rendered HTML, so taking it
+	// would store tags and entities instead of what the author typed.
 	var text *string
-	if note.Has("content") {
+	if note.Has("_misskey_content") {
+		value := strings.TrimSpace(note.String("_misskey_content"))
+		text = &value
+	} else if note.Has("content") {
+		// A peer that sends no Markdown source leaves only HTML; unescaping it
+		// is the best available approximation.
 		value := html.UnescapeString(strings.TrimSpace(note.String("content")))
 		text = &value
 	}
