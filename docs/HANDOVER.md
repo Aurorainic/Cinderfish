@@ -6768,3 +6768,32 @@ Firefish 的 `ui/_common_/common.vue` 在 `main` 频道上处理新通知：页�
   - `localStorage.ui = "deck"` 进入 Deck，点「添加列」出现「提及」；
   - 添加后列标题为「提及」，正文显示 bob 的 `@w149alice` 提及帖（`.deck` 内文本命中）。
   截图 `/tmp/w149-shots/mentions-column.png`（不入库）。
+
+## 12FN. 第一百五十波：v-hotkey 真正生效（2026-11-07）
+
+`directives/hotkey.ts` 此前是 no-op，注释写着「makeHotkey 未移植，需要 keycode/autocomplete 表」。
+因此笔记卡片上的 `r`（回复）、`e/a/plus`（回应）、`q`（转贴）、`m/o`（菜单）、`up/k`、`down/j`、
+`esc` 全都无效。
+
+### 12FN.1 改动
+
+| 层 | 文件 | 内容 |
+|----|------|------|
+| 键码 | `web/src/scripts/keycode.ts`（新） | 生成 a-z / 0-9 别名表，保留 `esc/enter/up/down/left/right/plus`；返回 `KeyboardEvent.code` |
+| 匹配 | `web/src/scripts/hotkey.ts`（新） | 移植 `makeHotkey`：`|` 分隔多键、`(…)` 禁止连发、ctrl/alt/shift 修饰、忽略 input/textarea/contenteditable、preventDefault/stopPropagation |
+| 指令 | `web/src/directives/hotkey.ts` | 真正 add/remove keydown 监听（含 `global` 修饰与 `updated` 重绑），用 WeakMap 保存 handler |
+| 注释 | `MkNoteSub.vue` | 去掉「v-hotkey 是 no-op」的过时说明 |
+
+### 12FN.2 有意的限制
+
+- 只保留仓库里用到的别名；Firefish 的完整 keycode 表没有全部搬过来，未知名称按 `code` 原样匹配。
+- 与上游一致，`metaKey` 组合不触发；`contenteditable` 后代也算输入中。
+- 只在 MkNote / MkNoteDetailed 上挂载；MkNoteSub 没有快捷键（与上游一致）。
+
+### 12FN.3 验证证据
+
+- `vue-tsc --noEmit`、`check:port`（hardTotal 0）、`pnpm build` 全绿；Go 侧未改动。
+- 真实二进制 + 无头浏览器（1400×900，CDP `Input.dispatchKeyEvent`）：
+  - 聚焦笔记卡片后按 `r` → 回复编辑器对话框出现；
+  - 关闭后按 `m` → 笔记菜单出现，含「添加到书签 / 置顶 / 复制内容 / 复制链接 / 编辑 / 编辑历史 / 删除」。
+  截图 `/tmp/w150-shots/hotkeys.png`（不入库）。

@@ -150,7 +150,7 @@
 //     port's missing `<I18n>` component, so the author is not a link there;
 //   * "open in window" is dropped (`os.pageWindow` is not part of the os shim)
 //     and the router has no `forcePage` mode;
-//   * `v-hotkey` is registered as a no-op by the foundation layer.
+//   * the note actions are buttons only; keyboard shortcuts live on MkNote.
 import { computed, ref, type Ref } from "vue";
 import { api } from "@/api/client";
 import type { Note, NoteDetailed } from "@/api/types";
