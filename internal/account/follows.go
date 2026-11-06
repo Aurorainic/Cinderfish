@@ -18,6 +18,10 @@ type Follow struct {
 	ID        string
 	CreatedAt time.Time
 	User      *User
+	// Notify is "normal" when every note of the followee should notify the
+	// follower, empty otherwise. WithReplies is the "include replies" switch.
+	Notify      string
+	WithReplies bool
 }
 
 // followVisibility reads the two privacy settings of a user's profile.
@@ -73,7 +77,7 @@ func (s *Service) listFollows(ctx context.Context, anchor, other, userID string,
 
 	var q strings.Builder
 	q.WriteString(`
-SELECT f.id, f.created_at,
+SELECT f.id, f.created_at, COALESCE(f.notify, ''), f.with_replies,
        u.id, u.username, u.username_lower, u.host, COALESCE(u.password_hash, ''), COALESCE(u.token, ''),
        u.is_admin, u.is_suspended, u.created_at
 FROM followings f
@@ -113,7 +117,7 @@ WHERE f.`)
 	for rows.Next() {
 		f := Follow{User: &User{}}
 		u := f.User
-		if err := rows.Scan(&f.ID, &f.CreatedAt,
+		if err := rows.Scan(&f.ID, &f.CreatedAt, &f.Notify, &f.WithReplies,
 			&u.ID, &u.Username, &u.UsernameLower, &u.Host, &u.PasswordHash, &u.Token,
 			&u.IsAdmin, &u.IsSuspended, &u.CreatedAt); err != nil {
 			return nil, fmt.Errorf("account: scan follow: %w", err)
@@ -121,4 +125,71 @@ WHERE f.`)
 		out = append(out, &f)
 	}
 	return out, rows.Err()
+}
+
+// ErrNotFollowing is returned when a follow relationship does not exist.
+var ErrNotFollowing = errors.New("account: not following")
+
+// UpdateFollowing applies the per-follow settings. A nil pointer leaves that
+// field unchanged, which is what following/update needs: the client sends only
+// the switches it flipped.
+func (s *Service) UpdateFollowing(ctx context.Context, followerID, followeeID string, notify *string, withReplies *bool) error {
+	sets := make([]string, 0, 2)
+	args := make([]any, 0, 4)
+	args = append(args, followerID, followeeID)
+	if notify != nil {
+		value := any(nil)
+		if *notify != "" && *notify != "none" {
+			value = *notify
+		}
+		args = append(args, value)
+		sets = append(sets, fmt.Sprintf("notify = $%d", len(args)))
+	}
+	if withReplies != nil {
+		args = append(args, *withReplies)
+		sets = append(sets, fmt.Sprintf("with_replies = $%d", len(args)))
+	}
+	if len(sets) == 0 {
+		return nil
+	}
+
+	tag, err := s.pool.Exec(ctx, `
+UPDATE followings SET `+strings.Join(sets, ", ")+`
+WHERE follower_id = $1 AND followee_id = $2
+`, args...)
+	if err != nil {
+		return fmt.Errorf("account: update following: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFollowing
+	}
+	return nil
+}
+
+// UpdateAllFollowing applies the settings to every account the user follows.
+func (s *Service) UpdateAllFollowing(ctx context.Context, followerID string, notify *string, withReplies *bool) error {
+	sets := make([]string, 0, 2)
+	args := make([]any, 0, 3)
+	args = append(args, followerID)
+	if notify != nil {
+		value := any(nil)
+		if *notify != "" && *notify != "none" {
+			value = *notify
+		}
+		args = append(args, value)
+		sets = append(sets, fmt.Sprintf("notify = $%d", len(args)))
+	}
+	if withReplies != nil {
+		args = append(args, *withReplies)
+		sets = append(sets, fmt.Sprintf("with_replies = $%d", len(args)))
+	}
+	if len(sets) == 0 {
+		return nil
+	}
+	if _, err := s.pool.Exec(ctx, `
+UPDATE followings SET `+strings.Join(sets, ", ")+` WHERE follower_id = $1
+`, args...); err != nil {
+		return fmt.Errorf("account: update all following: %w", err)
+	}
+	return nil
 }

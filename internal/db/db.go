@@ -594,6 +594,16 @@ ALTER TABLE access_tokens
     ADD COLUMN IF NOT EXISTS app_id TEXT REFERENCES apps (id) ON DELETE CASCADE;
 CREATE INDEX IF NOT EXISTS idx_access_tokens_app ON access_tokens (app_id, user_id);
 `,
+
+	// v21: per-follow settings. notify is Misskey's "normal" (every note of
+	// this account notifies) or empty (no per-note notification); with_replies
+	// is the "include replies in my feeds" switch. Both are stored for API
+	// compatibility; the feeds that consume them are listed in HANDOVER.
+	21: `
+ALTER TABLE followings
+    ADD COLUMN IF NOT EXISTS notify TEXT,
+    ADD COLUMN IF NOT EXISTS with_replies BOOLEAN NOT NULL DEFAULT TRUE;
+`,
 }
 
 // Migrate applies pending migrations in order and returns the version

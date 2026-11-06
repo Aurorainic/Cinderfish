@@ -202,6 +202,11 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("POST /api/following/requests/accept", s.handleFollowingRequestsAccept)
 	s.mux.HandleFunc("POST /api/following/requests/reject", s.handleFollowingRequestsReject)
 	s.mux.HandleFunc("POST /api/following/requests/cancel", s.handleFollowingRequestsCancel)
+	// Per-follow settings and the forced unfollow of a follower.
+	s.mux.HandleFunc("POST /api/following/list", s.handleFollowingList)
+	s.mux.HandleFunc("POST /api/following/update", s.handleFollowingUpdate)
+	s.mux.HandleFunc("POST /api/following/update-all", s.handleFollowingUpdateAll)
+	s.mux.HandleFunc("POST /api/following/invalidate", s.handleFollowingInvalidate)
 
 	// Mutes and blocks. Both tables exist since schema v1; these endpoints
 	// are what the settings page and the timeline filter read.
