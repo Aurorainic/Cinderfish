@@ -1190,3 +1190,14 @@ UserLite 部分也有简化：`name`/`avatarUrl` 只从 profile 行来，没有 
 
 `pending` = `attempts < 12`，`dueNow` = 其中已到期，`failed` = `attempts >= 12`（worker 不再取用）；
 `recent` 为 id 最大的 20 行。非管理员 403，匿名 401。
+
+## 2026-11-06 增补：合规链接与实例规则（admin/update-meta）
+
+`admin/meta` 与 `admin/update-meta` 新增：
+
+| 字段 | 校验 |
+|------|------|
+| `tosUrl` / `privacyPolicyUrl` / `repositoryUrl` / `feedbackUrl` / `inquiryUrl` / `impressumUrl` | 空串或 `http(s)`，≤300；`tosUrl` 空时 `admin/meta` 返回 `null` |
+| `serverRules` | 字符串数组，去空行、每条 ≤300、最多 20 条 |
+
+`meta` 同步返回这些字段（`serverRules` 恒为数组），关于页据此展示链接与规则。

@@ -22,6 +22,13 @@ type instanceSettings struct {
 	MaintainerEmail  string
 	RegistrationMode string
 	BlockedHosts     []string
+	TosURL           string
+	PrivacyPolicyURL string
+	RepositoryURL    string
+	FeedbackURL      string
+	InquiryURL       string
+	ImpressumURL     string
+	ServerRules      []string
 }
 
 // instanceMetaKey maps a settings field to its instance_meta key.
@@ -31,6 +38,13 @@ var instanceMetaKeys = map[string]string{
 	"maintainerName":   "maintainerName",
 	"maintainerEmail":  "maintainerEmail",
 	"registrationMode": "registrationMode",
+	"tosUrl":           "tosUrl",
+	"privacyPolicyUrl": "privacyPolicyUrl",
+	"repositoryUrl":    "repositoryUrl",
+	"feedbackUrl":      "feedbackUrl",
+	"inquiryUrl":       "inquiryUrl",
+	"impressumUrl":     "impressumUrl",
+	"serverRules":      "serverRules",
 }
 
 // liveInstanceSettings reads the runtime overrides, falling back to the
@@ -50,20 +64,32 @@ func (s *Server) liveInstanceSettings(ctx context.Context) instanceSettings {
 		return out
 	}
 	rows, err := s.pool.Query(ctx, `
-SELECT key, value #>> '{}' FROM instance_meta
-WHERE key = ANY($1)
+SELECT key, value FROM instance_meta WHERE key = ANY($1)
 `, []string{
 		instanceMetaKeys["name"], instanceMetaKeys["description"],
 		instanceMetaKeys["maintainerName"], instanceMetaKeys["maintainerEmail"],
 		instanceMetaKeys["registrationMode"],
+		instanceMetaKeys["tosUrl"], instanceMetaKeys["privacyPolicyUrl"],
+		instanceMetaKeys["repositoryUrl"], instanceMetaKeys["feedbackUrl"],
+		instanceMetaKeys["inquiryUrl"], instanceMetaKeys["impressumUrl"],
+		instanceMetaKeys["serverRules"],
 	})
 	if err != nil {
 		return out
 	}
 	defer rows.Close()
 	for rows.Next() {
-		var key, value string
-		if err := rows.Scan(&key, &value); err != nil {
+		var key string
+		var raw []byte
+		if err := rows.Scan(&key, &raw); err != nil {
+			continue
+		}
+		if key == instanceMetaKeys["serverRules"] {
+			_ = json.Unmarshal(raw, &out.ServerRules)
+			continue
+		}
+		var value string
+		if err := json.Unmarshal(raw, &value); err != nil {
 			continue
 		}
 		switch key {
@@ -79,6 +105,18 @@ WHERE key = ANY($1)
 			if value != "" {
 				out.RegistrationMode = value
 			}
+		case instanceMetaKeys["tosUrl"]:
+			out.TosURL = value
+		case instanceMetaKeys["privacyPolicyUrl"]:
+			out.PrivacyPolicyURL = value
+		case instanceMetaKeys["repositoryUrl"]:
+			out.RepositoryURL = value
+		case instanceMetaKeys["feedbackUrl"]:
+			out.FeedbackURL = value
+		case instanceMetaKeys["inquiryUrl"]:
+			out.InquiryURL = value
+		case instanceMetaKeys["impressumUrl"]:
+			out.ImpressumURL = value
 		}
 	}
 	return out
@@ -104,6 +142,15 @@ INSERT INTO instance_meta (key, value) VALUES ($1, to_jsonb($2::text))
 ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
 `, key, value)
 	return err
+}
+
+// nilOrString maps an empty settings string to JSON null, which is what
+// Misskey's nullable URL fields expect.
+func nilOrString(value string) any {
+	if value == "" {
+		return nil
+	}
+	return value
 }
 
 // liveBlockedHosts reads the blocked-host list. It prefers the policy cache
@@ -180,6 +227,13 @@ func (s *Server) handleAdminMeta(w http.ResponseWriter, r *http.Request) {
 		"maintainerEmail":  settings.MaintainerEmail,
 		"registrationMode": settings.RegistrationMode,
 		"blockedHosts":     blocked,
+		"tosUrl":           nilOrString(settings.TosURL),
+		"privacyPolicyUrl": settings.PrivacyPolicyURL,
+		"repositoryUrl":    settings.RepositoryURL,
+		"feedbackUrl":      settings.FeedbackURL,
+		"inquiryUrl":       settings.InquiryURL,
+		"impressumUrl":     settings.ImpressumURL,
+		"serverRules":      settings.ServerRules,
 	})
 }
 
@@ -204,6 +258,13 @@ func (s *Server) handleAdminUpdateMeta(w http.ResponseWriter, r *http.Request) {
 		MaintainerEmail  *string   `json:"maintainerEmail"`
 		RegistrationMode *string   `json:"registrationMode"`
 		BlockedHosts     *[]string `json:"blockedHosts"`
+		TosURL           *string   `json:"tosUrl"`
+		PrivacyPolicyURL *string   `json:"privacyPolicyUrl"`
+		RepositoryURL    *string   `json:"repositoryUrl"`
+		FeedbackURL      *string   `json:"feedbackUrl"`
+		InquiryURL       *string   `json:"inquiryUrl"`
+		ImpressumURL     *string   `json:"impressumUrl"`
+		ServerRules      *[]string `json:"serverRules"`
 	}
 	if err := decodeOptionalJSON(r, &body); err != nil {
 		writeAPIError(w, err)
@@ -250,6 +311,61 @@ func (s *Server) handleAdminUpdateMeta(w http.ResponseWriter, r *http.Request) {
 			updates["registrationMode"] = value
 		default:
 			writeAPIError(w, invalidParamError("registrationMode must be open, invite or admin"))
+			return
+		}
+	}
+
+	urlFields := []struct {
+		field string
+		value *string
+	}{
+		{"tosUrl", body.TosURL},
+		{"privacyPolicyUrl", body.PrivacyPolicyURL},
+		{"repositoryUrl", body.RepositoryURL},
+		{"feedbackUrl", body.FeedbackURL},
+		{"inquiryUrl", body.InquiryURL},
+		{"impressumUrl", body.ImpressumURL},
+	}
+	for _, item := range urlFields {
+		if item.value == nil {
+			continue
+		}
+		value := strings.TrimSpace(*item.value)
+		if value != "" {
+			if len(value) > 300 || (!strings.HasPrefix(value, "https://") && !strings.HasPrefix(value, "http://")) {
+				writeAPIError(w, invalidParamError(item.field+" must be an http(s) URL of at most 300 characters"))
+				return
+			}
+		}
+		updates[item.field] = value
+	}
+	if body.ServerRules != nil {
+		rules := make([]string, 0, len(*body.ServerRules))
+		for _, rule := range *body.ServerRules {
+			trimmed := strings.TrimSpace(rule)
+			if trimmed == "" {
+				continue
+			}
+			if utf8.RuneCountInString(trimmed) > 300 {
+				writeAPIError(w, invalidParamError("each server rule is at most 300 characters"))
+				return
+			}
+			rules = append(rules, trimmed)
+		}
+		if len(rules) > 20 {
+			writeAPIError(w, invalidParamError("serverRules has at most 20 entries"))
+			return
+		}
+		payload, err := json.Marshal(rules)
+		if err != nil {
+			writeInternalServerError(w)
+			return
+		}
+		if _, err := s.pool.Exec(r.Context(), `
+INSERT INTO instance_meta (key, value) VALUES ('serverRules', $1::jsonb)
+ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
+`, payload); err != nil {
+			writeInternalServerError(w)
 			return
 		}
 	}

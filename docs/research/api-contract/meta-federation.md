@@ -1145,3 +1145,16 @@ page：
 - 项目记录：`docs/HANDOVER.md` §12、`docs/research/2026-11-04-misskey-api-coverage.md` §6、`docs/research/2026-10-28-m5-federation-source-calibration.md`
 
 上游对照文件（`tmp/refcheck/misskey`，Misskey `c05e844`）：`packages/backend/src/server/api/ApiCallService.ts`、`server/WellKnownServerService.ts`、`server/NodeinfoServerService.ts`、`core/entities/MetaEntityService.ts`、`core/RoleService.ts`、`server/api/error.ts`。
+
+## 2026-11-06 增补：公开 stats
+
+`POST /api/stats`（无需登录）返回：
+
+```json
+{ "usersCount": 24, "notesCount": 154, "originalNotesCount": 120,
+  "originalUsersCount": 24, "reactionsCount": 0, "followingCount": 0,
+  "instancesCount": 0, "driveFiles": 1, "driveUsage": 123456 }
+```
+
+`usersCount` = 未冻结本地账号；`instancesCount` = `users.host` 去重；`driveUsage` = 文件大小之和。
+单条 SQL 子查询完成，没有缓存；关于页用它渲染统计。

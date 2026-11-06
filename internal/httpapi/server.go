@@ -115,6 +115,7 @@ func (s *Server) SetStorage(storage media.Storage) {
 
 func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("POST /api/meta", s.handleMeta)
+	s.mux.HandleFunc("POST /api/stats", s.handleStats)
 	s.mux.HandleFunc("POST /api/ping", s.handlePing)
 	s.mux.HandleFunc("GET /api/ping", s.handlePing)
 
