@@ -1159,3 +1159,19 @@ OAuth 2.0 授权码端点（仅 PKCE `S256`）。认证：**需要登录**，且
 请求头：`Content-Type: application/json`、`User-Agent: Cinderfish-Hooks`、
 `X-Firefish-Hook-Id`、`X-Firefish-Hook-Secret`。结果回写 `latestSentAt` 与 `latestStatus`
 （网络错误为 1）。失败不重试，也不影响发帖。
+
+## 2026-11-06 增补：MiAuth 轮询（miauth/{session}/check）
+
+### POST /api/miauth/gen-token（登录）
+
+批准会话并签发 token；请求 `{ session, name?, description?, iconUrl?, permission? }`，返回
+`{ token }`。token 关联 `session`，供应用轮询取走。
+
+### POST /api/miauth/{session}/check（无需登录）
+
+- 首次：`{ "ok": true, "token": "<明文 token>", "user": { /* UserDetailed */ } }`，
+  同时把该令牌标记为 `fetched`；
+- 已取走 / 从未批准的 session：`{ "ok": false }`（HTTP 200，不是错误）。
+
+会话字符串本身就是能力凭据，端点只应答一次；迁移 v13 的 `access_tokens.fetched` 保证第二次轮询
+不会再次泄露 token。

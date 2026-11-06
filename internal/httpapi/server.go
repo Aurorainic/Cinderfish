@@ -135,6 +135,7 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("POST /api/users/followers", s.handleUsersFollowers)
 	s.mux.HandleFunc("POST /api/users/following", s.handleUsersFollowing)
 	s.mux.HandleFunc("POST /api/miauth/gen-token", s.handleMiAuthGenToken)
+	s.mux.HandleFunc("POST /api/miauth/{session}/check", s.handleMiAuthCheck)
 	s.mux.HandleFunc("POST /api/i/apps", s.handleApps)
 	s.mux.HandleFunc("POST /api/i/revoke-token", s.handleRevokeToken)
 	s.mux.HandleFunc("POST /api/i/export", s.handleIExport)

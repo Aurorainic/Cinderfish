@@ -217,3 +217,40 @@ func (t *TokenService) RevokeOwned(ctx context.Context, userID, id string) (bool
 	}
 	return tag.RowsAffected() > 0, nil
 }
+
+// FindUnfetchedBySession returns the token issued for a MiAuth session that the
+// requesting application has not collected yet, together with its owner. A
+// session that was never approved (or was already collected) reports
+// ErrInvalidToken.
+func (t *TokenService) FindUnfetchedBySession(ctx context.Context, session string) (*AccessToken, *User, error) {
+	if session == "" {
+		return nil, nil, ErrInvalidToken
+	}
+	row := t.pool.QueryRow(ctx, `
+SELECT id, token, user_id, session, name, scopes, created_at
+FROM access_tokens WHERE session = $1 AND NOT fetched
+ORDER BY created_at DESC LIMIT 1
+`, session)
+	at, err := scanAccessToken(row)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil, ErrInvalidToken
+	}
+	if err != nil {
+		return nil, nil, err
+	}
+	user, err := t.users.GetByID(ctx, at.UserID)
+	if err != nil {
+		return nil, nil, err
+	}
+	return at, user, nil
+}
+
+// MarkFetched records that the application collected the token. The second
+// poll of the same session must answer "not ready" rather than leak the token
+// again.
+func (t *TokenService) MarkFetched(ctx context.Context, id string) error {
+	if _, err := t.pool.Exec(ctx, `UPDATE access_tokens SET fetched = TRUE WHERE id = $1`, id); err != nil {
+		return fmt.Errorf("account: mark token fetched: %w", err)
+	}
+	return nil
+}

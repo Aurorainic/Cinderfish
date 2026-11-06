@@ -478,6 +478,12 @@ CREATE TABLE IF NOT EXISTS webhooks (
 );
 CREATE INDEX IF NOT EXISTS idx_webhooks_user ON webhooks (user_id, created_at DESC);
 `,
+
+	// v13: MiAuth hand-off. `fetched` marks the one-time collection of a token
+	// by the requesting application through miauth/{session}/check.
+	13: `
+ALTER TABLE access_tokens ADD COLUMN IF NOT EXISTS fetched BOOLEAN NOT NULL DEFAULT FALSE;
+`,
 }
 
 // Migrate applies pending migrations in order and returns the version

@@ -15,7 +15,7 @@
 | 指标 | 数量 |
 |------|------|
 | Misskey 端点总数 | 440 |
-| Cinderfish 已注册路由 | 101 |
+| Cinderfish 已注册路由 | 102 |
 | 其中 Misskey 同名路径 | 98 |
 | 其中 Cinderfish 自有路径/别名 | 3（`notifications` 别名、`admin/federation/mode`、`admin/federation/allowlist`） |
 | 未实现（Misskey 同名） | 339 |
@@ -23,7 +23,7 @@
 统计口径：`internal/httpapi/server.go` 里 `HandleFunc("METHOD /api/…")` 的去重路径；
 GET 与 POST 同名路径只算一个。
 
-## 2. 已实现（101 条注册路由）
+## 2. 已实现（102 条注册路由）
 
 ```
 admin/accounts/create       admin/announcements/create  admin/announcements/delete
@@ -50,7 +50,7 @@ i/update                    i/webhooks/create           i/webhooks/delete
 i/webhooks/list             i/webhooks/show             i/webhooks/update
 meta                        mute/create
 mute/delete                 mute/list
-miauth/gen-token            notes/children              notes/conversation
+miauth/gen-token            miauth/{session}/check*            notes/children              notes/conversation
 notes/create                notes/delete                notes/favorites/create
 notes/favorites/delete      notes/global-timeline       notes/hybrid-timeline
 notes/local-timeline        notes/polls/vote            notes/reactions
@@ -76,6 +76,9 @@ users/update
 `hashtags/trend`、`drive/folders*`、`emojis`、`admin/emoji/*`、`notes/polls/vote`、
 `following/requests/*`、`users/update`、`signin`、`signup`、`username/available`、
 `i/registry/scopes`，以及 `admin/federation/mode` 的 GET。
+
+2026-11-06 第十五波新增：`miauth/{session}/check`（Misskey 在 api/index.ts 里实现，不在 endpoints
+目录，故不计入「Misskey 同名端点」分子）；迁移 v13 增加 `access_tokens.fetched`。
 
 2026-11-06 第十四波新增：`admin/update-meta` 增加 `blockedHosts`（不是新路由），策略层在出站与入站
 按精确主机拒绝。
