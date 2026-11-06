@@ -418,3 +418,16 @@ export interface AuthorizedApp {
 export interface AdminDriveFile extends DriveFile {
 	user: UserLite | null;
 }
+
+/** One instance announcement. */
+export interface Announcement {
+	id: string;
+	title: string;
+	text: string;
+	imageUrl: string | null;
+	isActive: boolean;
+	createdAt: string;
+	updatedAt: string;
+	expiresAt: string | null;
+	isRead: boolean;
+}

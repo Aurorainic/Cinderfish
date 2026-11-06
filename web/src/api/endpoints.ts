@@ -7,6 +7,7 @@
 
 import type {
 	AdminDriveFile,
+	Announcement,
 	AdminEmoji,
 	AuthorizedApp,
 	BlockingRecord,
@@ -120,6 +121,11 @@ export const ENDPOINTS = {
 	notesGlobalTimeline: "notes/global-timeline",
 
 	// notifications
+	announcements: "announcements",
+	adminAnnouncementsCreate: "admin/announcements/create",
+	adminAnnouncementsList: "admin/announcements/list",
+	adminAnnouncementsDelete: "admin/announcements/delete",
+
 	notifications: "notifications",
 	notificationsMarkAllAsRead: "notifications/mark-all-as-read",
 
@@ -347,6 +353,19 @@ export interface AdminAccountsCreateParams {
 	password: string;
 }
 
+export interface AnnouncementsParams {
+	limit?: number;
+	untilId?: string;
+}
+
+export interface AdminAnnouncementsCreateParams {
+	title: string;
+	text: string;
+	imageUrl?: string | null;
+	/** Unix milliseconds. */
+	expiresAt?: number | null;
+}
+
 export interface AdminShowUsersParams {
 	limit?: number;
 	offset?: number;
@@ -514,6 +533,23 @@ export interface EndpointMap {
 		req: NotificationsParams;
 		res: Notification[];
 	};
+	[ENDPOINTS.announcements]: {
+		req: AnnouncementsParams;
+		res: Announcement[];
+	};
+	[ENDPOINTS.adminAnnouncementsList]: {
+		req: AnnouncementsParams;
+		res: Announcement[];
+	};
+	[ENDPOINTS.adminAnnouncementsCreate]: {
+		req: AdminAnnouncementsCreateParams;
+		res: Announcement;
+	};
+	[ENDPOINTS.adminAnnouncementsDelete]: {
+		req: { id: string };
+		res: EmptyResponse;
+	};
+
 	[ENDPOINTS.notificationsMarkAllAsRead]: {
 		req: Record<string, never>;
 		res: EmptyResponse;

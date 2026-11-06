@@ -1659,6 +1659,66 @@ cd web && pnpm build                    # exit 0
 - 文件缩略图只在 146 B 的纯白 PNG 上看过；缺失媒体文件（遗留 sunset.png）会触发一次 404，属预期。
 - 远端文件（origin=remote）没有数据可看，实例当前不联邦。
 
+## 12X. 批次：前端第八波——实例公告（2026-11-06）
+
+**工作方式**：目标模式下的第八波，一轮完成迁移、端点、两页、测试、真实二进制与浏览器走查、提交。
+施工依据 `docs/research/2026-11-06-firefish-port-wave8-contract.md`。
+
+### 12X.1 落地清单
+
+| 层 | 文件 | 说明 |
+|----|------|------|
+| 迁移 | `internal/db/db.go`（v10） | `announcements` 表：标题/正文/图片/有效期/启用位 + 两个索引 |
+| 服务 | `internal/announcement/service.go`（新） | `Create` / `List(activeOnly)` / `Get` / `Delete` |
+| 端点 | `internal/httpapi/announcements.go`（新）、`server.go` | 公开 `announcements`；管理端 create/list/delete |
+| 公告页 | `web/src/pages/Announcements.vue` | 占位页改为真实列表：时间、图片、正文、有效期、加载更多 |
+| 管理页 | `web/src/pages/AdminAnnouncements.vue` | 新建表单（标题/正文/图片/datetime-local 有效期）、列表、删除确认、过期标记 |
+| 管理菜单 | `web/src/pages/AdminIndex.vue` | 内容组新增「公告」 |
+| 接口层 | `web/src/api/endpoints.ts`、`types.ts` | 四个端点与 `Announcement` |
+| 测试 | `internal/httpapi/announcements_test.go`（新，3 个用例） | 生命周期、校验与权限、过期隐藏 |
+
+### 12X.2 有意的降级
+
+1. 没有已读跟踪（`i/read-announcement` 未实现），`isRead` 恒为 false，公告页写明。
+2. 没有首页横幅：横幅需要已读状态才能关闭，本波只做列表页。
+3. 没有 update 端点：管理页的编辑工作流是「删除后重发」。
+4. 正文按纯文本渲染并保留换行，不解析 MFM。
+
+### 12X.3 验证证据
+
+```
+gofmt -l internal/ cmd/                 # 空
+go vet ./...                            # exit 0
+CINDERFISH_TEST_DATABASE_URL=… go test -count=1 ./...   # 全绿（新增 3 个公告用例）
+cd web && pnpm exec vue-tsc --noEmit    # exit 0
+cd web && pnpm run check:port           # 398 文件，hardTotal 0
+cd web && pnpm build                    # exit 0
+```
+
+真实二进制 `:3991`：
+
+| 场景 | 结果 |
+|------|------|
+| 匿名 `announcements`（无公告） | 0 |
+| 管理员 API 创建 | 返回 id/title、`isRead=false`；公开列表变为 `["API 验证公告"]` |
+| 匿名调用 create | 401；非管理员 token 在测试中为 403 |
+| 管理页表单发布「界面发布公告」 | 列表立即出现两条，正文换行保留 |
+| `/announcements` | 两条公告均显示标题、时间与正文；底部说明已读状态未实现 |
+| 管理菜单 | 内容组出现「公告」 |
+
+无头 Helium 156（1440×900 / 390×844）：管理页、公开页与移动端均无横向溢出、无 JS 异常；管理页的
+`datetime-local` 有效期输入在移动端正常换行。截图在 `/tmp/w8-shots`（不入库）。
+
+走查数据已清理：两条公告与 w8admin 删除（announcements 无用户外键，单独清理），用户数回到 23；
+临时二进制、配置、媒体目录、profile 与服务停止。
+
+### 12X.4 仍未验证
+
+- 公告的 `imageUrl` 只在 API 层校验了协议，页面没有加载过真实图片。
+- `untilId` 加载更多没有构造多页数据；`limit` 上限行为未实测。
+- 过期公告的公开隐藏由测试的 400ms 有效期验证，没有在浏览器里等过期。
+- 已读跟踪与首页横幅按设计未做。
+
 ## 13. 文档索引
 
 | 文档 | 内容 |
@@ -1692,6 +1752,7 @@ cd web && pnpm build                    # exit 0
 | `docs/research/2026-11-06-firefish-port-wave5-contract.md` | **第五波施工契约（静音/屏蔽、令牌管理、实例静音、无障碍、多账号、4 个 widget 与明确不做的项），见 §12U** |
 | `docs/research/2026-11-06-firefish-port-wave6-contract.md` | **第六波施工契约（notes/search、notes/search-by-tag、users/search 与搜索/标签页），见 §12V** |
 | `docs/research/2026-11-06-firefish-port-wave7-contract.md` | **第七波施工契约（admin/show-users 筛选、admin/drive/files 与用户/文件管理页），见 §12W** |
+| `docs/research/2026-11-06-firefish-port-wave8-contract.md` | **第八波施工契约（公告表 v10、四个公告端点、公告页与管理页），见 §12X** |
 
 ## 14. 已知的未验证项
 
@@ -1702,6 +1763,8 @@ cd web && pnpm build                    # exit 0
   与远端结果没有构造数据；`ILIKE '%…%'` 的性能没有压测。
 - **第七波的排序与游标组合未全测（2026-11-06，见 §12W.4）**：四种 sort、hostname/userId、文件游标与
   远端文件没有构造数据；`state=silenced` 仅在实现层面为空集。
+- **第八波未测的边角（2026-11-06，见 §12X.4）**：公告图片渲染、`untilId` 多页、`limit` 上限、
+  浏览器内过期隐藏均未构造数据；已读跟踪与首页横幅按设计未做。
 - **仍未移植的设置页**：邮箱、整合、安全（2FA）、导入导出、迁移、Webhook、插件、自定义 KaTeX、状态栏、
   删除账号、应用授权以外的账号操作；对应后端端点不存在或前端缺少依赖（见第五波契约 §3.3）。
 - **仍缺的 widgets**：rss、rss-ticker、server-metric、online-users、federation、job-queue、aiscript、

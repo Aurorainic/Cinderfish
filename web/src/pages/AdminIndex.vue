@@ -92,6 +92,12 @@ const menuDef = computed<MkSuperMenuGroup[]>(() => [
 		title: "内容",
 		items: [
 			{
+				icon: "ph-megaphone-simple ph-bold ph-lg",
+				text: t("announcements"),
+				to: "/admin/announcements",
+				active: isActive("/admin/announcements"),
+			},
+			{
 				icon: "ph-smiley ph-bold ph-lg",
 				text: t("customEmojis"),
 				to: "/admin/emojis",
