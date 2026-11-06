@@ -2,6 +2,7 @@ package httpapi_test
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -136,4 +137,71 @@ func postNoContentWithToken(t *testing.T, ts *httptest.Server, path, token strin
 	}
 	defer resp.Body.Close()
 	return resp.StatusCode
+}
+
+// TestAnnouncementsPagination covers the limit and untilId cursor: the list is
+// newest first, a short limit pages through it, and the service caps an
+// oversized limit at 100.
+func TestAnnouncementsPagination(t *testing.T) {
+	ts, srv := adminTestServer(t, "open")
+
+	ids := make([]string, 0, 3)
+	for _, title := range []string{"one", "two", "three"} {
+		resp, raw := postRawWithToken(t, ts, "/api/admin/announcements/create", "admintoken000000", map[string]any{
+			"title": title, "text": "body " + title,
+		})
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("create %s: %d %v", title, resp.StatusCode, raw)
+		}
+		created, _ := raw.(map[string]any)
+		ids = append(ids, created["id"].(string))
+	}
+
+	list := func(params map[string]any) []any {
+		resp, raw := postRaw(t, ts, "/api/announcements", params)
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("announcements %v: %d %v", params, resp.StatusCode, raw)
+		}
+		arr, _ := raw.([]any)
+		return arr
+	}
+
+	// Newest first.
+	all := list(map[string]any{})
+	if len(all) != 3 {
+		t.Fatalf("all = %d, want 3", len(all))
+	}
+	if got, _ := all[0].(map[string]any); got["id"] != ids[2] {
+		t.Errorf("first = %v, want the newest %s", got["id"], ids[2])
+	}
+
+	// limit=2 keeps the two newest; the cursor continues from the second.
+	page := list(map[string]any{"limit": 2})
+	if len(page) != 2 {
+		t.Fatalf("limit 2 = %d rows, want 2", len(page))
+	}
+	if got, _ := page[1].(map[string]any); got["id"] != ids[1] {
+		t.Errorf("page[1] = %v, want %s", got["id"], ids[1])
+	}
+	rest := list(map[string]any{"untilId": ids[1]})
+	if len(rest) != 1 {
+		t.Fatalf("untilId page = %d rows, want 1", len(rest))
+	}
+	if got, _ := rest[0].(map[string]any); got["id"] != ids[0] {
+		t.Errorf("untilId page = %v, want %s", got["id"], ids[0])
+	}
+
+	// An oversized limit is capped at 100 rather than failing: seed enough
+	// rows to observe the cap without going through the API 100 times.
+	pool := srv.TestPool()
+	if _, err := pool.Exec(context.Background(), `
+INSERT INTO announcements (id, title, text)
+SELECT 'w63cap' || lpad(g::text, 4, '0'), 'cap ' || g, 'body'
+FROM generate_series(1, 150) AS g`); err != nil {
+		t.Fatalf("seed announcements: %v", err)
+	}
+	capped := list(map[string]any{"limit": 1000})
+	if len(capped) != 100 {
+		t.Errorf("limit 1000 = %d rows, want the 100 cap", len(capped))
+	}
 }

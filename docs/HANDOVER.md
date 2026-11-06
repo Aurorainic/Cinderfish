@@ -4166,8 +4166,9 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
   文件覆盖 `userId`、`origin=remote`、`hostname`（大小写折叠）与 `sinceId`/`untilId`/双游标。
   `admin/show-users` 的四种 sort 也在 2026-11-07 由 `TestAdminShowUsersSorts` 覆盖
   （+/-follower、+/-createdAt；`state=silenced` 仍在实现层面为空集，没有数据可造）。
-- **第八波未测的边角（2026-11-06，见 §12X.4）**：公告图片渲染、`untilId` 多页、`limit` 上限、
-  浏览器内过期隐藏均未构造数据；已读跟踪与首页横幅按设计未做。
+- **第八波的部分边角（2026-11-06，见 §12X.4）**：`untilId` 多页与 `limit` 上限已由
+  `TestAnnouncementsPagination` 覆盖（2026-11-07，含 100 条上限）。仍未构造数据的：公告图片渲染、
+  浏览器内的过期隐藏；已读跟踪与首页横幅按设计未做。
 - **第十波未测边角（2026-11-06，见 §12Z.4）**：远端举报、分页游标与 toast 文案未验证；转发、
   通知与自动处置按设计未做。
 - **第十一波未测边角（2026-11-06，见 §12AA.4）**：失败/超时路径、重试与投递顺序、编辑页内删除、
