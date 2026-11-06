@@ -844,7 +844,7 @@ Go 的 mux 不允许通配符出现在段中间，所以路由写成 `GET /{acct
 5. **`EmojiReact` 未实现**：Firefish/Misskey 的自定义反应若走 `EmojiReact` 类型会被当作未知活动；`Like` 会读 `_misskey_reaction` → `content` → `name`，兜底 `"⭐"`（`internal/federation/inbox.go:339`–`366`）。
 6. **`Move`、`Flag`、`Question`（投票）未实现**（`docs/research/2026-11-04-misskey-api-coverage.md` §6）。
 7. 锁推账户的入站 `Follow` 会写入 `follow_requests`，但**不产生 `receiveFollowRequest` 通知**；本地发起关注远端锁推账户时也不会写待审行（同上文档 §6）。
-8. 出站签名固定用“第一个管理员（否则第一个本地用户）”的密钥（`internal/httpapi/federation_wire.go:140`–`146`），多用户实例下签名者与活动作者不一致。
+8. ~~出站签名固定用“第一个管理员”的密钥~~：2026-11-06 第四十二波已改为**按活动作者取密钥**——投递队列每行记录 `user_id`，`Client.PostActivity` 用它作为签名者（`client.sign(ctx, req, body, asUserID)`）；只有没有用户上下文的普通对象抓取才回落到实例密钥（第一个管理员）。对端会校验签名密钥属于活动声明的 actor，固定密钥会让第二个用户的投递被拒。
 
 ---
 

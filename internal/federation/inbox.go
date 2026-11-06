@@ -124,7 +124,7 @@ func (i *Inbox) follow(ctx context.Context, actor *RemoteUser, activity Object) 
 		i.OnFollow(ctx, actor.ID, target.id)
 	}
 
-	if err := i.client.PostActivity(ctx, actor.Inbox, i.renderer.RenderAccept(i.renderer.ActorRef(target.id), activity)); err != nil {
+	if err := i.client.PostActivity(ctx, actor.Inbox, i.renderer.RenderAccept(i.renderer.ActorRef(target.id), activity), target.id); err != nil {
 		return "ok: followed but Accept delivery failed: " + err.Error(), nil
 	}
 	return "ok", nil

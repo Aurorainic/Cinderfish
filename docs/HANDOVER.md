@@ -3189,6 +3189,41 @@ go vet ./...              # exit 0
 - 远端已软删除笔记收到 Update 时的 `skip` 分支。
 - `go test` 与浏览器走查未执行。
 
+## 12BF. 批次：按活动作者签名（2026-11-06）
+
+**工作方式**：目标模式第四十二波。施工依据
+`docs/research/2026-11-06-firefish-port-wave42-contract.md`；修复 `meta-federation.md`
+「已知限制」第 8 条。
+
+### 12BF.1 落地清单
+
+| 层 | 文件 | 说明 |
+|----|------|------|
+| 客户端 | `internal/federation/client.go` | `KeySource` 带 `userID`；`PostActivity` 带 `asUserID`；`sign` 透传 |
+| 投递 | `internal/federation/deliver.go` | 用队列行的 `dl.UserID` 签名 |
+| 入站 | `internal/federation/inbox.go` | `Accept` 用接受者密钥 |
+| 装配 | `internal/httpapi/federation_wire.go` | 按用户取密钥；空 userID 回落实例密钥 |
+| 文档 | `meta-federation.md` | 第 8 条限制改为已修 |
+
+### 12BF.2 有意的限制
+
+1. 实例密钥仍是第一个管理员，没有独立 instance actor 文档。
+2. `KeyID` 格式不变。
+3. 未新增测试。
+
+### 12BF.3 验证证据（编译层）
+
+```
+gofmt -l internal/ cmd/   # 空
+go vet ./...              # exit 0
+```
+
+### 12BF.4 仍未验证
+
+- 双实例：第二个用户发帖是否被对端接受（签名密钥与 actor 一致）。
+- 入站 `Accept` 的签名方是否为接受者。
+- `go test` 与浏览器走查未执行。
+
 ## 13. 文档索引
 
 | 文档 | 内容 |
@@ -3256,6 +3291,7 @@ go vet ./...              # exit 0
 | `docs/research/2026-11-06-firefish-port-wave39-contract.md` | **第三十九波施工契约（邮箱前端页面），见 §12BC** |
 | `docs/research/2026-11-06-firefish-port-wave40-contract.md` | **第四十波施工契约（出站投递与取消转贴），见 §12BD** |
 | `docs/research/2026-11-06-firefish-port-wave41-contract.md` | **第四十一波施工契约（编辑的联邦 Update），见 §12BE** |
+| `docs/research/2026-11-06-firefish-port-wave42-contract.md` | **第四十二波施工契约（按活动作者签名），见 §12BF** |
 
 ## 14. 已知的未验证项
 
@@ -3316,6 +3352,7 @@ go vet ./...              # exit 0
 - **第三十九波未测（2026-11-06，见 §12BC.4）**：邮箱三页只有编译层证据，渲染与完整链路未走查。
 - **第四十波未测（2026-11-06，见 §12BD.4）**：出站投递与取消转贴只有编译层证据；真实双实例投递未验证。
 - **第四十一波未测（2026-11-06，见 §12BE.4）**：编辑的 Update 双向都只有编译层证据。
+- **第四十二波未测（2026-11-06，见 §12BF.4）**：按作者签名只有编译层证据，双实例未验证。
 - **仍未移植的设置页**：邮箱、整合、导入导出、迁移、Webhook、插件、自定义 KaTeX、状态栏、
   删除账号、应用授权以外的账号操作；对应后端端点不存在或前端缺少依赖（见第五波契约 §3.3）。
 - **仍缺的 widgets**：rss、rss-ticker、server-metric、online-users、federation、job-queue、aiscript、

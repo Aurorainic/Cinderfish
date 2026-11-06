@@ -23,13 +23,20 @@ func (s *Server) AttachFederation() {
 	s.fedRenderer = federation.NewRenderer(s.baseURL())
 	s.federationStore = federation.NewStore(s.pool)
 
-	// Sign outbound requests with the instance's first administrator
-	// key. A personal instance has one actor that speaks for it, which
-	// is what Misskey does with its instance actor too.
-	s.federationClient = federation.NewClient(s.federationPolicy, s.fedRenderer, func(ctx context.Context) (string, *rsa.PrivateKey, error) {
-		id, err := s.signingUserID(ctx)
-		if err != nil {
-			return "", nil, err
+	// Sign each outbound activity with the key of the account it speaks for:
+	// a peer checks that the signature's key belongs to the actor the
+	// activity names, so one fixed instance key would get a delivery from a
+	// second user rejected. Requests with no user context (plain object
+	// fetches) fall back to the instance key, which is the first
+	// administrator's.
+	s.federationClient = federation.NewClient(s.federationPolicy, s.fedRenderer, func(ctx context.Context, userID string) (string, *rsa.PrivateKey, error) {
+		id := userID
+		if id == "" {
+			resolved, err := s.signingUserID(ctx)
+			if err != nil {
+				return "", nil, err
+			}
+			id = resolved
 		}
 		kp, err := s.federationStore.EnsureLocalKey(ctx, id)
 		if err != nil {

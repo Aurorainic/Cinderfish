@@ -33,13 +33,16 @@ type Client struct {
 	policy   *Policy
 	renderer *Renderer
 	http     *http.Client
-	// KeySource returns the key pair and key id used to sign outbound
-	// requests. A personal instance signs everything as one actor.
-	KeySource func(ctx context.Context) (keyID string, priv *rsa.PrivateKey, err error)
+	// KeySource returns the signing key for one local user. Deliveries pass
+	// the activity's author: a peer checks that the signature's key belongs
+	// to the actor it names, so signing someone else's activity with the
+	// instance key gets it rejected. An empty userID asks for the instance
+	// key, which is what plain object fetches use.
+	KeySource func(ctx context.Context, userID string) (keyID string, priv *rsa.PrivateKey, err error)
 }
 
 // NewClient returns a client for this instance.
-func NewClient(policy *Policy, renderer *Renderer, keySource func(context.Context) (string, *rsa.PrivateKey, error)) *Client {
+func NewClient(policy *Policy, renderer *Renderer, keySource func(context.Context, string) (string, *rsa.PrivateKey, error)) *Client {
 	return &Client{
 		policy:    policy,
 		renderer:  renderer,
@@ -142,7 +145,7 @@ func (c *Client) FetchObject(ctx context.Context, target, objectID string) (Obje
 	}
 	req.Header.Set("Accept", ContentTypeActivity+", "+ContentTypeLD)
 	req.Header.Set("User-Agent", UserAgent)
-	if err := c.sign(ctx, req, nil); err != nil {
+	if err := c.sign(ctx, req, nil, ""); err != nil {
 		return nil, err
 	}
 
@@ -179,8 +182,9 @@ func (c *Client) FetchObject(ctx context.Context, target, objectID string) (Obje
 	return obj, nil
 }
 
-// PostActivity signs and POSTs an activity to inboxURL.
-func (c *Client) PostActivity(ctx context.Context, inboxURL string, activity Object) error {
+// PostActivity signs and POSTs an activity to inboxURL. asUserID names the
+// local account the activity speaks for; it picks the signing key.
+func (c *Client) PostActivity(ctx context.Context, inboxURL string, activity Object, asUserID string) error {
 	if err := c.policy.CheckURLAllowed(ctx, inboxURL); err != nil {
 		return err
 	}
@@ -194,7 +198,7 @@ func (c *Client) PostActivity(ctx context.Context, inboxURL string, activity Obj
 		return err
 	}
 	req.Header.Set("User-Agent", UserAgent)
-	if err := c.sign(ctx, req, body); err != nil {
+	if err := c.sign(ctx, req, body, asUserID); err != nil {
 		return err
 	}
 
@@ -211,11 +215,11 @@ func (c *Client) PostActivity(ctx context.Context, inboxURL string, activity Obj
 	return nil
 }
 
-func (c *Client) sign(ctx context.Context, req *http.Request, body []byte) error {
+func (c *Client) sign(ctx context.Context, req *http.Request, body []byte, asUserID string) error {
 	if c.KeySource == nil {
 		return nil
 	}
-	keyID, priv, err := c.KeySource(ctx)
+	keyID, priv, err := c.KeySource(ctx, asUserID)
 	if err != nil {
 		return fmt.Errorf("federation: signing key: %w", err)
 	}

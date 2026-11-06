@@ -183,7 +183,7 @@ func (d *Deliverer) deliverOne(ctx context.Context, dl Delivery) error {
 		return d.abandon(ctx, dl, err)
 	}
 
-	if err := d.client.PostActivity(ctx, dl.InboxURL, activity); err != nil {
+	if err := d.client.PostActivity(ctx, dl.InboxURL, activity, dl.UserID); err != nil {
 		return d.fail(ctx, dl, err)
 	}
 
