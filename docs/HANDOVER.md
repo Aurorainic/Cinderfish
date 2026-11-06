@@ -4402,7 +4402,7 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
   `TestWebhookDeliveryFailureStatus` 覆盖（接收端 500 → `latestStatus=500`；
   连接失败 → `1`），未产生的事件类型由 `TestWebhookIgnoresUnproducedEvents` 覆盖
   （订阅 follow 的 webhook 在关注发生时收不到投递）。投递**按设计不重试**，一条事件一个独立请求；
-  仍未验证的：编辑页内删除。
+  编辑页内删除已由 §12EH 覆盖（删除后回到列表，`i/webhooks/list` 为空）。
 - **第十二波边角（2026-11-07，见 §12DU）**：`admin/get-table-stats` 的计数来自 `pg_class.reltuples`，
   未 `ANALYZE` 前实测为 20001、实际 23001，`ANALYZE notes` 后为 23001——与 PostgreSQL 语义一致；
   `/admin/database` 页面在真实库上渲染 4.4 MB / 36 表 / 90 索引与各表行数（§12DZ）；
@@ -5867,3 +5867,9 @@ gofmt -l internal/ cmd/                                        # 空
 go vet ./...                                                   # exit 0
 CINDERFISH_TEST_DATABASE_URL=... go test ./... -count=1         # 全绿
 ```
+
+## 12EH. 第一百一十八波：Webhook 编辑页删除（2026-11-07）
+
+`/settings/webhook/edit/<id>` 打开后直接点「删除」→ 确认「好」→ 跳回 `/settings/webhook`，
+`i/webhooks/list` 返回 0 条。页面输入框里的名称不在 `innerText` 中，脚本按「删除」按钮
+判断加载完成（第一次误判为未加载，不是页面缺陷）。
