@@ -1128,3 +1128,34 @@ OAuth 2.0 授权码端点（仅 PKCE `S256`）。认证：**需要登录**，且
 | 400 `LAST_ADMIN` | 调用者是最后一个未冻结管理员 |
 
 注销是即时的硬删除，token 立即失效。前端在成功后调用 `signOut()` 并回到首页。
+
+## 2026-11-06 增补：Webhook（i/webhooks/*）
+
+迁移 v12 新增 `webhooks` 表。端点与上游同名，载荷与请求头也沿用上游的投递格式。
+
+### POST /api/i/webhooks/create
+
+`{ name, url, secret, on }`：
+
+- `name` 1–100 字符；`url` 必须 `http(s)` 且 ≤1024；`secret` 1–1024；
+- `on` 取自 `mention/unfollow/follow/followed/note/reply/renote/reaction`，非空、去重；
+- 返回 `{ id, userId, name, url, secret, on, active, createdAt, latestSentAt, latestStatus }`。
+
+### i/webhooks/list | show | update | delete
+
+- `list`：当前账号的全部 Webhook，无分页；
+- `show`：`{ webhookId }`，不属于当前账号返回 404 `NO_SUCH_WEBHOOK`；
+- `update`：`{ webhookId, name, url, secret, on, active }`（全量字段）；
+- `delete`：`{ webhookId }`，204；别人的 id 也是 204（无副作用）。
+
+### 投递
+
+发帖成功后异步 POST 到订阅了该事件的启用 hook（5 秒超时）：
+
+```json
+{ "hookId": "…", "userId": "…", "eventId": "…", "createdAt": "…", "type": "note|reply|renote", "body": { /* Note */ } }
+```
+
+请求头：`Content-Type: application/json`、`User-Agent: Cinderfish-Hooks`、
+`X-Firefish-Hook-Id`、`X-Firefish-Hook-Secret`。结果回写 `latestSentAt` 与 `latestStatus`
+（网络错误为 1）。失败不重试，也不影响发帖。

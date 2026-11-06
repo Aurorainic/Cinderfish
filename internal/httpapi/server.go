@@ -20,6 +20,7 @@ import (
 	"github.com/Aurorainic/cinderfish/internal/note"
 	"github.com/Aurorainic/cinderfish/internal/report"
 	"github.com/Aurorainic/cinderfish/internal/streaming"
+	"github.com/Aurorainic/cinderfish/internal/webhook"
 )
 
 // Server holds dependencies shared by all handlers.
@@ -43,6 +44,7 @@ type Server struct {
 	registry      *account.RegistryService
 	announcements *announcement.Service
 	reports       *report.Service
+	webhooks      *webhook.Service
 
 	storage media.Storage
 	drive   *media.DriveService
@@ -96,6 +98,7 @@ func NewServerWithDB(cfg *config.Config, pool *pgxpool.Pool) *Server {
 	s.registry = account.NewRegistryService(pool)
 	s.announcements = announcement.NewService(pool)
 	s.reports = report.NewService(pool)
+	s.webhooks = webhook.NewService(pool)
 	return s
 }
 
@@ -136,6 +139,11 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("POST /api/i/revoke-token", s.handleRevokeToken)
 	s.mux.HandleFunc("POST /api/i/export", s.handleIExport)
 	s.mux.HandleFunc("POST /api/i/delete-account", s.handleIDeleteAccount)
+	s.mux.HandleFunc("POST /api/i/webhooks/create", s.handleWebhookCreate)
+	s.mux.HandleFunc("POST /api/i/webhooks/list", s.handleWebhookList)
+	s.mux.HandleFunc("POST /api/i/webhooks/show", s.handleWebhookShow)
+	s.mux.HandleFunc("POST /api/i/webhooks/update", s.handleWebhookUpdate)
+	s.mux.HandleFunc("POST /api/i/webhooks/delete", s.handleWebhookDelete)
 
 	// Following. These give the Streaming API's follow/followed events a
 	// source, which M4 left as a known gap.

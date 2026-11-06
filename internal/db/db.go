@@ -460,6 +460,24 @@ CREATE TABLE IF NOT EXISTS abuse_reports (
 );
 CREATE INDEX IF NOT EXISTS idx_abuse_reports_unresolved ON abuse_reports (resolved, created_at DESC);
 `,
+
+	// v12: per-user outbound webhooks. `on` holds Misskey's event names; only
+	// note/reply/renote are produced by this port.
+	12: `
+CREATE TABLE IF NOT EXISTS webhooks (
+    id             TEXT PRIMARY KEY,
+    user_id        TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    name           TEXT NOT NULL,
+    url            TEXT NOT NULL,
+    secret         TEXT NOT NULL,
+    events         TEXT[] NOT NULL DEFAULT '{}',
+    active         BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+    latest_sent_at TIMESTAMPTZ,
+    latest_status  INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_webhooks_user ON webhooks (user_id, created_at DESC);
+`,
 }
 
 // Migrate applies pending migrations in order and returns the version
