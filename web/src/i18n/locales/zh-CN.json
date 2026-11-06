@@ -1243,6 +1243,7 @@
 	"_permissions.read:mutes": "查看静音用户列表",
 	"_permissions.write:mutes": "编辑静音用户列表",
 	"_permissions.write:notes": "撰写或删除帖子",
+	"_permissions.read:notes": "查看帖子",
 	"_permissions.read:notifications": "查看通知",
 	"_permissions.write:notifications": "管理通知",
 	"_permissions.read:reactions": "查看回应",

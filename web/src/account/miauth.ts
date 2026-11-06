@@ -1,10 +1,11 @@
 /**
  * MiAuth flow, ported from Firefish `pages/miauth.vue`.
  *
- * Cinderfish implements only `POST /api/miauth/gen-token`
- * (docs/research/api-contract/auth-users.md). The approval page is ours, and
- * unlike Misskey the `permission` array is not required and no scope is
- * enforced server-side (only `/streaming` checks `read:account`).
+ * Cinderfish implements `POST /api/miauth/gen-token` and the polling endpoint
+ * `POST /api/miauth/{session}/check` (docs/research/api-contract/auth-users.md).
+ * The approval page is `/miauth/:session`. Unlike Misskey the `permission`
+ * array is not required and no scope is enforced server-side (only
+ * `/streaming` checks `read:account`).
  */
 import { accountApi } from "./transport";
 import { me } from "./me";

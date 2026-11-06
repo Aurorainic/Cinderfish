@@ -1325,6 +1325,7 @@
 	"_permissions.read:mutes": "ミュートを見る",
 	"_permissions.write:mutes": "ミュートを操作する",
 	"_permissions.write:notes": "投稿を作成・削除する",
+	"_permissions.read:notes": "ノートの閲覧",
 	"_permissions.read:notifications": "通知を見る",
 	"_permissions.write:notifications": "通知を操作する",
 	"_permissions.read:reactions": "リアクションを見る",

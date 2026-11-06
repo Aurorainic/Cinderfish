@@ -2076,6 +2076,61 @@ cd web && pnpm build                    # exit 0
 - 与 allowlist 模式组合、子域精确匹配的运维体验没有走查。
 - 已收到的远端内容不会清理，按设计保留。
 
+## 12AE. 批次：前端第十五波——MiAuth 第三方授权（2026-11-06）
+
+**工作方式**：目标模式第十五波，一轮完成迁移、check 端点、授权页、缺失文案、测试、真实二进制与浏览器
+走查、文档与提交。施工依据 `docs/research/2026-11-06-firefish-port-wave15-contract.md`。
+
+### 12AE.1 落地清单
+
+| 层 | 文件 | 说明 |
+|----|------|------|
+| 迁移 | `internal/db/db.go`（v13） | `access_tokens.fetched`，标记 token 已被应用取走 |
+| 令牌服务 | `internal/account/tokens.go` | `FindUnfetchedBySession`、`MarkFetched` |
+| 端点 | `internal/httpapi/miauth.go`（新）、`server.go` | `POST /api/miauth/{session}/check`：一次取走，之后 `{ok:false}` |
+| 页面 | `web/src/pages/MiAuth.vue` | 从占位页改为复用 `CfMiauth`（登录、权限展示、接受/取消、callback 跳转） |
+| 文案 | `i18n/locales/{zh-CN,ja-JP}.json` | 补 `_permissions.read:notes` |
+| 测试 | `internal/httpapi/miauth_test.go`（新） | 首次取走含 user、二次 ok=false、未知 session ok=false |
+
+### 12AE.2 有意的限制
+
+1. scope 不强制：permission 只用于展示，除 Streaming 的 `read:account` 外服务端不校验。
+2. 没有拒绝回执：取消只是不签发 token，应用轮询一直是 `{ok:false}`。
+3. 没有授权页过期与 token 生命周期区分。
+4. OAuth 同意页仍未做（`/oauth/authorize` 仍直接签码）。
+
+### 12AE.3 验证证据
+
+```
+gofmt -l internal/ cmd/                 # 空
+go vet ./...                            # exit 0
+CINDERFISH_TEST_DATABASE_URL=… go test -count=1 ./...   # 全绿（新增 MiAuth check 用例）
+cd web && pnpm exec vue-tsc --noEmit    # exit 0
+cd web && pnpm run check:port           # 398 文件，hardTotal 0
+cd web && pnpm build                    # exit 0
+```
+
+真实二进制 `:3991`：
+
+| 场景 | 结果 |
+|------|------|
+| 授权前 `miauth/w15-app/check` | `{ok:false}` |
+| 打开 `/miauth/w15-app?name=W15 应用&permission=read:notes,write:notes` | 显示应用名、两项权限（「查看帖子」「撰写或删除帖子」）、取消/接受 |
+| 点「接受」 | 页面显示「请返回至应用」 |
+| 首次轮询 | `{ok:true, token:<32 位>, user:w15user}` |
+| 第二次轮询 | `{ok:false}` |
+| 移动端 390×844 | 授权卡片正常换行，无横向溢出 |
+
+无头 Helium 156：无 JS 异常。截图在 `/tmp/w15-shots`（不入库）。
+
+走查数据已清理：w15user 与其令牌删除，用户数回到 23；服务与临时文件停止。
+
+### 12AE.4 仍未验证
+
+- 未登录状态下的登录表单与授权衔接没有走查（走查注入的是已登录会话）。
+- 带 `callback` 的应用跳转没有构造真实第三方应用。
+- OAuth 同意页、拒绝回执、scope 强制与授权页过期按设计未做。
+
 ## 13. 文档索引
 
 | 文档 | 内容 |
@@ -2116,6 +2171,7 @@ cd web && pnpm build                    # exit 0
 | `docs/research/2026-11-06-firefish-port-wave12-contract.md` | **第十二波施工契约（admin/get-table-stats、admin/get-index-stats 与数据库页），见 §12AB** |
 | `docs/research/2026-11-06-firefish-port-wave13-contract.md` | **第十三波施工契约（运行时实例设置、admin/meta 与 update-meta 子集），见 §12AC** |
 | `docs/research/2026-11-06-firefish-port-wave14-contract.md` | **第十四波施工契约（blockedHosts、策略与入站拒绝、实例屏蔽页），见 §12AD** |
+| `docs/research/2026-11-06-firefish-port-wave15-contract.md` | **第十五波施工契约（MiAuth check、fetched 标记与授权页），见 §12AE** |
 
 ## 14. 已知的未验证项
 
@@ -2138,6 +2194,8 @@ cd web && pnpm build                    # exit 0
   上游 update-meta 的其余字段按设计忽略。
 - **第十四波未测边角（2026-11-06，见 §12AD.4）**：真实入站签名请求的拒绝、与 allowlist 组合、
   子域匹配的运维体验未验证。
+- **第十五波未测边角（2026-11-06，见 §12AE.4）**：未登录授权衔接、callback 跳转未走查；OAuth 同意页、
+  拒绝回执、scope 强制按设计未做。
 - **仍未移植的设置页**：邮箱、整合、安全（2FA）、导入导出、迁移、Webhook、插件、自定义 KaTeX、状态栏、
   删除账号、应用授权以外的账号操作；对应后端端点不存在或前端缺少依赖（见第五波契约 §3.3）。
 - **仍缺的 widgets**：rss、rss-ticker、server-metric、online-users、federation、job-queue、aiscript、
