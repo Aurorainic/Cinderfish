@@ -4122,7 +4122,8 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
 ### 12BV.4 仍未验证
 
 - 通知中心里新的三种类型**没有浏览器走查**：图标、文案、点击跳转、类型过滤都只过了编译。
-- 远端导入触发通知走的是 `OnNoteCreated`，双实例用例没有覆盖到（本波只用了本地发帖触发）。
+- 远端导入触发通知走的是 `OnNoteCreated`，双实例用例已于 2026-11-07 补上（§12CX：bob 的
+  `notify=normal` 关注在 alpha 的帖子到达 beta 后落成 `note` 通知）。
 - Streaming `homeTimeline` 的实际 WS 过滤行为没有用真实连接验证，只有 `LoadFollows` 的单元断言。
 
 ## 12BW. 第五十八波：入站反应修复与 EmojiReact（2026-11-06）
@@ -4563,7 +4564,7 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
   `following/list` 与 `users/following|followers` 的 `sinceDate`/`untilDate` 已实现并有用例。
 - **第五十七波部分补验证（2026-11-07，见 §12CB/§12CL）**：`follow` 与 `note` 两类通知在通知页渲染
   已走查；`homeTimeline` 的 withReplies 过滤新增了真实 WebSocket 端到端用例。仍未验证的：
-  远端导入触发通知的双实例用例。
+  远端导入通知的双实例用例已由 §12CX 覆盖；仍未验证的是 directNotes 与类型过滤组合的推送。
 - **第五十八波仍未验证**：没有对真实 Misskey/Firefish 验证 `EmojiReact`；远端自定义表情未解析；
   `Question` 入站已在第六十六波补上（§12CE）；笔记正文的远端自定义表情已在第七十一波解析并渲染
   （§12CJ）。仍未验证的：真实异种软件互投、反应里的自定义表情。
@@ -5301,3 +5302,23 @@ CINDERFISH_TEST_DATABASE_URL=... go test ./... -count=1         # 全绿
 ```
 
 仍未验证：`directNotes` 参数与类型过滤组合下的推送、通知列表页在前端收到事件后的插入动画。
+
+## 12CX. 第八十五波：远端导入笔记的 follower 通知（2026-11-07）
+
+第五十七波只验证了「本地发帖 → 关注者收 `note` 通知」，远端笔记入库后的 `OnNoteCreated`
+回调没有双实例用例。
+
+`internal/httpapi/two_instance_notify_test.go` 的 `TestTwoInstanceRemoteNoteNotification`：
+
+1. beta 的 bob 发签名 Follow 给 alpha 的 alice；alpha 的 Accept 让 beta 建立关注行；
+2. bob 通过 `following/update` 把该关注的 `notify` 设为 `normal`；
+3. alice 发帖，beta 落库远端副本；
+4. beta 的 `notifications` 出现一条 `type=note`、`note_id` 指向该副本、收件人为 bob。
+
+```
+gofmt -l internal/ cmd/                                        # 空
+go vet ./...                                                   # exit 0
+CINDERFISH_TEST_DATABASE_URL=... go test ./... -count=1         # 全绿
+```
+
+仍未验证：该通知的 Streaming 推送（事件层已有 `main` 频道用例）、`directNotes` 组合。
