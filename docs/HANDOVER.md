@@ -4663,7 +4663,8 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
 - **主题安装只在本浏览器生效**：`cinderfish.installedThemes` 存 localStorage，没有走 `i/registry`，换设备不同步。
 - **i18n 只覆盖 zh-CN / ja-JP**，其余 37 个 locale 未生成；`yaml` devDependency 未装
   （重新生成 locale 前要先 `pnpm add -D yaml`）。
-- **S3 后端未做真实服务端验证**：只验证了编译、接口与 URL 生成逻辑。
+- **S3 后端未做真实服务端验证**：2026-11-07 起已用 moto 与 s3rver 两个 S3 协议实现验证
+  上传/读取/删除/预签名（§12CI），并修掉预签名未接线的缺陷；仍未验证真实 AWS/R2/B2 与 TLS。
 - ~~**缩略图/WebP 生成未实现**~~：第四十六波实现了缩略图（≤512px，JPEG/PNG）；WebP 仍未做。
 - **前端没有真实第三方客户端联调**：页面已在构建产物上用浏览器走查；2026-11-07 起已用官方
   `misskey-js`（2026.10.2-alpha.0）连过本实例（见 §12CG），仍未用 Misskey Web 前端整站连接。
@@ -4852,3 +4853,38 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
 - 网络闪断后的重订阅；`ListenRedis` 的重连行为只有代码阅读。
 - `w69:deliver` 投递唤醒：两实例都是 `federation_mode = "none"`，没有产生投递。
 - 持久化（本轮 `save ''`、`appendonly no`，符合 pub/sub 不需要持久化的语义）。
+
+## 12CI. 第七十波：S3 后端的真实 S3 协议验证（2026-11-07）
+
+此前 S3 只有编译、接口和 URL 生成证据。这一轮用两个 S3 协议实现跑了真实 HTTP：
+
+- `s3rver`（npm）：签名、建桶、PUT/GET/DELETE 都能走通，但它不识别 minio-go 的
+  `aws-chunked` 请求体，下载内容带 chunk 签名帧，不能用来验证字节完整性；
+- `moto`（Python，安装到 `/tmp/w70-py`，未进仓库）：正确解码 aws-chunked。
+
+### 12CI.1 发现并修复的缺陷
+
+`media.S3Options.Presign` 一直没有接线：`cmd/cinderfish/main.go` 没设置它，
+而 `config.example.toml` 与 DEPLOY 都写着「`public_base_url` 留空即用预签名 GET」。
+结果私有桶拿到的是未签名 URL，直接 403。现在 `openStorage` 在
+`public_base_url == ""` 时设置 `Presign: true`，行为与文档一致。
+
+### 12CI.2 验证证据
+
+- 新增 `internal/media/s3_test.go` 的 `TestS3URLModes`：公开基地址、未签名直链、预签名三种 URL
+  （预签名含 `X-Amz-Signature` 与 `X-Amz-Credential`，路径为 `/<bucket>/<key>`）。
+- 真实二进制（端口 3996，`backend = "s3"`，endpoint `127.0.0.1:4570`，moto，region `us-east-1`）：
+  - 上传 800×400 PNG → `url` 与 `thumbnailUrl` 都是带签名的 URL；
+  - `GET` 原图 → 200、`image/png`、1894 字节，SHA-256 与本地文件一致；
+  - `GET` 缩略图 → 200、`image/png`、1085 字节；
+  - `drive/files/delete` → 200，随后用同凭据 `GetObject` 原图与缩略图都返回
+    `The specified key does not exist`。
+- 公开基地址模式下（`public_base_url` 指向桶），对象 URL 不含签名、路径正确；moto 对匿名 GET
+  返回 403 属该 mock 的行为，真实部署需要桶策略或 CDN 允许匿名读，DEPLOY 已如此说明。
+
+### 12CI.3 仍未验证
+
+- 真实 AWS S3 / Cloudflare R2 / Backblaze B2（只用了 moto 与 s3rver 两个模拟实现）。
+- 分段上传（>20 MiB 会被应用层拒绝，走不到 multipart）。
+- 预签名 URL 过期后的行为；`PresignTTL` 固定 5 分钟，配置没有暴露。
+- S3 的 TLS 与自定义 CA。

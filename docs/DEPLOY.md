@@ -170,7 +170,8 @@ server {
 `backend = "s3"`，填写 endpoint / bucket / 凭据。两种读取方式：
 
 - `public_base_url` 非空：对象按 `<public_base_url>/<key>` 直接公开读（适合 R2、B2 或带 CDN 的桶）。
-- 留空：使用预签名 GET，桶可以保持私有（适合 MinIO、AWS S3）。
+- 留空：使用预签名 GET，桶可以保持私有（适合 MinIO、AWS S3）。预签名需要知道桶的 region：
+  AWS 会自动查询，非 AWS 服务建议显式填写 `region`，否则生成 URL 前会先做一次区域发现请求。
 
 迁移已有文件：
 
