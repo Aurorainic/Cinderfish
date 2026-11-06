@@ -3459,6 +3459,39 @@ cd web && pnpm build                    # exit 0
 - 公告群发的收件人筛选与并发行为。
 - `go test` 与浏览器走查未执行。
 
+## 12BM. 批次：无后端的管理页转说明页（2026-11-06）
+
+**工作方式**：目标模式第四十九波，只改前端与文档。施工依据
+`docs/research/2026-11-06-firefish-port-wave49-contract.md`。
+
+### 12BM.1 落地清单
+
+| 层 | 文件 | 说明 |
+|----|------|------|
+| 组件 | `components/admin/AdminUnavailable.vue` | 现状说明 + 已有项（可带链接）+ 缺口清单 |
+| 页面 | `pages/Admin{Experiments,Integrations,ProxyAccount,Promotions,Security,OtherSettings}.vue` | 六个占位页改为说明页 |
+| 菜单 | `pages/AdminIndex.vue` | 新增「未实现的实例功能」分组，六个入口 |
+| 文档 | 本契约 | 六个页面的缺口结论 |
+
+### 12BM.2 有意的限制
+
+1. 这些页面只有说明与跳转，没有交互。
+2. 缺口判定以「没有端点或表结构」为据；实现其一后应改回真实页面并移出分组。
+3. 未新增测试。
+
+### 12BM.3 验证证据（编译层）
+
+```
+cd web && pnpm exec vue-tsc --noEmit    # exit 0
+cd web && pnpm run check:port           # hardTotal 0（400 文件）
+cd web && pnpm build                    # exit 0
+```
+
+### 12BM.4 仍未验证
+
+- 六个说明页的渲染与管理台菜单分组在窄屏下的表现。
+- 浏览器走查未执行。
+
 ## 13. 文档索引
 
 | 文档 | 内容 |
@@ -3533,6 +3566,7 @@ cd web && pnpm build                    # exit 0
 | `docs/research/2026-11-06-firefish-port-wave46-contract.md` | **第四十六波施工契约（缩略图管道），见 §12BJ** |
 | `docs/research/2026-11-06-firefish-port-wave47-contract.md` | **第四十七波施工契约（锁推生效与关注通知），见 §12BK** |
 | `docs/research/2026-11-06-firefish-port-wave48-contract.md` | **第四十八波施工契约（邮件通知），见 §12BL** |
+| `docs/research/2026-11-06-firefish-port-wave49-contract.md` | **第四十九波施工契约（无后端管理页转说明页），见 §12BM** |
 
 ## 14. 已知的未验证项
 
@@ -3600,6 +3634,7 @@ cd web && pnpm build                    # exit 0
 - **第四十六波未测（2026-11-06，见 §12BJ.4）**：缩略图生成与删除只有编译层证据。
 - **第四十七波未测（2026-11-06，见 §12BK.4）**：锁推与关注通知只有编译层证据。
 - **第四十八波未测（2026-11-06，见 §12BL.4）**：邮件通知与公告群发只有编译层证据。
+- **第四十九波未测（2026-11-06，见 §12BM.4）**：六个说明页与菜单分组未走查。
 - **仍未移植的设置页**：邮箱、整合、导入导出、迁移、Webhook、插件、自定义 KaTeX、状态栏、
   删除账号、应用授权以外的账号操作；对应后端端点不存在或前端缺少依赖（见第五波契约 §3.3）。
 - **仍缺的 widgets**：rss、rss-ticker、server-metric、online-users、federation、job-queue、aiscript、

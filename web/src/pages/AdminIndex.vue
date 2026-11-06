@@ -24,10 +24,10 @@
 // the redirect is unconditional so /admin never renders the empty child.
 //
 // Differences from upstream, all forced by what the backend serves:
-//   * the menu lists only ported pages; the rest of the router table is still
-//     `TODO: port`, and `admin/abuse-user-reports` / `latest-version` do not
-//     exist, so the warnings banner and the quick-action block are gone rather
-//     than fake;
+//   * the menu lists the working pages plus a group for upstream features this
+//     backend does not implement, whose pages explain the gap; `latest-version`
+//     does not exist, so the warnings banner and the quick-action block are
+//     gone rather than fake;
 //   * the instance banner image is dropped (`$instance.iconUrl` is not
 //     mirrored by `@/instance`), and no abuse/report count is shown.
 import {
@@ -168,6 +168,49 @@ const menuDef = computed<MkSuperMenuGroup[]>(() => [
 				text: "实例 CSS",
 				to: "/admin/custom-css",
 				active: isActive("/admin/custom-css"),
+			},
+		],
+	},
+	{
+		// Upstream features this backend does not have. The pages explain the
+		// gap instead of rendering controls that would do nothing.
+		title: "未实现的实例功能",
+		items: [
+			{
+				icon: "ph-flask ph-bold ph-lg",
+				text: "实验性功能",
+				to: "/admin/experiments",
+				active: isActive("/admin/experiments"),
+			},
+			{
+				icon: "ph-plugs ph-bold ph-lg",
+				text: "外部整合",
+				to: "/admin/integrations",
+				active: isActive("/admin/integrations"),
+			},
+			{
+				icon: "ph-user-switch ph-bold ph-lg",
+				text: "代理账号",
+				to: "/admin/proxy-account",
+				active: isActive("/admin/proxy-account"),
+			},
+			{
+				icon: "ph-megaphone ph-bold ph-lg",
+				text: "广告与推广",
+				to: "/admin/ads",
+				active: isActive("/admin/ads"),
+			},
+			{
+				icon: "ph-shield-check ph-bold ph-lg",
+				text: "安全设置",
+				to: "/admin/security",
+				active: isActive("/admin/security"),
+			},
+			{
+				icon: "ph-sliders ph-bold ph-lg",
+				text: "其它设置",
+				to: "/admin/other-settings",
+				active: isActive("/admin/other-settings"),
 			},
 		],
 	},
