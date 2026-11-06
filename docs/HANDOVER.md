@@ -5873,3 +5873,17 @@ CINDERFISH_TEST_DATABASE_URL=... go test ./... -count=1         # 全绿
 `/settings/webhook/edit/<id>` 打开后直接点「删除」→ 确认「好」→ 跳回 `/settings/webhook`，
 `i/webhooks/list` 返回 0 条。页面输入框里的名称不在 `innerText` 中，脚本按「删除」按钮
 判断加载完成（第一次误判为未加载，不是页面缺陷）。
+
+## 12EI. 第一百一十九波：状态栏多条目（2026-11-07）
+
+在 `/settings/statusbar` 添加两条：第一条高度设为「极大」（卡片内第 2 个 select），
+第二条打开「深色背景」。首页底部：
+
+- `.cf-statusbars > .item` 两条，高度分别为 40px 与 26px；
+- 第二条带 `black` 类；
+- 远端实例存在时 `.track` 的 `animationName` 为 `cf-statusbar-scroll-…`。
+
+减少动画偏好：`Emulation.setEmulatedMedia` 后 `matchMedia('(prefers-reduced-motion: reduce)')`
+为 true，但同一元素的 `animationName` 仍报告原动画名；CSS 里的
+`@media (prefers-reduced-motion:reduce){.track{animation:none}}` 已确认在构建产物中且位于
+基础规则之后。无头 Chromium 下无法确认视觉效果，按「尚未确认」记录，不写成已验证。
