@@ -4498,7 +4498,8 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
 - **第三十五波的部分边角（2026-11-06，见 §12AY.4）**：`TestDriveUploadFromURLRejectsUnsafeTargets`
   覆盖 SSRF 守卫的每条拒绝路径（非 http(s)、无主机、回环、localhost、私网、无法解析）、
   缺 url 400、匿名 401 与他人文件夹被拒（2026-11-07）。下载成功与 `FETCH_FAILED` 分支已于
-  2026-11-07 用真实公网地址验证（§12DJ）；`FILE_TOO_LARGE` 需要一个 >20 MiB 的公网文件，仍未构造。
+  2026-11-07 用真实公网地址验证（§12DJ）；`FILE_TOO_LARGE` 也用 `proof.ovh.net` 的 100 MB
+  文件验证（§12EA，4.3 秒后返回 400）。
 - **第三十六波已补验证（2026-11-06，见 §12AZ.4）**：`TestAnnouncementReadState` 覆盖已读写入与
   回读、`hasUnreadAnnouncement` 角标联动、重复已读幂等、另一账号仍视为未读、缺参数 400 与匿名 401
   （2026-11-07）。MeDetailed 没有公告**计数**字段，徽标是布尔值（与 Misskey 一致）。
@@ -5795,3 +5796,12 @@ Deck 在 390 宽退化为「主列」单列，1400 宽显示主列 + 侧栏，�
 请求耗时的测量见 §12DU。
 
 仍未验证：`refresh` 按钮触发重新统计的等待态、磁盘配额告警（本实例无配额）。
+
+## 12EA. 第一百一十二波：URL 上传的 20 MiB 上限（2026-11-07）
+
+`proof.ovh.net/files/100Mb.dat` 可从本机直连。`drive/files/upload-from-url` 读取到
+`limit+1` 字节即停止并返回 400 `FILE_TOO_LARGE`（message「File is too large.」），
+实测耗时约 4.3 秒。至此该端点的成功、远端 404、超大文件与 SSRF 拒绝四条路径都有证据。
+
+仍未验证：重定向到私网地址的拒绝（httpbin/httpbingo 对 loopback 目标直接 403，
+公开重定向服务无法构造；同一守卫的直连分支已有用例）。
