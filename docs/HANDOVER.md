@@ -154,7 +154,7 @@ go run ./cmd/cinderfish-media-migrate --config config.toml --to local --to-local
 
 `--dry-run` 只统计；`--limit N` 限制条数；单个对象失败不会中断其余，报告会列出失败 key，退出码为 1。`--delete-source` 只在整轮无失败时清理源对象。迁移完成后把 `config.toml` 的 `media.backend` 切到新后端再重启。
 
-配置项可用 `CINDERFISH_*` 环境变量覆盖，如 `CINDERFISH_PORT`、`CINDERFISH_DOMAIN`、`CINDERFISH_REGISTRATION_MODE`、`CINDERFISH_FEDERATION_MODE`、`CINDERFISH_MEDIA_BACKEND`、`CINDERFISH_MEDIA_LOCAL_PATH`、`CINDERFISH_WEB_DIR`、`CINDERFISH_REDIS_ENABLED`、`CINDERFISH_REDIS_URL`、`CINDERFISH_REDIS_PREFIX`。
+配置项可用 `CINDERFISH_*` 环境变量覆盖，如 `CINDERFISH_PORT`、`CINDERFISH_DOMAIN`、`CINDERFISH_REGISTRATION_MODE`、`CINDERFISH_FEDERATION_MODE`、`CINDERFISH_MEDIA_BACKEND`、`CINDERFISH_MEDIA_LOCAL_PATH`、`CINDERFISH_WEB_DIR`、`CINDERFISH_REDIS_ENABLED`、`CINDERFISH_TEST_REDIS_URL`、`CINDERFISH_REDIS_PREFIX`。
 
 ## 8. 代码结构
 
@@ -4567,7 +4567,7 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
 - **第五十波已补验证（2026-11-07，见 §12BN.4）**：状态栏在真实二进制下添加、着色、滚动与
   刷新保留均走查通过；期间发现固定条使用了不存在的 `block-end` 属性、导致贴在左上角，
   已修为 `inset-block-end`；多条目叠加（§12EI）与 390 宽移动端（§12EP：底边贴住视口、无溢出）
-  已覆盖；Deck/Zen 按设计不挂载状态栏。仍未验证的：减少动画偏好（无头环境无法确认）。
+  已覆盖；Deck/Zen 按设计不挂载状态栏。减少动画偏好已在 2026-11-07 确认生效（§12FE）。
 - **第五十一波部分补验证（2026-11-07 对账 §12CB/§12CC）**：迁移页表单、本地目标拒绝、`MkMoved`
   横幅（含本地目标的 `MkMention` 多余 `@` 修复）都已走查；`i/move` 的双实例投递已于
   2026-11-07 补齐（§12DI）；跨实例「关注者改关」由 §12EN 覆盖（本地关注者被迁移到新远端账号并
@@ -4710,7 +4710,9 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
   `misskey-js`（2026.10.2-alpha.0）连过本实例（见 §12CG），仍未用 Misskey Web 前端整站连接。
 - **Redis 只对 miniredis 验证过**：单元测试仍用 miniredis；2026-11-07 起已用真实 `redis-server`
   （8.0.5）跑过双进程 Streaming 中继（§12CH）、`requirepass` 认证与 Redis 重启后的自动重订阅
-  （§12CQ）。仍未验证：网络丢包/长时间断开、持久化配置与 `w78:deliver` 投递唤醒。
+  （§12CQ）。`w78:deliver` 投递唤醒已于 2026-11-07 在真实 Redis 上验证，含 Redis 重启后的重新
+  订阅（§12FF）；Redis 只承担 pub/sub，AOF/RDB 不承载任何队列状态，因此「持久化配置」不适用。
+  仍未验证：真实网络丢包/长时间断线。
 - **Streaming 未做真实 Misskey 客户端联调**：已用自写 WebSocket 客户端验证；2026-11-07 起
   也用 `misskey-js` 的 `Stream` 验证了 `localTimeline` 与 `main` 频道（§12CG）。仍未用 Misskey Web 整站连接。
 - **联邦没有任何第三方联调**：只跑了本实现的双实例测试（真签名、真 HTTP、真库），没有对 Mastodon / GoToSocial / 真实 Misskey 实例互通。这是 M5 之后最该补的验证。
@@ -5901,7 +5903,8 @@ CINDERFISH_TEST_DATABASE_URL=... go test ./... -count=1         # 全绿
 减少动画偏好：`Emulation.setEmulatedMedia` 后 `matchMedia('(prefers-reduced-motion: reduce)')`
 为 true，但同一元素的 `animationName` 仍报告原动画名；CSS 里的
 `@media (prefers-reduced-motion:reduce){.track{animation:none}}` 已确认在构建产物中且位于
-基础规则之后。无头 Chromium 下无法确认视觉效果，按「尚未确认」记录，不写成已验证。
+基础规则之后。~~无头 Chromium 下无法确认视觉效果，按「尚未确认」记录~~——后续 §12FE 更正：
+当时看错了属性（应看 `animationDuration`），实际已生效。
 
 ## 12EJ. 第一百二十波：真实音视频播放（2026-11-07）
 
@@ -6436,3 +6439,57 @@ Host。这一轮用 Go 的反向代理复现同一拓扑。
 - `CINDERFISH_TEST_DATABASE_URL=… go test ./internal/httpapi/ -run TestInboxBehindReverseProxy`
   通过；日志显示 `inbox Follow … ok`、`inbox Accept … ok`，以及唯一的
   `signature does not verify`（Host 不匹配的负例）。
+
+## 12FE. 第一百四十一波：减少动画偏好的实际生效（2026-11-07）
+
+第一百一十九波记录过「`Emulation.setEmulatedMedia` 后 `matchMedia` 为 true，但元素的
+`animationName` 仍是原动画名」，据此把减少动画偏好列为无头环境无法确认。这个检查属性选错了：
+`_animations.scss` 的全局规则改的是 **`animation-duration`**（0.01ms）与迭代次数，不是动画名。
+
+### 12FE.1 复核
+
+在真实二进制 + Helium/CDP 上：
+
+| 状态 | `animationDuration` | `animationIterationCount` | `transitionDuration` |
+|------|---------------------|---------------------------|----------------------|
+| 常态 | 2s | infinite | 2s |
+| `prefers-reduced-motion: reduce`（`Emulation.setEmulatedMedia` feature） | 1e-05s | 1 | 1e-05s |
+
+样式表加载完成后（`document.styleSheets.length > 0`）再测，`matchMedia` 同时为 true。
+构建产物 `web/dist/assets/index-*.css` 里存在
+`@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;…}}`，
+状态栏还有单独的 `.track{animation:none}` 兜底。
+
+### 12FE.2 结论
+
+减少动画偏好在应用里真实生效：所有动画/过渡被压到 0.01ms 并只跑一次。旧记录里的
+「无法确认」是测量属性错误，不是产品缺陷。截图不适用（效果是动画停止，静态截图看不出差异）。
+
+## 12FF. 第一百四十二波：真实 Redis 上的投递唤醒与重启重订阅（2026-11-07）
+
+§14 记录「`w78:deliver` 投递唤醒、持久化配置、长时间断网未验证」。本轮用真实 `redis-server`
+补前两项中的唤醒与重启。
+
+### 12FF.1 用例
+
+- `TestRedisWakeRealServer`（`CINDERFISH_TEST_REDIS_URL` 门控）：连接真实 Redis（DB 15、随机频道前缀），
+  监听者与发布者各一个客户端，反复发布直到收到唤醒；证明
+  `NewRedisWake` → `ListenDeliveries` 在真实 TCP/订阅时序下工作。
+- `TestRedisWakeSurvivesRestart`：测试自己起一个临时 `redis-server`（随机端口、临时目录、关闭
+  持久化），收到第一次唤醒后杀掉并同端口重启，监听者的 1 秒重试循环重新订阅，第二次发布再次收到
+  唤醒。`redis-server` 不在 PATH 时跳过。
+
+两条都在 `internal/federation/`，与原有 miniredis 用例并存。
+
+### 12FF.2 有意的限制
+
+- 没有模拟真实网络丢包（需要 tc/netem 与 root）；重启覆盖的是连接级失败。
+- Redis 在我们这里只承担 pub/sub（Streaming 中继与投递唤醒），队列本身在 PostgreSQL，
+  所以 AOF/RDB 持久化不承载任何状态，「持久化配置」这项不适用而不是未验证。
+
+### 12FF.3 验证证据
+
+- `CINDERFISH_TEST_REDIS_URL=redis://127.0.0.1:6379/0 go test ./internal/federation/ -run TestRedisWake`
+  全绿（真实 Redis 用例 + 重启用例，总耗时约 1.4 秒）。
+- 未设置 `CINDERFISH_TEST_REDIS_URL` 时前者跳过；没有 `redis-server` 时后者跳过，普通
+  `go test ./...` 不受影响。
