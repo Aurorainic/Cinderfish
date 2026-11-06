@@ -2404,6 +2404,45 @@ cd web && pnpm build                    # exit 0
 - 并发登录、时钟漂移 ±1 步长之外的行为、验证码重放（同一码在有效窗口内可重复使用，与 TOTP 规范一致）。
 - `go test`（含数据库用例）未执行，新增端点尚无自动化用例。
 
+## 12AK. 批次：账号安全操作（2026-11-06）
+
+**工作方式**：目标模式第二十一波，承接第二十波。按用户 2026-11-06 的指示仍然只写代码，
+验证只到编译层。施工依据 `docs/research/2026-11-06-firefish-port-wave21-contract.md`。
+
+### 12AK.1 落地清单
+
+| 层 | 文件 | 说明 |
+|----|------|------|
+| 账号层 | `internal/account/security.go`（新） | `ChangePassword`、`RegenerateToken`、`SigninHistory` |
+| 端点 | `internal/httpapi/security.go`（新）、`server.go` | `i/change-password`、`i/regenerate-token`、`i/signin-history` |
+| 前端类型 | `api/types.ts`、`endpoints.ts` | `SigninHistoryEntry`、三个端点 |
+| 安全设置 | `pages/SettingsSecurity.vue` | 改密表单、令牌重生成并更新本地凭据、登录历史列表与分页 |
+
+### 12AK.2 有意的限制
+
+1. 改密不吊销既有 token，也没有“退出所有设备”。
+2. 无密码强度校验（只要求非空，与 Misskey 一致）。
+3. 登录历史的 `headers` 恒为 `{}`，没有 User-Agent/地理位置。
+4. `i/regenerate-token` 额外返回 `{token}`（Misskey 返回空），便于本移植立即替换本地凭据。
+5. 登录失败限流仍缺。
+
+### 12AK.3 验证证据（编译层）
+
+```
+gofmt -l internal/ cmd/                 # 空
+go vet ./...                            # exit 0
+cd web && pnpm exec vue-tsc --noEmit    # exit 0
+cd web && pnpm run check:port           # hardTotal 0
+cd web && pnpm build                    # exit 0
+```
+
+### 12AK.4 仍未验证
+
+- 改密后旧密码失效、新密码登录成功的端到端流程。
+- 令牌重生成后当前浏览器继续可用、旧令牌 401 的行为。
+- 登录历史的游标分页（第二页）与失败记录展示。
+- `go test` 与浏览器走查未执行，三个端点没有自动化用例。
+
 ## 13. 文档索引
 
 | 文档 | 内容 |
@@ -2450,6 +2489,7 @@ cd web && pnpm build                    # exit 0
 | `docs/research/2026-11-06-firefish-port-wave18-contract.md` | **第十八波施工契约（对象存储只读页与投递队列概览），见 §12AH** |
 | `docs/research/2026-11-06-firefish-port-wave19-contract.md` | **第十九波施工契约（合规链接、serverRules、公共 stats 与关于页），见 §12AI** |
 | `docs/research/2026-11-06-firefish-port-wave20-contract.md` | **第二十波施工契约（TOTP 两步验证、登录协商与安全设置页），见 §12AJ** |
+| `docs/research/2026-11-06-firefish-port-wave21-contract.md` | **第二十一波施工契约（改密、令牌重生成与登录历史），见 §12AK** |
 
 ## 14. 已知的未验证项
 
@@ -2484,6 +2524,8 @@ cd web && pnpm build                    # exit 0
   大表统计耗时未验证。
 - **第二十波未测（2026-11-06，见 §12AJ.4）**：按用户指示本轮只写代码，TOTP 端到端登录（空码/错码/
   正确码）、设置页交互、移动端布局与数据库用例都未执行；`qr` 为空串、安全密钥与备份码按设计未做。
+- **第二十一波未测（2026-11-06，见 §12AK.4）**：改密/令牌重生成/登录历史三个端点没有自动化用例，
+  端到端与分页未走查；`i/*` 缺口从 46 降到 43。
 - **仍未移植的设置页**：邮箱、整合、导入导出、迁移、Webhook、插件、自定义 KaTeX、状态栏、
   删除账号、应用授权以外的账号操作；对应后端端点不存在或前端缺少依赖（见第五波契约 §3.3）。
 - **仍缺的 widgets**：rss、rss-ticker、server-metric、online-users、federation、job-queue、aiscript、

@@ -55,28 +55,91 @@
 
 			<section class="_formBlock">
 				<h2 class="sectionTitle">{{ t("password") }}</h2>
+				<CfInput
+					v-model="currentPassword"
+					class="field"
+					type="password"
+					autocomplete="current-password"
+				>
+					<template #label>{{ t("currentPassword") }}</template>
+				</CfInput>
+				<CfInput
+					v-model="newPassword"
+					class="field"
+					type="password"
+					autocomplete="new-password"
+				>
+					<template #label>{{ t("newPassword") }}</template>
+				</CfInput>
+				<CfInput
+					v-model="newPassword2"
+					class="field"
+					type="password"
+					autocomplete="new-password"
+				>
+					<template #label>{{ t("newPasswordRetype") }}</template>
+				</CfInput>
 				<div class="row">
-					<CfButton primary disabled>
+					<CfButton
+						primary
+						:disabled="passwordBusy || !canChangePassword"
+						@click="changePassword()"
+					>
 						<i class="ph-lock-key ph-bold ph-lg"></i>
 						{{ t("changePassword") }}
 					</CfButton>
-					<CfButton danger disabled>
+				</div>
+				<CfInfo v-if="passwordError != null" warn class="note">
+					{{ passwordError }}
+				</CfInfo>
+				<CfInfo v-if="passwordNotice != null" class="note">
+					{{ passwordNotice }}
+				</CfInfo>
+
+				<h2 class="sectionTitle spaced">{{ t("regenerateLoginToken") }}</h2>
+				<CfInfo class="note">
+					{{ t("regenerateLoginTokenDescription") }}
+					新令牌会替换当前浏览器保存的凭据；其它设备上已保存的旧令牌将立即失效。
+				</CfInfo>
+				<div class="row">
+					<CfButton
+						danger
+						:disabled="passwordBusy || currentPassword === ''"
+						@click="regenerateToken()"
+					>
 						<i class="ph-arrows-clockwise ph-bold ph-lg"></i>
 						{{ t("regenerateLoginToken") }}
 					</CfButton>
 				</div>
-				<CfInfo class="note">
-					修改密码所需的 <code>i/change-password</code>、重新生成令牌所需的
-					<code>i/regenerate-token</code> 在本实例<strong>未提供</strong>，因此两个按钮保持禁用。
-					{{ t("regenerateLoginTokenDescription") }}
+				<CfInfo v-if="freshToken != null" class="note">
+					新令牌：<code class="_monospace">{{ freshToken }}</code>
+					（已保存到本浏览器）
 				</CfInfo>
 			</section>
 
 			<section class="_formBlock">
 				<h2 class="sectionTitle">{{ t("signinHistory") }}</h2>
-				<div class="empty">
-					登录历史端点 <code>i/signin-history</code> <strong>未提供</strong>，没有可显示的记录。
+				<div v-if="historyLoading" class="empty">加载中…</div>
+				<div v-else-if="history.length === 0" class="empty">
+					还没有登录记录。
 				</div>
+				<template v-else>
+					<ul class="history">
+						<li v-for="entry in history" :key="entry.id" class="historyRow">
+							<i
+								class="historyIcon"
+								:class="entry.success ? 'ph-check-circle ph-bold' : 'ph-warning-circle ph-bold'"
+							></i>
+							<code class="_monospace historyIp">{{ entry.ip || "—" }}</code>
+							<CfTime class="historyTime" :time="entry.createdAt" mode="absolute" />
+						</li>
+					</ul>
+					<div v-if="historyMore" class="row">
+						<CfButton :disabled="historyLoading" @click="loadHistory(true)">
+							加载更多
+						</CfButton>
+					</div>
+				</template>
 			</section>
 
 			<section class="_formBlock">
@@ -191,9 +254,13 @@
 // implements the TOTP half; password change, signin history and token
 // regeneration have no endpoint yet and stay marked as unavailable instead of
 // rendering dead buttons.
-import { onMounted, ref } from "vue";
-import { me, updateMe } from "@/account";
-import type { MeDetailed, TwoFactorRegistration } from "@/api/types";
+import { computed, onMounted, ref } from "vue";
+import { addStoredAccount, me, updateMe } from "@/account";
+import type {
+	MeDetailed,
+	SigninHistoryEntry,
+	TwoFactorRegistration,
+} from "@/api/types";
 import { api } from "@/api/client";
 import CfButton from "@/components/ui/CfButton.vue";
 import CfInfo from "@/components/ui/CfInfo.vue";
@@ -216,6 +283,25 @@ const confirmingDisable = ref(false);
 const busy = ref(false);
 const twoFactorError = ref<string | null>(null);
 
+const currentPassword = ref("");
+const newPassword = ref("");
+const newPassword2 = ref("");
+const passwordBusy = ref(false);
+const passwordError = ref<string | null>(null);
+const passwordNotice = ref<string | null>(null);
+const freshToken = ref<string | null>(null);
+
+const history = ref<SigninHistoryEntry[]>([]);
+const historyLoading = ref(false);
+const historyMore = ref(false);
+
+const canChangePassword = computed(
+	() =>
+		currentPassword.value !== "" &&
+		newPassword.value !== "" &&
+		newPassword.value === newPassword2.value,
+);
+
 async function load(): Promise<void> {
 	loading.value = true;
 	errorText.value = null;
@@ -236,6 +322,78 @@ function describeTwoFactorError(error: unknown, fallback: string): string {
 	return error instanceof Error && error.message !== ""
 		? error.message
 		: fallback;
+}
+
+async function changePassword(): Promise<void> {
+	if (passwordBusy.value) return;
+	passwordError.value = null;
+	passwordNotice.value = null;
+	if (newPassword.value !== newPassword2.value) {
+		passwordError.value = "两次输入的新密码不一致。";
+		return;
+	}
+	passwordBusy.value = true;
+	try {
+		await api("i/change-password", {
+			currentPassword: currentPassword.value,
+			newPassword: newPassword.value,
+		});
+		currentPassword.value = "";
+		newPassword.value = "";
+		newPassword2.value = "";
+		passwordNotice.value = "密码已更新。其它设备上的会话不受影响。";
+	} catch (error) {
+		passwordError.value = describeTwoFactorError(
+			error,
+			"无法修改密码，请检查当前密码。",
+		);
+	} finally {
+		passwordBusy.value = false;
+	}
+}
+
+async function regenerateToken(): Promise<void> {
+	if (passwordBusy.value) return;
+	passwordError.value = null;
+	passwordNotice.value = null;
+	freshToken.value = null;
+	passwordBusy.value = true;
+	try {
+		const result = await api("i/regenerate-token", {
+			password: currentPassword.value,
+		});
+		freshToken.value = result.token;
+		updateMe({ token: result.token });
+		if (me.value != null) {
+			addStoredAccount({ id: me.value.id, token: result.token });
+		}
+		currentPassword.value = "";
+	} catch (error) {
+		passwordError.value = describeTwoFactorError(
+			error,
+			"无法重新生成令牌，请检查当前密码。",
+		);
+	} finally {
+		passwordBusy.value = false;
+	}
+}
+
+async function loadHistory(more = false): Promise<void> {
+	if (historyLoading.value) return;
+	historyLoading.value = true;
+	try {
+		const last = more ? history.value[history.value.length - 1] : undefined;
+		const rows = await api("i/signin-history", {
+			limit: 10,
+			...(last != null ? { untilId: last.id } : {}),
+		});
+		history.value = more ? [...history.value, ...rows] : rows;
+		historyMore.value = rows.length === 10;
+	} catch {
+		historyMore.value = false;
+	} finally {
+		historyLoading.value = false;
+	}
 }
 
 async function startRegistration(): Promise<void> {
@@ -309,6 +467,7 @@ function cancelDisable(): void {
 
 onMounted(() => {
 	void load();
+	void loadHistory();
 });
 
 definePageMetadata({ title: t("security"), icon: "ph-lock ph-bold ph-lg" });
@@ -367,6 +526,49 @@ definePageMetadata({ title: t("security"), icon: "ph-lock ph-bold ph-lg" });
 
 	.field {
 		margin-block-start: 12px;
+	}
+
+	.spaced {
+		margin-block-start: 24px;
+	}
+
+	.history {
+		margin: 8px 0 0;
+		padding: 0;
+		list-style: none;
+	}
+
+	.historyRow {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		padding: 8px 0;
+
+		&:not(:last-child) {
+			border-bottom: 1px solid var(--divider);
+		}
+	}
+
+	.historyIcon {
+		flex: none;
+		color: var(--success);
+
+		&.ph-warning-circle {
+			color: var(--error);
+		}
+	}
+
+	.historyIp {
+		flex: 1;
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.historyTime {
+		margin-inline-start: auto;
+		opacity: 0.7;
 	}
 
 	.secret,

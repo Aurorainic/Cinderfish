@@ -39,6 +39,7 @@ import type {
 	ObjectStorageInfo,
 	PingResponse,
 	RegistryDetail,
+	SigninHistoryEntry,
 	SigninStep,
 	SignupResponse,
 	TableStat,
@@ -64,6 +65,9 @@ export const ENDPOINTS = {
 	iTwoFactorDone: "i/2fa/done",
 	iTwoFactorUnregister: "i/2fa/unregister",
 	iTwoFactorPasswordLess: "i/2fa/password-less",
+	iChangePassword: "i/change-password",
+	iRegenerateToken: "i/regenerate-token",
+	iSigninHistory: "i/signin-history",
 	iApps: "i/apps",
 	iExport: "i/export",
 	iWebhooksCreate: "i/webhooks/create",
@@ -474,6 +478,18 @@ export interface EndpointMap {
 	[ENDPOINTS.iTwoFactorPasswordLess]: {
 		req: { value: boolean };
 		res: Record<string, never>;
+	};
+	[ENDPOINTS.iChangePassword]: {
+		req: { currentPassword: string; newPassword: string };
+		res: Record<string, never>;
+	};
+	[ENDPOINTS.iRegenerateToken]: {
+		req: { password: string };
+		res: { token: string };
+	};
+	[ENDPOINTS.iSigninHistory]: {
+		req: { limit?: number; sinceId?: string; untilId?: string };
+		res: SigninHistoryEntry[];
 	};
 	[ENDPOINTS.miAuthGenToken]: {
 		req: MiAuthGenTokenParams;

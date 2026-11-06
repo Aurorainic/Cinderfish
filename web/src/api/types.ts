@@ -385,6 +385,15 @@ export interface TwoFactorRegistration {
 	issuer: string;
 }
 
+/** One row of `i/signin-history`. */
+export interface SigninHistoryEntry {
+	id: string;
+	createdAt: string;
+	ip: string;
+	headers: Record<string, unknown>;
+	success: boolean;
+}
+
 export interface MiAuthTokenResponse {
 	token: string;
 }
