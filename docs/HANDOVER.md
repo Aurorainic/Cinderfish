@@ -3581,8 +3581,8 @@ cd web && pnpm build                                           # exit 0
 
 ### 12BK.5 仍未验证
 
-- 远程关注者的锁推路径（入站 Follow 被转成请求）只由 `internal/federation` 的既有用例覆盖，
-  没有第二实例的端到端走查。
+- 远程关注者的锁推路径：2026-11-07 已用 `TestLockedFollowAcrossInstances` 做双实例端到端
+  （入站 Follow → 请求 → API 接受 → 出站 Accept → 对端落库），见 §12CN。
 - 「已发出」页的取消（`requests/cancel`）没有验证关注者一侧的回执。
 - 隐私页其余六个开关的界面回读（本次只操作了锁推开关）。
 
@@ -5023,3 +5023,34 @@ CINDERFISH_TEST_DATABASE_URL=... go test ./... -count=1         # 全绿
 - 投递失败后的重试窗口（队列 `attempts < 12`）尚未构造真实失败。
 - 引用转帖（quote）到远端帖的对端渲染没有单独走查。
 - 回帖通知的 Streaming 推送仍只有单元断言覆盖。
+
+## 12CN. 第七十五波：锁推的跨实例关注请求（2026-11-07）
+
+`TestLockedFollowRequestFlow` 只覆盖本地账号之间的锁推，远程关注者的入站路径此前没有
+端到端用例。
+
+### 12CN.1 用例
+
+`internal/httpapi/two_instance_locked_follow_test.go` 的 `TestLockedFollowAcrossInstances`：
+
+1. alpha 的 alice 打开锁推；
+2. beta 的 bob 发送**签名 Follow**到 alpha 的 `/inbox`；
+3. alpha 返回 `ok: follow request queued`：`following/requests/list` 出现 bob，
+   `users/followers` 仍为空；
+4. alice 通过 `following/requests/accept` 批准；
+5. alpha 的投递 worker 发出 Accept（`deliver_queue` 有已投递行），beta 的 inbox 接受；
+6. beta 的 `followings` 出现 bob→alice 的远端副本，`users/following` 也能读到。
+
+### 12CN.2 验证证据
+
+```
+gofmt -l internal/ cmd/                                        # 空
+go vet ./...                                                   # exit 0
+CINDERFISH_TEST_DATABASE_URL=... go test ./... -count=1         # 全绿
+```
+
+### 12CN.3 仍未验证
+
+- 拒绝（Reject）的跨实例回执（队列断言已有，对端处理没有单独用例）。
+- alpha 在批准前重启，待审请求与通知是否保留（数据库持久，理论上保留）。
+- 远端关注者的通知邮件（`receiveFollowRequest`）在锁推 + 邮件订阅组合下未实测。
