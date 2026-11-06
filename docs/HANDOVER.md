@@ -3339,6 +3339,45 @@ cd web && pnpm build                    # exit 0
 - 上传者已删除账号时的 `user: null` 分支。
 - `go test` 与浏览器走查未执行。
 
+## 12BJ. 批次：缩略图管道（2026-11-06）
+
+**工作方式**：目标模式第四十六波，继续只写代码、验证到编译层。施工依据
+`docs/research/2026-11-06-firefish-port-wave46-contract.md`。
+
+### 12BJ.1 落地清单
+
+| 层 | 文件 | 说明 |
+|----|------|------|
+| 生成 | `internal/media/thumbnail.go` | 箱式滤波降采样（≤512px）、解码前限 4000 万像素、JPEG q82 / PNG |
+| 存储 | `internal/media/drive.go` | `storeThumbnail`（尽力而为）、`thumbnailURL`、`Delete` 顺带删缩略图 |
+| 下发 | `internal/httpapi/drive.go` | `packDriveFile` 的 `thumbnailUrl`；`/media` 按扩展名给 Content-Type |
+| 前端 | `api/types.ts`、`MkDriveFileThumbnail.vue`、`MkMedia.vue`、`UserPhotos.vue` | 优先用缩略图，回退原图 |
+| 文档 | `drive-media.md` | `thumbnailUrl` 语义与限制更新 |
+
+### 12BJ.2 有意的限制
+
+1. 没有 WebP（Go 标准库无编码器）。
+2. 没有 `properties` 宽高与 `blurhash`。
+3. 历史文件不补生成缩略图。
+4. 未加测试。
+
+### 12BJ.3 验证证据（编译层）
+
+```
+gofmt -l internal/ cmd/                 # 空
+go vet ./...                            # exit 0
+cd web && pnpm exec vue-tsc --noEmit    # exit 0
+cd web && pnpm run check:port           # hardTotal 0（400 文件）
+cd web && pnpm build                    # exit 0
+```
+
+### 12BJ.4 仍未验证
+
+- 真实图片上传后的缩略图尺寸、体积与透明保留。
+- 非图片、损坏图片、超大像素图三条跳过/失败分支。
+- 删除文件时缩略图对象是否真的消失。
+- `go test` 与浏览器走查未执行。
+
 ## 13. 文档索引
 
 | 文档 | 内容 |
@@ -3410,6 +3449,7 @@ cd web && pnpm build                    # exit 0
 | `docs/research/2026-11-06-firefish-port-wave43-contract.md` | **第四十三波施工契约（四个兼容端点），见 §12BG** |
 | `docs/research/2026-11-06-firefish-port-wave44-contract.md` | **第四十四波施工契约（实例 CSS 与邮件设置页），见 §12BH** |
 | `docs/research/2026-11-06-firefish-port-wave45-contract.md` | **第四十五波施工契约（管理台文件详情），见 §12BI** |
+| `docs/research/2026-11-06-firefish-port-wave46-contract.md` | **第四十六波施工契约（缩略图管道），见 §12BJ** |
 
 ## 14. 已知的未验证项
 
@@ -3474,6 +3514,7 @@ cd web && pnpm build                    # exit 0
 - **第四十三波未测（2026-11-06，见 §12BG.4）**：四个兼容端点与账号信息页只有编译层证据。
 - **第四十四波未测（2026-11-06，见 §12BH.4）**：实例 CSS 链路与邮件状态页只有编译层证据。
 - **第四十五波未测（2026-11-06，见 §12BI.4）**：文件详情的四类预览与 `user: null` 分支未走查。
+- **第四十六波未测（2026-11-06，见 §12BJ.4）**：缩略图生成与删除只有编译层证据。
 - **仍未移植的设置页**：邮箱、整合、导入导出、迁移、Webhook、插件、自定义 KaTeX、状态栏、
   删除账号、应用授权以外的账号操作；对应后端端点不存在或前端缺少依赖（见第五波契约 §3.3）。
 - **仍缺的 widgets**：rss、rss-ticker、server-metric、online-users、federation、job-queue、aiscript、
@@ -3492,7 +3533,7 @@ cd web && pnpm build                    # exit 0
 - **i18n 只覆盖 zh-CN / ja-JP**，其余 37 个 locale 未生成；`yaml` devDependency 未装
   （重新生成 locale 前要先 `pnpm add -D yaml`）。
 - **S3 后端未做真实服务端验证**：只验证了编译、接口与 URL 生成逻辑。
-- **缩略图/WebP 生成未实现**：`drive_files.thumbnail_key` 字段已留，图片处理管道还没写。
+- ~~**缩略图/WebP 生成未实现**~~：第四十六波实现了缩略图（≤512px，JPEG/PNG）；WebP 仍未做。
 - **前端没有真实第三方客户端联调**：页面已在构建产物上用浏览器走查，但没有用 misskey-js 或 Misskey Web 前端连过本实例。
 - **Redis 只对 miniredis 验证过**：本机没有 `redis-server`，跨进程中继的单元测试与双进程 smoke 都用 miniredis；没有对真实 Redis 做过持久化/认证/网络闪断验证。
 - **Streaming 未做真实 Misskey 客户端联调**：已用自写 WebSocket 客户端验证（握手、`connect`、`connected`、笔记投递全部通过），但**没有**用 misskey-js 或 Misskey Web 前端实际连过。

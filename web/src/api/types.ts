@@ -133,7 +133,8 @@ export interface DriveFile {
 	size: number;
 	isSensitive: boolean;
 	url: string;
-	thumbnailUrl: null;
+	/** Preview URL; null when the file is not an image or has no thumbnail. */
+	thumbnailUrl: string | null;
 	webpublicUrl: null;
 	comment: string | null;
 	folderId: string | null;

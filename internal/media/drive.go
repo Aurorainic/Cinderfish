@@ -1,12 +1,14 @@
 package media
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"mime"
 	"os"
 	"path"
@@ -33,6 +35,7 @@ type File struct {
 	StorageKey     string
 	StorageBackend string
 	ThumbnailKey   *string
+	ThumbnailURL   string
 	IsSensitive    bool
 	FolderID       *string
 	Comment        string
@@ -119,13 +122,71 @@ func (s *DriveService) Save(ctx context.Context, userID, name string, r io.Reade
 		URL:            url,
 	}
 
+	// A thumbnail is best effort: an image that fails to decode is still a
+	// valid upload, it just has no preview.
+	if err := s.storeThumbnail(ctx, tmp, f); err != nil {
+		log.Printf("media: thumbnail for %s: %v", f.ID, err)
+	}
+
 	if _, err := s.pool.Exec(ctx, `
-INSERT INTO drive_files (id, user_id, name, content_type, size, md5, storage_key, storage_backend, folder_id)
-VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
-`, f.ID, f.UserID, f.Name, f.ContentType, f.Size, f.MD5, f.StorageKey, f.StorageBackend, f.FolderID); err != nil {
+INSERT INTO drive_files (id, user_id, name, content_type, size, md5, storage_key, storage_backend, thumbnail_key, folder_id)
+VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+`, f.ID, f.UserID, f.Name, f.ContentType, f.Size, f.MD5, f.StorageKey, f.StorageBackend, f.ThumbnailKey, f.FolderID); err != nil {
 		return nil, fmt.Errorf("media: insert file: %w", err)
 	}
 	return f, nil
+}
+
+// storeThumbnail renders and stores a preview for image uploads, filling the
+// file's thumbnail fields. src must be rewound by the caller before the call;
+// it is left at the end afterwards.
+func (s *DriveService) storeThumbnail(ctx context.Context, src io.ReadSeeker, f *File) error {
+	if !CanThumbnail(f.ContentType) {
+		return nil
+	}
+	if _, err := src.Seek(0, io.SeekStart); err != nil {
+		return fmt.Errorf("media: rewind for thumbnail: %w", err)
+	}
+	// Reading at most the upload limit bounds memory: Save already refused
+	// anything larger.
+	data, err := io.ReadAll(io.LimitReader(src, s.maxSize))
+	if err != nil {
+		return fmt.Errorf("media: read for thumbnail: %w", err)
+	}
+	thumb, ext, err := GenerateThumbnail(data, f.ContentType)
+	if err != nil {
+		return err
+	}
+	if thumb == nil {
+		return nil
+	}
+	thumbKey := ThumbnailKeyFor(f.StorageKey, ext)
+	thumbURL, err := s.storage.Put(ctx, thumbKey, bytes.NewReader(thumb), int64(len(thumb)),
+		thumbnailContentType(ext))
+	if err != nil {
+		return err
+	}
+	key := thumbKey
+	f.ThumbnailKey = &key
+	f.ThumbnailURL = thumbURL
+	return nil
+}
+
+// thumbnailURL resolves the stored thumbnail key to a URL, or empty when the
+// file has none.
+func (s *DriveService) thumbnailURL(f *File) string {
+	if f.ThumbnailKey == nil || *f.ThumbnailKey == "" {
+		return ""
+	}
+	return s.storage.URL(*f.ThumbnailKey)
+}
+
+// thumbnailContentType maps the thumbnail extension back to a media type.
+func thumbnailContentType(ext string) string {
+	if ext == ".png" {
+		return "image/png"
+	}
+	return "image/jpeg"
 }
 
 // Get loads a file's metadata.
@@ -146,6 +207,7 @@ FROM drive_files WHERE id = $1
 		return nil, fmt.Errorf("media: scan file: %w", err)
 	}
 	f.URL = s.storage.URL(f.StorageKey)
+	f.ThumbnailURL = s.thumbnailURL(&f)
 	return &f, nil
 }
 
@@ -173,6 +235,7 @@ FROM drive_files WHERE id = ANY($1)
 			return nil, fmt.Errorf("media: scan file list: %w", err)
 		}
 		f.URL = s.storage.URL(f.StorageKey)
+		f.ThumbnailURL = s.thumbnailURL(&f)
 		out = append(out, &f)
 	}
 	return out, rows.Err()
@@ -222,6 +285,7 @@ FROM drive_files WHERE user_id = $1`
 			return nil, fmt.Errorf("media: scan file list: %w", err)
 		}
 		f.URL = s.storage.URL(f.StorageKey)
+		f.ThumbnailURL = s.thumbnailURL(&f)
 		out = append(out, &f)
 	}
 	return out, rows.Err()
@@ -238,6 +302,13 @@ func (s *DriveService) Delete(ctx context.Context, id, userID string) error {
 	}
 	if _, err := s.pool.Exec(ctx, `DELETE FROM drive_files WHERE id = $1`, id); err != nil {
 		return fmt.Errorf("media: delete file row: %w", err)
+	}
+	if f.ThumbnailKey != nil && *f.ThumbnailKey != "" {
+		// A leftover thumbnail is harmless but it keeps the bytes billed, so
+		// remove it too; a failure here must not fail the delete.
+		if err := s.storage.Delete(ctx, *f.ThumbnailKey); err != nil {
+			log.Printf("media: delete thumbnail %s: %v", *f.ThumbnailKey, err)
+		}
 	}
 	if err := s.storage.Delete(ctx, f.StorageKey); err != nil {
 		return err

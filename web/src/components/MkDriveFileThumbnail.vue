@@ -4,7 +4,7 @@
 		<img
 			v-if="is === 'image'"
 			class="image"
-			:src="file.url"
+			:src="file.thumbnailUrl ?? file.url"
 			:alt="file.name"
 			:title="file.name"
 			:style="{ objectFit: fit === 'contain' ? 'contain' : 'cover' }"
@@ -32,9 +32,9 @@
 </template>
 
 <script lang="ts" setup>
-// Wave-2 degradation (contract §5): the backend never produces thumbnails, so
-// `thumbnailUrl`/`blurhash` are always null. Images are decoded from `url`
-// directly instead of going through MkImgWithBlurhash; the video badge and the
+// Images load `thumbnailUrl` when the server generated one (wave 46) and fall
+// back to the original `url` otherwise. `blurhash` is still always null, so
+// there is no placeholder to show while loading; the video badge and the
 // per-type icons are unchanged from upstream.
 import { computed } from "vue";
 import type { DriveFile } from "@/api/types";

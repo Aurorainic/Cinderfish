@@ -28,7 +28,7 @@
 			>
 				<ImgWithBlurhash
 					:hash="media.blurhash"
-					:src="url"
+					:src="displayUrl"
 					:alt="media.comment ?? ''"
 					:type="media.type"
 					:cover="false"
@@ -80,12 +80,12 @@ import ImgWithBlurhash from "@/components/MkImgWithBlurhash.vue";
 /**
  * Ported from Firefish. Degradations, all forced by the Cinderfish API contract:
  *   - vue-plyr is not installed: videos use a native video controls element;
- *   - thumbnailUrl is always null, so there is no poster and no still-frame
- *     fallback for animated images (getStaticImageUrl returns the raw URL);
+ *   - there is no still-frame fallback for animated images (getStaticImageUrl
+ *     returns the raw URL), though images do load the server thumbnail;
  *   - PhotoSwipe is not installed: the image links to the file in a new tab.
  *
- * The raw prop keeps its Firefish shape but has no effect: it only chose
- * between url and thumbnailUrl, and thumbnailUrl is always null.
+ * The raw prop keeps its Firefish shape but has no effect: the thumbnail is
+ * always preferred for display and the link always opens the original.
  */
 const props = defineProps<{
 	media: DriveFile;
@@ -96,6 +96,11 @@ const hide = ref(true);
 
 /** Cinderfish serves local files from a root-relative /media/... path. */
 const url = computed(() => resolveMediaUrl(props.media.url));
+// The image and the poster use the server's thumbnail when it exists; the
+// full-size file is still what the link opens.
+const displayUrl = computed(() =>
+	resolveMediaUrl(props.media.thumbnailUrl ?? props.media.url),
+);
 
 const mediaType = computed(() =>
 	props.media.type === "video/quicktime" ? "video/mp4" : props.media.type,

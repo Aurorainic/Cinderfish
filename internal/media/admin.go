@@ -86,6 +86,7 @@ FROM drive_files f JOIN users u ON u.id = f.user_id`
 			return nil, fmt.Errorf("media: scan admin file list: %w", err)
 		}
 		f.URL = s.storage.URL(f.StorageKey)
+		f.ThumbnailURL = s.thumbnailURL(&f)
 		out = append(out, &f)
 	}
 	return out, rows.Err()

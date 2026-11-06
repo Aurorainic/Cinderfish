@@ -150,11 +150,11 @@ token（查 `users.token`），其余查 `access_tokens`（miAuth / OAuth 签发
 | `name` | string | 文件名 | 已去路径成分；缺省回退 `"file"` |
 | `type` | string | MIME | 数据库列 `content_type` |
 | `size` | number | 字节数 | `int64`，上限 20 MiB |
-| `isSensitive` | boolean | **恒 `false`** | 上传接口不接受 `isSensitive`，库列从未被写入 |
+| `isSensitive` | boolean | 上传时为 `false`，可由 `drive/files/update` 设置 | — |
 | `url` | string | `"/media/ab/cd/<sha256>"` 或 S3 公网 URL | 本地后端是**相对路径**，前端需拼 origin |
-| `thumbnailUrl` | null | **恒 null** | 没有缩略图生成 |
+| `thumbnailUrl` | string \| null | 缩略图 URL；非图片或解码失败时为 `null` | 第四十六波起：≤512px 的 JPEG/PNG 预览 |
 | `webpublicUrl` | null | **恒 null** | 没有 webp 处理 |
-| `comment` | null | **恒 null** | 上传接口不接受 `comment` |
+| `comment` | string \| null | 说明文字 | 上传时为 `null`，`drive/files/update` 可写 |
 | `folderId` | string \| null | 所属文件夹 | 根目录为 `null` |
 | `blurhash` | null | **恒 null** | 未计算 |
 
@@ -285,7 +285,8 @@ Cinderfish 没有实例配额，`capacity` 恒为 `0`，客户端应读作“无
 
 要点与差异：
 
-- **返回的文件 `isSensitive` 恒 `false`**，`comment`/`thumbnailUrl`/`webpublicUrl`/`blurhash` 恒 `null`。
+- 上传返回的 `isSensitive` 为 `false`、`comment` 为 `null`（这两项由 `drive/files/update` 设置）；
+  `webpublicUrl`/`blurhash` 仍恒 `null`；`thumbnailUrl` 自第四十六波起对图片有值。
 - 没有配额（`NO_FREE_SPACE`）、没有内容审核（`INAPPROPRIATE`）、没有 `force` 语义。
 - **去重是双向的**：同内容共享一个对象；`drive/files/delete` 删任一行都会删掉共享对象，导致另一行
   （可能属于别的用户）的 `url` 变成 404。这一点与 Misskey 的“引用计数 + force 强制新副本”不同，
@@ -595,7 +596,8 @@ Cinderfish 没有实例配额，`capacity` 恒为 `0`，客户端应读作“无
   `DriveFile.url` 通常直接指向 bucket，并不会走这条路由，两条路径的可用性需要分别验证。
 - 越权/穿越已防护：`LocalStorage.path` 用 `filepath.Clean("/"+key)` 归一化并拒绝逃出根目录
   （`internal/media/local.go:82`）；key 是内容哈希，不可枚举。
-- 没有尺寸变换（无缩略图 / 无 webp），也没有防盗链。
+- 缩略图由第四十六波的箱式滤波降采样生成（最长边 512，JPEG q82 / PNG 保留透明），没有 WebP，
+  也没有防盗链。
 - `/media` 前缀被显式排除在 SPA 兜底之外（`internal/httpapi/web.go:47`），不会被前端路由吞掉。
 - 引用：`internal/httpapi/drive.go:215`–`246`；`internal/media/local.go:57`、`:77`、`:82`。
 
@@ -605,8 +607,9 @@ Cinderfish 没有实例配额，`capacity` 恒为 `0`，客户端应读作“无
 
 ### 云盘文件
 
-1. **没有缩略图 / webpublic**：`thumbnailUrl`、`webpublicUrl`、`blurhash` 恒 `null`，`thumbnail_key`
-   列从未被写入。前端只能用 `url` 原图做网格，注意流量。
+1. **有缩略图，但没有 webpublic / blurhash**：`thumbnailUrl` 自第四十六波起对图片文件有值
+   （`thumbnail_key` 列被写入，≤512px），`webpublicUrl`、`blurhash` 仍恒 `null`。前端网格应优先用
+   `thumbnailUrl`，回退 `url`。
 2. **没有 `md5` / `properties`**：`DriveFile` 缺这两个字段（`properties.width/height` 常被前端用于
    占位防抖动，这里拿不到，需要在 `<img>` `load` 后自行测量）。另外库列名叫 `md5`，实际存的是
    **SHA-256** 摘要（`internal/media/drive.go:95`），即便将来输出也不是真 MD5。

@@ -3,7 +3,9 @@ package httpapi
 import (
 	"errors"
 	"io"
+	"mime"
 	"net/http"
+	"path"
 
 	"github.com/Aurorainic/cinderfish/internal/media"
 )
@@ -311,7 +313,10 @@ func (s *Server) handleMediaServe(w http.ResponseWriter, r *http.Request) {
 	}
 	defer rc.Close()
 
-	w.Header().Set("Content-Type", "application/octet-stream")
+	// Thumbnails and uploads are keyed by hash, so the type comes from the
+	// extension the storage key carries (".jpg", ".png", …); anything unknown
+	// stays octet-stream and the browser sniffs it.
+	w.Header().Set("Content-Type", mediaContentType(key))
 	w.WriteHeader(http.StatusOK)
 	_, _ = io.Copy(w, rc)
 }
@@ -326,10 +331,20 @@ func packDriveFile(f *media.File) map[string]any {
 		"size":         f.Size,
 		"isSensitive":  f.IsSensitive,
 		"url":          f.URL,
-		"thumbnailUrl": nil,
+		"thumbnailUrl": nilIfEmpty(f.ThumbnailURL),
 		"webpublicUrl": nil,
 		"comment":      nilIfEmpty(f.Comment),
 		"folderId":     f.FolderID,
 		"blurhash":     nil,
 	}
+}
+
+// mediaContentType maps a storage key's extension to a content type.
+func mediaContentType(key string) string {
+	if ext := path.Ext(key); ext != "" {
+		if ct := mime.TypeByExtension(ext); ct != "" {
+			return ct
+		}
+	}
+	return "application/octet-stream"
 }

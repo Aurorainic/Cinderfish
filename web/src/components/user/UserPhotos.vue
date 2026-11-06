@@ -25,7 +25,11 @@
 						:to="notePage(image.note)"
 					>
 						<img
-							:src="resolveMediaUrl(image.file.url)"
+							:src="
+								resolveMediaUrl(
+									image.file.thumbnailUrl ?? image.file.url,
+								)
+							"
 							:title="image.file.name"
 							:alt="image.file.name"
 							loading="lazy"
@@ -41,8 +45,9 @@
 // Degradations versus Firefish:
 //   * `users/notes` has no `fileType` filter, so every note with attachments is
 //     fetched (`withFiles: true`) and the images are picked client-side;
-//   * `thumbnailUrl` and `blurhash` are always null (no thumbnailing), so the
-//     original `url` is shown instead of MkImgWithBlurhash;
+//   * `blurhash` is always null, so the grid shows the server thumbnail
+//     (`thumbnailUrl`, wave 46) with the original as fallback rather than
+//     MkImgWithBlurhash;
 //   * `excludeNsfw` does not exist; sensitive files are hidden locally unless
 //     the reader opted into seeing them (`defaultStore.state.nsfw`).
 //
