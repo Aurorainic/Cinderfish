@@ -4571,7 +4571,8 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
 - **第五十九波部分补验证（2026-11-07 对账 §12CC）**：`/admin/abuses` 的举报者、被举报者、内容与
   「标记已处理」按钮已走查。仍未验证的：远端举报没有对真实实例验证；重复举报与笔记级目标的展示。
 - **第六十波部分补验证（2026-11-07 对账 §12CB）**：三个说明页与 `SignupComplete` 的结构与文案
-  已走查。仍未验证的：「24 个占位页全部在范围外」未经逐页复核。
+  已走查。「24 个占位页全部在范围外」已于 2026-11-07 逐页复核（§12CZ）：25 个含 `TODO: port`
+  的文件中，`SettingsIndex.vue` 只是注释，其余 24 个全部属于首版范围外功能。
 - **第六十一波已补验证（2026-11-07，见 §12CB/§12CF）**：`/tags/<tag>` 的「被 N 人提到」与笔记列表
   已走查；`hashtags/list` 的 12 个排序枚举全部有用例。仍未验证的：大表聚合耗时。
 - **第六十二波仍未验证**：两个端点没有前端调用方，没有对应走查。
@@ -5341,3 +5342,31 @@ CINDERFISH_TEST_DATABASE_URL=... go test ./... -count=1         # 全绿
 ```
 
 仍未验证：真实网络抖动下多轮退避的总时长、进程重启后未到期行的恢复（表持久，理论成立）。
+
+## 12CZ. 第八十七波：占位页逐页复核（2026-11-07）
+
+第六十波声称「24 个占位页全部在范围外」，此前没有逐页核对。本轮用静态搜索复核：
+
+- `grep -rl "TODO: port" web/src/pages` 命中 **25** 个文件；其中 `SettingsIndex.vue` 只在注释里
+  提到该标记，不是占位页。
+- 其余 24 个全部是首版范围外功能，且都有（或曾有）路由，直接访问会显示占位说明：
+
+| 范围 | 文件 |
+|------|------|
+| 聊天 | `MessagingIndex`、`MessagingRoom` |
+| 频道 | `Channel`、`ChannelEditor`、`Channels` |
+| 天线 | `AntennaTimeline`、`MyAntennasCreate/Edit/Index` |
+| 列表 | `MyListsIndex`、`MyListsList`、`UserListTimeline` |
+| 剪辑 | `Clip`、`MyClips`、`MyClipsIndex` |
+| 分组 | `MyGroupsGroup`、`MyGroupsIndex` |
+| 画廊 | `GalleryIndex`、`GalleryEdit`、`GalleryPost` |
+| 页面 | `Page`、`PageEditor`、`Pages` |
+| 中继 | `AdminRelays`（AGENTS.md 明确中继首版不做） |
+
+发现一处死代码：`MyClipsIndex.vue` 没有对应的 `page("MyClipsIndex")` 路由；文件保留（属于
+前端 port workflow 的边界），不影响导航。
+
+导航菜单 `menuOptions` 仍然列出 `messaging`/`channels`，但侧栏按可用页面过滤，实测截图里没有
+这两项（§12CB 的走查）。
+
+仍未验证：移动端断点下占位页的排版（不在首版范围，风险低）。
