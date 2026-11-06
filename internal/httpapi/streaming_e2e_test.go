@@ -30,6 +30,8 @@ func newStreamingServer(t *testing.T, mode string) *httptest.Server {
 		Media: config.Media{Backend: "local"},
 	}
 	srv := httpapi.NewServerWithDB(cfg, pool)
+	// The binary always attaches the federation surface; following/* needs it.
+	srv.AttachFederation()
 	storage, err := media.NewLocalStorage(t.TempDir(), "/media")
 	if err != nil {
 		t.Fatalf("local storage: %v", err)

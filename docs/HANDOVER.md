@@ -4552,8 +4552,9 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
   仍未验证的：真实第三方客户端没跑过这条授权流程（`app/show` 的 secret 所有者分支已在 §12CK 补用例）。
 - **第五十六波已补验证（2026-11-07，见 §12CC/§12CF）**：「移除关注者」菜单、确认框与行删除已走查；
   `following/list` 与 `users/following|followers` 的 `sinceDate`/`untilDate` 已实现并有用例。
-- **第五十七波部分补验证（2026-11-07 对账 §12CB）**：`follow` 与 `note` 两类通知在通知页渲染已走查。
-  仍未验证的：远端导入触发通知无双实例用例；`homeTimeline` 的 WS 过滤只有单元断言。
+- **第五十七波部分补验证（2026-11-07，见 §12CB/§12CL）**：`follow` 与 `note` 两类通知在通知页渲染
+  已走查；`homeTimeline` 的 withReplies 过滤新增了真实 WebSocket 端到端用例。仍未验证的：
+  远端导入触发通知的双实例用例。
 - **第五十八波仍未验证**：没有对真实 Misskey/Firefish 验证 `EmojiReact`；远端自定义表情未解析；
   `Question` 入站已在第六十六波补上（§12CE）；远端自定义表情已在第七十一波解析并渲染（§12CJ）；
   仍未验证真实异种软件互投。
@@ -4958,3 +4959,32 @@ CINDERFISH_TEST_DATABASE_URL=... go test ./... -count=1         # 全绿
 
 - 真实第三方客户端（Misskey Web、misskey-js 之外的实现）跑完整 OAuth 登录。
 - `includeSecret` 在通过 access token（而非原生 token）调用时的行为只用代码阅读确认。
+
+## 12CL. 第七十三波：homeTimeline 的 withReplies 端到端用例（2026-11-07）
+
+`internal/streaming/channel_test.go` 只对过滤器做了单元断言；这一轮用真实 WebSocket +
+真实关注行验证发布侧与订阅侧接在一起时的行为。
+
+### 12CL.1 落地
+
+- `internal/httpapi/streaming_home_filter_test.go` 的
+  `TestStreamingHomeTimelineRespectsWithReplies`：
+  1. bob 关注 alice，并通过 `following/update` 把 `withReplies` 设为 false；
+  2. bob 用 `homeTimeline` 连接 Streaming；
+  3. alice 先回复 carol，再发一条普通笔记；
+  4. 第一个到达的 note 事件必须是普通笔记——事件在 bus 上保序，若回复未被过滤会先到。
+- `newStreamingServer` 补 `AttachFederation()`：`following/create` 依赖 federation store，
+  之前的 streaming 测试没有关注操作所以没暴露。
+
+### 12CL.2 验证证据
+
+```
+gofmt -l internal/ cmd/                                        # 空
+go vet ./...                                                   # exit 0
+CINDERFISH_TEST_DATABASE_URL=... go test ./... -count=1         # 全绿
+```
+
+### 12CL.3 仍未验证
+
+- 连接建立后再修改 withReplies 是否立即生效（当前在连接时取快照）。
+- renote 与 withFiles 组合、mute/block 过滤的端到端。
