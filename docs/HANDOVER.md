@@ -2443,6 +2443,46 @@ cd web && pnpm build                    # exit 0
 - 登录历史的游标分页（第二页）与失败记录展示。
 - `go test` 与浏览器走查未执行，三个端点没有自动化用例。
 
+## 12AL. 批次：资料扩展字段（2026-11-06）
+
+**工作方式**：目标模式第二十二波。继续按用户指示只写代码，验证到编译层。施工依据
+`docs/research/2026-11-06-firefish-port-wave22-contract.md`。
+
+### 12AL.1 落地清单
+
+| 层 | 文件 | 说明 |
+|----|------|------|
+| 账号层 | `internal/account/profile.go`、`profile_details.go`（新） | Profile 新增元数据与布尔字段；`UpdateProfileDetails` 合并进 `settings` JSONB |
+| 端点 | `internal/httpapi/i_update.go` | 接受 location/birthday/lang/fields 与 10 个布尔开关，含长度与格式校验 |
+| 打包 | `internal/httpapi/users_pack.go` | `UserDetailed` 的 location/birthday/lang/fields/publicReactions、`MeDetailed` 的布尔开关改为真实值 |
+| 前端类型 | `api/types.ts`、`account/types.ts` | `ProfileField`、`ProfileUpdateRequest` 扩展 |
+| 资料页 | `pages/SettingsProfile.vue` | 位置、生日、语言、附加信息编辑器 |
+| 其它设置 | `pages/SettingsOther.vue` | 推荐笔记开关改为真实写入 |
+
+### 12AL.2 有意的限制
+
+1. 横幅、锁推、关注审批、`isBot`/`isCat`、发言猫语仍无写入路径。
+2. 邮箱修改与 `i/update-email` 仍缺。
+3. 元数据与布尔值存在 `settings` JSONB，不是独立列。
+4. `fields` 的链接不做 URL 校验。
+
+### 12AL.3 验证证据（编译层）
+
+```
+gofmt -l internal/ cmd/                 # 空
+go vet ./...                            # exit 0
+cd web && pnpm exec vue-tsc --noEmit    # exit 0
+cd web && pnpm run check:port           # hardTotal 0
+cd web && pnpm build                    # exit 0
+```
+
+### 12AL.4 仍未验证
+
+- 保存资料（含附加信息增删）后 `users/show` 与 `POST /api/i` 的回读。
+- 日期/语言非法值的 400 分支与清空语义。
+- 推荐笔记开关的写入与时间线表现（时间线本身还没有插入推荐笔记的逻辑）。
+- `go test` 与浏览器走查未执行。
+
 ## 13. 文档索引
 
 | 文档 | 内容 |
@@ -2490,6 +2530,7 @@ cd web && pnpm build                    # exit 0
 | `docs/research/2026-11-06-firefish-port-wave19-contract.md` | **第十九波施工契约（合规链接、serverRules、公共 stats 与关于页），见 §12AI** |
 | `docs/research/2026-11-06-firefish-port-wave20-contract.md` | **第二十波施工契约（TOTP 两步验证、登录协商与安全设置页），见 §12AJ** |
 | `docs/research/2026-11-06-firefish-port-wave21-contract.md` | **第二十一波施工契约（改密、令牌重生成与登录历史），见 §12AK** |
+| `docs/research/2026-11-06-firefish-port-wave22-contract.md` | **第二十二波施工契约（资料扩展字段与推荐笔记开关），见 §12AL** |
 
 ## 14. 已知的未验证项
 
@@ -2526,6 +2567,8 @@ cd web && pnpm build                    # exit 0
   正确码）、设置页交互、移动端布局与数据库用例都未执行；`qr` 为空串、安全密钥与备份码按设计未做。
 - **第二十一波未测（2026-11-06，见 §12AK.4）**：改密/令牌重生成/登录历史三个端点没有自动化用例，
   端到端与分页未走查；`i/*` 缺口从 46 降到 43。
+- **第二十二波未测（2026-11-06，见 §12AL.4）**：资料扩展字段与推荐笔记开关只过了编译层，
+  保存/回读、非法值分支与时间线表现未验证。
 - **仍未移植的设置页**：邮箱、整合、导入导出、迁移、Webhook、插件、自定义 KaTeX、状态栏、
   删除账号、应用授权以外的账号操作；对应后端端点不存在或前端缺少依赖（见第五波契约 §3.3）。
 - **仍缺的 widgets**：rss、rss-ticker、server-metric、online-users、federation、job-queue、aiscript、

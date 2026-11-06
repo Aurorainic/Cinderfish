@@ -51,6 +51,53 @@
 				}}</template>
 			</FormTextarea>
 
+			<FormInput
+				v-model="location"
+				class="_formBlock"
+				:max="LOCATION_MAX"
+				:disabled="saving"
+			>
+				<template #label>{{ t("location") }}</template>
+				<template #caption>所在地，最多 {{ LOCATION_MAX }} 个字符。</template>
+			</FormInput>
+
+			<FormInput
+				v-model="birthday"
+				class="_formBlock"
+				type="date"
+				:disabled="saving"
+			>
+				<template #label>{{ t("birthday") }}</template>
+			</FormInput>
+
+			<FormInput
+				v-model="lang"
+				class="_formBlock"
+				:max="LANG_MAX"
+				:disabled="saving"
+			>
+				<template #label>{{ t("language") }}</template>
+				<template #caption>BCP-47 语言标签，例如 <code>zh-CN</code> 或 <code>ja</code>。</template>
+			</FormInput>
+
+			<FormSection>
+				<template #label>{{ t("_profile.metadata") }}</template>
+				<div v-for="(field, index) in fields" :key="index" class="fieldRow">
+					<FormInput v-model="field.name" :max="FIELD_NAME_MAX" :disabled="saving">
+						<template #label>{{ t("_profile.metadataLabel") }}</template>
+					</FormInput>
+					<FormInput v-model="field.value" :max="FIELD_VALUE_MAX" :disabled="saving">
+						<template #label>{{ t("_profile.metadataContent") }}</template>
+					</FormInput>
+					<CfButton danger :disabled="saving" @click="removeField(index)">
+						{{ t("remove") }}
+					</CfButton>
+				</div>
+				<CfButton :disabled="saving || fields.length >= FIELDS_MAX" @click="addField">
+					添加一项
+				</CfButton>
+			</FormSection>
+
 			<CfInfo v-if="saveFailed" class="_formBlock" warn>
 				{{ saveErrorText }}
 			</CfInfo>
@@ -66,11 +113,10 @@
 			</div>
 
 			<FormSection>
-				<template #label>未提供的字段</template>
+				<template #label>仍不支持的字段</template>
 				<CfInfo>
-					后端 <code>i/update</code> 只接受 name、description、avatarId、
-					followersVisibility、followingVisibility。所在地、生日、语言、附加信息
-					以及「猫／机器人」标记都没有写入接口，因此这里不提供输入框；两项关注可见性在「隐私」设置页。
+					横幅、<code>isCat</code>/<code>isBot</code> 标记与发言猫语仍没有写入路径，
+					因此这里不提供输入框。附加信息最多 16 项，标签 255 字符、内容 1024 字符。
 				</CfInfo>
 			</FormSection>
 		</template>
@@ -78,17 +124,11 @@
 </template>
 
 <script setup lang="ts">
-// Firefish's profile settings page, reduced to what `POST /api/i/update`
-// actually writes (docs/research/api-contract/auth-users.md):
-//   * name / description — saved with the button, not on every keystroke like
-//     upstream, so a failed request cannot silently drop the old value;
-//   * avatar — `selectFile` + `avatarId`, applied immediately as upstream does;
-//   * the image cropper (`os.cropImage`) does not exist here, so the chosen file
-//     is used as-is;
-//   * banner, location, birthday, lang, fields (metadata), isCat/isBot/speakAsCat
-//     have no write path and are not rendered as dead controls — the section at
-//     the bottom says so instead;
-//   * `langmap` is not consumed here for the same reason.
+// Firefish's profile settings page. `POST /api/i/update` writes name,
+// description, avatar, location, birthday, lang and the metadata fields; the
+// image cropper (`os.cropImage`) does not exist here, so the chosen file is
+// used as-is. Banner, isCat/isBot and speakAsCat still have no write path and
+// are not rendered as dead controls.
 import { computed, onMounted, ref } from "vue";
 import { me, refreshAccount, updateProfile } from "@/account";
 import { success } from "@/os";
@@ -107,6 +147,11 @@ import FormTextarea from "@/components/form/textarea.vue";
 /** internal/httpapi/i_update.go: maxProfileNameLength / maxProfileDescriptionLength */
 const NAME_MAX = 50;
 const DESCRIPTION_MAX = 500;
+const LOCATION_MAX = 50;
+const LANG_MAX = 16;
+const FIELDS_MAX = 16;
+const FIELD_NAME_MAX = 255;
+const FIELD_VALUE_MAX = 1024;
 
 const loading = ref(true);
 const loadFailed = ref(false);
@@ -117,6 +162,10 @@ const saveErrorText = ref("");
 
 const name = ref("");
 const description = ref("");
+const location = ref("");
+const birthday = ref("");
+const lang = ref("");
+const fields = ref<{ name: string; value: string }[]>([]);
 
 const user = computed(() => me.value);
 
@@ -127,6 +176,22 @@ function errorText(error: unknown): string {
 function syncFromUser(): void {
 	name.value = me.value?.name ?? "";
 	description.value = me.value?.description ?? "";
+	location.value = me.value?.location ?? "";
+	birthday.value = me.value?.birthday ?? "";
+	lang.value = me.value?.lang ?? "";
+	fields.value = (me.value?.fields ?? []).map((f) => ({
+		name: f.name,
+		value: f.value,
+	}));
+}
+
+function addField(): void {
+	if (fields.value.length >= FIELDS_MAX) return;
+	fields.value = [...fields.value, { name: "", value: "" }];
+}
+
+function removeField(index: number): void {
+	fields.value = fields.value.filter((_, i) => i !== index);
 }
 
 async function load(): Promise<void> {
@@ -158,6 +223,12 @@ async function save(): Promise<void> {
 			name: trimmedName === "" ? null : trimmedName,
 			description:
 				description.value.trim() === "" ? null : description.value,
+			location: location.value.trim() === "" ? null : location.value.trim(),
+			birthday: birthday.value === "" ? null : birthday.value,
+			lang: lang.value.trim() === "" ? null : lang.value.trim(),
+			fields: fields.value
+				.map((f) => ({ name: f.name.trim(), value: f.value.trim() }))
+				.filter((f) => f.name !== ""),
 		});
 		syncFromUser();
 		success();
@@ -220,5 +291,13 @@ definePageMetadata({
 	display: flex;
 	justify-content: flex-end;
 	margin-top: 1.5em;
+}
+
+.fieldRow {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: flex-end;
+	gap: 8px;
+	margin-block-end: 8px;
 }
 </style>

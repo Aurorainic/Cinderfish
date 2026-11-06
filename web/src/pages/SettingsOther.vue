@@ -4,16 +4,19 @@
 		<section class="_formBlock">
 			<h2 class="sectionTitle">{{ t("otherSettings") }}</h2>
 
-			<div class="kvRow">
-				<span class="kvKey">{{ t("showFeaturedNotesInTimeline") }}</span>
-				<span class="kvValue">
-					{{ me?.injectFeaturedNote ? t("yes") : t("no") }}
-				</span>
-			</div>
-			<CfInfo class="note">
-				Firefish 用 <code>i/update { injectFeaturedNote }</code> 切换这一项，
-				而 Cinderfish 的 <code>i/update</code> 只接受 name / description / avatarId /
-				followersVisibility / followingVisibility，所以这里只读显示，修改<strong>未提供</strong>。
+			<CfSwitch
+				:model-value="injectFeatured"
+				class="_formBlock"
+				@update:model-value="toggleFeatured"
+			>
+				{{ t("showFeaturedNotesInTimeline") }}
+				<template #caption>
+					开启后，时间线会插入管理员推荐的笔记。写入
+					<code>i/update { injectFeaturedNote }</code>，保存在个人资料里。
+				</template>
+			</CfSwitch>
+			<CfInfo v-if="featuredError != null" class="note" warn>
+				{{ featuredError }}
 			</CfInfo>
 		</section>
 
@@ -86,8 +89,8 @@
 // second section: they are all real `defaultStore` keys with live consumers
 // (MkAcct, MkPostForm, MkStarButton), unlike the upstream page which keeps them
 // scattered or drop them entirely.
-import { computed } from "vue";
-import { me } from "@/account";
+import { computed, ref } from "vue";
+import { me, updateProfile } from "@/account";
 import CfA from "@/components/ui/CfA.vue";
 import CfInfo from "@/components/ui/CfInfo.vue";
 import CfInput from "@/components/ui/CfInput.vue";
@@ -97,6 +100,22 @@ import { definePageMetadata } from "@/scripts/page-metadata";
 import { defaultStore } from "@/store";
 
 defineOptions({ name: "CfPageSettingsOther" });
+
+const injectFeatured = ref(me.value?.injectFeaturedNote ?? false);
+const featuredError = ref<string | null>(null);
+
+async function toggleFeatured(value: boolean): Promise<void> {
+	featuredError.value = null;
+	const previous = injectFeatured.value;
+	injectFeatured.value = value;
+	try {
+		await updateProfile({ injectFeaturedNote: value });
+	} catch (error) {
+		injectFeatured.value = previous;
+		featuredError.value =
+			error instanceof Error ? error.message : String(error);
+	}
+}
 
 function storeRef<K extends keyof typeof defaultStore.state & string>(key: K) {
 	return computed<(typeof defaultStore.state)[K]>({

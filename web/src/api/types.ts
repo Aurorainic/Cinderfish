@@ -16,6 +16,11 @@ export type NotificationType =
 
 export type FollowVisibility = "public" | "followers" | "private";
 
+export interface ProfileField {
+	name: string;
+	value: string;
+}
+
 export interface UserLite {
 	id: string;
 	name: string | null;
@@ -49,10 +54,10 @@ export interface UserDetailed extends UserLite {
 	isSilenced: boolean;
 	isSuspended: boolean;
 	description: string | null;
-	location: null;
-	birthday: null;
-	lang: null;
-	fields: unknown[];
+	location: string | null;
+	birthday: string | null;
+	lang: string | null;
+	fields: ProfileField[];
 	verifiedLinks: unknown[];
 	followersCount: number;
 	followingCount: number;

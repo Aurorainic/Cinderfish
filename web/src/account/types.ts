@@ -8,11 +8,12 @@
  *
  * Contract source: docs/research/api-contract/auth-users.md.
  */
-import type { MeDetailed as ApiMeDetailed } from "../api/types";
+import type { MeDetailed as ApiMeDetailed, ProfileField } from "../api/types";
 
 export type {
 	DriveFile,
 	MetaLite,
+	ProfileField,
 	SigninResponse,
 	SigninStep,
 	SignupResponse,
@@ -48,6 +49,20 @@ export interface ProfileUpdateRequest {
 	avatarId?: string | null;
 	followersVisibility?: UserVisibility | null;
 	followingVisibility?: UserVisibility | null;
+	location?: string | null;
+	birthday?: string | null;
+	lang?: string | null;
+	fields?: ProfileField[];
+	noCrawle?: boolean;
+	preventAiLearning?: boolean;
+	isExplorable?: boolean;
+	hideOnlineStatus?: boolean;
+	publicReactions?: boolean;
+	alwaysMarkNsfw?: boolean;
+	autoSensitive?: boolean;
+	carefulBot?: boolean;
+	autoAcceptFollowed?: boolean;
+	injectFeaturedNote?: boolean;
 }
 
 /** Stored credential entry for the account switcher. */
