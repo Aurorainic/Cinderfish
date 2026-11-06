@@ -4582,8 +4582,8 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
 - **第五十六波已补验证（2026-11-07，见 §12CC/§12CF）**：「移除关注者」菜单、确认框与行删除已走查；
   `following/list` 与 `users/following|followers` 的 `sinceDate`/`untilDate` 已实现并有用例。
 - **第五十七波部分补验证（2026-11-07，见 §12CB/§12CL）**：`follow` 与 `note` 两类通知在通知页渲染
-  已走查；`homeTimeline` 的 withReplies 过滤新增了真实 WebSocket 端到端用例。仍未验证的：
-  远端导入通知的双实例用例已由 §12CX 覆盖；`directNotes` 属于聊天范围，首版不做。
+  已走查；`homeTimeline` 的 withReplies 过滤新增了真实 WebSocket 端到端用例；远端导入通知的双实例
+  用例由 §12CX 覆盖。`directNotes` 属于聊天范围，首版不做。
 - **第五十八波已补验证**：`Question` 入站（§12CE）、笔记正文与反应里的远端自定义表情
   （§12CJ/§12DC）都已实现并有用例。仍未验证的：真实异种软件互投。
 - **第五十九波部分补验证（2026-11-07 对账 §12CC）**：`/admin/abuses` 的举报者、被举报者、内容与
@@ -4680,15 +4680,18 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
   `#app` 有内容后再交互；真实用户不受影响。
 - **仍未移植的设置页**：邮箱、整合、导入导出、迁移、Webhook、插件、自定义 KaTeX、状态栏、
   删除账号、应用授权以外的账号操作；对应后端端点不存在或前端缺少依赖（见第五波契约 §3.3）。
-- **仍缺的 widgets**：rss、rss-ticker、server-metric、online-users、federation、job-queue、aiscript、
-  以及 activity 的子图表；缺服务端代理、Streaming stats 通道或 AiScript 运行时。
+- **仍缺的 widgets（2026-11-07 更新）**：online-users、federation、instance-cloud 已补上（§12EY，
+  后两者依赖 `federation/instances`，不画 `charts/instance`）；仍缺 rss、rss-ticker（需服务端 RSS
+  抓取代理）、server-metric（需系统指标端点）、job-queue（需队列内省）、aiscript（运行时按契约
+  drop），以及 activity 的子图表。
 
-- **浏览器可视化走查（Task 8 波次）未做**：2026-10-31 的最终轮，内建浏览器返回 `BROWSER_USER_TAKEOVER`（用户接管面板），按工具契约当轮停止。因此 1440/1280/1100/840/720/600/380 的截图、`scrollWidth` 溢出实测与登录态视觉复核**都没有执行**；同一轮的后端 API 走查（未读数、通知类型、回复可见性、纯转贴反应、四条时间线）已用真实二进制完成，见 §11.15.7。本波次没有改 CSS 或 DOM 结构，风险低，但不能当作已验证。
-- **新前端骨架的浏览器验证已部分补上（2026-11-05，第二波）**：§12R 用无头 Chromium + CDP 对
-  `/`、`/notes/:id`、`/my/notifications`、`/my/drive`、`/my/follow-requests` 做了桌面（1440）与移动（390）
-  两档走查，shell 渲染、主题应用、图标字体、时间线出帖都看过；但**登录/注册表单、设置页、Deck 壳、
-  访客壳，以及构建产物（`web/dist` 经 Go 静态托管）仍未走查**，Streaming 只验证了首屏 REST 拉取，
-  实时推送（新帖插入、通知红点）没有实测。
+- ~~**浏览器可视化走查（Task 8 波次）未做**~~：2026-10-31 的那一轮确实没能执行，但后续波次已用
+  无头 Chromium/CDP 与真实二进制覆盖了登录态视觉复核与溢出实测：§12CB（1440 与 390，42 张截图）、
+  §12EK（280 宽）、§12EP（390×844 状态栏）、§12EM（全部调色板）等；`scrollWidth` 检查在每轮
+  移动端走查中都会跑。1440/1280/1100/840/720/600/380 这七档并没有逐档单独留档，作为历史记录保留。
+- ~~**新前端骨架的浏览器验证已部分补上（2026-11-05，第二波）**~~：后续波次补齐了当时列出的欠账——
+  登录/注册（§12CV/§12DK）、设置页（§12DB/§12DD/§12DQ 等）、Deck（§12EE）、访客壳
+  （§12CB/§12DV）、`web/dist` 静态托管（§12CB）、Streaming 实时插入与通知红点（§12CW）。
 - ~~**CfTab 选项卡标签不显示**~~：第三波已修（§12S.2 第 1 条），笔记详情页签实测可见。
 - ~~**30 个 Firefish 内置主题只移植了 4 个**~~：第四波移植了剩余 26 个调色板（`themes/builtin/*.json5`
   经 `?raw` 加载），当前可选主题 28 个；全部 12 个浅色与 16 个深色调色板已于 2026-11-07 逐个
@@ -4709,7 +4712,8 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
 - **Streaming 未做真实 Misskey 客户端联调**：已用自写 WebSocket 客户端验证；2026-11-07 起
   也用 `misskey-js` 的 `Stream` 验证了 `localTimeline` 与 `main` 频道（§12CG）。仍未用 Misskey Web 整站连接。
 - **联邦没有任何第三方联调**：只跑了本实现的双实例测试（真签名、真 HTTP、真库），没有对 Mastodon / GoToSocial / 真实 Misskey 实例互通。这是 M5 之后最该补的验证。
-- **Streaming 多进程中继只手测了单连接的 LISTEN/NOTIFY 往返**，没有做真正的双进程联调。
+- ~~**Streaming 多进程中继只手测了单连接的 LISTEN/NOTIFY 往返**~~：2026-11-07 用两个真实进程 +
+  真实 `redis-server` 跑了中继（§12CH），Redis 重启后的自动重订阅也已验证（§12CQ）。
 - **前端移植第三波已完成的验证（2026-11-05，见 §12S.3）**：发帖链路、个人页五页签、关注/粉丝列表、
   12 个设置子页、收藏/探索/标签/搜索、导航壳、deck 列与 12 个 widget 已落地；桌面 18 条路由与
   移动 4 条路由实测无溢出、无 JS 异常，浏览器真实发帖与设置保存均回读 API 确认。
@@ -6222,3 +6226,44 @@ localStorage，而且缓存键不区分账号。
   `api/i` 的用户名为 `w134bob`。
 - 截图：`/tmp/w134-shots/after-relogin.png`（不入库）。
 - 没有改代码，因此不需要重跑 Go/前端检查；走查完成后已停服务并删除 `w134*` 用户。
+
+## 12EY. 第一百三十五波：在线人数端点与联邦/在线/实例云 widget（2026-11-07）
+
+§14 的 widget 缺口里，有三个已经具备真实数据来源：
+
+- `get-online-users-count` 此前没有实现，但 Misskey 的语义（`USER_ONLINE_THRESHOLD` = 10 分钟内的
+  活跃账号）可以用内存跟踪实现，不需要新表。
+- `federation/instances` 已在第五波前后实现，`federation` 与 `instance-cloud` 两个 widget 却仍以
+  「端点不存在」的占位文案渲染。
+
+### 12EY.1 落地清单
+
+| 层 | 文件 | 内容 |
+|----|------|------|
+| 活跃跟踪 | `internal/httpapi/activity.go`（新） | `activityTracker`：每次认证请求 touch，10 分钟窗口计数并顺手清理过期项 |
+| 接线 | `internal/httpapi/auth.go`、`server.go` | 认证成功时 touch；`Server.activity` 在 `NewServer` 初始化 |
+| 端点 | `internal/httpapi/online.go`（新） | `POST/GET /api/get-online-users-count` → `{count}`，匿名可读（与 Misskey 的 requireCredential:false、allowGet 一致） |
+| widget | `web/src/widgets/online-users.vue`（新） | 15 秒轮询，透明卡片 |
+| widget | `web/src/widgets/federation.vue`（新） | `federation/instances {limit:5}`，主机名 + 软件名，60 秒刷新 |
+| widget | `web/src/widgets/instance-cloud.vue` | 占位说明改为真实主机 chip 列表（`limit:25`），保留联邦模式行被移除 |
+| 注册 | `web/src/widgets/index.ts` | 两个新 widget 加入选择器（18 项） |
+
+### 12EY.2 有意的限制
+
+- 在线人数按**本进程**的认证请求统计：重启归零，多进程部署只统计处理 API 的进程。Misskey 用
+  `users.lastActiveDate` 列，语义相同但没有持久化；个人实例下这个取舍避免了每请求一次写库。
+- `federation` widget 不画 `charts/instance` 的请求图（没有时间序列存储），也不排序
+  `+lastCommunicatedAt`（端点按用户数排序），列表内容仍是真实数据。
+- `federation/instances` 不返回图标 URL，两个 widget 用行星占位图标。
+- 仍然缺的 widget：rss、rss-ticker、server-metric、job-queue、aiscript、activity 子图表（见 §14）。
+
+### 12EY.3 验证证据
+
+- `gofmt -l internal/ cmd/` 无输出；`go vet ./...` 通过；含数据库的全量 `go test ./...` 全绿。
+- `TestActivityTrackerWindow`：0 → 2 → 9 分钟仍为 2 → 11 分钟后归零且 map 清空 → 重新 touch 为 1。
+- `TestOnlineUsersCountEndpoint`：匿名 `count=0`；alice 调 `/api/i` 后 1；bob 后 2；GET 别名 200。
+- `vue-tsc --noEmit`、`check:port`（hardTotal 0）、`pnpm build` 全绿。
+- 真实二进制 + 无头浏览器（1400×900）：选择器出现「在线用户」「联邦宇宙」；添加后页面显示
+  「1 人在线」，联邦 widget 列出 `remote.example` 与 `other.example`，实例云显示两个主机 chip；
+  `POST /api/get-online-users-count` 同步返回 `{"count":1}`。截图
+  `/tmp/w135-shots/widgets.png`（不入库）。

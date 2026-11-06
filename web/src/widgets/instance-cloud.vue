@@ -5,32 +5,40 @@
 		icon="ph-bold ph-cloud"
 		:show-header="widgetProps.showHeader === true"
 	>
-		<div class="rows">
-			<div class="row">
-				<span class="label">{{ t("federation") }}</span>
-				<span class="value">{{ federationLabel }}</span>
-			</div>
-			<div class="row">
-				<span class="label">{{ t("host") }}</span>
-				<span class="value">{{ instance.host }}</span>
-			</div>
+		<CfLoading v-if="fetching && instances.length === 0" />
+		<div v-else-if="failed" class="state">
+			<div>{{ t("somethingHappened") }}</div>
+			<CfButton @click="loadInstances">{{ t("retry") }}</CfButton>
 		</div>
-		<CfInfo>
-			实例云未提供：服务器没有 `federation/instances` 接口，无法列出已交换通讯的服务器。
-		</CfInfo>
+		<div v-else-if="instances.length === 0" class="state">
+			{{ t("nothing") }}
+		</div>
+		<div v-else class="cloud">
+			<a
+				v-for="instance in instances"
+				:key="instance.host"
+				class="node"
+				:href="`https://${instance.host}`"
+				target="_blank"
+				rel="noopener noreferrer"
+				:title="`${instance.usersCount} ${t('users')} · ${instance.notesCount} ${t('notes')}`"
+			>{{ instance.host }}</a>
+		</div>
 	</WidgetCard>
 </template>
 
 <script setup lang="ts">
-// Firefish lists the 25 instances with the newest `lastCommunicatedAt` from
-// `federation/instances`. That endpoint does not exist on Cinderfish and the
-// contract forbids inventing entries, so the widget reports the real federation
-// mode from `meta` and says the cloud itself is unavailable.
+// Firefish renders the 25 instances with the newest `lastCommunicatedAt` as an
+// icon cloud, using the icon URL in the response. `federation/instances` here
+// orders by user count and carries no icon, so the cloud becomes a wrapped list
+// of host names with the real counts in the tooltip.
+import { ref } from "vue";
 import WidgetCard from "./WidgetCard.vue";
-import { CfInfo } from "@/components/ui";
-import { instance } from "@/instance";
+import { CfButton, CfLoading } from "@/components/ui";
+import { api } from "@/api/client";
+import type { FederationInstance } from "@/api/types";
+import { useInterval } from "@/composables/use-interval";
 import { t } from "@/i18n";
-import { computed } from "vue";
 import { useWidgetPropsManager, type WidgetComponentExpose, type WidgetField } from "./index";
 import type { Widget } from "@/store/widgets";
 
@@ -50,18 +58,26 @@ const { widgetProps, configure } = useWidgetPropsManager(
 	(data) => emit("updateProps", data),
 );
 
-const federationLabel = computed(() => {
-	switch (instance.federation) {
-		case "all":
-			return "公开";
-		case "specified":
-			return "仅白名单";
-		case "none":
-			return "关闭";
-		default:
-			return "?";
-	}
-});
+const instances = ref<FederationInstance[]>([]);
+const fetching = ref(true);
+const failed = ref(false);
+
+function loadInstances(): void {
+	fetching.value = true;
+	failed.value = false;
+	api<FederationInstance[]>("federation/instances", { limit: 25 })
+		.then((result) => {
+			instances.value = result;
+		})
+		.catch(() => {
+			failed.value = true;
+		})
+		.finally(() => {
+			fetching.value = false;
+		});
+}
+
+useInterval(loadInstances, 1000 * 60, { immediate: true, afterMounted: true });
 
 defineExpose<WidgetComponentExpose>({
 	name,
@@ -71,27 +87,31 @@ defineExpose<WidgetComponentExpose>({
 </script>
 
 <style lang="scss" scoped>
-.rows {
+.state {
 	display: flex;
 	flex-direction: column;
+	align-items: center;
 	gap: 8px;
+	padding: 16px 14px;
+	opacity: 0.8;
+}
+
+.cloud {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
 	padding: 12px 14px;
 
-	> .row {
-		display: flex;
-		justify-content: space-between;
-		gap: 8px;
-		font-size: 0.9em;
-
-		> .label {
-			opacity: 0.7;
-		}
-
-		> .value {
-			overflow: hidden;
-			white-space: nowrap;
-			text-overflow: ellipsis;
-		}
+	> .node {
+		display: inline-block;
+		max-width: 100%;
+		padding: 2px 8px;
+		border: solid 0.5px var(--divider);
+		border-radius: 999px;
+		font-size: 0.82em;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
 	}
 }
 </style>

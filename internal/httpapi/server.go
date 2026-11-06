@@ -64,6 +64,10 @@ type Server struct {
 	streamBus *streaming.Bus
 	stream    *streaming.Server
 
+	// activity records the last authenticated request of each user, which is
+	// what get-online-users-count reports.
+	activity *activityTracker
+
 	// ActivityPub. federationPolicy, fedRenderer and federationStore are
 	// populated by AttachFederation; the greenlet handlers check for nil.
 	federationPolicy  *federation.Policy
@@ -77,7 +81,12 @@ type Server struct {
 // NewServer returns a Server with no database backing. It serves the
 // endpoints that do not need persistence.
 func NewServer(cfg *config.Config) *Server {
-	s := &Server{cfg: cfg, startedAt: time.Now(), streamBus: streaming.NewBus()}
+	s := &Server{
+		cfg:       cfg,
+		startedAt: time.Now(),
+		streamBus: streaming.NewBus(),
+		activity:  newActivityTracker(),
+	}
 	if cfg != nil {
 		s.mail = mail.New(mail.Settings{
 			Host:     cfg.Mail.Host,
@@ -131,6 +140,8 @@ func (s *Server) SetStorage(storage media.Storage) {
 func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("POST /api/meta", s.handleMeta)
 	s.mux.HandleFunc("POST /api/stats", s.handleStats)
+	s.mux.HandleFunc("POST /api/get-online-users-count", s.handleGetOnlineUsersCount)
+	s.mux.HandleFunc("GET /api/get-online-users-count", s.handleGetOnlineUsersCount)
 	s.mux.HandleFunc("POST /api/ping", s.handlePing)
 	s.mux.HandleFunc("GET /api/ping", s.handlePing)
 

@@ -53,6 +53,9 @@ func (s *Server) authenticate(ctx context.Context, r *http.Request, body map[str
 	if user.IsSuspended {
 		return nil, errAccountSuspended
 	}
+	if s.activity != nil {
+		s.activity.touch(user.ID)
+	}
 	return &AuthInfo{User: user, Token: accessToken}, nil
 }
 

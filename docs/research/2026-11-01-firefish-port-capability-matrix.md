@@ -316,6 +316,12 @@ JobQueue、InstanceCloud、Button、Aiscript、UserList、ServerInfo）。按「
 
 > 精确的 widget 逐个判定放在 Deck 移植任务里做，判定依据只看「依赖端点是否在 §2 白名单内」。
 
+> **2026-11-07 更新**：上表写于 Tier 1 端点补齐之前。`hashtags/trend` 与 `federation/instances`
+> 现已实现，`trends`、`federation`、`instance-cloud` 三个 widget 已按真实数据移植；`online-users`
+> 依赖新增的 `get-online-users-count`（内存 10 分钟活跃窗口），也已移植。仍缺：rss / rss-ticker
+> （RSS 抓取代理）、server-metric（系统指标端点）、job-queue（队列内省）、aiscript（契约 drop）、
+> activity 子图表。见 HANDOVER §12EY。
+
 ## 4. 首批保留页面名单（187 个页面中的 18 项）
 
 这份名单是 §2 白名单的落地形式：**不在名单里的页面一律按 §5 隐藏**，不注册路由、不出现在导航，
