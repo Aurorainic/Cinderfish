@@ -54,7 +54,7 @@ func packNote(n *note.Note, pc notePackContext) map[string]any {
 		"reactionCount":  pc.ReactionTotal,
 		"reactions":      pc.Reactions,
 		"reactionEmojis": []any{},
-		"emojis":         []any{},
+		"emojis":         packNoteEmojis(n.Emojis),
 		"fileIds":        n.FileIDs,
 		"files":          files,
 		"replyId":        n.ReplyID,
@@ -186,6 +186,17 @@ func (s *Server) notePackContext(ctx context.Context, n *note.Note, viewerID str
 // unixMilli converts a millisecond timestamp to a time.
 func unixMilli(ms int64) time.Time {
 	return time.UnixMilli(ms)
+}
+
+// packNoteEmojis renders the custom emoji a note references. The renderer
+// looks a shortcode up here before falling back to the instance registry, so
+// a remote note keeps its own emoji images.
+func packNoteEmojis(emojis []note.Emoji) []any {
+	out := make([]any, 0, len(emojis))
+	for _, e := range emojis {
+		out = append(out, map[string]any{"name": e.Name, "url": e.URL})
+	}
+	return out
 }
 
 // pollExpires renders the poll expiry as a millisecond timestamp.

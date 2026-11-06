@@ -174,3 +174,27 @@ func isUniqueViolation(err error) bool {
 	}
 	return false
 }
+
+// LookupLocal maps the given shortcodes to the URLs of local emoji rows.
+// Unknown names are simply absent from the result.
+func (s *EmojiService) LookupLocal(ctx context.Context, names []string) (map[string]string, error) {
+	out := make(map[string]string, len(names))
+	if len(names) == 0 {
+		return out, nil
+	}
+	rows, err := s.pool.Query(ctx, `
+SELECT name, url FROM emojis WHERE host IS NULL AND name = ANY($1)
+`, names)
+	if err != nil {
+		return nil, fmt.Errorf("media: lookup emoji: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var name, url string
+		if err := rows.Scan(&name, &url); err != nil {
+			return nil, fmt.Errorf("media: scan emoji: %w", err)
+		}
+		out[name] = url
+	}
+	return out, rows.Err()
+}

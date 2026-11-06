@@ -58,7 +58,7 @@ type Note struct {
 	// RemoteMentions holds user@host acct strings for mentioned remote
 	// accounts; Mentions stays the local user ids.
 	RemoteMentions     []string
-	Emojis             []string
+	Emojis             []Emoji
 	FileIDs            []string
 	RenoteCount        int
 	RepliesCount       int
@@ -299,7 +299,7 @@ SELECT id FROM users WHERE username_lower = lower($1) AND host IS NULL
 		Tags:           tags,
 		Mentions:       mentions,
 		RemoteMentions: remoteMentions,
-		Emojis:         []string{},
+		Emojis:         []Emoji{},
 		CreatedAt:      now,
 	}
 
@@ -460,7 +460,7 @@ func scanNote(row pgx.Row) (*Note, error) {
 	n.Tags = decodeStrings(tags)
 	n.Mentions = decodeStrings(mentions)
 	n.RemoteMentions = decodeStrings(remoteMentions)
-	n.Emojis = decodeStrings(emojis)
+	n.Emojis = decodeEmojis(emojis)
 	if n.FileIDs == nil {
 		n.FileIDs = []string{}
 	}
@@ -690,6 +690,27 @@ func mustJSON(v any) []byte {
 		return []byte("[]")
 	}
 	return b
+}
+
+// Emoji is one custom emoji a note references: the shortcode without colons
+// and the image URL a renderer should use.
+type Emoji struct {
+	Name string `json:"name"`
+	URL  string `json:"url"`
+}
+
+func decodeEmojis(b []byte) []Emoji {
+	if len(b) == 0 {
+		return []Emoji{}
+	}
+	var out []Emoji
+	if err := json.Unmarshal(b, &out); err != nil {
+		return []Emoji{}
+	}
+	if out == nil {
+		return []Emoji{}
+	}
+	return out
 }
 
 func decodeStrings(b []byte) []string {

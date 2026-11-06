@@ -28,11 +28,25 @@ func NoteDataFromAP(note Object, actor *RemoteUser, r *Renderer) RemoteNote {
 	}
 
 	tags := make([]string, 0, 4)
+	emojis := make([]EmojiRef, 0, 2)
+	seenEmoji := map[string]bool{}
 	for _, tag := range note.Objects("tag") {
-		if tag.IsType("Hashtag") {
+		switch {
+		case tag.IsType("Hashtag"):
 			if name := tag.String("name"); name != "" {
 				tags = append(tags, strings.TrimPrefix(name, "#"))
 			}
+		case tag.IsType("Emoji"):
+			name := strings.Trim(tag.String("name"), ":")
+			url := tag.Object("icon").String("url")
+			if url == "" {
+				url = tag.String("href")
+			}
+			if name == "" || url == "" || seenEmoji[name] {
+				continue
+			}
+			seenEmoji[name] = true
+			emojis = append(emojis, EmojiRef{Name: name, URL: url})
 		}
 	}
 
@@ -58,6 +72,7 @@ func NoteDataFromAP(note Object, actor *RemoteUser, r *Renderer) RemoteNote {
 		ReplyAPID:     note.Ref("inReplyTo"),
 		QuoteAPID:     quoteOf(note),
 		Tags:          tags,
+		Emojis:        emojis,
 		Sensitive:     note.Bool("sensitive"),
 		CreatedAt:     publishedOrNow(note),
 		PollChoices:   poll.PollChoices,

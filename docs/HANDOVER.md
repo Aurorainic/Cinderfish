@@ -4139,7 +4139,7 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
 ### 12BW.2 有意的限制
 
 - 出站反应仍是 `Like` + `content`（与 Misskey `renderLike` 一致），没有改发 `EmojiReact`。
-- 不处理 `EmojiReact` 的 `tag` 自定义表情定义（还没有远端 emoji 表）。
+- 不处理 `EmojiReact` 的 `tag` 自定义表情定义（笔记正文里的 Emoji tag 已在第七十一波补上，见 §12CJ）。
 - `Flag`、`Question`（投票）当时仍未处理（`Flag` 见第五十九波，`Question` 见 §12CE）。
 
 ### 12BW.3 验证证据
@@ -4555,7 +4555,8 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
 - **第五十七波部分补验证（2026-11-07 对账 §12CB）**：`follow` 与 `note` 两类通知在通知页渲染已走查。
   仍未验证的：远端导入触发通知无双实例用例；`homeTimeline` 的 WS 过滤只有单元断言。
 - **第五十八波仍未验证**：没有对真实 Misskey/Firefish 验证 `EmojiReact`；远端自定义表情未解析；
-  `Question` 入站已在第六十六波补上（§12CE）；仍未验证真实异种软件互投。
+  `Question` 入站已在第六十六波补上（§12CE）；远端自定义表情已在第七十一波解析并渲染（§12CJ）；
+  仍未验证真实异种软件互投。
 - **第五十九波部分补验证（2026-11-07 对账 §12CC）**：`/admin/abuses` 的举报者、被举报者、内容与
   「标记已处理」按钮已走查。仍未验证的：远端举报没有对真实实例验证；重复举报与笔记级目标的展示。
 - **第六十波部分补验证（2026-11-07 对账 §12CB）**：三个说明页与 `SignupComplete` 的结构与文案
@@ -4888,3 +4889,44 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
 - 分段上传（>20 MiB 会被应用层拒绝，走不到 multipart）。
 - 预签名 URL 过期后的行为；`PresignTTL` 固定 5 分钟，配置没有暴露。
 - S3 的 TLS 与自定义 CA。
+
+## 12CJ. 第七十一波：自定义表情的双向传播（2026-11-07）
+
+第五十八波留下的「远端自定义表情未解析」：入站笔记的 `tag: Emoji` 被丢弃，`note.emojis`
+恒为空数组；本地笔记的自定义表情也没有 Emoji tag，出站对端只能看到 `:name:` 文本。
+
+### 12CJ.1 落地清单
+
+| 层 | 文件 | 内容 |
+|----|------|------|
+| 入站解析 | `internal/federation/convert.go` | `tag` 中 `type: Emoji` 的 `name`（去冒号）+ `icon.url`（回退 `href`），去重、缺 URL 跳过 |
+| 入站存储 | `internal/federation/store.go` | `RemoteNote.Emojis`，与笔记同事务写入 `notes.emojis`（JSONB 数组） |
+| 笔记模型 | `internal/note/service.go` | `Emoji{Name,URL}`；`Note.Emojis` 由 `[]string` 改为 `[]Emoji`，扫描时解码 |
+| 打包 | `internal/httpapi/notes_pack.go` | `note.emojis` 输出 `[{name,url}]`，Mfm 通过 `customEmojis` 直接命中 |
+| 出站 | `internal/httpapi/activitypub.go`、`internal/federation/render.go` | `renderNote` 从正文提取 `:name:`、查本地 emoji 表、相对 URL 补成绝对；渲染为 `tag: Emoji` |
+| 查询 | `internal/media/emoji.go` | `LookupLocal(ctx, names)`：按名字批量取本地 URL |
+| 测试隔离 | `internal/httpapi/server_db_test.go` | TRUNCATE 列表补 `emojis`（新用例写入的 emoji 会污染下一次运行） |
+
+### 12CJ.2 有意的限制
+
+- 只解析笔记正文里的 Emoji tag；反应（`EmojiReact`）里的自定义表情仍未解析成图片。
+- 远端 emoji 只随笔记携带，不落 `emojis` 表，因此不能在本实例的 emoji 选择器里出现。
+- 本地 emoji 的 URL 若是相对路径，出站时用实例 base URL 补全；远端 emoji 的 URL 原样保留。
+- 没有 `aliases` 解析：正文必须用 `name` 本身。
+
+### 12CJ.3 验证证据
+
+- `gofmt -l internal/ cmd/` 无输出；`go vet ./...` 通过；全量 `go test ./...`（含数据库）全绿。
+- `TestNoteDataFromAPEmojis`：冒号剥离、`icon.url` 优先、`href` 回退、重复合并、缺图跳过。
+- `TestInboundCustomEmoji`：beta 的 bob 发带 `:blob:` tag 的签名 Create，alpha 落库后
+  `notes/show` 的 `emojis` 为 `[{name:blob,url:https://beta.example/...}]`。
+- `TestOutboundCustomEmojiTags`：alpha 管理员注册 `:blob:`（本地文件），alice 发「look :blob: here」，
+  经真实投递到 beta；beta 的 `notes/show` 里 emoji URL 以 `https://alpha.example/` 开头。
+- 真实二进制 + Helium：给一条笔记设置 emojis 后打开 `/notes/<id>`，正文里的 `:blob:`
+  被替换成图片（`<img src=".../static-assets/badges/info.svg">`），`innerText` 中不再出现短代码。
+
+### 12CJ.4 仍未验证
+
+- 真实 Misskey / Firefish 的 Emoji tag 形状差异（有的实现把 `name` 写成不带冒号）。
+- emoji 别名、敏感 emoji 与远端 emoji 缓存。
+- 反应里的自定义表情渲染。

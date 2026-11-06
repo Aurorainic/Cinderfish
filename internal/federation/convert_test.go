@@ -121,3 +121,38 @@ func TestRenderNoteQuestion(t *testing.T) {
 		t.Errorf("multi poll emitted the wrong choice list")
 	}
 }
+
+// TestNoteDataFromAPEmojis covers custom emoji tags: colons are stripped,
+// icon.url wins, href is the fallback, duplicates collapse and an entry with
+// no image is dropped.
+func TestNoteDataFromAPEmojis(t *testing.T) {
+	actor := &RemoteUser{ID: "u1", Host: "remote.example", URI: "https://remote.example/users/carol"}
+	r := &Renderer{BaseURL: "https://fish.example"}
+	note := Object{
+		"id":           "https://remote.example/notes/2",
+		"type":         "Note",
+		"attributedTo": actor.URI,
+		"content":      "<p>:blob: :cat:</p>",
+		"to":           []any{Public},
+		"tag": []any{
+			map[string]any{"type": "Emoji", "name": ":blob:", "icon": map[string]any{"type": "Image", "url": "https://remote.example/emoji/blob.png"}},
+			map[string]any{"type": "Emoji", "name": "blob", "icon": map[string]any{"url": "https://remote.example/emoji/blob2.png"}},
+			map[string]any{"type": "Emoji", "name": ":cat:", "href": "https://remote.example/emoji/cat.png"},
+			map[string]any{"type": "Emoji", "name": ":broken:"},
+			map[string]any{"type": "Hashtag", "name": "#tag"},
+		},
+	}
+	data := NoteDataFromAP(note, actor, r)
+	if len(data.Emojis) != 2 {
+		t.Fatalf("emojis = %v, want blob and cat", data.Emojis)
+	}
+	if data.Emojis[0].Name != "blob" || data.Emojis[0].URL != "https://remote.example/emoji/blob.png" {
+		t.Errorf("first emoji = %+v", data.Emojis[0])
+	}
+	if data.Emojis[1].Name != "cat" || data.Emojis[1].URL != "https://remote.example/emoji/cat.png" {
+		t.Errorf("second emoji = %+v", data.Emojis[1])
+	}
+	if len(data.Tags) != 1 || data.Tags[0] != "tag" {
+		t.Errorf("tags = %v", data.Tags)
+	}
+}

@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 	"time"
 
@@ -573,6 +574,24 @@ func (s *Server) renderNote(ctx context.Context, n *note.Note) (federation.Objec
 			log.Printf("httpapi: resolve remote mention %s: %v", acct, err)
 		}
 	}
+	// Local custom emoji in the text travel as Emoji tags so peers show the
+	// image rather than the shortcode.
+	if s.emojis != nil && data.Text != "" {
+		names := shortcodesIn(data.Text)
+		if urls, err := s.emojis.LookupLocal(ctx, names); err == nil {
+			for _, name := range names {
+				url, ok := urls[name]
+				if !ok {
+					continue
+				}
+				if strings.HasPrefix(url, "/") {
+					url = s.baseURL() + url
+				}
+				data.Emojis = append(data.Emojis, federation.EmojiRef{Name: name, URL: url})
+			}
+		}
+	}
+
 	// A poll travels with the note so peers store the same choices.
 	if n.PollID != nil && s.notes != nil {
 		if poll, err := s.notes.Poll(ctx, n.ID); err == nil && len(poll.Choices) >= 2 {
@@ -604,6 +623,23 @@ func (s *Server) resolveRemoteMention(ctx context.Context, acct string) (*federa
 		return nil, federation.ErrRemoteNotFound
 	}
 	return s.federationInbox.ResolveAcct(ctx, user, host)
+}
+
+// shortcodePattern matches :name: custom emoji shortcodes.
+var shortcodePattern = regexp.MustCompile(`:([A-Za-z0-9_+\-]+):`)
+
+// shortcodesIn returns the distinct custom emoji names used in text, in order.
+func shortcodesIn(text string) []string {
+	matches := shortcodePattern.FindAllStringSubmatch(text, -1)
+	out := make([]string, 0, len(matches))
+	seen := map[string]bool{}
+	for _, m := range matches {
+		if !seen[m[1]] {
+			seen[m[1]] = true
+			out = append(out, m[1])
+		}
+	}
+	return out
 }
 
 // appendUniqueString appends v when absent.

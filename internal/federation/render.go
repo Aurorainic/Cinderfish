@@ -179,6 +179,9 @@ type NoteData struct {
 	InReplyTo  string
 	QuoteURL   string
 	Tags       []string
+	// Emojis are the custom emoji the note text uses, so a peer can render
+	// them instead of showing the shortcode.
+	Emojis []EmojiRef
 	// MentionRefs are the actor ids of the mentioned users.
 	MentionRefs []string
 	Attachments []Object
@@ -256,6 +259,13 @@ func (r *Renderer) RenderNote(n NoteData) Object {
 	}
 	for _, m := range n.MentionRefs {
 		tag = append(tag, Object{"type": "Mention", "href": m})
+	}
+	for _, e := range n.Emojis {
+		tag = append(tag, Object{
+			"type": "Emoji",
+			"name": ":" + e.Name + ":",
+			"icon": Object{"type": "Image", "url": e.URL},
+		})
 	}
 	if len(tag) > 0 {
 		note["tag"] = tag

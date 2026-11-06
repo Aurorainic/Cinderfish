@@ -355,6 +355,7 @@ type RemoteNote struct {
 	ReplyAPID   string
 	QuoteAPID   string
 	Tags        []string
+	Emojis      []EmojiRef
 	Sensitive   bool
 	CreatedAt   time.Time
 	// Poll is set for an inbound Question: the choices, whether more than one
@@ -387,6 +388,10 @@ func (s *Store) InsertRemoteNote(ctx context.Context, n RemoteNote) (string, err
 	if tags == nil {
 		tags = []string{}
 	}
+	emojis := n.Emojis
+	if emojis == nil {
+		emojis = []EmojiRef{}
+	}
 
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
@@ -398,10 +403,10 @@ func (s *Store) InsertRemoteNote(ctx context.Context, n RemoteNote) (string, err
 INSERT INTO notes (id, user_id, user_host, visibility, local_only, cw, text,
                    reply_id, renote_id, renote_user_id, ap_id, activity_uri,
                    tags, mentions, emojis, is_sensitive, created_at)
-VALUES ($1,$2,$3,$4,FALSE,$5,$6,$7,$8,$9,$10,$11,$12,'[]'::jsonb,'[]'::jsonb,$13,$14)
+VALUES ($1,$2,$3,$4,FALSE,$5,$6,$7,$8,$9,$10,$11,$12,'[]'::jsonb,$13,$14,$15)
 	`, id, n.UserID, n.UserHost, n.Visibility, nullIfEmpty(n.CW), nullIfEmpty(n.Text),
 		replyID, renoteID, renoteUserID, n.APID, n.ActivityURI,
-		marshalStrings(tags), n.Sensitive, n.CreatedAt); err != nil {
+		marshalStrings(tags), marshalAny(emojis), n.Sensitive, n.CreatedAt); err != nil {
 		return "", fmt.Errorf("federation: insert remote note: %w", err)
 	}
 
@@ -838,6 +843,17 @@ func marshalFields(f []ProfileField) []byte {
 		f = []ProfileField{}
 	}
 	b, _ := json.Marshal(f)
+	return b
+}
+
+// EmojiRef is one custom emoji referenced by a remote note.
+type EmojiRef struct {
+	Name string `json:"name"`
+	URL  string `json:"url"`
+}
+
+func marshalAny(v any) []byte {
+	b, _ := json.Marshal(v)
 	return b
 }
 
