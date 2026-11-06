@@ -15,15 +15,15 @@
 | 指标 | 数量 |
 |------|------|
 | Misskey 端点总数 | 440 |
-| Cinderfish 已注册路由 | 132 |
-| 其中 Misskey 同名路径 | 125 |
+| Cinderfish 已注册路由 | 136 |
+| 其中 Misskey 同名路径 | 129 |
 | 其中 Cinderfish 自有路径/别名 | 7（`notifications` 别名、`admin/federation/mode`、`admin/federation/allowlist`、`miauth/{session}/check`、`admin/object-storage`、`admin/deliver-queue`、`notes/history`） |
-| 未实现（Misskey 同名） | 315 |
+| 未实现（Misskey 同名） | 311 |
 
 统计口径：`internal/httpapi/server.go` 里 `HandleFunc("METHOD /api/…")` 的去重路径；
 GET 与 POST 同名路径只算一个。
 
-## 2. 已实现（132 条注册路由）
+## 2. 已实现（136 条注册路由）
 
 ```
 admin/accounts/create       admin/announcements/create  admin/announcements/delete
@@ -45,7 +45,8 @@ email-address/available     emojis                      federation/instances
 federation/show-instance
 following/create            following/delete
 following/requests/accept    following/requests/cancel   following/requests/list
-following/requests/reject    following/requests/sent     hashtags/trend
+following/requests/reject    following/requests/sent     hashtags/search
+hashtags/trend
 i                           i/apps                      i/delete-account
 i/export                    i/favorites                 i/import
 i/2fa/done                  i/2fa/password-less         i/2fa/register
@@ -53,7 +54,7 @@ i/2fa/unregister            i/change-password           i/regenerate-token
 i/signin-history
 i/notifications             i/pin                       i/registry/clear
 i/registry/get              i/registry/get-all          i/registry/get-detail
-i/registry/keys             i/registry/remove           i/registry/scopes
+i/registry/keys             i/registry/keys-with-type   i/registry/remove
 i/email-verification        i/update-email
 i/read-announcement         i/registry/set              i/revoke-token
 i/unpin                     i/update                    i/webhooks/create
@@ -65,10 +66,9 @@ miauth/gen-token            miauth/{session}/check*            notes/children   
 notes/create                notes/delete                notes/edit                  notes/favorites/create
 notes/favorites/delete      notes/global-timeline       notes/hybrid-timeline
 notes/local-timeline        notes/mentions              notes/polls/vote
-notes/reactions
-notes/reactions/create      notes/reactions/delete      notes/renotes
-notes/search                notes/search-by-tag
-notes/unrenote
+notes/reactions             notes/reactions/create      notes/reactions/delete
+notes/featured              notes/renotes               notes/search
+notes/search-by-tag         notes/unrenote
 notes/replies               notes/show                  notes/state                 notes/timeline
 notifications*              notifications/mark-all-as-read
 ping                        request-reset-password      reset-password
@@ -76,6 +76,7 @@ signin                      signup                      stats
 username/available          users/followers             users/following
 verify-email
 users                       users/notes                 users/report-abuse
+users/stats
 users/search
 users/show
 users/update
@@ -95,6 +96,8 @@ users/update
 
 2026-11-06 第十九波新增：`stats`（公开计数）；`admin/update-meta` 增加六个合规 URL 与
 `serverRules`（不是新路由）。
+
+2026-11-06 第四十三波新增：`users/stats`、`hashtags/search`、`i/registry/keys-with-type`、`notes/featured`。
 
 2026-11-06 第四十波新增：`notes/unrenote`（取消转贴）；同时修复出站投递从未接线的问题
 （`notes/create` 发 `Create`/`Announce`、`notes/delete` 发 `Delete`/`Undo(Announce)`）。

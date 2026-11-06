@@ -29,6 +29,7 @@
 | `/api/i/registry/get` | POST | 必须 | 否 | `internal/httpapi/registry.go:81` | 读取原始值 |
 | `/api/i/registry/get-detail` | POST | 必须 | 否 | `internal/httpapi/registry.go:105` | 读取值 + `updatedAt` |
 | `/api/i/registry/keys` | POST | 必须 | 否 | `internal/httpapi/registry.go:130` | 列出 scope 下的 key |
+| `/api/i/registry/keys-with-type` | POST | 必须 | 否 | `internal/httpapi/registry.go:229` | 列出 scope 下的 key 及其值类型 |
 | `/api/i/registry/scopes` | POST | 必须 | 否 | `internal/httpapi/registry.go` | 列出当前用户写过的 scope |
 | `/api/i/registry/get-all` | POST | 必须 | 否 | `internal/httpapi/registry.go:148` | 取出整个 scope |
 | `/api/i/registry/remove` | POST | 必须 | 否 | `internal/httpapi/registry.go:170` | 删除一个 key |
@@ -1243,3 +1244,10 @@ UserLite 部分也有简化：`name`/`avatarUrl` 只从 profile 行来，没有 
 - 公网 `meta` 同步返回：`iconUrl`/`bannerUrl` 空串、`themeColor` 回落到默认值。
 
 实例图标被 `MkInstanceTicker`、关于页与 favicon 使用；横幅显示在欢迎页等位置。
+
+## 2026-11-06 增补：i/registry/keys-with-type（第四十三波）
+
+请求同 `i/registry/keys`（`key` 忽略、`scope` 生效、需登录）→ `{ "<key>": "<type>" }`。
+`type` 从存的 JSON 推断：`string`、`number`、`boolean`、`object`、`array`、`null`。
+上游把类型与值一起存，本实现只存值，因此把数字存成字符串的客户端会看到 `string`——
+这与它实际读回的值一致，是刻意的不做魔法。

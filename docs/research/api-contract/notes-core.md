@@ -33,6 +33,7 @@
 | `POST /api/notes/favorites/delete` | 必需 | `noteId` | `{}` | `internal/httpapi/notes_favorites.go:71` |
 | `POST /api/i/favorites` | 必需 | `limit`、`sinceId`、`untilId`、`sinceDate`、`untilDate` | `NoteFavorite[]` | `internal/httpapi/notes_favorites.go:106` |
 | `POST /api/notes/polls/vote` | 必需 | `noteId`、`choice` | `{}` | `internal/httpapi/notes_polls.go:23` |
+| `POST /api/notes/featured` | 匿名可 | `limit`、`sinceId`、`untilId` | `Note[]` | `internal/httpapi/notes.go:623` |
 
 本命名空间**没有** GET 别名，也没有短路径别名（`notes/create`、`notes/show` 等即为 Misskey 原生路径）。
 
@@ -1047,3 +1048,12 @@ Firefish 的「取消转发」与「删除」是两个动作：它传的是**被
 
 返回 `UserDetailed[]`，排除冻结账号；带凭据时排除双向屏蔽关系；每条结果带
 `notesCount` / `followersCount` / `followingCount`。`origin` 非法 → 400。
+
+## 2026-11-06 增补：notes/featured（第四十三波）
+
+`{limit?, sinceId?, untilId?}` → `Note[]`（非详情版），匿名与登录看到同一份列表。
+
+取近 **30 天**、`public`、本地、非转贴、未删除的笔记，按
+`renote_count * 2 + replies_count + 反应数` 降序，同分按 id 倒序。上游用 Redis 里的评分索引，
+本实现从已存的计数推导——不需要第二条写入路径，删除笔记后立刻生效。30 天窗口是为了让查询
+只看最近的行；窗口之外的老笔记不会出现，这是与上游的已知差异。

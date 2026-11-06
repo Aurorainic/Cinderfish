@@ -35,3 +35,35 @@ func (s *Server) handleHashtagsTrend(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, out)
 }
+
+// handleHashtagsSearch implements POST /api/hashtags/search.
+//
+// `query` may be empty, which asks for the most used tags overall — the shape
+// the composer's suggestion list wants. `sort` is accepted and ignored:
+// Cinderfish only ranks by usage, and silently honouring half of upstream's
+// sort modes would be worse than ranking the same way every time.
+func (s *Server) handleHashtagsSearch(w http.ResponseWriter, r *http.Request) {
+	if s.hashtags == nil {
+		writeAPIError(w, &APIError{
+			Message: "Not available.", Code: "INTERNAL_ERROR",
+			ID: errIDInternal, Kind: "server", Status: http.StatusServiceUnavailable,
+		})
+		return
+	}
+	var body struct {
+		Query  string `json:"query"`
+		Limit  int    `json:"limit"`
+		Offset int    `json:"offset"`
+		Sort   string `json:"sort"`
+	}
+	if err := decodeOptionalJSON(r, &body); err != nil {
+		writeAPIError(w, err)
+		return
+	}
+	tags, err := s.hashtags.SearchHashtags(r.Context(), body.Query, body.Limit, body.Offset)
+	if err != nil {
+		writeInternalServerError(w)
+		return
+	}
+	writeJSON(w, http.StatusOK, tags)
+}

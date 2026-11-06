@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/Aurorainic/cinderfish/internal/account"
@@ -217,4 +218,50 @@ func (s *Server) handleRegistryClear(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, struct{}{})
+}
+
+// handleRegistryKeysWithType implements POST /api/i/registry/keys-with-type:
+// the key list plus the JSON type of each stored value.
+//
+// Upstream keeps the type next to the value; Cinderfish infers it from the
+// stored JSON, which is the same answer unless a client stored a number as a
+// string.
+func (s *Server) handleRegistryKeysWithType(w http.ResponseWriter, r *http.Request) {
+	if !s.requireRegistry(w) {
+		return
+	}
+	var body registryRequest
+	userID, ok := s.registryAuth(w, r, &body)
+	if !ok {
+		return
+	}
+	all, err := s.registry.All(r.Context(), userID, body.Scope)
+	if err != nil {
+		writeInternalServerError(w)
+		return
+	}
+	out := make(map[string]string, len(all))
+	for key, raw := range all {
+		out[key] = registryValueType(raw)
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+// registryValueType names the JSON type of a stored registry value.
+func registryValueType(raw json.RawMessage) string {
+	trimmed := strings.TrimSpace(string(raw))
+	switch {
+	case trimmed == "" || trimmed == "null":
+		return "null"
+	case trimmed[0] == '"':
+		return "string"
+	case trimmed[0] == '{':
+		return "object"
+	case trimmed[0] == '[':
+		return "array"
+	case trimmed == "true" || trimmed == "false":
+		return "boolean"
+	default:
+		return "number"
+	}
 }

@@ -612,3 +612,40 @@ func (s *Server) handleNotesReactionsDelete(w http.ResponseWriter, r *http.Reque
 	}
 	writeJSON(w, http.StatusOK, map[string]any{})
 }
+
+// handleNotesFeatured implements POST /api/notes/featured: public local notes
+// ranked by engagement over the recent window.
+//
+// Upstream ranks through a Redis-backed score that Cinderfish does not keep;
+// deriving the order from the stored counters gives the same shape without a
+// second write path. An anonymous caller and a signed-in one see the same
+// list, matching the endpoint's public nature.
+func (s *Server) handleNotesFeatured(w http.ResponseWriter, r *http.Request) {
+	if s.notes == nil {
+		writeInternalServerError(w)
+		return
+	}
+	var body struct {
+		Limit   int    `json:"limit"`
+		UntilID string `json:"untilId"`
+		SinceID string `json:"sinceId"`
+	}
+	if err := decodeOptionalJSON(r, &body); err != nil {
+		writeAPIError(w, err)
+		return
+	}
+	rows, err := s.notes.Featured(r.Context(), body.Limit, body.UntilID, body.SinceID)
+	if err != nil {
+		writeInternalServerError(w)
+		return
+	}
+	var viewerID string
+	if info, err := s.authenticate(r.Context(), r, bodyAsMap(r)); err == nil && info != nil {
+		viewerID = info.User.ID
+	}
+	out := make([]any, 0, len(rows))
+	for _, n := range rows {
+		out = append(out, packNote(n, s.notePackContext(r.Context(), n, viewerID)))
+	}
+	writeJSON(w, http.StatusOK, out)
+}

@@ -52,6 +52,8 @@ import type {
 	TwoFactorRegistration,
 	UserNameAvailability,
 	EmailAddressAvailability,
+	UserStats,
+	RegistryValueType,
 	UserDetailed,
 	UserLite,
 	Webhook,
@@ -108,6 +110,7 @@ export const ENDPOINTS = {
 	usersSearch: "users/search",
 	usersReportAbuse: "users/report-abuse",
 	usersNotes: "users/notes",
+	usersStats: "users/stats",
 	usersFollowers: "users/followers",
 	usersFollowing: "users/following",
 
@@ -133,6 +136,7 @@ export const ENDPOINTS = {
 	registryGet: "i/registry/get",
 	registryGetDetail: "i/registry/get-detail",
 	registryKeys: "i/registry/keys",
+	registryKeysWithType: "i/registry/keys-with-type",
 	registryScopes: "i/registry/scopes",
 	registryGetAll: "i/registry/get-all",
 	registryRemove: "i/registry/remove",
@@ -146,6 +150,7 @@ export const ENDPOINTS = {
 	notesState: "notes/state",
 	notesDelete: "notes/delete",
 	notesUnrenote: "notes/unrenote",
+	notesFeatured: "notes/featured",
 	notesReplies: "notes/replies",
 	notesMentions: "notes/mentions",
 	notesSearch: "notes/search",
@@ -160,6 +165,7 @@ export const ENDPOINTS = {
 	notesFavoritesDelete: "notes/favorites/delete",
 	notesPollsVote: "notes/polls/vote",
 	hashtagsTrend: "hashtags/trend",
+	hashtagsSearch: "hashtags/search",
 
 	// timelines
 	notesTimeline: "notes/timeline",
@@ -573,6 +579,7 @@ export interface EndpointMap {
 	};
 	[ENDPOINTS.usersShow]: { req: UsersShowParams; res: UserDetailed };
 	[ENDPOINTS.usersNotes]: { req: UsersNotesParams; res: NoteDetailed[] };
+	[ENDPOINTS.usersStats]: { req: { userId?: string }; res: UserStats };
 	[ENDPOINTS.usersFollowers]: {
 		req: UsersFollowersParams;
 		res: Following[];
@@ -612,6 +619,10 @@ export interface EndpointMap {
 		res: RegistryDetail;
 	};
 	[ENDPOINTS.registryKeys]: { req: RegistryGetParams; res: string[] };
+	[ENDPOINTS.registryKeysWithType]: {
+		req: RegistryGetParams;
+		res: Record<string, RegistryValueType>;
+	};
 	[ENDPOINTS.registryScopes]: { req: { domain?: string | null }; res: string[][] };
 	[ENDPOINTS.registryGetAll]: {
 		req: RegistryGetParams;
@@ -642,6 +653,10 @@ export interface EndpointMap {
 	};
 	[ENDPOINTS.notesDelete]: { req: NoteIdParams; res: EmptyResponse };
 	[ENDPOINTS.notesUnrenote]: { req: NoteIdParams; res: EmptyResponse };
+	[ENDPOINTS.notesFeatured]: {
+		req: { limit?: number; sinceId?: string; untilId?: string };
+		res: Note[];
+	};
 	[ENDPOINTS.notesReplies]: { req: NoteListParams; res: NoteDetailed[] };
 	[ENDPOINTS.notesRenotes]: { req: NoteListParams; res: NoteDetailed[] };
 	[ENDPOINTS.notesConversation]: {
@@ -674,6 +689,10 @@ export interface EndpointMap {
 		res: EmptyResponse;
 	};
 	[ENDPOINTS.hashtagsTrend]: { req: Record<string, never>; res: HashtagTrend[] };
+	[ENDPOINTS.hashtagsSearch]: {
+		req: { query?: string; limit?: number; offset?: number; sort?: string };
+		res: string[];
+	};
 
 	[ENDPOINTS.notesMentions]: {
 		req: {

@@ -303,3 +303,56 @@ WHERE user_id = $1 AND deleted_at IS NULL AND local_only = FALSE
 		packed["notesCount"] = notes
 	}
 }
+
+// handleUsersStats implements POST /api/users/stats: the activity counters of
+// one account.
+//
+// Upstream requires userId; this port also accepts an empty userId and answers
+// for the caller, which is what the account-info page needs for itself. The
+// endpoint is public: every number it returns is already on the profile.
+func (s *Server) handleUsersStats(w http.ResponseWriter, r *http.Request) {
+	if s.accounts == nil {
+		writeInternalServerError(w)
+		return
+	}
+	var body struct {
+		UserID string `json:"userId"`
+	}
+	if err := decodeOptionalJSON(r, &body); err != nil {
+		writeAPIError(w, err)
+		return
+	}
+
+	userID := body.UserID
+	if userID == "" {
+		info, err := s.authenticate(r.Context(), r, bodyAsMap(r))
+		if err != nil || info == nil {
+			writeAPIError(w, invalidParamError("userId is required"))
+			return
+		}
+		userID = info.User.ID
+	}
+
+	user, err := s.accounts.GetByID(r.Context(), userID)
+	if err != nil || user == nil {
+		writeAPIError(w, &APIError{
+			Message: "No such user.", Code: "NO_SUCH_USER",
+			ID: errIDNoSuchUser, Kind: "client", Status: http.StatusNotFound,
+		})
+		return
+	}
+	stats, err := s.accounts.Stats(r.Context(), user.ID)
+	if err != nil {
+		writeInternalServerError(w)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"notesCount":     stats.NotesCount,
+		"repliesCount":   stats.RepliesCount,
+		"renotesCount":   stats.RenotesCount,
+		"repliedCount":   stats.RepliedCount,
+		"renotedCount":   stats.RenotedCount,
+		"pollVotesCount": stats.PollVotesCount,
+		"pollVotedCount": stats.PollVotedCount,
+	})
+}

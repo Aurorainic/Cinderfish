@@ -3224,6 +3224,44 @@ go vet ./...              # exit 0
 - 入站 `Accept` 的签名方是否为接受者。
 - `go test` 与浏览器走查未执行。
 
+## 12BG. 批次：四个兼容端点（2026-11-06）
+
+**工作方式**：目标模式第四十三波，继续只写代码、验证到编译层。施工依据
+`docs/research/2026-11-06-firefish-port-wave43-contract.md`。
+
+### 12BG.1 落地清单
+
+| 层 | 文件 | 说明 |
+|----|------|------|
+| 统计 | `internal/account/stats.go` | `Stats`：五条聚合查询（笔记分桶、被回复/被转贴、投票两向） |
+| 端点 | `internal/httpapi/users.go`、`hashtags.go`、`registry.go`、`notes.go` | `users/stats`、`hashtags/search`、`i/registry/keys-with-type`、`notes/featured` |
+| 查询 | `internal/note/hashtag_search.go`、`featured.go` | 标签搜索与推荐排序 |
+| 前端 | `api/endpoints.ts`、`api/types.ts`、`pages/SettingsAccountInfo.vue` | 四个端点类型；账号信息页改用真实统计，移除过时的「不可用」项 |
+| 文档 | `notes-core.md`、`timelines-notifications.md`、`admin-emoji-registry.md`、`auth-users.md`、台账 | 契约与计数（136/129/311） |
+
+### 12BG.2 有意的限制
+
+1. `hashtags/search` 忽略 `sort`。
+2. `notes/featured` 有 30 天窗口。
+3. `keys-with-type` 的类型是读时推断。
+4. 四个端点均未新增测试。
+
+### 12BG.3 验证证据（编译层）
+
+```
+gofmt -l internal/ cmd/                 # 空
+go vet ./...                            # exit 0
+cd web && pnpm exec vue-tsc --noEmit    # exit 0
+cd web && pnpm run check:port           # hardTotal 0（400 文件）
+cd web && pnpm build                    # exit 0
+```
+
+### 12BG.4 仍未验证
+
+- 四个端点的返回值（计数一致性、标签排序、类型推断、推荐排序）。
+- 账号信息页的实际渲染与统计失败时的降级。
+- `go test` 与浏览器走查未执行。
+
 ## 13. 文档索引
 
 | 文档 | 内容 |
@@ -3292,6 +3330,7 @@ go vet ./...              # exit 0
 | `docs/research/2026-11-06-firefish-port-wave40-contract.md` | **第四十波施工契约（出站投递与取消转贴），见 §12BD** |
 | `docs/research/2026-11-06-firefish-port-wave41-contract.md` | **第四十一波施工契约（编辑的联邦 Update），见 §12BE** |
 | `docs/research/2026-11-06-firefish-port-wave42-contract.md` | **第四十二波施工契约（按活动作者签名），见 §12BF** |
+| `docs/research/2026-11-06-firefish-port-wave43-contract.md` | **第四十三波施工契约（四个兼容端点），见 §12BG** |
 
 ## 14. 已知的未验证项
 
@@ -3353,6 +3392,7 @@ go vet ./...              # exit 0
 - **第四十波未测（2026-11-06，见 §12BD.4）**：出站投递与取消转贴只有编译层证据；真实双实例投递未验证。
 - **第四十一波未测（2026-11-06，见 §12BE.4）**：编辑的 Update 双向都只有编译层证据。
 - **第四十二波未测（2026-11-06，见 §12BF.4）**：按作者签名只有编译层证据，双实例未验证。
+- **第四十三波未测（2026-11-06，见 §12BG.4）**：四个兼容端点与账号信息页只有编译层证据。
 - **仍未移植的设置页**：邮箱、整合、导入导出、迁移、Webhook、插件、自定义 KaTeX、状态栏、
   删除账号、应用授权以外的账号操作；对应后端端点不存在或前端缺少依赖（见第五波契约 §3.3）。
 - **仍缺的 widgets**：rss、rss-ticker、server-metric、online-users、federation、job-queue、aiscript、

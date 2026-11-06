@@ -4,7 +4,7 @@
 
 **证据口径**：所有请求字段、响应字段、错误码、HTTP 状态码都从本仓库代码读出（引用 `internal/...:行号`），不以 Misskey 官方文档为准；与 Misskey 的差异处会单独标注。核对过的上游参考为 `tmp/refcheck/misskey`（`c05e844`）与 `tmp/refcheck/firefish`（`02c31e0`），仅用于"差异"小节，不用于推断本实现行为。
 
-覆盖端点：`signup`、`signin`、`username/available`、`email-address/available`、`i/update-email`、`i/email-verification`、`verify-email`、`request-reset-password`、`reset-password`、`miauth/gen-token`、`i`、`i/update`（含 `users/update` 别名）、`i/2fa/*`、`i/change-password`、`i/regenerate-token`、`i/signin-history`、`users/show`、`users/notes`、`users/followers`、`users/following`、`i/pin`、`i/unpin`，以及 OAuth 的三个端点。个人资料打包（`UserLite` / `UserDetailed` / `MeDetailed`）与 `users/notes` 用到的 `Note` 打包也在此文档化。
+覆盖端点：`signup`、`signin`、`username/available`、`users/stats`、`i/registry/keys-with-type`、`email-address/available`、`i/update-email`、`i/email-verification`、`verify-email`、`request-reset-password`、`reset-password`、`miauth/gen-token`、`i`、`i/update`（含 `users/update` 别名）、`i/2fa/*`、`i/change-password`、`i/regenerate-token`、`i/signin-history`、`users/show`、`users/notes`、`users/followers`、`users/following`、`i/pin`、`i/unpin`，以及 OAuth 的三个端点。个人资料打包（`UserLite` / `UserDetailed` / `MeDetailed`）与 `users/notes` 用到的 `Note` 打包也在此文档化。
 
 ---
 
@@ -34,6 +34,7 @@
 | POST | `/api/users/update` | 需登录 | 同上（`internal/httpapi/server.go:119`） | `i/update` 的别名，行为完全相同 |
 | POST | `/api/users/show` | 可选登录 | `internal/httpapi/account.go:220` | 用户详情；带 token 时补关系标志 |
 | POST | `/api/users/notes` | 可选登录 | `internal/httpapi/users.go:24` | 某用户的 public/home 笔记列表 |
+| POST | `/api/users/stats` | 匿名可 | `internal/httpapi/users.go:313` | 某用户的七项计数；`userId` 缺省时取调用者 |
 | POST | `/api/users/followers` | 可选登录 | `internal/httpapi/users.go:104` | 粉丝列表（`Following` 信封） |
 | POST | `/api/users/following` | 可选登录 | `internal/httpapi/users.go:110` | 关注列表（`Following` 信封） |
 | POST | `/api/i/pin` | 需登录 | `internal/httpapi/i_pin.go:17` | 置顶自己的笔记（上限 5） |
@@ -1391,3 +1392,15 @@ OAuth 2.0 授权码端点（仅 PKCE `S256`）。认证：**需要登录**，且
 - 注册流程不接受邮箱（`emailRequiredForSignup` 恒 `false`），邮箱只能在登录后补填。
 - 没有「重新发送」冷却以外的限流，也没有按 IP 的发送配额。
 - 不支持 HTML 邮件与多语言模板：正文是固定中文纯文本。
+
+## 2026-11-06 增补：users/stats（第四十三波）
+
+`{userId?}` → `{notesCount, repliesCount, renotesCount, repliedCount, renotedCount, pollVotesCount, pollVotedCount}`。
+
+三个笔记桶**互斥**：`notesCount` 只数既不是回复也不是转贴的笔记，`repliesCount` 数回复，
+`renotesCount` 数转贴，所以三者相加等于该账号的全部笔记（未删除）。`repliedCount` 是「自己的笔记
+被多少条不同的笔记回复过」，`renotedCount` 同理；`pollVotesCount` 是自己投出的票数，
+`pollVotedCount` 是自己的投票收到的票数。全部从现有表聚合，删除笔记后立刻反映。
+
+`userId` 省略时取调用者（需要凭据），这是给账号信息页用的便利；上游要求必填。
+其它所有数字都是公开信息，因此端点不要求登录。

@@ -26,6 +26,7 @@
 | `/api/i/notifications` | POST | **必需** | 同 `notifications`（**同一 handler 的别名**） | `Notification[]` | `internal/httpapi/server.go:184` |
 | `/api/notifications/mark-all-as-read` | POST | **必需** | 无 | `{}` | `internal/httpapi/notifications.go:106` |
 | `/api/hashtags/trend` | POST | 匿名可 | 无 | `HashtagTrend[]` | `internal/httpapi/hashtags.go:13` |
+| `/api/hashtags/search` | POST | 匿名可 | `query`、`limit`、`offset`（`sort` 忽略） | `string[]` | `internal/httpapi/hashtags.go:45` |
 | `/streaming` | GET（WebSocket Upgrade） | 可选（匿名可） | 无 body；令牌走 `?i=` 或 `Authorization` | WebSocket 帧 | `internal/httpapi/streaming.go:45` |
 
 **没有任何端点要求管理员权限。** 本命名空间只有三种认证档位：需要登录、匿名可用、弱认证（时间线里"坏令牌当作匿名"）。
@@ -709,3 +710,12 @@ Misskey Streaming API 的 WebSocket 入口。`internal/httpapi/streaming.go:45` 
 需登录。参数：`following`（只保留关注者与自己）、`limit`、`sinceId`/`untilId`、`visibility`。
 返回 `Note[]`，匹配 `notes.mentions`（本地用户 id 数组）并套用可见性、静音、屏蔽与实例静音过滤。
 远端账号的提及不会进入该数组，因此不出现在此列表。
+
+## 2026-11-06 增补：hashtags/search（第四十三波）
+
+`{query?, limit?, offset?, sort?}` → `string[]`（小写标签）。`query` 为空表示「最常用的标签」，
+非空则按包含匹配（大小写不敏感）。排序固定为「使用次数降序，同次数按字母升序」，`offset` 默认
+0、`limit` 默认 10 上限 100。`sort` 字段接受但忽略——上游的排序模式依赖 Redis 索引，
+本实现只有使用次数一个信号，半实现一个排序不如固定成同一种。
+
+只统计未删除、且可见性为 `public`/`home` 的笔记标签，与 `hashtags/trend` 同一口径。

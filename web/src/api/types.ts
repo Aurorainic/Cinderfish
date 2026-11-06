@@ -438,6 +438,27 @@ export interface UserNameAvailability {
 	available: boolean;
 }
 
+// users/stats: the three note buckets are disjoint, so they add up to every
+// note the account has written.
+export interface UserStats {
+	notesCount: number;
+	repliesCount: number;
+	renotesCount: number;
+	repliedCount: number;
+	renotedCount: number;
+	pollVotesCount: number;
+	pollVotedCount: number;
+}
+
+// i/registry/keys-with-type: the stored value's JSON type, inferred on read.
+export type RegistryValueType =
+	| "string"
+	| "number"
+	| "boolean"
+	| "object"
+	| "array"
+	| "null";
+
 // email-address/available: `reason` is "format" for a malformed address and
 // "used" when another account already owns it.
 export interface EmailAddressAvailability {

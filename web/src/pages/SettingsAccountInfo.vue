@@ -39,6 +39,32 @@
 					<template #key>{{ t("followersCount") }}</template>
 					<template #value>{{ number(account.followersCount) }}</template>
 				</CfKeyValue>
+				<template v-if="stats != null">
+					<CfKeyValue oneline>
+						<template #key>回复</template>
+						<template #value>{{ number(stats.repliesCount) }}</template>
+					</CfKeyValue>
+					<CfKeyValue oneline>
+						<template #key>{{ t("renote") }}</template>
+						<template #value>{{ number(stats.renotesCount) }}</template>
+					</CfKeyValue>
+					<CfKeyValue oneline>
+						<template #key>被回复</template>
+						<template #value>{{ number(stats.repliedCount) }}</template>
+					</CfKeyValue>
+					<CfKeyValue oneline>
+						<template #key>被转发</template>
+						<template #value>{{ number(stats.renotedCount) }}</template>
+					</CfKeyValue>
+					<CfKeyValue oneline>
+						<template #key>投出的票</template>
+						<template #value>{{ number(stats.pollVotesCount) }}</template>
+					</CfKeyValue>
+					<CfKeyValue oneline>
+						<template #key>收到的票</template>
+						<template #value>{{ number(stats.pollVotedCount) }}</template>
+					</CfKeyValue>
+				</template>
 			</section>
 
 			<section class="_formBlock">
@@ -76,13 +102,15 @@
 </template>
 
 <script lang="ts" setup>
-// Firefish fetches `users/stats` for the statistics block. Cinderfish has no
-// such endpoint (docs/research/api-contract/auth-users.md), but `i` already
-// carries notesCount / followingCount / followersCount, so the block is filled
-// from the profile and refreshed once on mount. Password change, 2FA and
-// account deletion have no endpoints at all, so they are listed, not rendered.
+// Firefish fetches `users/stats` for the statistics block; the endpoint landed
+// in wave 43, so the count rows come from it and the three totals still come
+// from the profile (`i` carries notesCount / followingCount / followersCount).
+// Password change and 2FA live on the security page; account deletion has no
+// endpoint and stays listed, not rendered.
 import { computed, onMounted, ref } from "vue";
 import { me, refreshAccount } from "@/account";
+import { api } from "@/api/client";
+import type { UserStats } from "@/api/types";
 import CfButton from "@/components/ui/CfButton.vue";
 import CfInfo from "@/components/ui/CfInfo.vue";
 import CfKeyValue from "@/components/ui/CfKeyValue.vue";
@@ -97,14 +125,13 @@ defineOptions({ name: "CfPageSettingsAccountInfo" });
 const account = computed(() => me.value);
 const loading = ref(false);
 const loadError = ref<string | null>(null);
+const stats = ref<UserStats | null>(null);
 
 interface UnavailableItem {
 	title: string;
 }
 
 const unavailableItems = computed<UnavailableItem[]>(() => [
-	{ title: t("changePassword") },
-	{ title: t("twoStepAuthentication") },
 	{ title: t("deleteAccount") },
 ]);
 
@@ -119,6 +146,15 @@ async function load(): Promise<void> {
 		const fresh = await refreshAccount();
 		if (fresh == null && me.value != null) {
 			loadError.value = t("somethingHappened");
+		}
+		// A missing stat block is not worth an error banner: the profile
+		// numbers above are already shown.
+		if (me.value != null) {
+			try {
+				stats.value = await api("users/stats", { userId: me.value.id });
+			} catch {
+				stats.value = null;
+			}
 		}
 	} finally {
 		loading.value = false;
