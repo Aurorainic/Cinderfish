@@ -2,6 +2,7 @@ package httpapi_test
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"testing"
@@ -63,8 +64,7 @@ func TestNotesSearchRespectsVisibility(t *testing.T) {
 func TestNotesSearchHidesMutedAuthor(t *testing.T) {
 	f := newFederationServer(t, "public")
 	aliceToken, _ := f.registerUser(t, "alice")
-	bobToken, bobID := f.registerUser(t, "bob")
-	_ = bobID
+	bobToken, _ := f.registerUser(t, "bob")
 	createSearchNote(t, f, aliceToken, "muted searchterm", "public")
 
 	if got := len(searchList(t, f, "/api/notes/search", map[string]any{"query": "muted searchterm", "i": bobToken})); got != 1 {
@@ -177,5 +177,91 @@ func TestUsersSearchHidesBlocked(t *testing.T) {
 	}
 	if got := len(searchList(t, f, "/api/users/search", map[string]any{"query": "ali"})); got != 1 {
 		t.Errorf("anonymous hits = %d, want 1", got)
+	}
+}
+
+// TestNotesSearchFilters covers the parameters the timeline search accepts
+// beyond the query itself: offset, userId, host (local only) and withFiles.
+func TestNotesSearchFilters(t *testing.T) {
+	f := newFederationServer(t, "public")
+	aliceToken, aliceID := f.registerUser(t, "alice")
+	bobToken, _ := f.registerUser(t, "bob")
+
+	first := createNote(t, f.ts, aliceToken, map[string]any{"text": "w63filter first"})
+	second := createNote(t, f.ts, aliceToken, map[string]any{"text": "w63filter second"})
+	createNote(t, f.ts, bobToken, map[string]any{"text": "w63filter third"})
+
+	// Attach a drive file to the second note so withFiles has something to
+	// match. The file row only needs to exist for the EXISTS subquery.
+	if _, err := f.pool.Exec(context.Background(), `
+INSERT INTO drive_files (id, user_id, name, content_type, size, md5, storage_key, storage_backend)
+VALUES ('w63file', $1, 'w63.txt', 'text/plain', 3, 'w63md5', 'w63/key', 'local')
+`, aliceID); err != nil {
+		t.Fatalf("insert file: %v", err)
+	}
+	if _, err := f.pool.Exec(context.Background(),
+		`UPDATE notes SET file_ids = ARRAY['w63file']::text[] WHERE id = $1`, second); err != nil {
+		t.Fatalf("attach file: %v", err)
+	}
+
+	search := func(params map[string]any) []any {
+		params["query"] = "w63filter"
+		return postListWithToken(t, f.ts, "/api/notes/search", "", params)
+	}
+
+	// Offset pages through the same ordered set.
+	all := search(map[string]any{})
+	if len(all) != 3 {
+		t.Fatalf("search = %d notes, want 3", len(all))
+	}
+	page := search(map[string]any{"offset": 2})
+	if len(page) != 1 {
+		t.Fatalf("offset page = %d notes, want 1", len(page))
+	}
+	// Newest first: the third note is row 0, so offset 2 lands on the first.
+	oldest, _ := page[0].(map[string]any)
+	if oldest["id"] != first {
+		t.Errorf("offset page note = %v, want %s", oldest["id"], first)
+	}
+
+	// userId narrows to one author.
+	byAlice := search(map[string]any{"userId": aliceID})
+	if len(byAlice) != 2 {
+		t.Fatalf("userId filter = %d notes, want 2", len(byAlice))
+	}
+	for _, item := range byAlice {
+		if user, _ := item.(map[string]any)["user"].(map[string]any); user["id"] != aliceID {
+			t.Errorf("userId filter returned %v", user["id"])
+		}
+	}
+
+	// An empty host keeps local notes only.
+	local := search(map[string]any{"host": ""})
+	if len(local) != 3 {
+		t.Fatalf("host air filter = %d notes, want 3", len(local))
+	}
+	// A non-empty host matches nothing here.
+	remote := search(map[string]any{"host": "remote.example"})
+	if len(remote) != 0 {
+		t.Errorf("host remote.example = %d notes, want 0", len(remote))
+	}
+
+	// withFiles keeps the note that carries an attachment.
+	withFiles := search(map[string]any{"withFiles": true})
+	if len(withFiles) != 1 {
+		t.Fatalf("withFiles = %d notes, want 1", len(withFiles))
+	}
+	if got, _ := withFiles[0].(map[string]any); got["id"] != second {
+		t.Errorf("withFiles note = %v, want %s", got["id"], second)
+	}
+
+	// search-by-tag has the same withFiles switch.
+	if _, err := f.pool.Exec(context.Background(),
+		`UPDATE notes SET tags = '["w63filter"]'::jsonb WHERE id = $1`, second); err != nil {
+		t.Fatalf("tag: %v", err)
+	}
+	tagged := postListWithToken(t, f.ts, "/api/notes/search-by-tag", "", map[string]any{"tag": "w63filter", "withFiles": true})
+	if len(tagged) != 1 || tagged[0].(map[string]any)["id"] != second {
+		t.Errorf("search-by-tag withFiles = %v, want the tagged note", tagged)
 	}
 }
