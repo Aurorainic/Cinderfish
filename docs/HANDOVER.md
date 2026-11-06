@@ -2848,6 +2848,42 @@ cd web && pnpm build                    # exit 0
 - 表格在移动端与实例信息页跳转。
 - `go test` 与浏览器走查未执行。
 
+## 12AW. 批次：笔记「已编辑」标记（2026-11-06）
+
+**工作方式**：目标模式第三十三波，继续只写代码、验证到编译层。施工依据
+`docs/research/2026-11-06-firefish-port-wave33-contract.md`。
+
+### 12AW.1 落地清单
+
+| 层 | 文件 | 说明 |
+|----|------|------|
+| 服务层 | `internal/note/service.go` | `Note.UpdatedAt`、`noteSelect`/`scanNote` 读取 `updated_at` |
+| 打包 | `internal/httpapi/notes_pack.go` | `updatedAt`（RFC3339Nano 或 null） |
+| 前端 | `api/types.ts`、`components/MkNoteHeader.vue` | 类型字段与铅笔标记（title 显示编辑时间） |
+| 文档 | `api-contract/notes-core.md` | 字段与副作用说明 |
+
+### 12AW.2 有意的限制
+
+1. 仅本地编辑设置 `updatedAt`，远端 Update 未处理。
+2. 无单次编辑详情入口。
+3. 其余 locale 未生成。
+
+### 12AW.3 验证证据（编译层）
+
+```
+gofmt -l internal/ cmd/                 # 空
+go vet ./...                            # exit 0
+cd web && pnpm exec vue-tsc --noEmit    # exit 0
+cd web && pnpm run check:port           # hardTotal 0
+cd web && pnpm build                    # exit 0
+```
+
+### 12AW.4 仍未验证
+
+- 编辑后列表与详情页的 `updatedAt`、铅笔标记与提示时间。
+- 未编辑笔记的 `updatedAt: null`。
+- `go test` 与浏览器走查未执行。
+
 ## 13. 文档索引
 
 | 文档 | 内容 |
@@ -2906,6 +2942,7 @@ cd web && pnpm build                    # exit 0
 | `docs/research/2026-11-06-firefish-port-wave30-contract.md` | **第三十波施工契约（账号导入），见 §12AT** |
 | `docs/research/2026-11-06-firefish-port-wave31-contract.md` | **第三十一波施工契约（实例图标/横幅/主题色），见 §12AU** |
 | `docs/research/2026-11-06-firefish-port-wave32-contract.md` | **第三十二波施工契约（已收录实例列表），见 §12AV** |
+| `docs/research/2026-11-06-firefish-port-wave33-contract.md` | **第三十三波施工契约（笔记已编辑标记），见 §12AW** |
 
 ## 14. 已知的未验证项
 
@@ -2957,6 +2994,7 @@ cd web && pnpm build                    # exit 0
 - **第三十波未测（2026-11-06，见 §12AT.4）**：账号导入只过了编译层，导出→导入往返、冲突与非法格式未验证。
 - **第三十一波未测（2026-11-06，见 §12AU.4）**：实例图标/横幅/主题色只过了编译层，保存与展示未验证。
 - **第三十二波未测（2026-11-06，见 §12AV.4）**：已收录实例列表只过了编译层，排序/过滤/空库未验证。
+- **第三十三波未测（2026-11-06，见 §12AW.4）**：已编辑标记只过了编译层，编辑后的显示与时间提示未验证。
 - **仍未移植的设置页**：邮箱、整合、导入导出、迁移、Webhook、插件、自定义 KaTeX、状态栏、
   删除账号、应用授权以外的账号操作；对应后端端点不存在或前端缺少依赖（见第五波契约 §3.3）。
 - **仍缺的 widgets**：rss、rss-ticker、server-metric、online-users、federation、job-queue、aiscript、

@@ -167,6 +167,7 @@ export interface Poll {
 export interface Note {
 	id: string;
 	createdAt: string;
+	updatedAt: string | null;
 	userId: string;
 	user: UserLite;
 	text: string | null;

@@ -20,6 +20,11 @@
 					<MkA class="created-at" :to="notePage(note)">
 						<MkTime :time="note.createdAt" />
 					</MkA>
+					<i
+						v-if="note.updatedAt"
+						class="ph-pencil ph-bold edited"
+						:title="editedTitle"
+					></i>
 					<MkVisibility :note="note" />
 				</div>
 				<MkInstanceTicker
@@ -34,10 +39,13 @@
 
 <script lang="ts" setup>
 // Degradations vs Firefish:
-//   * the "edited" marker is dropped: Cinderfish notes have no `updatedAt`;
+//   * the "edited" marker shows when `updatedAt` is set; the tooltip carries
+//     the edit time;
 //   * `note.user.instance` is always `null` in this backend, so the instance
 //     ticker never renders (the setting is still honoured if it gains a value).
+import { computed } from "vue";
 import type { Note, NoteDetailed } from "@/api/types";
+import { t } from "@/i18n";
 import MkVisibility from "@/components/MkVisibility.vue";
 import MkInstanceTicker from "@/components/MkInstanceTicker.vue";
 import { notePage } from "@/filters/note";
@@ -58,6 +66,16 @@ const showTicker =
 	defaultStore.state.instanceTicker === "always" ||
 	(defaultStore.state.instanceTicker === "remote" &&
 		props.note.user.instance != null);
+
+const editedTitle = computed(() => {
+	const at = props.note.updatedAt;
+	if (at == null) return "";
+	const date = new Date(at);
+	return t("edited", {
+		date: date.toLocaleDateString(),
+		time: date.toLocaleTimeString(),
+	});
+});
 </script>
 
 <style lang="scss" scoped>
@@ -71,6 +89,12 @@ const showTicker =
 	border-radius: 100px;
 	font-size: 0.8em;
 	text-shadow: 0 2px 2px var(--shadow);
+	.edited {
+		margin-inline-start: 0.4rem;
+		opacity: 0.6;
+		font-size: 0.9em;
+	}
+
 	> .avatar {
 		width: 3.7em;
 		height: 3.7em;
