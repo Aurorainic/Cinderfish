@@ -2957,6 +2957,43 @@ cd web && pnpm build                    # exit 0
 - 菜单输入与列表插入。
 - `go test` 与浏览器走查未执行。
 
+## 12AZ. 批次：公告已读状态（2026-11-06）
+
+**工作方式**：目标模式第三十六波，继续只写代码、验证到编译层。施工依据
+`docs/research/2026-11-06-firefish-port-wave36-contract.md`。
+
+### 12AZ.1 落地清单
+
+| 层 | 文件 | 说明 |
+|----|------|------|
+| 迁移 | `internal/db/db.go` | v17：`announcement_reads`；AGENTS schema 17；测试库 TRUNCATE |
+| 服务层 | `internal/announcement/service.go` | `MarkRead`、`ReadIDs`、`UnreadCount` |
+| 端点 | `internal/httpapi/announcements.go`、`server.go` | 列表填充 `isRead`、`i/read-announcement`、`hasUnreadAnnouncement` |
+| 前端 | `api/endpoints.ts`、`pages/Announcements.vue` | 标记已读、未读强调线、清理占位说明 |
+| 文档 | `admin-emoji-registry.md`、台账 | 端点与字段说明（124/117/323） |
+
+### 12AZ.2 有意的限制
+
+1. 打开页面即标记当前页，不做视口级标记。
+2. 修改公告不重置已读。
+3. 无「全部已读」按钮。
+
+### 12AZ.3 验证证据（编译层）
+
+```
+gofmt -l internal/ cmd/                 # 空
+go vet ./...                            # exit 0
+cd web && pnpm exec vue-tsc --noEmit    # exit 0
+cd web && pnpm run check:port           # hardTotal 0
+cd web && pnpm build                    # exit 0
+```
+
+### 12AZ.4 仍未验证
+
+- 已读写入、列表 `isRead` 与 `hasUnreadAnnouncement` 的联动。
+- 匿名列表仍为 `isRead:false`。
+- `go test` 与浏览器走查未执行。
+
 ## 13. 文档索引
 
 | 文档 | 内容 |
@@ -3018,6 +3055,7 @@ cd web && pnpm build                    # exit 0
 | `docs/research/2026-11-06-firefish-port-wave33-contract.md` | **第三十三波施工契约（笔记已编辑标记），见 §12AW** |
 | `docs/research/2026-11-06-firefish-port-wave34-contract.md` | **第三十四波施工契约（notes/state 与收藏菜单），见 §12AX** |
 | `docs/research/2026-11-06-firefish-port-wave35-contract.md` | **第三十五波施工契约（从 URL 上传），见 §12AY** |
+| `docs/research/2026-11-06-firefish-port-wave36-contract.md` | **第三十六波施工契约（公告已读状态），见 §12AZ** |
 
 ## 14. 已知的未验证项
 
@@ -3072,6 +3110,7 @@ cd web && pnpm build                    # exit 0
 - **第三十三波未测（2026-11-06，见 §12AW.4）**：已编辑标记只过了编译层，编辑后的显示与时间提示未验证。
 - **第三十四波未测（2026-11-06，见 §12AX.4）**：notes/state 与菜单只过了编译层，状态切换与失败回退未验证。
 - **第三十五波未测（2026-11-06，见 §12AY.4）**：从 URL 上传只过了编译层，SSRF 拒绝与下载分支未验证。
+- **第三十六波未测（2026-11-06，见 §12AZ.4）**：公告已读只过了编译层，写入/回读与角标联动未验证。
 - **仍未移植的设置页**：邮箱、整合、导入导出、迁移、Webhook、插件、自定义 KaTeX、状态栏、
   删除账号、应用授权以外的账号操作；对应后端端点不存在或前端缺少依赖（见第五波契约 §3.3）。
 - **仍缺的 widgets**：rss、rss-ticker、server-metric、online-users、federation、job-queue、aiscript、

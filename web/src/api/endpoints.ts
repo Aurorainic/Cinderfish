@@ -74,6 +74,7 @@ export const ENDPOINTS = {
 	iChangePassword: "i/change-password",
 	iRegenerateToken: "i/regenerate-token",
 	iSigninHistory: "i/signin-history",
+	iReadAnnouncement: "i/read-announcement",
 	iApps: "i/apps",
 	iExport: "i/export",
 	iImport: "i/import",
@@ -501,6 +502,10 @@ export interface EndpointMap {
 	[ENDPOINTS.iRegenerateToken]: {
 		req: { password: string };
 		res: { token: string };
+	};
+	[ENDPOINTS.iReadAnnouncement]: {
+		req: { announcementId: string };
+		res: EmptyResponse;
 	};
 	[ENDPOINTS.iSigninHistory]: {
 		req: { limit?: number; sinceId?: string; untilId?: string };

@@ -14,7 +14,12 @@
 					<p class="caption">当前没有可显示的公告。</p>
 				</div>
 				<template v-else>
-					<article v-for="item in list" :key="item.id" class="_formBlock notice">
+					<article
+					v-for="item in list"
+					:key="item.id"
+					class="_formBlock notice"
+					:class="{ unread: !item.isRead }"
+				>
 						<header class="head">
 							<h2 class="title">{{ item.title }}</h2>
 							<MkTime class="date" :time="item.createdAt" mode="absolute" />
@@ -37,7 +42,8 @@
 						<CfLoading v-else mini />
 					</div>
 					<CfInfo class="readNote">
-						已读状态还没有服务端记录（`i/read-announcement` 未实现），所以这里每次都会显示全部有效公告。
+						打开本页会把已显示的公告标记为已读（`i/read-announcement`），
+						未读的公告带左侧强调线。
 					</CfInfo>
 				</template>
 			</div>
@@ -47,11 +53,11 @@
 
 <script lang="ts" setup>
 // Firefish pages `announcements` and marks each read through
-// `i/read-announcement`. The list endpoint now exists; read tracking does not,
-// so `isRead` is always false and the page says so instead of pretending to
-// remember which notices were dismissed.
+// `i/read-announcement`. The port marks every notice it displays; the service
+// records the mark, so the list and `hasUnreadAnnouncement` stay in sync.
 import { onMounted, ref } from "vue";
 import { ApiError, api, resolveMediaUrl } from "@/api/client";
+import { updateMe } from "@/account";
 import type { Announcement } from "@/api/types";
 import MkPageHeader from "@/components/global/MkPageHeader.vue";
 import MkSpacer from "@/components/global/MkSpacer.vue";
@@ -85,6 +91,7 @@ async function load(): Promise<void> {
 		const page = await api("announcements", { limit: LIMIT + 1 });
 		hasMore.value = page.length > LIMIT;
 		list.value = page.slice(0, LIMIT);
+		void markRead(list.value);
 	} catch (cause) {
 		error.value = errorText(cause);
 		list.value = [];
@@ -103,11 +110,28 @@ async function loadMore(): Promise<void> {
 			untilId: last.id,
 		});
 		hasMore.value = page.length > LIMIT;
-		list.value = [...list.value, ...page.slice(0, LIMIT)];
+		const added = page.slice(0, LIMIT);
+		list.value = [...list.value, ...added];
+		void markRead(added);
 	} catch (cause) {
 		error.value = errorText(cause);
 	} finally {
 		loadingMore.value = false;
+	}
+}
+
+async function markRead(items: Announcement[]): Promise<void> {
+	for (const item of items) {
+		if (item.isRead) continue;
+		try {
+			await api("i/read-announcement", { announcementId: item.id });
+			item.isRead = true;
+		} catch {
+			// Leave it unread; the next visit tries again.
+		}
+	}
+	if (!hasMore.value && list.value.every((item) => item.isRead)) {
+		updateMe({ hasUnreadAnnouncement: false });
 	}
 }
 
@@ -157,6 +181,11 @@ definePageMetadata({
 	padding: 16px;
 	background: var(--panel);
 	border-radius: var(--radius);
+	border-inline-start: 3px solid transparent;
+
+	&.unread {
+		border-inline-start-color: var(--accent);
+	}
 
 	.head {
 		display: flex;
