@@ -306,10 +306,12 @@ func (s *Server) handleAdminUpdateMeta(w http.ResponseWriter, r *http.Request) {
 		ImpressumURL     *string   `json:"impressumUrl"`
 		ServerRules      *[]string `json:"serverRules"`
 		HiddenTags       *[]string `json:"hiddenTags"`
-		IconURL          *string   `json:"iconUrl"`
-		BannerURL        *string   `json:"bannerUrl"`
-		ThemeColor       *string   `json:"themeColor"`
-		CustomCSS        *string   `json:"customCss"`
+		// The three branding fields accept an explicit null to clear them, the
+		// way Misskey's clients send it; nullableField tells null from absent.
+		IconURL    nullableField `json:"iconUrl"`
+		BannerURL  nullableField `json:"bannerUrl"`
+		ThemeColor nullableField `json:"themeColor"`
+		CustomCSS  *string       `json:"customCss"`
 	}
 	if err := decodeOptionalJSON(r, &body); err != nil {
 		writeAPIError(w, err)
@@ -417,16 +419,19 @@ ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
 
 	for _, item := range []struct {
 		field string
-		value *string
+		value nullableField
 		url   bool
 	}{
 		{"iconUrl", body.IconURL, true},
 		{"bannerUrl", body.BannerURL, true},
 	} {
-		if item.value == nil {
+		if !item.value.provided() {
 			continue
 		}
-		value := strings.TrimSpace(*item.value)
+		value := ""
+		if v := item.value.asUpdatePointer(); v != nil {
+			value = strings.TrimSpace(*v)
+		}
 		if value != "" {
 			if len(value) > 300 || (!strings.HasPrefix(value, "https://") && !strings.HasPrefix(value, "http://")) {
 				writeAPIError(w, invalidParamError(item.field+" must be an http(s) URL of at most 300 characters"))
@@ -435,8 +440,11 @@ ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
 		}
 		updates[item.field] = value
 	}
-	if body.ThemeColor != nil {
-		color := strings.TrimSpace(*body.ThemeColor)
+	if body.ThemeColor.provided() {
+		color := ""
+		if v := body.ThemeColor.asUpdatePointer(); v != nil {
+			color = strings.TrimSpace(*v)
+		}
 		if color != "" && !validThemeColor(color) {
 			writeAPIError(w, invalidParamError("themeColor must be #rrggbb"))
 			return
