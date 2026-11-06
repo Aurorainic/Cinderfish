@@ -4495,8 +4495,8 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
   匿名 401（2026-11-07）。仍未验证的：笔记菜单里切换失败时的**回退**界面行为。
 - **第三十五波的部分边角（2026-11-06，见 §12AY.4）**：`TestDriveUploadFromURLRejectsUnsafeTargets`
   覆盖 SSRF 守卫的每条拒绝路径（非 http(s)、无主机、回环、localhost、私网、无法解析）、
-  缺 url 400、匿名 401 与他人文件夹被拒（2026-11-07）。**下载成功分支未验证**：成功抓取需要一个
-  公网地址，测试环境里不可构造；`FETCH_FAILED`（远端非 2xx）与 `FILE_TOO_LARGE` 分支同样未构造。
+  缺 url 400、匿名 401 与他人文件夹被拒（2026-11-07）。下载成功与 `FETCH_FAILED` 分支已于
+  2026-11-07 用真实公网地址验证（§12DJ）；`FILE_TOO_LARGE` 需要一个 >20 MiB 的公网文件，仍未构造。
 - **第三十六波已补验证（2026-11-06，见 §12AZ.4）**：`TestAnnouncementReadState` 覆盖已读写入与
   回读、`hasUnreadAnnouncement` 角标联动、重复已读幂等、另一账号仍视为未读、缺参数 400 与匿名 401
   （2026-11-07）。MeDetailed 没有公告**计数**字段，徽标是布尔值（与 Misskey 一致）。
@@ -5557,3 +5557,17 @@ CINDERFISH_TEST_DATABASE_URL=... go test ./... -count=1         # 全绿
 ```
 
 仍未验证：跨实例「关注者改关」的端到端、真实异种软件的 Move 互认。
+
+## 12DJ. 第九十七波：URL 上传的成功与非 2xx 分支（2026-11-07）
+
+本机可直连 `https://example.com`（GitHub 仍需代理），因此第三十五波留下的成功分支可以真测。
+
+- `drive/files/upload-from-url {url:"https://example.com", name:"example.html"}` →
+  200，返回 `type: text/html; charset=utf-8`、`size: 577`、`url: /media/…`；
+- 通过 `/media/…` 取回：200、`text/html; charset=utf-8`、577 字节，内容以
+  `<!doctype html><html lang=en>` 开头；
+- `{url:"https://example.com/definitely-not-here-xyz"}` → 400
+  `FETCH_FAILED`、message「Remote answered 404.」。
+
+仍未验证：`FILE_TOO_LARGE`（需要 >20 MiB 公网文件）与重定向到私网地址的拒绝路径
+（后者由 SSRF 用例覆盖同类逻辑）。
