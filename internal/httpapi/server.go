@@ -215,6 +215,7 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("POST /api/admin/accounts/create", s.handleAdminAccountsCreate)
 	s.mux.HandleFunc("POST /api/admin/show-users", s.handleAdminShowUsers)
 	s.mux.HandleFunc("POST /api/admin/drive/files", s.handleAdminDriveFiles)
+	s.mux.HandleFunc("POST /api/admin/drive/show-file", s.handleAdminDriveShowFile)
 	s.mux.HandleFunc("POST /api/admin/get-table-stats", s.handleAdminTableStats)
 	s.mux.HandleFunc("POST /api/admin/meta", s.handleAdminMeta)
 	s.mux.HandleFunc("POST /api/admin/object-storage", s.handleAdminObjectStorage)

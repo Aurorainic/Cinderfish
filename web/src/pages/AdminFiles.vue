@@ -82,6 +82,9 @@
 									<span class="date"
 										><MkTime :time="file.createdAt" mode="absolute"
 									/></span>
+									<MkA class="detail" :to="`/admin/file/${file.id}`"
+										>详情</MkA
+									>
 								</div>
 							</div>
 						</li>

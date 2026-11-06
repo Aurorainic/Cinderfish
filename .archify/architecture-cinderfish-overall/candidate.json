@@ -57,7 +57,7 @@
       "id": "main",
       "type": "backend",
       "label": "cmd/cinderfish",
-      "sublabel": "入口 · 自动迁移 · 优雅关闭（另有 admin / media-migrate CLI）",
+      "sublabel": "入口 · 自动迁移 · 优雅关闭",
       "pos": [300, 180],
       "size": [190, 64],
       "sources": [
@@ -258,7 +258,7 @@
       "items": [
         "M1–M7 全部完成；2026-11-04 起工作面收敛为后端 API 与联邦，web 前端移植由独立 workflow 推进",
         "Misskey API 覆盖 136 条注册路由（Misskey 全集 440），差集台账 docs/research/2026-11-04-misskey-api-coverage.md",
-        "迁移 v18 · 34 张表；单二进制内嵌迁移脚本，启动时自动升级",
+        "迁移 v18 · 34 张表；单二进制内嵌迁移脚本，启动时自动升级；另有 cinderfish-admin / cinderfish-media-migrate 两个 CLI",
         "周边能力已接入：邮件验证/重置、TOTP 两步验证、Webhook、举报、公告、账号导入导出"
       ]
     },

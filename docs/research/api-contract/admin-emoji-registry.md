@@ -1035,6 +1035,13 @@ UserLite 部分也有简化：`name`/`avatarUrl` 只从 profile 行来，没有 
 
 返回 `DriveFile[]`，每条额外带 `user`（UserLite，上传者）。非管理员返回 403。
 
+### POST /api/admin/drive/show-file（第四十五波）
+
+`{fileId}` → 单条 `DriveFile` + `user`（UserLite）。不存在的 id → 404 `NO_SUCH_FILE`；
+非管理员 403。上游还会返回上传 IP 与原始请求，本实现两者都不存，因此不返回。
+**没有管理员删除他人文件的端点**：`drive/files/delete` 只允许删自己的文件，管理台文件详情页
+因此是只读的。
+
 ## 2026-11-06 增补：实例公告
 
 迁移 v10 新增 `announcements` 表；`announcements` 与 `admin/announcements/*` 四个端点共用它。

@@ -2,8 +2,8 @@
 
 - 产出：`cinderfish-overall.html`
 - 源：`candidate.json`（Archify architecture schema v1）
-- 绘制时基线：`0511de2`（Redis 可选中继之后）
-- 画布：1040×812，宽画布契约不触发（宽度低于 1240）
+- 绘制时基线：`d8c080f`（出站笔记投递与 Update 活动之后，2026-11-06）
+- 画布：1096×812，宽画布契约不触发（宽度低于 1240）
 
 ## 目录命名
 
@@ -14,13 +14,13 @@ receipt 的路径字段都要跟着改。复审证据按 `review-<n>/` 递增，
 
 ## 这张图表达什么
 
-展示 M1–M5 已实现系统的主链路：客户端与远端实例如何进入单二进制，笔记、账户、Streaming、媒体如何落到 PostgreSQL 与对象存储，以及联邦的入站验签与出站投递队列。
+展示 M1–M7 已完成系统的主链路：客户端与远端实例如何进入单二进制，笔记、账户、Streaming、媒体、邮件、Webhook 如何落到 PostgreSQL 与对象存储，以及联邦的入站验签与出站投递队列。
 
 - **矩形边界**：`cinderfish` 单进程内的包。`main` 装配 `httpapi`，`httpapi` 挂接各领域包与联邦、Streaming。
 - **边界外**：`PostgreSQL` 与 `media` 后端（local / S3）是进程外依赖；`Misskey 客户端` 与 `Fediverse 远端实例` 是协议对端。
 - **虚线**：Streaming 通过 PostgreSQL `LISTEN/NOTIFY` 做跨进程中继，不是进程内直连。
 - **web 节点**：Vue 3 前端，经 `httpapi` 的静态托管与 SPA fallback 由同一进程发出；协议命名空间不进 SPA。
-- **M7**：打磨项（S3 迁移工具、admin 面板、性能自测、部署文档）尚未开始，状态写在 `cards` 里。
+- **M7 之后**：2026-11-04 起工作面收敛为后端 API 与联邦，web 前端移植由独立 workflow 推进；进度以 `docs/research/2026-11-04-misskey-api-coverage.md` 台账为准，状态写在 `cards` 里。
 
 ## 每完成一个里程碑怎么改
 

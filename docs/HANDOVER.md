@@ -3302,6 +3302,43 @@ cd web && pnpm build                    # exit 0
 - 邮件状态页在已配置/未配置两种实例下的呈现。
 - `go test` 与浏览器走查未执行。
 
+## 12BI. 批次：管理台文件详情（2026-11-06）
+
+**工作方式**：目标模式第四十五波，继续只写代码、验证到编译层。施工依据
+`docs/research/2026-11-06-firefish-port-wave45-contract.md`。
+
+### 12BI.1 落地清单
+
+| 层 | 文件 | 说明 |
+|----|------|------|
+| 端点 | `internal/httpapi/admin_drive.go`、`server.go` | `admin/drive/show-file`：按 id 取任意用户文件 + 所属账号；404 `NO_SUCH_FILE` |
+| 页面 | `pages/AdminFile.vue` | 类型分流预览、字段表、上传者链接、只读原因说明 |
+| 入口 | `pages/AdminFiles.vue` | 每行「详情」链接 |
+| 类型 | `api/endpoints.ts` | `adminDriveShowFile` |
+| 文档 | `admin-emoji-registry.md`、台账 | 端点契约（137/130/310） |
+
+### 12BI.2 有意的限制
+
+1. 没有删除/批量清理（无端点）。
+2. 不显示上传 IP、原始请求、远端缓存状态。
+3. 缩略图仍为 `null`，预览用原图。
+
+### 12BI.3 验证证据（编译层）
+
+```
+gofmt -l internal/ cmd/                 # 空
+go vet ./...                            # exit 0
+cd web && pnpm exec vue-tsc --noEmit    # exit 0
+cd web && pnpm run check:port           # hardTotal 0（400 文件）
+cd web && pnpm build                    # exit 0
+```
+
+### 12BI.4 仍未验证
+
+- 详情页在图片/视频/音频/其它四类文件下的渲染。
+- 上传者已删除账号时的 `user: null` 分支。
+- `go test` 与浏览器走查未执行。
+
 ## 13. 文档索引
 
 | 文档 | 内容 |
@@ -3372,6 +3409,7 @@ cd web && pnpm build                    # exit 0
 | `docs/research/2026-11-06-firefish-port-wave42-contract.md` | **第四十二波施工契约（按活动作者签名），见 §12BF** |
 | `docs/research/2026-11-06-firefish-port-wave43-contract.md` | **第四十三波施工契约（四个兼容端点），见 §12BG** |
 | `docs/research/2026-11-06-firefish-port-wave44-contract.md` | **第四十四波施工契约（实例 CSS 与邮件设置页），见 §12BH** |
+| `docs/research/2026-11-06-firefish-port-wave45-contract.md` | **第四十五波施工契约（管理台文件详情），见 §12BI** |
 
 ## 14. 已知的未验证项
 
@@ -3435,6 +3473,7 @@ cd web && pnpm build                    # exit 0
 - **第四十二波未测（2026-11-06，见 §12BF.4）**：按作者签名只有编译层证据，双实例未验证。
 - **第四十三波未测（2026-11-06，见 §12BG.4）**：四个兼容端点与账号信息页只有编译层证据。
 - **第四十四波未测（2026-11-06，见 §12BH.4）**：实例 CSS 链路与邮件状态页只有编译层证据。
+- **第四十五波未测（2026-11-06，见 §12BI.4）**：文件详情的四类预览与 `user: null` 分支未走查。
 - **仍未移植的设置页**：邮箱、整合、导入导出、迁移、Webhook、插件、自定义 KaTeX、状态栏、
   删除账号、应用授权以外的账号操作；对应后端端点不存在或前端缺少依赖（见第五波契约 §3.3）。
 - **仍缺的 widgets**：rss、rss-ticker、server-metric、online-users、federation、job-queue、aiscript、

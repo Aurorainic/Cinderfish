@@ -96,3 +96,46 @@ func (s *Server) handleAdminDriveFiles(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, out)
 }
+
+// handleAdminDriveShowFile is POST /api/admin/drive/show-file: one file with
+// its owner, regardless of who uploaded it.
+//
+// Upstream's version also returns the user's IP and the request that uploaded
+// it; Cinderfish stores neither, so the response is the drive file plus the
+// owner and nothing else. Admins see the same fields the files list returns.
+func (s *Server) handleAdminDriveShowFile(w http.ResponseWriter, r *http.Request) {
+	if !s.requireAdmin(w, r) {
+		return
+	}
+	if s.drive == nil || s.accounts == nil {
+		writeInternalServerError(w)
+		return
+	}
+	var body struct {
+		FileID string `json:"fileId"`
+	}
+	if err := decodeOptionalJSON(r, &body); err != nil {
+		writeAPIError(w, err)
+		return
+	}
+	if body.FileID == "" {
+		writeAPIError(w, invalidParamError("fileId is required"))
+		return
+	}
+
+	file, err := s.drive.Get(r.Context(), body.FileID)
+	if err != nil || file == nil {
+		writeAPIError(w, &APIError{
+			Message: "No such file.", Code: "NO_SUCH_FILE",
+			ID: errIDNoSuchFile, Kind: "client", Status: http.StatusNotFound,
+		})
+		return
+	}
+	packed := packDriveFile(file)
+	if owner, err := s.accounts.GetByID(r.Context(), file.UserID); err == nil && owner != nil {
+		packed["user"] = packUserLite(owner, "", nil)
+	} else {
+		packed["user"] = nil
+	}
+	writeJSON(w, http.StatusOK, packed)
+}

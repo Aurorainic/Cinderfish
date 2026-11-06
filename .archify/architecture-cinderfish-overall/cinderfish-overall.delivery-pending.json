@@ -1,8 +1,0 @@
-{
-  "schemaVersion": 1,
-  "command": "deliver",
-  "status": "pending",
-  "receiptId": "2e420be2-6187-4388-9689-d8cd4d6a272e",
-  "input": "/home/lainsaka/文档/MilnFish/.worktrees/firefish-port/.archify/architecture-cinderfish-overall/candidate.json",
-  "output": "/home/lainsaka/文档/MilnFish/.worktrees/firefish-port/.archify/architecture-cinderfish-overall/cinderfish-overall.html"
-}

@@ -215,6 +215,7 @@ export const ENDPOINTS = {
 	adminAccountsCreate: "admin/accounts/create",
 	adminShowUsers: "admin/show-users",
 	adminDriveFiles: "admin/drive/files",
+	adminDriveShowFile: "admin/drive/show-file",
 	adminSuspendUser: "admin/suspend-user",
 	adminUnsuspendUser: "admin/unsuspend-user",
 	federationShowInstance: "federation/show-instance",
@@ -903,6 +904,10 @@ export interface EndpointMap {
 	[ENDPOINTS.adminDriveFiles]: {
 		req: AdminDriveFilesParams;
 		res: AdminDriveFile[];
+	};
+	[ENDPOINTS.adminDriveShowFile]: {
+		req: { fileId: string };
+		res: AdminDriveFile;
 	};
 	[ENDPOINTS.adminSuspendUser]: {
 		req: { userId: string };
