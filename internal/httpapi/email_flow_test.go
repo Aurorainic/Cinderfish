@@ -70,8 +70,16 @@ func (s *localSMTP) serve(conn net.Conn) {
 		switch {
 		case strings.HasPrefix(upper, "EHLO"), strings.HasPrefix(upper, "HELO"):
 			write("250-local\r\n250 HELP\r\n")
-		case strings.HasPrefix(upper, "MAIL FROM"), strings.HasPrefix(upper, "RCPT TO"):
+		case strings.HasPrefix(upper, "MAIL FROM"):
 			write("250 ok\r\n")
+		case strings.HasPrefix(upper, "RCPT TO"):
+			// One address is rejected so tests can prove a failed recipient
+			// does not stop the others.
+			if strings.Contains(upper, "FAIL@EXAMPLE.COM") {
+				write("550 no such user\r\n")
+			} else {
+				write("250 ok\r\n")
+			}
 		case strings.HasPrefix(upper, "DATA"):
 			inData = true
 			write("354 go\r\n")

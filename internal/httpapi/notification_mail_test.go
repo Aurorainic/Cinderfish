@@ -185,3 +185,34 @@ VALUES ('root1', 'root', 'root', 'x', 'admintoken000000', TRUE)`); err != nil {
 	}
 	smtp.noMail(t, 700*time.Millisecond)
 }
+
+// TestAnnouncementMailFailureIsolation proves one rejected recipient does not
+// stop the broadcast: the SMTP harness answers 550 for fail@example.com.
+func TestAnnouncementMailFailureIsolation(t *testing.T) {
+	smtp := startLocalSMTP(t)
+	ts, srv := mailTestServer(t, smtp)
+
+	_, bob := post(t, ts, "/api/signup", map[string]any{"username": "bob", "password": "password-123"})
+	bobID, _ := bob["id"].(string)
+	_, erin := post(t, ts, "/api/signup", map[string]any{"username": "erin", "password": "password-123"})
+	erinID, _ := erin["id"].(string)
+	subscribeMail(t, srv, bobID, "bob@example.com", true, nil, true)
+	subscribeMail(t, srv, erinID, "fail@example.com", true, nil, true)
+
+	if _, err := srv.TestPool().Exec(context.Background(), `
+INSERT INTO users (id, username, username_lower, password_hash, token, is_admin)
+VALUES ('root2', 'root2', 'root2', 'x', 'admintoken000001', TRUE)`); err != nil {
+		t.Fatalf("insert admin: %v", err)
+	}
+	resp, out := postWithToken(t, ts, "/api/admin/announcements/create", "admintoken000001", map[string]any{
+		"title": "隔离测试", "text": "one bad address",
+	})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("create announcement: %d %v", resp.StatusCode, out)
+	}
+	mail := smtp.waitMail(t)
+	if !strings.Contains(mail, "To: bob@example.com") || !strings.Contains(mail, "隔离测试") {
+		t.Errorf("mail = %s, want the announcement delivered to bob", mail)
+	}
+	smtp.noMail(t, 700*time.Millisecond)
+}

@@ -4550,7 +4550,8 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
   （§12DN）；其余六个隐私开关的界面回读见 §12DQ。
 - **第四十八波已补验证（2026-11-07，见 §12BL.4）**：四类通知邮件与公告群发由本地 SMTP 用例
   真实收信验证，未验证/未订阅两种静默分支也在内；邮箱设置页开关的保存与回读走查通过。
-  仍未验证的：公网 SMTP 的 TLS/Auth、公告失败隔离、真实客户端的模板显示。
+  公告失败隔离已由 §12DV 覆盖（一个收件人被 550 拒绝，其余照常收到）。仍未验证的：
+  公网 SMTP 的 TLS/Auth、真实客户端的模板显示。
 - **第四十九波已补验证（2026-11-07，见 §12BM.4）**：六个说明页在真实二进制下逐一走查，
   标题/已有项/缺口清单齐全，页内表单控件与按钮均为 0（无假控件），菜单分组包含全部六个入口。
   仍未验证的：窄屏排版。
@@ -5741,3 +5742,16 @@ CINDERFISH_TEST_DATABASE_URL=... go test ./... -count=1         # 全绿
 数据已清理，未进入提交。
 
 仍未验证：更大规模（十万级）与并发下的耗时；SQL 慢查询日志与索引调优。
+
+## 12DV. 第一百零八波：公告群发的失败隔离（2026-11-07）
+
+本地 SMTP 测试服务器对 `fail@example.com` 的 `RCPT TO` 回 550，对其它地址正常。
+`TestAnnouncementMailFailureIsolation`：两个已验证且订阅公告的用户（bob 正常、erin 失败），
+管理员发公告后 bob 收到邮件；日志出现
+`mail: announcement to fail@example.com: ... 550 "no such user"`，群发没有中断。
+
+```
+gofmt -l internal/ cmd/                                        # 空
+go vet ./...                                                   # exit 0
+CINDERFISH_TEST_DATABASE_URL=... go test ./... -count=1         # 全绿
+```
