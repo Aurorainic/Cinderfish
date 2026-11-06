@@ -4287,6 +4287,37 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
 - `MkMoved` 横幅无法在单实例构造（需要远端账号声明本实例账号为其别名）。
 - 双因素登录、移除关注者菜单、远端举报的管理台展示未走查。
 - 真实联邦联调仍缺（全部联邦证据来自双实例测试）。
+
+## 12CC. 第六十四波：走查补漏（横幅、移除关注者、举报页、2FA 提示）
+
+第六十三波留下的四项，这一轮用数据库造数据 + 浏览器补测。
+
+### 12CC.1 结果
+
+| 项 | 结果 |
+|----|------|
+| `MkMoved` 横幅 | 用 SQL 把 bob 的 `moved_to_uri` 指向本地 alice 的 Actor URI，`/@w63bob` 显示「用户已迁移至新账号：@w63alice」。**发现缺陷**：本地目标 `host` 为空时 `MkMention` 会多渲染一个 `@`（显示为 `@w63alice@`），已修 |
+| 「移除关注者」菜单 | 在关注者资料页点菜单 → 出现「移除关注者」→ 确认「确定要移除关注者吗？」→ 好；`followings` 中 bob→alice 行消失 |
+| 管理台举报页 | `/admin/abuses` 显示举报者 w63bob、被举报者 w63carol、内容「w63 走查举报内容」与「标记已处理」按钮 |
+| 双因素登录提示 | carol 开启 TOTP 后，用密码登录会切到 `#cf-signin-token` 输入框（两步验证）。自动填码后完成登录的那一步没有在无头环境里跑通（表单点击时序问题），后端登录链路由测试覆盖 |
+
+### 12CC.2 修复
+
+`web/src/components/MkMention.vue`：`host === ""` 时不渲染 `@host` 片段。空的 host 表示本地账号，
+原先只有 `host !== localHost` 的判断会让它渲染成一个孤立的 `@`。
+
+### 12CC.3 验证证据
+
+- `vue-tsc --noEmit`、`check:port`（hardTotal 0）、`pnpm build` 全绿。
+- 浏览器：横幅文案为「用户已迁移至新账号： @w63alice」（无多余 `@`）；
+  `followings` 查询确认移除生效；举报页文案与按钮齐全；2FA 输入框出现。
+- 截图追加在 `/tmp/w63-shots`（`desktop-moved-banner-fixed.png`、`desktop-remove-follower.png`、
+  `desktop-admin-abuses.png`、`desktop-2fa-signin.png`）。
+
+### 12CC.4 仍未验证
+
+- 2FA **完成**登录（输入验证码后进入时间线）未在无头环境跑通；后端 `signin` + TOTP 由测试覆盖。
+- 同一轮里，账号登出后重新登录的 UI 路径没有单独测。
 - **仍未移植的设置页**：邮箱、整合、导入导出、迁移、Webhook、插件、自定义 KaTeX、状态栏、
   删除账号、应用授权以外的账号操作；对应后端端点不存在或前端缺少依赖（见第五波契约 §3.3）。
 - **仍缺的 widgets**：rss、rss-ticker、server-metric、online-users、federation、job-queue、aiscript、

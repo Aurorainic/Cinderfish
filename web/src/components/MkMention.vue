@@ -4,7 +4,10 @@
 		<img class="icon" :src="avatarUrl" alt="" />
 		<span class="main">
 			<span class="username">@{{ username }}</span>
-			<span v-if="host != localHost || showFullAcct" class="host"
+			<!-- An empty host means a local account: it has no @host part, and
+			     rendering one would leave a dangling "@" (the moved banner asks
+			     for a local target this way). -->
+			<span v-if="host !== '' && (host != localHost || showFullAcct)" class="host"
 				>@{{ host }}</span
 			>
 		</span>
