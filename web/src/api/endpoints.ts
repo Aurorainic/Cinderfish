@@ -105,6 +105,12 @@ export const ENDPOINTS = {
 	iMove: "i/move",
 	oauthAuthorize: "oauth/authorize",
 	apShow: "ap/show",
+	appCreate: "app/create",
+	appShow: "app/show",
+	authSessionGenerate: "auth/session/generate",
+	authSessionShow: "auth/session/show",
+	authSessionUserkey: "auth/session/userkey",
+	authAccept: "auth/accept",
 	iFavorites: "i/favorites",
 	iNotifications: "i/notifications",
 
@@ -318,6 +324,15 @@ export interface IUpdateParams {
 	followersVisibility?: "public" | "followers" | "private";
 	followingVisibility?: "public" | "followers" | "private";
 	mutedInstances?: string[] | null;
+}
+
+export interface AppEntity {
+	id: string;
+	name: string;
+	callbackUrl: string | null;
+	permission: string[];
+	isAuthorized: boolean;
+	secret?: string;
 }
 
 export interface UsersShowParams {
@@ -564,6 +579,29 @@ export interface EndpointMap {
 	[ENDPOINTS.iUnpin]: { req: NoteIdParams; res: MeDetailed };
 	[ENDPOINTS.iKnownAs]: { req: { alsoKnownAs: string[] }; res: MeDetailed };
 	[ENDPOINTS.iMove]: { req: { moveToAccount: string }; res: MeDetailed };
+	[ENDPOINTS.appCreate]: {
+		req: {
+			name: string;
+			description: string;
+			permission: string[];
+			callbackUrl?: string | null;
+		};
+		res: AppEntity;
+	};
+	[ENDPOINTS.appShow]: { req: { appId: string }; res: AppEntity };
+	[ENDPOINTS.authSessionGenerate]: {
+		req: { appSecret: string };
+		res: { token: string; url: string };
+	};
+	[ENDPOINTS.authSessionShow]: {
+		req: { token: string };
+		res: { id: string; app: AppEntity; token: string };
+	};
+	[ENDPOINTS.authSessionUserkey]: {
+		req: { appSecret: string; token: string };
+		res: { accessToken: string; user: UserDetailed };
+	};
+	[ENDPOINTS.authAccept]: { req: { token: string }; res: EmptyResponse };
 	[ENDPOINTS.apShow]: {
 		req: { uri: string };
 		res: {

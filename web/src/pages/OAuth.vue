@@ -19,7 +19,7 @@
 			</div>
 
 			<div v-else-if="internalState === 'accepted'" class="section">
-				<h2 class="title">{{ t("allowed") }}</h2>
+				<h2 class="title">已授权</h2>
 				<p class="description">{{ t("_auth.callback") }}…</p>
 			</div>
 

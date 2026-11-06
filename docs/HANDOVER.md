@@ -1,9 +1,9 @@
 # Cinderfish 交接说明
 
-- 最后更新：2026-11-06（目标模式第五十一至五十四波：账号迁移 `i/move`/`i/known-as`、入站 `Move`、
-  `migration` v19、`SettingsMigration` 与 `MkMoved`；KaTeX 宏页与集成说明页；OAuth 交互式同意页；
-  `ap/show` 与远程互动页。恢复目标模式时先补了 §12BO.3 的验证债，`go test ./...`（含数据库）
-  已全绿，详见 §12BP–§12BS。浏览器走查仍待用户手动确认后执行）
+- 最后更新：2026-11-06（目标模式第五十一至五十五波：账号迁移、KaTeX 宏页与集成说明页、
+  OAuth 交互式同意页、`ap/show` 与远程互动页、第三方应用授权全流程（`app/*` 与 `auth/session/*`，
+  schema v20）。恢复目标模式时先补了 §12BO.3 的验证债，`go test ./...`（含数据库）已全绿，
+  详见 §12BP–§12BT。浏览器走查仍待用户手动确认后执行）
 - 项目名 **Cinderfish**（2026-10-28 定名，Go module `github.com/Aurorainic/cinderfish`）
 - 仓库：当前目录 `/home/lainsaka/文档/MilnFish`，分支 `main`；远程 `origin` 为
   `https://github.com/Aurorainic/Cinderfish.git`（GitHub 仓库已更名，本地目录改名待办）
@@ -3788,6 +3788,44 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
 - `ImportObject` 的拒绝路径（attributedTo 与 host 不匹配、非 Note/Actor 对象）没有构造对端用例。
 - 真实 Mastodon / Misskey 实例的 `/authorize_interaction` 链接没有实测。
 
+## 12BT. 第五十五波：第三方应用授权（2026-11-06）
+
+契约见 `docs/research/2026-11-06-firefish-port-wave55-contract.md`。
+本轮把 Misskey `4ff2edf` 的后端源码稀疏克隆到 `tmp/refcheck/misskey`（此前只有 `/tmp` 抓取），
+端点契约以源码为准。
+
+### 12BT.1 落地清单
+
+| 层 | 内容 |
+|----|------|
+| 迁移 | v20：`apps`、`auth_sessions`、`access_tokens.app_id` |
+| 账号 | `account/apps.go`：应用注册/查询、会话生成/批准/取回、按应用发令牌 |
+| 端点 | `app/create`、`app/show`、`auth/session/generate|show|userkey`、`auth/accept` |
+| 兼容 | `i/apps` 在有 `app_id` 时回退到应用名称/权限（Misskey 规则） |
+| 前端 | `Auth.vue` 同意页（未登录嵌入登录、已授权自动放行、回调协议白名单） |
+| i18n | 补 `_auth.pleaseLogin` / `_auth.accepted` / `_auth.alreadyAuthorized`（zh-CN + ja-JP） |
+| 台账 | 147 路由 / 139 同名 / 301 未实现 |
+
+### 12BT.2 有意的限制
+
+- 应用密钥不过期、不轮换；同一 `(app,user)` 只有一条访问令牌。
+- 不校验回调域名所有权，只做跳转时的协议白名单。
+- `permission` 不校验取值，仅展示与记录。
+
+### 12BT.3 验证证据
+
+- `gofmt -l internal/ cmd/` 无输出；`go vet ./...` 通过。
+- `CINDERFISH_TEST_DATABASE_URL=… go test ./...` 全绿，含
+  `TestAppSessionFlow`（注册→会话→待批→批准→取 token→`/api/i` 生效→会话只能取一次→`i/apps`）
+  与 `TestAuthSessionGenerateRejectsUnknownSecret`。
+- `vue-tsc --noEmit`、`check:port`（hardTotal 0、missingKeys 0）、`pnpm build` 全绿。
+
+### 12BT.4 仍未验证
+
+- `Auth.vue` **没有浏览器走查**：未登录嵌入登录、已授权自动放行、回调跳转都只过了编译。
+- 真实第三方客户端（第三方 Misskey 客户端 / Firefish 的 auth.vue）没有跑过这条流程。
+- 应用所有者的 `app/show` 才返回 secret 这条分支没有用例（匿名注册的应用没有所有者）。
+
 
 
 
@@ -3871,6 +3909,7 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
 | `docs/research/2026-11-06-firefish-port-wave52-contract.md` | **第五十二波施工契约（设置页收尾），见 §12BQ** |
 | `docs/research/2026-11-06-firefish-port-wave53-contract.md` | **第五十三波施工契约（OAuth 同意页），见 §12BR** |
 | `docs/research/2026-11-06-firefish-port-wave54-contract.md` | **第五十四波施工契约（ap/show 与远程互动），见 §12BS** |
+| `docs/research/2026-11-06-firefish-port-wave55-contract.md` | **第五十五波施工契约（应用授权 app/* 与 auth/session/*），见 §12BT** |
 
 ## 14. 已知的未验证项
 
@@ -3948,6 +3987,8 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
   客户端跑完整 OAuth 登录。
 - **第五十四波未测（2026-11-06，见 §12BS.4）**：远程互动页未走查；`ImportObject` 的拒绝路径
   没有对端用例；真实 Mastodon/Misskey 的 `/authorize_interaction` 链接未实测。
+- **第五十五波未测（2026-11-06，见 §12BT.4）**：`Auth.vue` 未走查；真实第三方客户端没跑过这条
+  授权流程；`app/show` 返回 secret 的所有者分支没有用例。
 - **仍未移植的设置页**：邮箱、整合、导入导出、迁移、Webhook、插件、自定义 KaTeX、状态栏、
   删除账号、应用授权以外的账号操作；对应后端端点不存在或前端缺少依赖（见第五波契约 §3.3）。
 - **仍缺的 widgets**：rss、rss-ticker、server-metric、online-users、federation、job-queue、aiscript、
