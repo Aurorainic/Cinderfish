@@ -179,3 +179,49 @@ WHERE a.is_active = TRUE
 	}
 	return n, nil
 }
+
+// UpdateParams carries the editable announcement fields. A nil pointer keeps
+// the current value; an empty ImageURL clears it.
+type UpdateParams struct {
+	Title     *string
+	Text      *string
+	ImageURL  *string
+	IsActive  *bool
+	ExpiresAt *time.Time
+	SetExpiry bool
+}
+
+// Update rewrites an announcement. It returns ErrNotFound for an unknown id.
+func (s *Service) Update(ctx context.Context, id string, p UpdateParams) (*Announcement, error) {
+	current, err := s.Get(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if p.Title != nil {
+		current.Title = *p.Title
+	}
+	if p.Text != nil {
+		current.Text = *p.Text
+	}
+	if p.ImageURL != nil {
+		if *p.ImageURL == "" {
+			current.ImageURL = nil
+		} else {
+			current.ImageURL = p.ImageURL
+		}
+	}
+	if p.IsActive != nil {
+		current.IsActive = *p.IsActive
+	}
+	if p.SetExpiry {
+		current.ExpiresAt = p.ExpiresAt
+	}
+
+	row := s.pool.QueryRow(ctx, `
+UPDATE announcements
+SET title = $2, text = $3, image_url = $4, is_active = $5, expires_at = $6, updated_at = now()
+WHERE id = $1
+RETURNING `+announcementColumns+`
+`, id, current.Title, current.Text, current.ImageURL, current.IsActive, current.ExpiresAt)
+	return scanAnnouncement(row)
+}

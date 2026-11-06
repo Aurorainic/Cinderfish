@@ -15,15 +15,15 @@
 | 指标 | 数量 |
 |------|------|
 | Misskey 端点总数 | 440 |
-| Cinderfish 已注册路由 | 124 |
-| 其中 Misskey 同名路径 | 117 |
+| Cinderfish 已注册路由 | 125 |
+| 其中 Misskey 同名路径 | 118 |
 | 其中 Cinderfish 自有路径/别名 | 7（`notifications` 别名、`admin/federation/mode`、`admin/federation/allowlist`、`miauth/{session}/check`、`admin/object-storage`、`admin/deliver-queue`、`notes/history`） |
-| 未实现（Misskey 同名） | 323 |
+| 未实现（Misskey 同名） | 322 |
 
 统计口径：`internal/httpapi/server.go` 里 `HandleFunc("METHOD /api/…")` 的去重路径；
 GET 与 POST 同名路径只算一个。
 
-## 2. 已实现（124 条注册路由）
+## 2. 已实现（125 条注册路由）
 
 ```
 admin/accounts/create       admin/announcements/create  admin/announcements/delete
@@ -31,7 +31,7 @@ admin/abuse-user-reports    admin/deliver-queue*        admin/get-index-stats
 admin/get-table-stats
 admin/meta                  admin/object-storage*       admin/update-meta
 admin/resolve-abuse-user-report
-admin/announcements/list    admin/drive/files           admin/emoji/add
+admin/announcements/list    admin/announcements/update  admin/emoji/add
 admin/emoji/delete          admin/emoji/list            admin/federation/allowlist*
 admin/federation/mode*      admin/show-users            admin/suspend-user
 admin/unsuspend-user        announcements               blocking/create
@@ -91,6 +91,8 @@ users/update
 
 2026-11-06 第十九波新增：`stats`（公开计数）；`admin/update-meta` 增加六个合规 URL 与
 `serverRules`（不是新路由）。
+
+2026-11-06 第三十七波新增：`admin/announcements/update`（部分更新，`imageUrl: null`/`expiresAt: null` 清空，404 `NO_SUCH_ANNOUNCEMENT`）。
 
 2026-11-06 第三十六波新增：`i/read-announcement`（迁移 v17：`announcement_reads`）；公告列表按登录用户返回 `isRead`。
 

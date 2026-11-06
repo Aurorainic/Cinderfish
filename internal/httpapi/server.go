@@ -246,6 +246,7 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("POST /api/i/read-announcement", s.handleIReadAnnouncement)
 	s.mux.HandleFunc("POST /api/admin/announcements/create", s.handleAdminAnnouncementsCreate)
 	s.mux.HandleFunc("POST /api/admin/announcements/list", s.handleAdminAnnouncementsList)
+	s.mux.HandleFunc("POST /api/admin/announcements/update", s.handleAdminAnnouncementsUpdate)
 	s.mux.HandleFunc("POST /api/admin/announcements/delete", s.handleAdminAnnouncementsDelete)
 
 	// Abuse reports: users file them, administrators resolve them.

@@ -1069,6 +1069,21 @@ UserLite 部分也有简化：`name`/`avatarUrl` 只从 profile 行来，没有 
 
 `limit` / `untilId`；返回全部公告（含已过期与停用），id 倒序。
 
+### POST /api/admin/announcements/update（管理员，2026-11-06 第三十七波）
+
+与 `create` 同一套字段校验，但为部分更新：
+
+| 参数 | 语义 |
+|------|------|
+| `id` | 必填；不存在返回 404 `NO_SUCH_ANNOUNCEMENT` |
+| `title` / `text` | 提供则按 `create` 的规则校验并覆盖 |
+| `imageUrl` | 提供 `null` 清空；提供字符串按 `create` 规则校验；不提供则保持原值 |
+| `expiresAt` | 提供 `null` 清空；提供数字（Unix 毫秒）直接写入，不做「晚于现在」校验——填了过去的时间等于立即过期；不提供则保持原值 |
+| `isActive` | 可选布尔，切换上下线 |
+
+返回 `204`（不返回更新后的对象）。非管理员 403，未登录 401。三态语义用 `nullableField`
+判断「未提供 / 显式 null」——JSON 里缺字段与 `null` 不能混为一谈。
+
 ### POST /api/admin/announcements/delete（管理员）
 
 `{ id }`，返回 204；不存在的 id 也是 204（幂等）。

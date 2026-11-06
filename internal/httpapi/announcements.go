@@ -2,6 +2,8 @@ package httpapi
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"net/http"
 	"strings"
 	"time"
@@ -214,6 +216,95 @@ func (s *Server) handleAdminAnnouncementsList(w http.ResponseWriter, r *http.Req
 		out = append(out, packAnnouncement(a, false))
 	}
 	writeJSON(w, http.StatusOK, out)
+}
+
+// handleAdminAnnouncementsUpdate is POST /api/admin/announcements/update.
+// Absent fields keep their current value; `imageUrl: null` and
+// `expiresAt: null` clear them.
+func (s *Server) handleAdminAnnouncementsUpdate(w http.ResponseWriter, r *http.Request) {
+	if !s.requireAdmin(w, r) {
+		return
+	}
+	if s.announcements == nil {
+		writeInternalServerError(w)
+		return
+	}
+	var body struct {
+		ID        string          `json:"id"`
+		Title     *string         `json:"title"`
+		Text      *string         `json:"text"`
+		ImageURL  nullableField   `json:"imageUrl"`
+		IsActive  *bool           `json:"isActive"`
+		ExpiresAt json.RawMessage `json:"expiresAt"`
+	}
+	if err := decodeOptionalJSON(r, &body); err != nil {
+		writeAPIError(w, err)
+		return
+	}
+	if body.ID == "" {
+		writeAPIError(w, invalidParamError("id is required"))
+		return
+	}
+
+	params := announcement.UpdateParams{IsActive: body.IsActive}
+	if body.Title != nil {
+		title := strings.TrimSpace(*body.Title)
+		if title == "" || utf8.RuneCountInString(title) > maxAnnouncementTitle {
+			writeAPIError(w, invalidParamError("title is required and at most 256 characters"))
+			return
+		}
+		params.Title = &title
+	}
+	if body.Text != nil {
+		text := strings.TrimSpace(*body.Text)
+		if text == "" || utf8.RuneCountInString(text) > maxAnnouncementText {
+			writeAPIError(w, invalidParamError("text is required and at most 10000 characters"))
+			return
+		}
+		params.Text = &text
+	}
+	if body.ImageURL.provided() {
+		value := ""
+		if v := body.ImageURL.asUpdatePointer(); v != nil {
+			value = strings.TrimSpace(*v)
+		}
+		if value != "" {
+			if utf8.RuneCountInString(value) > maxAnnouncementImage {
+				writeAPIError(w, invalidParamError("imageUrl is too long"))
+				return
+			}
+			if !strings.HasPrefix(value, "https://") && !strings.HasPrefix(value, "http://") && !strings.HasPrefix(value, "/") {
+				writeAPIError(w, invalidParamError("imageUrl must be http(s) or an absolute path"))
+				return
+			}
+		}
+		params.ImageURL = &value
+	}
+	if len(body.ExpiresAt) > 0 {
+		params.SetExpiry = true
+		if string(body.ExpiresAt) != "null" {
+			var millis int64
+			if err := json.Unmarshal(body.ExpiresAt, &millis); err != nil {
+				writeAPIError(w, invalidParamError("expiresAt must be a millisecond timestamp or null"))
+				return
+			}
+			moment := time.UnixMilli(millis).UTC()
+			params.ExpiresAt = &moment
+		}
+	}
+
+	if _, err := s.announcements.Update(r.Context(), body.ID, params); err != nil {
+		if errors.Is(err, announcement.ErrNotFound) {
+			writeAPIError(w, &APIError{
+				Message: "No such announcement.", Code: "NO_SUCH_ANNOUNCEMENT",
+				ID: errIDInternal, Kind: "client", Status: http.StatusNotFound,
+			})
+			return
+		}
+		writeInternalServerError(w)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // handleAdminAnnouncementsDelete is POST /api/admin/announcements/delete.
