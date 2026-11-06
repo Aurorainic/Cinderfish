@@ -262,7 +262,7 @@ func (s *Server) handleUsersShow(w http.ResponseWriter, r *http.Request) {
 		for _, id := range body.UserIDs {
 			u, err := s.accounts.GetByID(r.Context(), id)
 			if err != nil {
-				u, err = s.accounts.GetByURI(r.Context(), id)
+				u, err = s.userByAPID(r.Context(), id)
 			}
 			if err != nil || u == nil {
 				continue
@@ -283,8 +283,9 @@ func (s *Server) handleUsersShow(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			// An actor URI is accepted here too: alsoKnownAs and
 			// moved_to_uri store URIs, and the client passes them back
-			// unchanged.
-			user, err = s.accounts.GetByURI(r.Context(), body.UserID)
+			// unchanged. A local account has no stored URI, so the helper
+			// derives it from the base URL.
+			user, err = s.userByAPID(r.Context(), body.UserID)
 		}
 	case body.Username != "" && body.Host == "":
 		user, err = s.accounts.GetByUsername(r.Context(), body.Username)

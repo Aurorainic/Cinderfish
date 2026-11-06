@@ -46,6 +46,20 @@ func TestIKnownAsLocalAlias(t *testing.T) {
 		t.Errorf("users/show alsoKnownAs = %v, want [%s]", show["alsoKnownAs"], bobURI)
 	}
 
+	// The stored URI resolves back to the account, even though a local user has
+	// no users.uri row: the base-URL form is what the migration page passes to
+	// users/show to render the alias.
+	if resp, byURI := postWithToken(t, f.ts, "/api/users/show", "", map[string]any{"userId": bobURI}); resp.StatusCode != http.StatusOK || byURI["username"] != "bob" {
+		t.Errorf("users/show by actor URI = %d %v", resp.StatusCode, byURI)
+	}
+	batch := postListWithToken(t, f.ts, "/api/users/show", "", map[string]any{"userIds": []string{bobURI}})
+	if len(batch) != 1 {
+		t.Fatalf("users/show by userIds = %v, want one", batch)
+	}
+	if got, _ := batch[0].(map[string]any); got["username"] != "bob" {
+		t.Errorf("users/show batch = %v", batch)
+	}
+
 	// Naming yourself is refused.
 	selfResp, self := postWithToken(t, f.ts, "/api/i/known-as", aliceToken, map[string]any{
 		"alsoKnownAs": []string{"@alice"},

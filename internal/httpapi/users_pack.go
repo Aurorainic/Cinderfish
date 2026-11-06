@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/Aurorainic/cinderfish/internal/account"
@@ -60,11 +61,34 @@ func (s *Server) packMovedTo(ctx context.Context, u *account.User, packed map[st
 	if u == nil || u.MovedToURI == "" || s.accounts == nil {
 		return
 	}
-	target, err := s.accounts.GetByURI(ctx, u.MovedToURI)
+	target, err := s.userByAPID(ctx, u.MovedToURI)
 	if err != nil || target == nil {
 		return
 	}
 	packed["movedToUri"] = packUserLite(target, "", loadProfile(ctx, s, target.ID))
+}
+
+// userByAPID resolves an actor URI to a user row. Remote actors store their
+// URI in users.uri, but a local account never does: its actor id is derived
+// from the base URL. Without the local branch, a local alias or move target
+// could be stored but never read back.
+func (s *Server) userByAPID(ctx context.Context, uri string) (*account.User, error) {
+	if uri == "" || s.accounts == nil {
+		return nil, account.ErrUserNotFound
+	}
+	if u, err := s.accounts.GetByURI(ctx, uri); err == nil {
+		return u, nil
+	}
+	if rest, ok := strings.CutPrefix(uri, s.baseURL()+"/users/"); ok {
+		id := rest
+		if i := strings.IndexAny(id, "/?#"); i >= 0 {
+			id = id[:i]
+		}
+		if id != "" {
+			return s.accounts.GetByID(ctx, id)
+		}
+	}
+	return nil, account.ErrUserNotFound
 }
 
 // packUserDetailed renders a user in the UserDetailed schema. prof
