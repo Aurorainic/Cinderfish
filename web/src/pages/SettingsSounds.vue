@@ -36,7 +36,21 @@
 			<ul class="sounds">
 				<li v-for="key in soundKeys" :key="key.key" class="sound">
 					<span class="soundName">{{ t(`_sfx.${key.sfx}`) }}</span>
-					<span class="soundType">{{ key.value.type || t("none") }}</span>
+					<select
+						class="soundType"
+						:value="key.value.type"
+						@change="onTypeChange(key, $event)"
+					>
+						<option value="none">{{ t("none") }}</option>
+						<option
+							v-for="file in sounds"
+							:key="file"
+							:value="file"
+						>{{ file }}</option>
+					</select>
+					<CfButton inline :disabled="key.value.type === 'none'" @click="preview(key)">
+						<i class="ph-play ph-bold"></i>
+					</CfButton>
 					<label class="soundVolume">
 						<input
 							v-model.number="key.value.volume"
@@ -59,27 +73,26 @@
 			</div>
 		</section>
 
-		<CfInfo class="note" :warn="true">
-			本波<strong>未提供</strong>提示音资源：<code>web/public/static-assets/sounds/</code>
-			下没有任何 mp3，<code>scripts/sound.ts</code> 的 <code>SOUND_ASSETS_AVAILABLE</code>
-			为 false，所以即使设置音量也不会出声。
-			音色选择需要 <code>get-sounds</code> 端点与试听弹窗，两者都未提供；
-			自定义音效（插件/上传）同样未实现。这里只保留主音量、静音与每类提示音的音量。
+		<CfInfo class="note">
+			音色来自 <code>get-sounds</code>（服务器扫描
+			<code>static-assets/sounds/</code> 下的 mp3），试听按钮即时播放。自动播放受浏览器策略
+			限制时首次点击后才会有声音。自定义音效（插件/上传）未实现。
 		</CfInfo>
 	</div>
 </template>
 
 <script lang="ts" setup>
 // Firefish's sounds page edits a ColdDeviceStorage entry per sound type through
-// `os.form` and lists the available files from `get-sounds`. Neither the
-// `get-sounds` endpoint nor the sound assets exist in Cinderfish, so the page
-// keeps what works: the master volume (honoured by `scripts/sound.ts`), a mute
-// shortcut, and the per-type volumes, with an explicit note that nothing plays.
-import { computed, reactive, ref, watch } from "vue";
+// `os.form` and lists the available files from `get-sounds`. The port uses a
+// native select per row plus a preview button; the options come from the
+// endpoint and the preview calls the same `playFile` the timeline uses.
+import { computed, onMounted, reactive, ref, watch } from "vue";
 import CfButton from "@/components/ui/CfButton.vue";
 import CfInfo from "@/components/ui/CfInfo.vue";
 import { t } from "@/i18n";
+import { apiGet } from "@/api/client";
 import { definePageMetadata } from "@/scripts/page-metadata";
+import { playFile } from "@/scripts/sound";
 import { ColdDeviceStorage, type SoundConfig } from "@/store";
 
 defineOptions({ name: "CfPageSettingsSounds" });
@@ -138,6 +151,29 @@ function percent(value: number): string {
 
 function toggleMute(): void {
 	masterVolumeRef.value = muted.value ? 0.3 : 0;
+}
+
+const sounds = ref<string[]>([]);
+
+onMounted(() => {
+	apiGet<(string | null)[]>("get-sounds")
+		.then((list) => {
+			sounds.value = list.filter((item): item is string => typeof item === "string");
+		})
+		.catch(() => {
+			// The current values stay selectable even if the list fails.
+		});
+});
+
+function onTypeChange(row: SoundRow, event: Event): void {
+	const type = (event.target as HTMLSelectElement).value;
+	row.value.type = type;
+	saveSound(row.storeKey, row.value);
+	if (type !== "none") playFile(type, row.value.volume);
+}
+
+function preview(row: SoundRow): void {
+	playFile(row.value.type, row.value.volume);
 }
 
 function saveSound(

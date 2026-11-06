@@ -6654,3 +6654,48 @@ Host。这一轮用 Go 的反向代理复现同一拓扑。
 - 无头浏览器（1400×900）：打开 `/@w146alice/reactions`，页面出现 1 条记录，
   显示 🎉、`w146owner`、笔记正文与回应计数，不显示「后端尚未提供」。
   截图 `/tmp/w146-shots/reactions-tab.png`（不入库）。
+
+## 12FK. 第一百四十七波：提示音资源与 get-sounds（2026-11-07）
+
+`scripts/sound.ts` 一直写着「没有任何 mp3，`SOUND_ASSETS_AVAILABLE = false`」，所以时间线的新帖
+提示音永远静音；设置页也只能调音量，不能选音色。
+
+### 12FK.1 落地清单
+
+| 层 | 文件 | 内容 |
+|----|------|------|
+| 资源 | `web/public/static-assets/sounds/syuilo/*.mp3` | Firefish 的 syuilo 音效集（18 个，1.3 MB） |
+| 播放 | `web/src/scripts/sound.ts` | `SOUND_ASSETS_AVAILABLE = true`，注释改为资源已就位 |
+| 端点 | `internal/httpapi/sounds.go`（新） | `POST/GET /api/get-sounds`：扫描 `<webdir>/static-assets/sounds/*/*.mp3`，返回 `[null, "syuilo/up", …]`（排序） |
+| 接线 | `internal/httpapi/server.go` | 注册端点 |
+| 设置页 | `web/src/pages/SettingsSounds.vue` | 每类提示音加音色下拉（来自 `get-sounds`）与试听按钮；选择后立即保存并试听 |
+| 客户端类型 | `web/src/api/endpoints.ts` | `getSounds` → `(string \| null)[]` |
+| 台账 | `docs/research/2026-11-04-misskey-api-coverage.md` | 161 → 162 路由、153 → 154 同名、287 → 286 未实现 |
+
+### 12FK.2 资源来源
+
+拷贝自 `tmp/refcheck/firefish-full/packages/backend/assets/sounds/syuilo/*.mp3`，即本项目的
+Firefish 参考镜像 `firefish-jclaudan-mirror@b425f61`（AGPL-3.0；与所有端口文件的头注一致）。
+MP3 无头注可保留，来源记录在此。若分发本项目，仍须按 AGPL-3.0 分发。
+
+### 12FK.3 有意的限制
+
+- 自动播放受浏览器策略限制：没有用户手势前 `play()` 会失败，`playFile` 已 catch，试听按钮点击后
+  正常出声。
+- `get-sounds` 每次请求扫描目录（18 个文件），没有缓存；目录不存在时返回 `[null]`。
+- 目前只有时间线新帖会调用 `sound.play("note"/"noteMy")`；通知、聊天等其它音效可配置但客户端还没有
+  全局触发器，未实现自定义上传/插件音效。
+- 自定义音效（上传 mp3）未实现。
+
+### 12FK.4 验证证据
+
+- `go vet ./...`、含数据库的全量 `go test ./...` 全绿；`vue-tsc --noEmit`、`check:port`
+  （hardTotal 0）、`pnpm build` 全绿。
+- `TestSoundFiles`：排序、忽略非 mp3、忽略空目录、缺失目录返回 `[nil]`；
+  `TestGetSoundsEndpoint`：匿名 200 且首项为 null。
+- 真实二进制：`POST /api/get-sounds` 返回 19 项（null + 18 个 `syuilo/*`）；
+  `GET /static-assets/sounds/syuilo/up.mp3` 返回 200 `audio/mpeg` 18240 B。
+- 无头浏览器（1400×900）：`/settings/sounds` 的下拉有 19 个选项（none + 18），把「帖子」音色改为
+  `syuilo/up`、音量调到 1 后点试听，捕获到 `new Audio("/static-assets/sounds/syuilo/up.mp3")` 且
+  `play()` 被调用一次；页面不再出现「未提供提示音资源」。
+  截图 `/tmp/w147-shots/sounds.png`（不入库）。

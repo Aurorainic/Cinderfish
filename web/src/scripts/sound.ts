@@ -1,13 +1,11 @@
 // Ported from firefish@b425f61:packages/client/src/scripts/sound.ts (AGPL-3.0-only)
 //
-// Firefish plays `/static-assets/sounds/<type>.mp3`. Cinderfish ships no sound
-// assets yet (web/public only holds favicon.svg), so the entry points keep the
-// Firefish signatures and the cold-store lookups, but stay silent: nothing is
-// fetched and no <audio> element is played. Set SOUND_ASSETS_AVAILABLE to true
-// once the mp3 files are added under web/public/static-assets/sounds/.
+// Firefish plays `/static-assets/sounds/<type>.mp3`. The syuilo set is copied
+// from the reference checkout into web/public/static-assets/sounds/syuilo/
+// (see docs/HANDOVER.md §12FK for the provenance record), so playback is on.
 import { ColdDeviceStorage } from "@/store";
 
-const SOUND_ASSETS_AVAILABLE = false;
+const SOUND_ASSETS_AVAILABLE = true;
 
 /** The `sound_*` cold-store keys Firefish's callers use. */
 export type SoundType =

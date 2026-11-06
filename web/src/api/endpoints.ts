@@ -245,6 +245,7 @@ export const ENDPOINTS = {
 	chartsUserNotes: "charts/user/notes",
 	serverInfo: "server-info",
 	usersReactions: "users/reactions",
+	getSounds: "get-sounds",
 	fetchRss: "fetch-rss",
 	adminFederationMode: "admin/federation/mode",
 	adminFederationAllowlist: "admin/federation/allowlist",
@@ -1067,6 +1068,11 @@ export interface EndpointMap {
 	[ENDPOINTS.fetchRss]: {
 		req: { url: string };
 		res: FetchRssFeed;
+	};
+
+	[ENDPOINTS.getSounds]: {
+		req: Record<string, never>;
+		res: (string | null)[];
 	};
 
 	[ENDPOINTS.usersReactions]: {
