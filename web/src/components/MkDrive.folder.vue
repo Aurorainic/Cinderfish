@@ -41,8 +41,8 @@
 // Wave-2 differences from upstream (contract §5, drive-media.md):
 //   * renaming/deleting a folder emits `updated`/`deleted` because there is no
 //     drive streaming channel to refresh the list;
-//   * dropping a *file* onto a folder is not implemented (drive/files/update is
-//     missing), so only OS uploads and folder moves are accepted;
+//   * dropping a drive *file* onto a folder moves it with `drive/files/update`
+//     and emits `file-moved` so the owner drops the tile from the old folder;
 //   * the menu has no `danger` styling: our os.MenuItem has no such field.
 import { computed, defineAsyncComponent, ref } from "vue";
 import { api, ApiError } from "@/api/client";
@@ -53,6 +53,7 @@ import { defaultStore } from "@/store/base";
 
 // Firefish injects these through vite `define`; string values are unchanged.
 const DATA_TRANSFER_DRIVE_FOLDER = "mk_drive_folder";
+const DATA_TRANSFER_DRIVE_FILE = "mk_drive_file";
 
 const props = withDefaults(
 	defineProps<{
@@ -72,6 +73,7 @@ const emit = defineEmits<{
 	(ev: "upload", file: File, folder: DriveFolder): void;
 	(ev: "updated", v: DriveFolder): void;
 	(ev: "deleted", id: string): void;
+	(ev: "file-moved", id: string): void;
 	(ev: "dragstart"): void;
 	(ev: "dragend"): void;
 }>();
@@ -109,8 +111,10 @@ function onDragover(ev: DragEvent) {
 	const isFile = ev.dataTransfer.items[0]?.kind === "file";
 	const isDriveFolder =
 		ev.dataTransfer.types[0] === DATA_TRANSFER_DRIVE_FOLDER;
+	const isDriveFile =
+		ev.dataTransfer.types[0] === DATA_TRANSFER_DRIVE_FILE;
 
-	if (isFile || isDriveFolder) {
+	if (isFile || isDriveFolder || isDriveFile) {
 		ev.dataTransfer.dropEffect =
 			ev.dataTransfer.effectAllowed === "all" ? "copy" : "move";
 	} else {
@@ -126,8 +130,7 @@ function onDragleave() {
 	draghover.value = false;
 }
 
-function moveFolderInto(movedId: string, parentId: string) {
-	api<DriveFolder>("drive/folders/update", { folderId: movedId, parentId })
+function moveFolderInto(movedId: string, parentId: string) {	api<DriveFolder>("drive/folders/update", { folderId: movedId, parentId })
 		.then(() => emit("deleted", movedId))
 		.catch((cause: unknown) => {
 			if (cause instanceof ApiError && cause.code === "INVALID_PARAM") {
@@ -141,6 +144,14 @@ function moveFolderInto(movedId: string, parentId: string) {
 		});
 }
 
+function moveFileInto(fileId: string) {
+	api("drive/files/update", { fileId, folderId: props.folder.id })
+		.then(() => emit("file-moved", fileId))
+		.catch(() => {
+			void alert({ type: "error", text: t("somethingHappened") });
+		});
+}
+
 function onDrop(ev: DragEvent) {
 	draghover.value = false;
 
@@ -150,6 +161,13 @@ function onDrop(ev: DragEvent) {
 		for (const file of Array.from(ev.dataTransfer.files)) {
 			emit("upload", file, props.folder);
 		}
+		return;
+	}
+
+	const driveFile = ev.dataTransfer.getData(DATA_TRANSFER_DRIVE_FILE);
+	if (driveFile != null && driveFile !== "") {
+		const dropped = JSON.parse(driveFile) as { id: string };
+		moveFileInto(dropped.id);
 		return;
 	}
 

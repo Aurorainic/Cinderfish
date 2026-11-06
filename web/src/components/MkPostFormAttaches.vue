@@ -24,8 +24,9 @@
 // Wave-3 degradations (contract §2):
 //   * `vue-draggable-plus` is not a dependency, so attachments keep the order in
 //     which they were picked and cannot be drag-sorted;
-//   * `drive/files/update` does not exist, so rename / sensitive flag / caption
-//     are gone and the only per-file action is "remove".
+//   * `drive/files/update` exists, but the composer keeps only "remove" per
+//     attachment; rename / caption / sensitive editing lives in the drive page,
+//     so the post form does not duplicate those dialogs;
 import type { DriveFile } from "@/api/types";
 import MkDriveFileThumbnail from "@/components/MkDriveFileThumbnail.vue";
 import { t } from "@/i18n";

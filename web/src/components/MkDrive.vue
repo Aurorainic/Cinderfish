@@ -58,6 +58,7 @@
 						@upload="upload"
 						@updated="replaceFolder"
 						@deleted="onFolderDeleted"
+						@file-moved="removeFile"
 						@dragstart="isDragSource = true"
 						@dragend="isDragSource = false"
 					/>
@@ -83,6 +84,7 @@
 									selectedFiles.some((x) => x.id === file.id)
 								"
 								@chosen="chooseFile"
+								@updated="replaceFile"
 								@deleted="removeFile"
 							/>
 							<!-- SEE: https://stackoverflow.com/questions/18744164/flex-box-align-last-row-to-grid -->
@@ -126,9 +128,9 @@
 //   * the file list is a CfPagination over drive/files (the folders list keeps
 //     upstream's own "load more" button, since CfPagination can only page one
 //     endpoint and the grid mixes two);
-//   * `drive/files/update` is missing, so files cannot be renamed, described,
-//     marked sensitive or moved between folders — dropping a *file* on a folder
-//     is not advertised and file tiles are not draggable;
+//   * `drive/files/update` backs rename / description / sensitive / folder
+//     moves; files are draggable onto folder tiles and file tiles refresh in
+//     place through the pagination's updateItem;
 //   * folder moves go through drive/folders/update; because the packed folder
 //     never carries a nested `parent`, the breadcrumb walks parentId with one
 //     drive/folders/show per level;
@@ -186,6 +188,7 @@ interface FilesPaginationHandle {
 	reload: () => Promise<unknown>;
 	prepend: (...items: DriveFile[]) => void;
 	removeItem: (finder: (item: DriveFile) => boolean) => boolean;
+	updateItem: (id: string, updater: (old: DriveFile) => DriveFile) => void;
 }
 
 const fileInput = ref<HTMLInputElement | null>(null);
@@ -345,6 +348,11 @@ function removeFolder(folderId: string): void {
 function removeFile(file: DriveFile | string): void {
 	const id = typeof file === "string" ? file : file.id;
 	pagingHandle()?.removeItem((item) => item.id === id);
+}
+
+/** Replaces a tile after `drive/files/update`. */
+function replaceFile(updated: DriveFile): void {
+	pagingHandle()?.updateItem(updated.id, () => updated);
 }
 
 /** Applies a rename/move result coming from a folder tile or breadcrumb. */

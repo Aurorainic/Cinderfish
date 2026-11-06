@@ -2561,6 +2561,44 @@ cd web && pnpm build                    # exit 0
 - 菜单入口在时间线与详情页的实际点击路径、移动端布局。
 - `go test` 与浏览器走查未执行；`note_edits` 已加入测试库 TRUNCATE 列表。
 
+## 12AO. 批次：云盘文件编辑（2026-11-06）
+
+**工作方式**：目标模式第二十五波，继续只写代码、验证到编译层。施工依据
+`docs/research/2026-11-06-firefish-port-wave25-contract.md`。
+
+### 12AO.1 落地清单
+
+| 层 | 文件 | 说明 |
+|----|------|------|
+| 迁移 | `internal/db/db.go` | v16：`drive_files.comment` |
+| 服务层 | `internal/media/drive.go` | `FileUpdate`/`Update`：名称、描述、敏感、移动文件夹 |
+| 端点 | `internal/httpapi/drive.go`、`server.go` | `drive/files/update`；`packDriveFile` 返回真实 `comment` |
+| 前端类型 | `api/types.ts`、`endpoints.ts` | `comment: string \| null`、新端点 |
+| 网盘 | `MkDrive.file.vue`、`MkDrive.folder.vue`、`MkDrive.vue` | 重命名/描述/敏感、拖拽移动、敏感角标、原地刷新 |
+| 文档 | `api-contract/drive-media.md` | 端点小节与总览 |
+
+### 12AO.2 有意的限制
+
+1. 面包屑不接受文件拖放；发帖框附件不做重命名。
+2. 无 URL 上传、去重查询与批量移动。
+
+### 12AO.3 验证证据（编译层）
+
+```
+gofmt -l internal/ cmd/                 # 空
+go vet ./...                            # exit 0
+cd web && pnpm exec vue-tsc --noEmit    # exit 0
+cd web && pnpm run check:port           # hardTotal 0
+cd web && pnpm build                    # exit 0
+```
+
+### 12AO.4 仍未验证
+
+- 重命名/描述/敏感标记的保存与回读，移动文件夹后列表的变化。
+- 拖拽在真实浏览器中的 dataTransfer 类型与 folder 高亮。
+- 他人文件夹 400、他人文件 404 的分支。
+- `go test` 与浏览器走查未执行。
+
 ## 13. 文档索引
 
 | 文档 | 内容 |
@@ -2611,6 +2649,7 @@ cd web && pnpm build                    # exit 0
 | `docs/research/2026-11-06-firefish-port-wave22-contract.md` | **第二十二波施工契约（资料扩展字段与推荐笔记开关），见 §12AL** |
 | `docs/research/2026-11-06-firefish-port-wave23-contract.md` | **第二十三波施工契约（通知类型静音与未读过滤），见 §12AM** |
 | `docs/research/2026-11-06-firefish-port-wave24-contract.md` | **第二十四波施工契约（笔记编辑与编辑历史），见 §12AN** |
+| `docs/research/2026-11-06-firefish-port-wave25-contract.md` | **第二十五波施工契约（云盘文件重命名/描述/敏感/移动），见 §12AO** |
 
 ## 14. 已知的未验证项
 
@@ -2653,6 +2692,8 @@ cd web && pnpm build                    # exit 0
   非法类型分支与设置页交互未验证。
 - **第二十四波未测（2026-11-06，见 §12AN.4）**：笔记编辑与历史只过了编译层，编辑/历史/回读链路、
   错误分支与菜单入口未验证；远端不接收 Update 是设计限制。
+- **第二十五波未测（2026-11-06，见 §12AO.4）**：云盘文件编辑只过了编译层，保存/回读、拖拽移动与
+  错误分支未验证。
 - **仍未移植的设置页**：邮箱、整合、导入导出、迁移、Webhook、插件、自定义 KaTeX、状态栏、
   删除账号、应用授权以外的账号操作；对应后端端点不存在或前端缺少依赖（见第五波契约 §3.3）。
 - **仍缺的 widgets**：rss、rss-ticker、server-metric、online-users、federation、job-queue、aiscript、

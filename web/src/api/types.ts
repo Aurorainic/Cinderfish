@@ -135,7 +135,7 @@ export interface DriveFile {
 	url: string;
 	thumbnailUrl: null;
 	webpublicUrl: null;
-	comment: null;
+	comment: string | null;
 	folderId: string | null;
 	blurhash: null;
 }

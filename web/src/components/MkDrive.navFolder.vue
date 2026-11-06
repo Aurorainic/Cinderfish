@@ -15,8 +15,9 @@
 </template>
 
 <script lang="ts" setup>
-// Dropping a *file* onto a breadcrumb cannot move it (drive/files/update does
-// not exist), so only OS files (upload) and drive folders (move) are handled.
+// Dropping a *file* onto a breadcrumb is still not handled: files move by
+// being dropped on a folder tile in the grid. This component keeps OS uploads
+// and drive-folder moves.
 // The dropped-folder move reports the backend's INVALID_PARAM for a cycle.
 import { ref } from "vue";
 import { api, ApiError } from "@/api/client";

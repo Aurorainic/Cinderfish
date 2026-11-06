@@ -173,6 +173,7 @@ export const ENDPOINTS = {
 	driveFiles: "drive/files",
 	driveFilesCreate: "drive/files/create",
 	driveFilesShow: "drive/files/show",
+	driveFilesUpdate: "drive/files/update",
 	driveFilesDelete: "drive/files/delete",
 	driveFolders: "drive/folders",
 	driveFoldersCreate: "drive/folders/create",
@@ -764,6 +765,16 @@ export interface EndpointMap {
 		res: DriveFile;
 	};
 	[ENDPOINTS.driveFilesShow]: { req: { fileId: string }; res: DriveFile };
+	[ENDPOINTS.driveFilesUpdate]: {
+		req: {
+			fileId: string;
+			name?: string | null;
+			isSensitive?: boolean;
+			comment?: string | null;
+			folderId?: string | null;
+		};
+		res: DriveFile;
+	};
 	[ENDPOINTS.driveFilesDelete]: { req: { fileId: string }; res: EmptyResponse };
 	[ENDPOINTS.driveFolders]: { req: DriveFilesParams; res: DriveFolder[] };
 	[ENDPOINTS.driveFoldersCreate]: {

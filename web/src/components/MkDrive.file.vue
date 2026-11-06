@@ -4,8 +4,11 @@
 		class="ncvczrfv"
 		:class="{ isSelected }"
 		:title="title"
+		draggable="true"
 		@click="onClick"
 		@contextmenu.stop="onContextmenu"
+		@dragstart="onDragstart"
+		@dragend="onDragend"
 	>
 		<MkDriveFileThumbnail class="thumbnail" :file="file" fit="contain" />
 
@@ -13,19 +16,24 @@
 			<span>{{ baseName }}</span>
 			<span v-if="extension != ''" class="ext">{{ extension }}</span>
 		</p>
+
+		<span v-if="file.isSensitive" class="sensitive" :title="t('sensitive')">
+			<i class="ph-eye-slash ph-bold"></i>
+		</span>
 	</div>
 </template>
 
 <script lang="ts" setup>
-// Wave-2 differences from upstream (contract §5, drive-media.md):
-//   * the avatar / banner / NSFW corner labels are gone: `_i.avatarId` and
-//     `_i.bannerId` are always null and `isSensitive` is always false;
-//   * rename / describe / mark-as-sensitive are gone: `drive/files/update`
-//     does not exist, so the only mutations left are delete;
+// Differences from upstream (contract §5, drive-media.md):
+//   * the avatar / banner corner labels are gone: `_i.avatarId` and
+//     `_i.bannerId` are always null; the sensitive flag is real now and the
+//     tile shows its own marker;
+//   * rename / describe / mark-as-sensitive call `drive/files/update`;
+//   * moving a file between folders still has no drag affordance: the folder
+//     picker is not ported, so the menu offers no "move" entry yet;
 //   * `deleted` is emitted after a successful delete because the drive has no
-//     streaming channel that would refresh the list for us;
-//   * the file tile is not draggable: moving a file between folders needs the
-//     same missing endpoint;
+//     streaming channel that would refresh the list for us; `updated` carries
+//     the new metadata so the parent can replace the tile in place;
 //   * "used in notes" was added as a menu entry so AttachedFiles has an entry
 //     point (the endpoint behind it is missing, the page says so).
 import { computed } from "vue";
@@ -35,7 +43,14 @@ import { api, resolveMediaUrl } from "@/api/client";
 import MkDriveFileThumbnail from "@/components/MkDriveFileThumbnail.vue";
 import bytes from "@/filters/bytes";
 import copyToClipboard from "@/scripts/copy-to-clipboard";
-import { confirm, contextMenu, popupMenu, success, type MenuItem } from "@/os";
+import {
+	confirm,
+	contextMenu,
+	inputText,
+	popupMenu,
+	success,
+	type MenuItem,
+} from "@/os";
 import { t } from "@/i18n";
 
 const props = withDefaults(
@@ -52,8 +67,12 @@ const props = withDefaults(
 
 const emit = defineEmits<{
 	(ev: "chosen", r: DriveFile): void;
+	(ev: "updated", file: DriveFile): void;
 	(ev: "deleted", id: string): void;
 }>();
+
+// Data-transfer type for dragging a drive file onto a folder.
+const DATA_TRANSFER_DRIVE_FILE = "mk_drive_file";
 
 const router = useRouter();
 
@@ -82,6 +101,22 @@ function getMenu(): MenuItem[] {
 			text: t("download"),
 			icon: "ph-download-simple ph-bold ph-lg",
 			action: download,
+		},
+		{ separator: true },
+		{
+			text: t("rename"),
+			icon: "ph-pencil-simple ph-bold ph-lg",
+			action: renameFile,
+		},
+		{
+			text: t("description"),
+			icon: "ph-text-align-left ph-bold ph-lg",
+			action: editComment,
+		},
+		{
+			text: t("sensitive"),
+			icon: "ph-eye-slash ph-bold ph-lg",
+			action: toggleSensitive,
 		},
 		{ separator: true },
 		{
@@ -127,6 +162,59 @@ function download() {
 
 function showAttachedNotes() {
 	void router.push(`/my/drive/file/${props.file.id}/attached`);
+}
+
+async function renameFile() {
+	const { canceled, result } = await inputText({
+		title: t("rename"),
+		default: props.file.name,
+		minLength: 1,
+		maxLength: 255,
+	});
+	if (canceled || result == null || result.trim() === "") return;
+	await applyUpdate({ name: result.trim() });
+}
+
+async function editComment() {
+	const { canceled, result } = await inputText({
+		title: t("description"),
+		default: props.file.comment ?? "",
+		maxLength: 512,
+	});
+	if (canceled) return;
+	await applyUpdate({ comment: result === "" ? null : result });
+}
+
+async function toggleSensitive() {
+	await applyUpdate({ isSensitive: !props.file.isSensitive });
+}
+
+async function applyUpdate(
+	patch: { name?: string; comment?: string | null; isSensitive?: boolean },
+): Promise<void> {
+	try {
+		const updated = await api("drive/files/update", {
+			fileId: props.file.id,
+			...patch,
+		});
+		emit("updated", updated);
+		success();
+	} catch {
+		// Keep the tile as-is; the caller's error toast is enough.
+	}
+}
+
+function onDragstart(ev: DragEvent): void {
+	if (!ev.dataTransfer) return;
+	ev.dataTransfer.effectAllowed = "move";
+	ev.dataTransfer.setData(
+		DATA_TRANSFER_DRIVE_FILE,
+		JSON.stringify({ id: props.file.id, name: props.file.name }),
+	);
+}
+
+function onDragend(): void {
+	// The drop target performs the move; nothing to clean up here.
 }
 
 async function deleteFile() {
@@ -211,6 +299,21 @@ async function deleteFile() {
 		> .ext {
 			opacity: 0.5;
 		}
+	}
+
+	> .sensitive {
+		position: absolute;
+		top: 10px;
+		inset-inline-end: 10px;
+		display: grid;
+		place-items: center;
+		width: 22px;
+		height: 22px;
+		border-radius: 100%;
+		background: var(--infoWarnBg);
+		color: var(--infoWarnFg);
+		font-size: 0.8em;
+		pointer-events: none;
 	}
 }
 </style>
