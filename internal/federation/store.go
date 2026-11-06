@@ -956,3 +956,21 @@ FROM users WHERE id = $1
 	}
 	return u, nil
 }
+
+// UpsertRemoteEmoji records an emoji received in a reaction tag, keyed by the
+// name and host the reaction used.
+func (s *Store) UpsertRemoteEmoji(ctx context.Context, name, host, url string) error {
+	if name == "" || host == "" || url == "" {
+		return nil
+	}
+	_, err := s.pool.Exec(ctx, `
+INSERT INTO emojis (id, name, host, aliases, url, is_sensitive, local_only)
+VALUES ($1,$2,$3,'[]'::jsonb,$4,FALSE,FALSE)
+ON CONFLICT (name, host) WHERE host IS NOT NULL
+DO UPDATE SET url = EXCLUDED.url
+	`, idgen.New(), name, host, url)
+	if err != nil {
+		return fmt.Errorf("federation: upsert remote emoji: %w", err)
+	}
+	return nil
+}

@@ -198,3 +198,32 @@ SELECT name, url FROM emojis WHERE host IS NULL AND name = ANY($1)
 	}
 	return out, rows.Err()
 }
+
+// LookupAll maps shortcodes to URLs across local and remote rows, preferring
+// the local definition when both exist. Used for reactions, which can carry
+// emoji from another instance.
+func (s *EmojiService) LookupAll(ctx context.Context, names []string) (map[string]string, error) {
+	out := make(map[string]string, len(names))
+	if len(names) == 0 {
+		return out, nil
+	}
+	rows, err := s.pool.Query(ctx, `
+SELECT name, url FROM emojis
+WHERE name = ANY($1)
+ORDER BY (host IS NULL) DESC
+`, names)
+	if err != nil {
+		return nil, fmt.Errorf("media: lookup emoji: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var name, url string
+		if err := rows.Scan(&name, &url); err != nil {
+			return nil, fmt.Errorf("media: scan emoji: %w", err)
+		}
+		if _, seen := out[name]; !seen {
+			out[name] = url
+		}
+	}
+	return out, rows.Err()
+}

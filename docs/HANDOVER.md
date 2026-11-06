@@ -4922,7 +4922,7 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
 
 ### 12CJ.2 有意的限制
 
-- 只解析笔记正文里的 Emoji tag；反应（`EmojiReact`）里的自定义表情仍未解析成图片。
+- 只解析笔记正文里的 Emoji tag；反应（`EmojiReact`）里的自定义表情在第九十波补上（§12DC）。
 - 远端 emoji 只随笔记携带，不落 `emojis` 表，因此不能在本实例的 emoji 选择器里出现。
 - 本地 emoji 的 URL 若是相对路径，出站时用实例 base URL 补全；远端 emoji 的 URL 原样保留。
 - 没有 `aliases` 解析：正文必须用 `name` 本身。
@@ -5408,3 +5408,35 @@ CINDERFISH_TEST_DATABASE_URL=... go test ./... -count=1         # 全绿
 `/tmp/w89-shots/*.png`（不入库）。
 
 仍未验证：更窄（320/360）与更宽的平板断点、Deck 布局、弹窗在移动端的滚动锁定。
+
+## 12DC. 第九十波：反应里的远端自定义表情（2026-11-07）
+
+第七十一波解析了笔记正文的 Emoji tag，但反应（`Like`/`EmojiReact`）里的自定义表情 URL 丢弃，
+`note.reactionEmojis` 恒为空。
+
+### 12DC.1 落地
+
+| 层 | 改动 |
+|----|------|
+| 入站 | `rememberReactionEmoji`：`:name:` / `:name@host:` 反应从活动 `tag` 的 Emoji 取 URL（`icon.url`，回退 `href`），host 取反应自带或 actor 的 host；`Store.UpsertRemoteEmoji` 写 `emojis`（host 非空、`local_only=false`，按 name+host upsert） |
+| 打包 | `notePackContext` 收集 reaction 里的短代码，`EmojiService.LookupAll`（本地优先）解析 URL；`reactionEmojis` 输出 name→url，并把未出现在正文 emojis 里的反应表情并入 `note.emojis`（反应图标组件消费的是这个列表） |
+| 说明 | 失败的解析只影响图标，不影响反应本身落库 |
+
+### 12DC.2 验证证据
+
+`TestInboundCustomEmojiReaction`（双实例、真实签名）：beta 的 bob 对 alpha 的笔记发
+`EmojiReact`，content `:blob:` 且带 Emoji tag；alpha 的 `notes/show` 返回
+`reactionEmojis.blob=https://beta.example/emoji/blob.png`，`emojis` 里也出现 blob，
+数据库中 emojis 行为 `host=beta.example`。
+
+```
+gofmt -l internal/ cmd/                                        # 空
+go vet ./...                                                   # exit 0
+CINDERFISH_TEST_DATABASE_URL=... go test ./... -count=1         # 全绿
+```
+
+### 12DC.3 仍未验证
+
+- 浏览器里的反应图标渲染（前端 `MkReactionIcon` 从 `note.emojis` 取图；只验证了 API 形状）。
+- 同名但不同 host 的两个远端表情：`reactionEmojis` 与合并列表按名字去重，可能只保留其一。
+- `Undo(EmojiReact)` 后表情行保留（不影响渲染，但会长期留在 emojis 表）。

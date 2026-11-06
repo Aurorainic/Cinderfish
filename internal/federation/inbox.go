@@ -460,6 +460,11 @@ func (i *Inbox) like(ctx context.Context, actor *RemoteUser, activity Object) (s
 	if err != nil {
 		return "skip: target note not found", nil
 	}
+	// A custom reaction carries its image in an Emoji tag. Store it so the
+	// receiving instance can render the reaction instead of the shortcode.
+	if strings.HasPrefix(reaction, ":") {
+		i.rememberReactionEmoji(ctx, actor, activity, reaction)
+	}
 	if err := i.store.ReactNoteID(ctx, noteID, actor.ID, reaction); err != nil {
 		return "", err
 	}
@@ -469,6 +474,47 @@ func (i *Inbox) like(ctx context.Context, actor *RemoteUser, activity Object) (s
 		}
 	}
 	return "ok", nil
+}
+
+// rememberReactionEmoji records the Emoji tag a custom reaction carries. The
+// host comes from the reaction's :name@host: form when present, otherwise
+// from the actor. Failures are ignored: the reaction itself still lands.
+func (i *Inbox) rememberReactionEmoji(ctx context.Context, actor *RemoteUser, activity Object, reaction string) {
+	name, host := reactionNameAndHost(reaction)
+	if name == "" {
+		return
+	}
+	if host == "" {
+		host = actor.Host
+	}
+	for _, tag := range activity.Objects("tag") {
+		if !tag.IsType("Emoji") {
+			continue
+		}
+		tagName := strings.Trim(tag.String("name"), ":")
+		if tagName != name && !strings.HasPrefix(tagName, name+"@") {
+			continue
+		}
+		url := tag.Object("icon").String("url")
+		if url == "" {
+			url = tag.String("href")
+		}
+		if url == "" {
+			continue
+		}
+		_ = i.store.UpsertRemoteEmoji(ctx, name, host, url)
+		return
+	}
+}
+
+// reactionNameAndHost splits :name: and :name@host:.
+func reactionNameAndHost(reaction string) (string, string) {
+	trimmed := strings.Trim(reaction, ":")
+	if trimmed == "" {
+		return "", ""
+	}
+	name, host, _ := strings.Cut(trimmed, "@")
+	return name, host
 }
 
 // resolveLocalTargets fills ReplyLocalID/QuoteLocalID when the target is a

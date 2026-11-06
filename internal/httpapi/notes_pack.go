@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/Aurorainic/cinderfish/internal/media"
@@ -22,6 +23,8 @@ type notePackContext struct {
 	ReactionTotal int
 	// Files are the drive files referenced by the note's FileIDs.
 	Files []*media.File
+	// ReactionEmojiURLs maps custom reaction shortcodes to their images.
+	ReactionEmojiURLs map[string]string
 }
 
 // packNote renders a note in Misskey's Note schema.
@@ -53,8 +56,8 @@ func packNote(n *note.Note, pc notePackContext) map[string]any {
 		"repliesCount":   n.RepliesCount,
 		"reactionCount":  pc.ReactionTotal,
 		"reactions":      pc.Reactions,
-		"reactionEmojis": []any{},
-		"emojis":         packNoteEmojis(n.Emojis),
+		"reactionEmojis": packReactionEmojis(pc.ReactionEmojiURLs),
+		"emojis":         packNoteEmojis(n.Emojis, pc.ReactionEmojiURLs),
 		"fileIds":        n.FileIDs,
 		"files":          files,
 		"replyId":        n.ReplyID,
@@ -180,6 +183,23 @@ func (s *Server) notePackContext(ctx context.Context, n *note.Note, viewerID str
 		pc.Reactions = map[string]int{}
 	}
 
+	// Custom reactions carry their own image; the renderer needs it because a
+	// remote emoji is not in the local registry.
+	if s.emojis != nil {
+		names := make([]string, 0, len(pc.Reactions))
+		for reaction := range pc.Reactions {
+			name, _ := reactionShortcode(reaction)
+			if name != "" {
+				names = append(names, name)
+			}
+		}
+		if len(names) > 0 {
+			if urls, err := s.emojis.LookupAll(ctx, names); err == nil && len(urls) > 0 {
+				pc.ReactionEmojiURLs = urls
+			}
+		}
+	}
+
 	return pc
 }
 
@@ -191,12 +211,41 @@ func unixMilli(ms int64) time.Time {
 // packNoteEmojis renders the custom emoji a note references. The renderer
 // looks a shortcode up here before falling back to the instance registry, so
 // a remote note keeps its own emoji images.
-func packNoteEmojis(emojis []note.Emoji) []any {
+func packNoteEmojis(emojis []note.Emoji, reactionEmojis map[string]string) []any {
 	out := make([]any, 0, len(emojis))
+	seen := make(map[string]bool, len(emojis))
 	for _, e := range emojis {
 		out = append(out, map[string]any{"name": e.Name, "url": e.URL})
+		seen[e.Name] = true
+	}
+	// The reaction views hand the note's emoji list to the icon renderer, so
+	// custom reactions are merged in when the text does not already use them.
+	for name, url := range reactionEmojis {
+		if seen[name] {
+			continue
+		}
+		out = append(out, map[string]any{"name": name, "url": url})
 	}
 	return out
+}
+
+// packReactionEmojis renders note.reactionEmojis as a name to URL map.
+func packReactionEmojis(urls map[string]string) map[string]any {
+	out := make(map[string]any, len(urls))
+	for name, url := range urls {
+		out[name] = url
+	}
+	return out
+}
+
+// reactionShortcode extracts the name from :name: or :name@host:.
+func reactionShortcode(reaction string) (string, string) {
+	if !strings.HasPrefix(reaction, ":") || !strings.HasSuffix(reaction, ":") || len(reaction) < 3 {
+		return "", ""
+	}
+	inner := strings.Trim(reaction, ":")
+	name, host, _ := strings.Cut(inner, "@")
+	return name, host
 }
 
 // pollExpires renders the poll expiry as a millisecond timestamp.
