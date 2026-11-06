@@ -3587,7 +3587,7 @@ cd web && pnpm build                                           # exit 0
 
 ## 12BL. 批次：邮件通知（2026-11-06）
 
-**工作方式**：目标模式第四十八波，继续只写代码、验证到编译层。施工依据
+**工作方式**：目标模式第四十八波，先只写代码验证到编译层，2026-11-07 补齐真实 SMTP 用例与界面走查。施工依据
 `docs/research/2026-11-06-firefish-port-wave48-contract.md`。
 
 ### 12BL.1 落地清单
@@ -3608,7 +3608,7 @@ cd web && pnpm build                                           # exit 0
 2. 不发转发、引用、反应邮件。
 3. 公告群发串行逐封。
 4. 无发送重试队列。
-5. 未新增测试。
+5. 测试见 §12BL.4（`TestNotificationMailReasons`、`TestAnnouncementMailCoverage`）。
 
 ### 12BL.3 验证证据（编译层）
 
@@ -3620,12 +3620,41 @@ cd web && pnpm run check:port           # hardTotal 0（400 文件）
 cd web && pnpm build                    # exit 0
 ```
 
-### 12BL.4 仍未验证
+### 12BL.4 补验证（2026-11-07）
 
-- 真实投递：提及/回复/关注/关注请求四类邮件。
-- 未验证邮箱、未订阅、类型未勾选三种不发送分支。
-- 公告群发的收件人筛选与并发行为。
-- `go test` 与浏览器走查未执行。
+`internal/httpapi/notification_mail_test.go` 复用 `email_flow_test.go` 的本地 SMTP 接收器，
+用真实 socket 收信：
+
+`TestNotificationMailReasons`（bob 已验证并订阅四类）：
+
+- 回复 bob 的笔记 → 邮件含 `To: bob@example.com`、「@alice 回复了你的帖子」；
+- 发帖 `@bob` → 「@alice 在帖子中提到了你」并带 `/notes/<id>` 链接；
+- alice 关注 bob → 「@alice 关注了你」；
+- bob 锁推后 carol 关注 → 「@carol 请求关注你」；
+- carol 已验证但未勾选任何类型 → 提及不发信（700ms 窗口）；
+- dave 已勾选但邮箱未验证 → 提及不发信。
+
+`TestAnnouncementMailCoverage`：管理员发公告，只寄给「已验证且 receiveAnnouncementEmail」
+的 bob（主题与正文都在），未订阅的 carol 不收。
+
+真实二进制 + Helium：`/settings/email` 在已验证邮箱下显示五个开关；点「被提及时」后
+`i` 回读 `emailNotificationTypes: ["mention"]`，刷新页面开关仍为开启状态
+（截图 `/tmp/w48-shots/settings-email.png`）。
+
+```
+gofmt -l internal/ cmd/                                        # 空
+go vet ./...                                                   # exit 0
+CINDERFISH_TEST_DATABASE_URL=... go test ./... -count=1         # 全绿
+cd web && pnpm exec vue-tsc --noEmit                           # exit 0
+cd web && pnpm run check:port                                  # hardTotal 0
+cd web && pnpm build                                           # exit 0
+```
+
+### 12BL.5 仍未验证
+
+- 公告群发的顺序与失败隔离只由代码阅读确认（两个收件人以内）。
+- 真实公网 SMTP 的 TLS/Auth 路径由既有 `email_flow_test` 覆盖，本次用 `TLS: none` 本地中继。
+- 邮件模板的中文编码在真实邮件客户端里的显示。
 
 ## 12BM. 批次：无后端的管理页转说明页（2026-11-06）
 
@@ -3729,7 +3758,7 @@ cd web && pnpm build                    # exit 0
 | 45 | `admin/drive/show-file` + 管理台文件详情 | 用例 + 浏览器走查（§12BI.4） |
 | 46 | 缩略图生成管道（`thumbnailUrl` 不再恒 null） | 单测 + 真实上传 + 界面（§12BJ.4） |
 | 47 | 锁推生效 + 关注类通知落库 + 隐私页七个真开关 | 用例 + 浏览器走查（§12BK.4） |
-| 48 | 邮件通知（四类触发 + 公告群发） | 编译层 |
+| 48 | 邮件通知（四类触发 + 公告群发） | 真实 SMTP 用例 + 界面（§12BL.4） |
 | 49 | 六个无后端管理页转说明页 | 编译层 |
 | 50 | 状态栏（federation 类型） | 编译层 |
 
@@ -4468,7 +4497,9 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
 - **第四十七波已补验证（2026-11-07，见 §12BK.4）**：锁推的「关注 → 待审 → 接受」从
   `following/create` 到界面全链路走查通过；`receiveFollowRequest` 与 `follow` 两类通知落库并在
   通知页渲染。仍未验证的：远程关注者的锁推入站路径、取消请求的回执、其余六个隐私开关的界面回读。
-- **第四十八波未测（2026-11-06，见 §12BL.4）**：邮件通知与公告群发只有编译层证据。
+- **第四十八波已补验证（2026-11-07，见 §12BL.4）**：四类通知邮件与公告群发由本地 SMTP 用例
+  真实收信验证，未验证/未订阅两种静默分支也在内；邮箱设置页开关的保存与回读走查通过。
+  仍未验证的：公网 SMTP 的 TLS/Auth、公告失败隔离、真实客户端的模板显示。
 - **第四十九波未测（2026-11-06，见 §12BM.4）**：六个说明页与菜单分组未走查。
 - **第五十波未测（2026-11-06，见 §12BN.4）**：状态栏的渲染与交互未走查。
 - **第五十一波未测（2026-11-06，见 §12BP.4）**：迁移页表单与 `MkMoved` 横幅只过编译；`i/move` 的

@@ -47,7 +47,7 @@
 3. 没有退订链接与 `List-Unsubscribe` 头，退订要在设置页操作。
 4. 公告群发是逐封串行发送，实例用户多时较慢；个人实例可接受。
 5. 没有发送失败重试队列，失败即丢（记日志）。
-6. 未新增测试。
+6. 测试于 2026-11-07 补：`TestNotificationMailReasons` 与 `TestAnnouncementMailCoverage`。
 
 ## 5. 验收
 
@@ -59,4 +59,4 @@ cd web && pnpm run check:port           # hardTotal 0
 cd web && pnpm build                    # exit 0
 ```
 
-台账不变（137/130/310）。未执行 `go test`、数据库测试与浏览器走查。
+台账不变（137/130/310）。浏览器走查于 2026-11-07 补齐（见 HANDOVER §12BL.4）。
