@@ -1599,7 +1599,8 @@ cd web && pnpm build                    # exit 0
 
 - `offset` 分页路径、`withFiles`、`host`、`userId` 过滤只写了实现，没有构造数据实测。
 - 远端用户与远端笔记的搜索：实例当前 `federation_mode=none`，没有远程行可搜。
-- 大结果集性能：`ILIKE '%…%'` 会全表扫描；个人实例可接受，但没有压测。
+- ~~大结果集性能：`ILIKE '%…%'` 会全表扫描；个人实例可接受，但没有压测。~~ 2026-11-07 在 20000 条
+  笔记上测过，见 §12ER：单关键词 3.9–6.5 ms，五词全文 12.7–17.7 ms，标签过滤 10.6–13.2 ms。
 - 搜索页的用户页签在空结果时显示「无用户」，有结果时的卡片样式已目视，但没有测很长的简介换行。
 
 ## 12W. 批次：前端第七波——管理台用户筛选与文件盘点（2026-11-06）
@@ -4387,7 +4388,8 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
   实例静音列表的校验与规范化由 §12EB 的用例覆盖。
 - ~~**第六波的搜索过滤组合未全测**~~：2026-11-07 补了 `TestNotesSearchFilters`，覆盖
   `offset`、`userId`、`host`（空 / 非空）与 `withFiles`（`notes/search` 与 `notes/search-by-tag`）。
-  仍然没有构造数据的：远端作者的搜索结果；`ILIKE '%…%'` 的性能没有压测。
+  远端作者的搜索结果已于 2026-11-07 补上（`TestNotesSearchRemoteAuthor`）；`ILIKE '%…%'` 的性能已
+  在 20000 条笔记上测量（§12ER）。
 - ~~**第七波的排序与游标组合未全测**~~：2026-11-07 补了 `TestAdminDriveFilters`，用构造的远端账号与
   文件覆盖 `userId`、`origin=remote`、`hostname`（大小写折叠）与 `sinceId`/`untilId`/双游标。
   `admin/show-users` 的四种 sort 也在 2026-11-07 由 `TestAdminShowUsersSorts` 覆盖
@@ -5989,3 +5991,24 @@ CINDERFISH_TEST_DATABASE_URL=... go test ./... -count=1         # 全绿
 - `notes/state` 的 `isFavorited` 保持 `false`，没有乐观写入。
 
 此前用 CDP 拦截时同样失败了一次但随后仍出现收藏行（疑似重放点击），改用 fetch 包装后行为稳定可复现。
+
+## 12ER. 第一百二十八波：搜索性能在 20000 条笔记上的测量（2026-11-07）
+
+`notes/search` 与 `notes/search-by-tag` 用的是 `ILIKE '%…%'`，早先只写了「个人实例可接受、未压测」。
+这一波用真实二进制补上测量。
+
+**构造**：在 `cinderfish_test` 里插入 50 个 `iperfu001…iperfu050` 用户和 20000 条 `iperf…` 笔记，
+正文形如 `w63perf searchable note <n>`，然后 `ANALYZE notes`。服务连同一个库（端口 3999），
+用登录令牌对 `POST /api/notes/search` 与 `POST /api/notes/search-by-tag` 各发 5 次，取 min/median/max。
+
+| 请求 | 命中 | min | median | max |
+|------|------|-----|--------|-----|
+| `notes/search {query:"w63perf", limit:10}`（单词，命中全部 20000 条） | 10（按 limit） | 3.9 ms | 4.3 ms | 6.5 ms |
+| `notes/search {query:"w63perf searchable note 12345"}`（多词，命中 1 条） | 1 | 12.7 ms | 13.2 ms | 17.7 ms |
+| `notes/search-by-tag {tag:"nope"}`（无命中） | 0 | 10.6 ms | 11.5 ms | 13.2 ms |
+
+结论：20000 条量级下单次搜索在 20 ms 以内，个人实例与「很小用户数」的定位下可以接受；多词查询
+每多一个词就多一次 `ILIKE`，是最慢的一档。没有做并发压力测试，也没有在更大数据集上外推。
+
+测量数据已清理：`DELETE FROM notes WHERE id LIKE 'iperf%'`、`DELETE FROM users WHERE
+username_lower LIKE 'iperfu%'`，再 `ANALYZE notes`；临时服务已停止。
