@@ -22,8 +22,9 @@
 - 缩略图是**尽力而为**：解码或编码失败只记日志，上传照常成功（`thumbnailUrl` 为 `null`）。
 - `Get`/`List`/`ListAll` 扫描后统一用 `thumbnailURL(f)` 解析出 URL。
 - `Delete` 顺带删除缩略图对象；失败只记日志，不让删除失败。
-- `/media/{path...}` 现在按扩展名推断 `Content-Type`（之前一律 `application/octet-stream`），
-  缩略图与常见上传类型都能直接被浏览器识别。
+- `/media/{path...}` 现在按扩展名推断 `Content-Type`（之前一律 `application/octet-stream`）；
+  2026-11-07 补：原图键无扩展名，扩展名推断只对缩略图成立，因此又加了按
+  `drive_files.content_type` 查库回填的分支，原图与缩略图都能直接被浏览器识别。
 
 ## 3. 前端
 
@@ -41,7 +42,7 @@
 2. 没有 `properties.width/height`，前端仍需在 `<img>` 加载后自行测量。
 3. 没有 `blurhash`。
 4. 已存在的文件不会补生成缩略图——只有新上传会生成；补历史文件需要一个离线任务。
-5. 未加测试；`internal/media` 已有测试文件，但按用户指示本阶段不跑。
+5. 测试于 2026-11-07 补：`internal/media/thumbnail_test.go` 与 `TestMediaServeContentType`。
 
 ## 5. 验收
 
@@ -53,4 +54,5 @@ cd web && pnpm run check:port           # hardTotal 0
 cd web && pnpm build                    # exit 0
 ```
 
-台账不变（137/130/310，没有新增路由）。未执行 `go test`、数据库测试与浏览器走查。
+台账不变（137/130/310，没有新增路由）。浏览器走查于 2026-11-07 补齐（`thumbnail_test.go`、
+`TestMediaServeContentType`、真实上传与 `/my/drive` 走查，见 HANDOVER §12BJ.4）。

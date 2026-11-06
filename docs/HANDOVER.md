@@ -3431,7 +3431,7 @@ cd web && pnpm build                                           # exit 0
 
 ## 12BJ. 批次：缩略图管道（2026-11-06）
 
-**工作方式**：目标模式第四十六波，继续只写代码、验证到编译层。施工依据
+**工作方式**：目标模式第四十六波，先只写代码验证到编译层，2026-11-07 补齐单测、真实上传与浏览器走查。施工依据
 `docs/research/2026-11-06-firefish-port-wave46-contract.md`。
 
 ### 12BJ.1 落地清单
@@ -3440,7 +3440,7 @@ cd web && pnpm build                                           # exit 0
 |----|------|------|
 | 生成 | `internal/media/thumbnail.go` | 箱式滤波降采样（≤512px）、解码前限 4000 万像素、JPEG q82 / PNG |
 | 存储 | `internal/media/drive.go` | `storeThumbnail`（尽力而为）、`thumbnailURL`、`Delete` 顺带删缩略图 |
-| 下发 | `internal/httpapi/drive.go` | `packDriveFile` 的 `thumbnailUrl`；`/media` 按扩展名给 Content-Type |
+| 下发 | `internal/httpapi/drive.go` | `packDriveFile` 的 `thumbnailUrl`；`/media` 先按扩展名、无扩展名再按 `drive_files.content_type` 给 Content-Type |
 | 前端 | `api/types.ts`、`MkDriveFileThumbnail.vue`、`MkMedia.vue`、`UserPhotos.vue` | 优先用缩略图，回退原图 |
 | 文档 | `drive-media.md` | `thumbnailUrl` 语义与限制更新 |
 
@@ -3449,7 +3449,7 @@ cd web && pnpm build                                           # exit 0
 1. 没有 WebP（Go 标准库无编码器）。
 2. 没有 `properties` 宽高与 `blurhash`。
 3. 历史文件不补生成缩略图。
-4. 未加测试。
+4. 测试见 §12BJ.4（`thumbnail_test.go` 与 `TestMediaServeContentType`）。
 
 ### 12BJ.3 验证证据（编译层）
 
@@ -3461,12 +3461,57 @@ cd web && pnpm run check:port           # hardTotal 0（400 文件）
 cd web && pnpm build                    # exit 0
 ```
 
-### 12BJ.4 仍未验证
+### 12BJ.4 补验证（2026-11-07）
 
-- 真实图片上传后的缩略图尺寸、体积与透明保留。
-- 非图片、损坏图片、超大像素图三条跳过/失败分支。
-- 删除文件时缩略图对象是否真的消失。
-- `go test` 与浏览器走查未执行。
+`internal/media/thumbnail_test.go`：
+
+- 800×400 PNG → `512×256` PNG；300×900 竖图 → `170×512`；100×50 不放大。
+- JPEG 输出 `.jpg` 且可被 `jpeg.Decode` 解码，`640×480 → 512×384`。
+- GIF 输出 PNG，`Image/GIF; charset=binary` 的大小写与参数被容忍。
+- webp/svg/pdf/空类型返回「无缩略图且无错误」；坏图返回解码错误。
+- 用改写 IHDR 的 10000×10000 头验证解压炸弹在解码前被拒。
+- `ThumbnailKeyFor` 三例（无扩展名、`.jpg`、裸键）。
+- `DriveService.Save`：缩略图落盘且可解码、`Get`/`List` 带同一 URL、text/plain 无缩略图、
+  `Delete` 后原图与缩略图对象都为 `ErrNotFound`；坏图上传仍成功且无缩略图。
+
+`internal/httpapi/media_serve_test.go` 新增 `TestMediaServeContentType`：
+
+- 原图以 `image/png` 提供且字节不变，缩略图 `image/png` 且更小；
+- text/plain 上传以 `text/plain` 提供且无缩略图。
+
+**修复的缺口**：原图存储键是无扩展名的内容哈希，`/media` 之前一律回
+`application/octet-stream`，直链会变成下载。现在键没有扩展名时按
+`drive_files.content_type` 查库回填；这同时修正了第四十六波契约里「按扩展名推断即可识别
+上传类型」的过度表述（只对缩略图成立）。
+
+真实二进制 + 实际 HTTP（`w46user`）：
+
+```
+800×400 PNG  → .thumb.png，GET 200 image/png 512×256
+640×480 JPEG → .thumb.jpg，GET 200 image/jpeg 512×384
+坏 PNG / webp → thumbnailUrl null，上传仍成功
+原图 GET → 200 image/png（修复前为 octet-stream）
+删除文件 → 原图与缩略图都 404
+```
+
+浏览器（Helium）打开 `/my/drive`：PNG 与 JPEG 两个条目的 `<img>` 分别加载
+`.thumb.png`（natural 512×256）与 `.thumb.jpg`（512×384），坏图条目回退原图；
+截图 `/tmp/w46-shots/my-drive.png`。
+
+```
+gofmt -l internal/ cmd/                                        # 空
+go vet ./...                                                   # exit 0
+CINDERFISH_TEST_DATABASE_URL=... go test ./... -count=1         # 全绿
+cd web && pnpm exec vue-tsc --noEmit                           # exit 0
+cd web && pnpm run check:port                                  # hardTotal 0
+cd web && pnpm build                                           # exit 0
+```
+
+### 12BJ.5 仍未验证
+
+- PNG 透明通道的保留（测试图为不透明 RGBA）。
+- 历史文件补生成缩略图（仍无离线任务）。
+- 大尺寸真实照片的内存峰值（只以像素上限与实现推断）。
 
 ## 12BK. 批次：锁推生效与关注通知（2026-11-06）
 
@@ -3649,7 +3694,7 @@ cd web && pnpm build                    # exit 0
 | 43 | `users/stats`、`hashtags/search`、`registry/keys-with-type`、`notes/featured` | 端点用例（§12BG.4） |
 | 44 | 实例级自定义 CSS + 邮件状态页 | 用例 + 浏览器走查（§12BH.4） |
 | 45 | `admin/drive/show-file` + 管理台文件详情 | 用例 + 浏览器走查（§12BI.4） |
-| 46 | 缩略图生成管道（`thumbnailUrl` 不再恒 null） | 编译层 |
+| 46 | 缩略图生成管道（`thumbnailUrl` 不再恒 null） | 单测 + 真实上传 + 界面（§12BJ.4） |
 | 47 | 锁推生效 + 关注类通知落库 + 隐私页七个真开关 | 编译层 |
 | 48 | 邮件通知（四类触发 + 公告群发） | 编译层 |
 | 49 | 六个无后端管理页转说明页 | 编译层 |
@@ -4384,7 +4429,9 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
   文件详情的图片/视频/音频/其它四类预览、字段与「详情」入口均走查通过。仍未验证的：
   敏感文件模糊预览、真实音视频播放。`user: null` 分支因外键级联在正常流程下不可达，
   仅作防御保留。
-- **第四十六波未测（2026-11-06，见 §12BJ.4）**：缩略图生成与删除只有编译层证据。
+- **第四十六波已补验证（2026-11-07，见 §12BJ.4）**：缩略图生成/跳过/删除与 `/media` 的
+  Content-Type 都有用例；真实 PNG/JPEG 上传得到 512 长边缩略图并在 `/my/drive` 实际加载。
+  顺带修复原图直链回 `octet-stream` 的缺口。仍未验证的：透明通道、历史文件补生成、大图内存峰值。
 - **第四十七波未测（2026-11-06，见 §12BK.4）**：锁推与关注通知只有编译层证据。
 - **第四十八波未测（2026-11-06，见 §12BL.4）**：邮件通知与公告群发只有编译层证据。
 - **第四十九波未测（2026-11-06，见 §12BM.4）**：六个说明页与菜单分组未走查。

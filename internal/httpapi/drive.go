@@ -313,10 +313,19 @@ func (s *Server) handleMediaServe(w http.ResponseWriter, r *http.Request) {
 	}
 	defer rc.Close()
 
-	// Thumbnails and uploads are keyed by hash, so the type comes from the
-	// extension the storage key carries (".jpg", ".png", …); anything unknown
-	// stays octet-stream and the browser sniffs it.
-	w.Header().Set("Content-Type", mediaContentType(key))
+	// Thumbnails keep their format in the key (".thumb.png"), but original
+	// uploads are keyed by content hash with no extension, so their type has
+	// to come from the drive row. A file that is not in drive_files (or a
+	// server without a database) falls back to sniffing as octet-stream.
+	contentType := mediaContentType(key)
+	if contentType == "application/octet-stream" && s.pool != nil {
+		var stored string
+		if err := s.pool.QueryRow(r.Context(),
+			`SELECT content_type FROM drive_files WHERE storage_key = $1 LIMIT 1`, key).Scan(&stored); err == nil && stored != "" {
+			contentType = stored
+		}
+	}
+	w.Header().Set("Content-Type", contentType)
 	w.WriteHeader(http.StatusOK)
 	_, _ = io.Copy(w, rc)
 }

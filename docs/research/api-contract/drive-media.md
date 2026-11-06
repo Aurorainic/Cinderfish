@@ -576,8 +576,9 @@ Cinderfish 没有实例配额，`capacity` 恒为 `0`，客户端应读作“无
 
 响应：
 
-- 成功：`200`，响应体是原始字节；`Content-Type` **恒为** `application/octet-stream`
-  （`internal/httpapi/drive.go:243`），不反映真实 MIME。
+- 成功：`200`，响应体是原始字节；`Content-Type` 优先按存储键扩展名（缩略图如
+  `.thumb.png`），无扩展名的原图按 `drive_files.content_type` 回查，都查不到时才回
+  `application/octet-stream`（`internal/httpapi/drive.go` 的 `handleMediaServe`）。
 - handler 不设置 `Content-Length`（`io.Copy` 直写）；超过 Go 内部 2 KiB 首包缓冲的响应会走 chunked，
   很小的文件可能被自动补上长度。没有 `ETag`、`Last-Modified`、`Cache-Control`，也**不支持 `Range`**
   （不返回 `Accept-Ranges`）。后果：`<video>` / `<audio>` 无法拖动进度条；没有验证器，服务端无法回答
@@ -651,9 +652,9 @@ Cinderfish 没有实例配额，`capacity` 恒为 `0`，客户端应读作“无
 
 ### 媒体服务与传输
 
-20. **`Content-Type` 恒 `application/octet-stream`**，且没有 `ETag` / `Cache-Control` / `Range`，
-    handler 也不设 `Content-Length`。`<img>` 一般仍能按内容嗅探解码，但视频不可 seek、音频体验差，
-    且缺少缓存验证器，前端最好自己按 `url` 做本地缓存。
+20. `Content-Type` 按扩展名或 `drive_files.content_type` 回填（第四十六波及 2026-11-07 修复），
+    但仍没有 `ETag` / `Cache-Control` / `Range`，handler 也不设 `Content-Length`。视频不可 seek、
+    音频体验差，且缺少缓存验证器，前端最好自己按 `url` 做本地缓存。
 21. **媒体地址与后端耦合**：本地后端是相对路径 `/media/...`（同源），S3 后端是绝对 URL（跨源、
     可能是 bucket 域名）。前端拼接图片地址时要处理“已是绝对 URL”和“相对路径”两种情况。
 22. **`/api` 与 `/media` 没有 CORS 头**，跨源前端不可用。
