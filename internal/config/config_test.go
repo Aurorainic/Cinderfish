@@ -57,12 +57,14 @@ func TestValidation(t *testing.T) {
 func TestS3BackendValidation(t *testing.T) {
 	t.Setenv("CINDERFISH_MEDIA_BACKEND", "s3")
 	_, err := Load("")
-	require.Error(t, err)
+	require.Error(t, err, "the s3 backend needs an endpoint and a bucket")
 
 	t.Setenv("CINDERFISH_MEDIA_S3_ENDPOINT", "http://localhost:9000")
 	t.Setenv("CINDERFISH_MEDIA_S3_BUCKET", "cinderfish")
-	_, err = Load("")
-	require.Error(t, err, "secret key check not enforced yet, but endpoint/bucket should pass; only other invalid fields fail")
+	c, err := Load("")
+	require.NoError(t, err)
+	assert.Equal(t, "http://localhost:9000", c.Media.S3.Endpoint)
+	assert.Equal(t, "cinderfish", c.Media.S3.Bucket)
 }
 
 func TestRedisDefaultsAndFile(t *testing.T) {
@@ -117,4 +119,41 @@ func TestRedisBlankPrefixFallsBack(t *testing.T) {
 	c, err := Load(path)
 	require.NoError(t, err)
 	assert.Equal(t, "cinderfish", c.Redis.Prefix)
+}
+
+// TestS3SettingsFromFileAndEnv pins the S3 block: the TOML fields parse, and the
+// environment overrides (used by container deployments) replace them.
+func TestS3SettingsFromFileAndEnv(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.toml")
+	require.NoError(t, os.WriteFile(path, []byte(`
+[media]
+backend = "s3"
+
+[media.s3]
+endpoint = "minio.internal:9000"
+bucket = "fish"
+region = "us-east-1"
+access_key = "file-ak"
+secret_key = "file-sk"
+use_ssl = true
+public_base_url = "https://cdn.example/media"
+ca_cert = "/etc/cinderfish/minio-ca.pem"
+`), 0o600))
+
+	c, err := Load(path)
+	require.NoError(t, err)
+	assert.Equal(t, "minio.internal:9000", c.Media.S3.Endpoint)
+	assert.Equal(t, "fish", c.Media.S3.Bucket)
+	assert.Equal(t, "/etc/cinderfish/minio-ca.pem", c.Media.S3.CACert)
+	assert.True(t, c.Media.S3.UseSSL)
+
+	t.Setenv("CINDERFISH_MEDIA_S3_ENDPOINT", "other.example:9001")
+	t.Setenv("CINDERFISH_MEDIA_S3_CA_CERT", "/run/secrets/ca.pem")
+	t.Setenv("CINDERFISH_MEDIA_S3_USE_SSL", "false")
+	c, err = Load(path)
+	require.NoError(t, err)
+	assert.Equal(t, "other.example:9001", c.Media.S3.Endpoint)
+	assert.Equal(t, "/run/secrets/ca.pem", c.Media.S3.CACert)
+	assert.False(t, c.Media.S3.UseSSL)
 }

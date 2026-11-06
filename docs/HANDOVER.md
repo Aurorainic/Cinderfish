@@ -6522,6 +6522,7 @@ Host。这一轮用 Go 的反向代理复现同一拓扑。
 | 配置 | `internal/config/config.go` | `[media.s3] ca_cert`（PEM 路径） |
 | 客户端 | `internal/media/s3.go` | `CACertPath`：读 PEM → `x509.CertPool` → 克隆默认 transport 并设置 `TLSClientConfig.RootCAs` |
 | 接线 | `cmd/cinderfish/main.go`、`cmd/cinderfish-media-migrate/main.go` | 把 `ca_cert` 传给 `S3Options` |
+| 环境变量 | `internal/config/config.go` | 补上此前缺失的 `CINDERFISH_MEDIA_S3_*` 覆盖（endpoint/bucket/region/access_key/secret_key/use_ssl/public_base_url/ca_cert） |
 | 文档 | `config.example.toml`、`deploy/config.production.toml`、`docs/DEPLOY.md` | 字段说明与用法 |
 | 测试 | `internal/media/s3_tls_test.go`（新） | 自签 CA + HTTPS 迷你 S3（PUT/HEAD/GET/DELETE + location），验证 Put/Get/Delete 与「不带 CA 必须失败」 |
 
@@ -6538,4 +6539,7 @@ Host。这一轮用 Go 的反向代理复现同一拓扑。
   - 带 `ca_cert`：Put → Get 内容一致 → Delete → Get 返回 `ErrNotFound`；
   - 不带 `ca_cert`：Put 以 TLS 错误失败（服务端日志出现 `bad certificate`，测试进程本身通过）；
   - CA 文件不含证书：`NewS3Storage` 直接报错。
+- `TestS3SettingsFromFileAndEnv`：TOML 解析 `ca_cert` 等字段，`CINDERFISH_MEDIA_S3_*` 环境变量正确覆盖；
+  `TestS3BackendValidation` 此前因 S3 env 未接线而是空跑，现在真正断言「缺 endpoint/bucket 报错、
+  补齐后通过」。
 - 全量 `go test ./...` 与前端三项检查见本轮提交前的运行记录。
