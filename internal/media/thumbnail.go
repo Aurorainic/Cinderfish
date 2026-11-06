@@ -12,6 +12,10 @@ import (
 
 	// Register the GIF decoder so image.Decode recognises image/gif.
 	_ "image/gif"
+	// WebP is the format most browsers and phones upload; x/image registers
+	// the decoder, so image.Decode handles still images. Animated WebP is
+	// rejected by the decoder and simply gets no thumbnail.
+	_ "golang.org/x/image/webp"
 )
 
 // Thumbnail sizing. 512 px on the long side is enough for every place the UI
@@ -30,6 +34,8 @@ var thumbnailFormats = map[string]string{
 	"image/pjpeg": ".jpg",
 	"image/png":   ".png",
 	"image/gif":   ".png",
+	// WebP may carry alpha, and PNG is the only encoder here that keeps it.
+	"image/webp": ".png",
 }
 
 // CanThumbnail reports whether the content type is one we can shrink.

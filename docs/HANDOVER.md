@@ -4698,7 +4698,8 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
   （重新生成 locale 前要先 `pnpm add -D yaml`）。
 - **S3 后端未做真实服务端验证**：2026-11-07 起已用 moto 与 s3rver 两个 S3 协议实现验证
   上传/读取/删除/预签名（§12CI），并修掉预签名未接线的缺陷；仍未验证真实 AWS/R2/B2 与 TLS。
-- ~~**缩略图/WebP 生成未实现**~~：第四十六波实现了缩略图（≤512px，JPEG/PNG）；WebP 仍未做。
+- ~~**缩略图/WebP 生成未实现**~~：第四十六波实现了缩略图（≤512px，JPEG/PNG）；WebP 的**解码**
+  于 2026-11-07 补上（§12EV：静图可生成预览，动图按解码失败跳过），但仍不生成 WebP 输出。
 - **前端没有真实第三方客户端联调**：页面已在构建产物上用浏览器走查；2026-11-07 起已用官方
   `misskey-js`（2026.10.2-alpha.0）连过本实例（见 §12CG），仍未用 Misskey Web 前端整站连接。
 - **Redis 只对 miniredis 验证过**：单元测试仍用 miniredis；2026-11-07 起已用真实 `redis-server`
@@ -6122,3 +6123,37 @@ username_lower LIKE 'iperfu%'`，再 `ANALYZE notes`；临时服务已停止。
 - 4000×3000 JPEG（12 MP）基准：优化前 305 ms/op、59.1 MB/op、1239 万次分配；直接取像素后
   165 ms/op、20.6 MB/op、39.3 万次分配。测试进程峰值 RSS 124 MB，其中约 48 MB 是基准自身持有
   的源 RGBA 图，缩略图路径本身约 20 MB/次。
+
+## 12EV. 第一百三十二波：WebP 上传的缩略图（2026-11-07）
+
+第四十六波记的「WebP 仍未做」是 §14 里最后一个本地功能缺口（其余是外部互操作或按设计不做）。
+现代浏览器与手机默认上传 WebP，此前这类文件没有预览。
+
+### 12EV.1 落地清单
+
+| 层 | 文件 | 内容 |
+|----|------|------|
+| 解码 | `internal/media/thumbnail.go` + `go.mod` | 引入 `golang.org/x/image/webp`（官方库），`image.Decode` 识别 `image/webp` |
+| 输出 | `internal/media/thumbnail.go` | `image/webp` → `.png`，保留透明通道（与 GIF 一致） |
+| 补生成 | `internal/media/backfill.go` | 扫描条件加入 `image/webp` |
+| 样本 | `internal/media/testdata/sample.webp` | 640×320、含透明条的 WebP（2.5 KB，真实编码器生成） |
+
+只新增一个依赖：`golang.org/x/image v0.47.0`（此前是间接依赖集合之外的独立模块；`go mod tidy`
+后为直接依赖）。没有采用外部进程或 cgo。
+
+### 12EV.2 有意的限制
+
+- 只支持**静图** WebP；动图（VP8X + ANIM）解码失败，原图照常保存与分发，只是没有预览。
+- 输出仍是 PNG/JPEG，不生成 WebP 副本；「WebP 生成」不在本实现的范围。
+- 无 AVIF / JPEG XL 解码器。
+- 渐变噪声类 WebP 的 PNG 预览可能比原图大（样本 2.5 KB → 70 KB），这是保留 alpha 的取舍。
+
+### 12EV.3 验证证据
+
+- `gofmt -l internal/ cmd/` 无输出；`go vet ./...` 通过；
+  `CINDERFISH_TEST_DATABASE_URL=… go test ./media/... -count=1` 与全量 `go test ./...` 全绿。
+- `TestGenerateThumbnailWebP`：识别 `image/webp`（含大小写与参数）、输出 `.png`、512×256、
+  透明条 alpha=0、不透明区 alpha=65535。
+- `TestDriveSaveStoresWebPThumbnail`：上传路径写出 `.thumb.png` 对象并能在存储后端回读。
+- 真实二进制：`drive/files/create` 上传 `sample.webp` → `thumbnailUrl` 指向 `.thumb.png`；
+  `GET` 原图 200 `image/webp` 2524 B，`GET` 缩略图 200 `image/png` 70761 B，PNG 头为 512×256。

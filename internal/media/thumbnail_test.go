@@ -11,6 +11,7 @@ import (
 	"image/gif"
 	"image/jpeg"
 	"image/png"
+	"os"
 	"testing"
 )
 
@@ -115,7 +116,7 @@ func TestGenerateThumbnailModes(t *testing.T) {
 func TestGenerateThumbnailRefusals(t *testing.T) {
 	// Unsupported types answer "no thumbnail" without an error: callers
 	// store the upload anyway.
-	for _, ct := range []string{"image/webp", "image/svg+xml", "application/pdf", ""} {
+	for _, ct := range []string{"image/svg+xml", "application/pdf", "image/avif", ""} {
 		thumb, ext, err := GenerateThumbnail(encodePNG(t, 10, 10), ct)
 		if thumb != nil || ext != "" || err != nil {
 			t.Errorf("%q = (%v, %q, %v), want no thumbnail and no error", ct, thumb, ext, err)
@@ -318,5 +319,73 @@ func BenchmarkGenerateThumbnailLarge(b *testing.B) {
 		if _, _, err := GenerateThumbnail(data, "image/jpeg"); err != nil {
 			b.Fatalf("thumbnail: %v", err)
 		}
+	}
+}
+
+// TestGenerateThumbnailWebP covers the browser-default upload format: the
+// still-image decoder handles it, the thumbnail is PNG so alpha survives, and
+// the transparent strip of the fixture stays transparent.
+func TestGenerateThumbnailWebP(t *testing.T) {
+	data, err := os.ReadFile("testdata/sample.webp")
+	if err != nil {
+		t.Fatalf("read fixture: %v", err)
+	}
+	if !CanThumbnail("image/webp") || !CanThumbnail("IMAGE/WEBP; charset=binary") {
+		t.Fatalf("image/webp is not recognised as thumbnailable")
+	}
+	thumb, ext, err := GenerateThumbnail(data, "image/webp")
+	if err != nil || thumb == nil {
+		t.Fatalf("webp thumbnail: %v (nil=%v)", err, thumb == nil)
+	}
+	if ext != ".png" {
+		t.Errorf("extension = %q, want .png", ext)
+	}
+	if cfg := decodeConfig(t, thumb); cfg.Width != 512 || cfg.Height != 256 {
+		t.Errorf("thumbnail = %dx%d, want 512x256", cfg.Width, cfg.Height)
+	}
+	decoded, err := png.Decode(bytes.NewReader(thumb))
+	if err != nil {
+		t.Fatalf("decode thumbnail: %v", err)
+	}
+	if _, _, _, a := decoded.At(10, 10).RGBA(); a != 0 {
+		t.Errorf("alpha at the transparent strip = %d, want 0", a)
+	}
+	if _, _, _, a := decoded.At(500, 10).RGBA(); a != 0xffff {
+		t.Errorf("alpha at the opaque area = %d, want 65535", a)
+	}
+}
+
+// TestDriveSaveStoresWebPThumbnail proves the upload path itself handles WebP:
+// the row records a .thumb.png key and the stored preview decodes.
+func TestDriveSaveStoresWebPThumbnail(t *testing.T) {
+	ctx := context.Background()
+	pool := migratePool(t)
+	storage, err := NewLocalStorage(t.TempDir(), "/media")
+	if err != nil {
+		t.Fatalf("storage: %v", err)
+	}
+	drive := NewDriveService(pool, storage)
+	data, err := os.ReadFile("testdata/sample.webp")
+	if err != nil {
+		t.Fatalf("read fixture: %v", err)
+	}
+	file, err := drive.Save(ctx, "u1", "photo.webp", bytes.NewReader(data), "image/webp", nil)
+	if err != nil {
+		t.Fatalf("save webp: %v", err)
+	}
+	if file.ThumbnailKey == nil || *file.ThumbnailKey == "" {
+		t.Fatalf("webp upload has no thumbnail key: %+v", file)
+	}
+	rc, err := storage.Get(ctx, *file.ThumbnailKey)
+	if err != nil {
+		t.Fatalf("thumbnail object: %v", err)
+	}
+	var buf bytes.Buffer
+	if _, err := buf.ReadFrom(rc); err != nil {
+		t.Fatalf("read thumbnail: %v", err)
+	}
+	rc.Close()
+	if cfg := decodeConfig(t, buf.Bytes()); cfg.Width != 512 || cfg.Height != 256 {
+		t.Errorf("stored thumbnail = %dx%d, want 512x256", cfg.Width, cfg.Height)
 	}
 }

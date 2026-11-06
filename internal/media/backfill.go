@@ -37,7 +37,7 @@ func (s *DriveService) BackfillThumbnails(ctx context.Context, limit int) (Backf
 SELECT id, content_type, storage_key, storage_backend
 FROM drive_files
 WHERE thumbnail_key IS NULL
-  AND content_type IN ('image/jpeg','image/pjpeg','image/png','image/gif')
+  AND content_type IN ('image/jpeg','image/pjpeg','image/png','image/gif','image/webp')
 ORDER BY created_at
 LIMIT NULLIF($1, 0)
 `, limit)
