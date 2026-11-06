@@ -45,4 +45,4 @@ cd web && pnpm run check:port           # hardTotal 0（400 文件）
 cd web && pnpm build                    # exit 0
 ```
 
-后端未改动。台账不变（137/130/310）。未执行 `go test` 与浏览器走查。
+后端未改动。台账不变（137/130/310）。浏览器走查于 2026-11-07 补齐（见 HANDOVER §12BM.4）。
