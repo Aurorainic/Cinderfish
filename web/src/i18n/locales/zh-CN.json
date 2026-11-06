@@ -679,6 +679,7 @@
 	"verificationEmailSent": "已发送确认电子邮件。请访问电子邮件中的链接以完成验证。",
 	"notSet": "未设置",
 	"emailVerified": "电子邮件地址已验证",
+	"unverified": "未验证",
 	"noteFavoritesCount": "加入书签的帖子数",
 	"pageLikesCount": "页面点赞次数",
 	"pageLikedCount": "页面被点赞次数",

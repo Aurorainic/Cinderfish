@@ -698,6 +698,7 @@
 	"verificationEmailSent": "確認のメールを送信しました。メールに記載されたリンクにアクセスして、設定を完了してください。",
 	"notSet": "未設定",
 	"emailVerified": "メールアドレスが確認されました",
+	"unverified": "未確認",
 	"noteFavoritesCount": "お気に入りの投稿の数",
 	"pageLikesCount": "ページにいいねした数",
 	"pageLikedCount": "ページにいいねされた数",

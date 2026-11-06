@@ -438,6 +438,13 @@ export interface UserNameAvailability {
 	available: boolean;
 }
 
+// email-address/available: `reason` is "format" for a malformed address and
+// "used" when another account already owns it.
+export interface EmailAddressAvailability {
+	available: boolean;
+	reason?: "format" | "used";
+}
+
 export interface NoteCreateResponse {
 	createdNote: NoteDetailed;
 }

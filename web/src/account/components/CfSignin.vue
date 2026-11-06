@@ -75,6 +75,10 @@
 			>
 				{{ signing ? t("loggingIn") : needsToken ? t("twoStepAuthentication") : t("login") }}
 			</button>
+
+			<RouterLink v-if="!needsToken" class="forgot" to="/reset-password">
+				{{ t("forgotPassword") }}
+			</RouterLink>
 		</div>
 	</form>
 </template>
@@ -322,6 +326,19 @@ async function onSubmit(): Promise<void> {
 		&:disabled {
 			opacity: 0.6;
 			cursor: not-allowed;
+		}
+	}
+
+	.forgot {
+		display: block;
+		margin-top: 10px;
+		text-align: center;
+		font-size: 0.85em;
+		opacity: 0.75;
+
+		&:hover {
+			opacity: 1;
+			text-decoration: underline;
 		}
 	}
 }

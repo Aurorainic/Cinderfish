@@ -888,8 +888,8 @@ onMounted(() => {
 
 	if (props.reply != null) initFromReply(props.reply);
 	if (props.initialNote != null) {
-		// Editing has no endpoint in Cinderfish (contract §2): the note text is
-		// pre-filled so the user can repost it, nothing is updated in place.
+		// Pre-fills the composer with an existing note's text. In-place editing
+		// is a separate page (`notes/edit`); this path only seeds the draft.
 		text.value = props.initialNote.text ?? text.value;
 	}
 	if (defaultStore.state.keepCw && props.reply?.cw != null) {

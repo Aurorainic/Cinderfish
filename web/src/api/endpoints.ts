@@ -51,6 +51,7 @@ import type {
 	TableStat,
 	TwoFactorRegistration,
 	UserNameAvailability,
+	EmailAddressAvailability,
 	UserDetailed,
 	UserLite,
 	Webhook,
@@ -66,6 +67,12 @@ export const ENDPOINTS = {
 	signup: "signup",
 	signin: "signin",
 	usernameAvailable: "username/available",
+	emailAddressAvailable: "email-address/available",
+	iUpdateEmail: "i/update-email",
+	iEmailVerification: "i/email-verification",
+	verifyEmail: "verify-email",
+	requestResetPassword: "request-reset-password",
+	resetPassword: "reset-password",
 	miAuthGenToken: "miauth/gen-token",
 	iTwoFactorRegister: "i/2fa/register",
 	iTwoFactorDone: "i/2fa/done",
@@ -479,6 +486,27 @@ export interface EndpointMap {
 	[ENDPOINTS.usernameAvailable]: {
 		req: { username: string };
 		res: UserNameAvailability;
+	};
+	[ENDPOINTS.emailAddressAvailable]: {
+		req: { email: string };
+		res: EmailAddressAvailability;
+	};
+	[ENDPOINTS.iUpdateEmail]: {
+		req: { password: string; email: string };
+		res: MeDetailed;
+	};
+	[ENDPOINTS.iEmailVerification]: {
+		req: { email?: string };
+		res: EmptyResponse;
+	};
+	[ENDPOINTS.verifyEmail]: { req: { code: string }; res: EmptyResponse };
+	[ENDPOINTS.requestResetPassword]: {
+		req: { username: string; email: string };
+		res: EmptyResponse;
+	};
+	[ENDPOINTS.resetPassword]: {
+		req: { token: string; password: string };
+		res: EmptyResponse;
 	};
 	[ENDPOINTS.iTwoFactorRegister]: {
 		req: { password: string };

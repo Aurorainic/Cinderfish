@@ -3072,6 +3072,44 @@ go vet ./...                            # exit 0（含测试文件编译）
 - `MeDetailed.email` 在原生 token 与 OAuth token 两种请求下的差异。
 - `go test`（含数据库）与浏览器走查未执行。
 
+## 12BC. 批次：邮箱前端页面（2026-11-06）
+
+**工作方式**：目标模式第三十九波，继续只写代码、验证到编译层。施工依据
+`docs/research/2026-11-06-firefish-port-wave39-contract.md`。
+
+### 12BC.1 落地清单
+
+| 层 | 文件 | 说明 |
+|----|------|------|
+| 类型 | `api/endpoints.ts`、`api/types.ts` | 六个端点与 `EmailAddressAvailability` |
+| 设置页 | `pages/SettingsEmail.vue` | 改邮箱（弹密码框）、验证徽标、重发验证邮件；通知开关标注无存储 |
+| 验证页 | `pages/VerifyEmail.vue` | 自动核销 code；未登录先引导登录；成功后刷新 `me` |
+| 重置页 | `pages/ResetPassword.vue` | 带 token 改密 / 不带 token 内联发起重置 |
+| 入口 | `account/components/CfSignin.vue` | 「忘记密码」链接 |
+| 文案 | `i18n/locales/{zh-CN,ja-JP}.json` | 新增 `unverified` |
+| 注释 | `pages/SettingsSecurity.vue`、`components/MkPostForm.vue` | 修掉「没有端点」的过时说明 |
+
+### 12BC.2 有意的限制
+
+1. 邮件通知开关不渲染（`i/update` 不存这两个字段）。
+2. `i/update-email` 发信失败时地址已保存，页面按普通错误显示，可点重发。
+3. 重置入口是内联表单，不是 Firefish 的弹窗。
+4. 验证页要求已登录。
+
+### 12BC.3 验证证据（编译层）
+
+```
+cd web && pnpm exec vue-tsc --noEmit    # exit 0
+cd web && pnpm run check:port           # hardTotal 0（400 文件）
+cd web && pnpm build                    # exit 0
+```
+
+### 12BC.4 仍未验证
+
+- 三个页面的实际渲染与交互（桌面/移动、错误分支、节流 429 的提示）。
+- 忘记密码 → 收信 → 重置的完整链路。
+- 浏览器走查与 `go test` 未执行。
+
 ## 13. 文档索引
 
 | 文档 | 内容 |
@@ -3136,6 +3174,7 @@ go vet ./...                            # exit 0（含测试文件编译）
 | `docs/research/2026-11-06-firefish-port-wave36-contract.md` | **第三十六波施工契约（公告已读状态），见 §12AZ** |
 | `docs/research/2026-11-06-firefish-port-wave37-contract.md` | **第三十七波施工契约（公告编辑），见 §12BA** |
 | `docs/research/2026-11-06-firefish-port-wave38-contract.md` | **第三十八波施工契约（邮件与邮箱验证），见 §12BB** |
+| `docs/research/2026-11-06-firefish-port-wave39-contract.md` | **第三十九波施工契约（邮箱前端页面），见 §12BC** |
 
 ## 14. 已知的未验证项
 
@@ -3193,6 +3232,7 @@ go vet ./...                            # exit 0（含测试文件编译）
 - **第三十六波未测（2026-11-06，见 §12AZ.4）**：公告已读只过了编译层，写入/回读与角标联动未验证。
 - **第三十七波未测（2026-11-06，见 §12BA.4）**：公告编辑只过了编译层，保存回读与清空语义未验证。
 - **第三十八波未测（2026-11-06，见 §12BB.4）**：SMTP 真投递与验证/重置端到端未执行，只有编译层证据。
+- **第三十九波未测（2026-11-06，见 §12BC.4）**：邮箱三页只有编译层证据，渲染与完整链路未走查。
 - **仍未移植的设置页**：邮箱、整合、导入导出、迁移、Webhook、插件、自定义 KaTeX、状态栏、
   删除账号、应用授权以外的账号操作；对应后端端点不存在或前端缺少依赖（见第五波契约 §3.3）。
 - **仍缺的 widgets**：rss、rss-ticker、server-metric、online-users、federation、job-queue、aiscript、

@@ -250,10 +250,9 @@
 
 <script lang="ts" setup>
 // Firefish's security page: `X2fa` (TOTP registration and removal), the
-// password dialog, `i/signin-history` and `i/regenerate-token`. The port
-// implements the TOTP half; password change, signin history and token
-// regeneration have no endpoint yet and stay marked as unavailable instead of
-// rendering dead buttons.
+// password dialog, `i/signin-history` and `i/regenerate-token`. All four have
+// endpoints, so all four are live; the backup-code list stays empty because
+// backup codes are not generated.
 import { computed, onMounted, ref } from "vue";
 import { addStoredAccount, me, updateMe } from "@/account";
 import type {
