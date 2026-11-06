@@ -114,6 +114,7 @@ export const ENDPOINTS = {
 	notesShow: "notes/show",
 	notesDelete: "notes/delete",
 	notesReplies: "notes/replies",
+	notesMentions: "notes/mentions",
 	notesSearch: "notes/search",
 	notesSearchByTag: "notes/search-by-tag",
 	notesConversation: "notes/conversation",
@@ -550,6 +551,17 @@ export interface EndpointMap {
 		res: EmptyResponse;
 	};
 	[ENDPOINTS.hashtagsTrend]: { req: Record<string, never>; res: HashtagTrend[] };
+
+	[ENDPOINTS.notesMentions]: {
+		req: {
+			following?: boolean;
+			limit?: number;
+			sinceId?: string;
+			untilId?: string;
+			visibility?: NoteVisibility;
+		};
+		res: NoteDetailed[];
+	};
 
 	[ENDPOINTS.notesSearch]: {
 		req: NotesSearchParams;

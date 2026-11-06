@@ -2131,6 +2131,66 @@ cd web && pnpm build                    # exit 0
 - 带 `callback` 的应用跳转没有构造真实第三方应用。
 - OAuth 同意页、拒绝回执、scope 强制与授权页过期按设计未做。
 
+## 12AF. 批次：前端第十六波——通知页签与提及（2026-11-06）
+
+**工作方式**：目标模式第十六波，一轮完成 `notes/mentions`、`unreadOnly`、通知页签、测试、真实二进制
+与浏览器走查、文档与提交。施工依据 `docs/research/2026-11-06-firefish-port-wave16-contract.md`。
+
+### 12AF.1 落地清单
+
+| 层 | 文件 | 说明 |
+|----|------|------|
+| 提及 | `internal/note/mentions.go`（新） | `Mentions`：jsonb 成员匹配 + 可见性/静音/屏蔽/实例静音 + following/visibility |
+| 端点 | `internal/httpapi/mentions.go`（新）、`server.go` | `POST /api/notes/mentions`，匿名 401 |
+| 未读 | `internal/note/reaction.go`、`internal/httpapi/notifications.go` | `List` 增加 `unreadOnly`，handler 透传 |
+| 页签 | `web/src/pages/Notifications.vue` | 全部/未读/提及；取消自动 mark-all-read，改为页头显式动作 |
+| 通知列表 | `web/src/components/MkNotifications.vue` | 新增 `unreadOnly` prop |
+| 接口层 | `endpoints.ts` | `notesMentions` |
+| 测试 | `internal/httpapi/mentions_test.go`（新） | 提及可见性/关注过滤；未读过滤与全部已读 |
+
+### 12AF.2 有意的限制
+
+1. 没有 directNotes 页签（无聊天范围）。
+2. 远端账号的提及不进入本地 `mentions` 数组，因此不出现在提及列表。
+3. 展示通知即标记已读，未读列表会随之减少（既有行为）。
+
+### 12AF.3 验证证据
+
+```
+gofmt -l internal/ cmd/                 # 空
+go vet ./...                            # exit 0
+CINDERFISH_TEST_DATABASE_URL=… go test -count=1 ./...   # 全绿（新增 2 个用例）
+cd web && pnpm exec vue-tsc --noEmit    # exit 0
+cd web && pnpm run check:port           # 398 文件，hardTotal 0
+cd web && pnpm build                    # exit 0
+```
+
+真实二进制 `:3991`：
+
+| 场景 | 结果 |
+|------|------|
+| `/my/notifications` | 页签「全部 / 未读 / 提及」都在 |
+| 停在「提及」时 alice 发 `hello @w16bob mention check` | 切到「未读」能看到该通知 |
+| 「提及」页签 | 显示带 @ 的帖子（含更早一条） |
+| `notes/mentions` 匿名调用 | 401（测试覆盖） |
+| following=true 未关注时 | 0；关注后 1（测试覆盖） |
+| `unreadOnly` 全部已读后 | 未读 0、全部仍 1（测试覆盖） |
+| 移动端 | 页签与列表正常，无横向溢出、无 JS 异常 |
+
+无头 Helium 156。截图在 `/tmp/w16-shots`（不入库）。
+
+顺带修正：页面一进来就 mark-all-as-read 会让「未读」页签永远为空，已改为显式页头动作。
+另修正 API 台账自第九波起累计的算术漂移（同名声明的未实现数与 440 总数不一致），本波按
+「440 − 同名已实现」重新对齐。
+
+走查数据已清理：w16alice/w16bob 与其帖子、通知级联删除，用户数回到 23；服务与临时文件停止。
+
+### 12AF.4 仍未验证
+
+- 远端账号提及的展示（当前设计不进入本地列表）。
+- 未读页签在流式推送到达时的实时插入没有专门验证。
+- directNotes、按类型过滤与页签组合没有走查。
+
 ## 13. 文档索引
 
 | 文档 | 内容 |
@@ -2172,6 +2232,7 @@ cd web && pnpm build                    # exit 0
 | `docs/research/2026-11-06-firefish-port-wave13-contract.md` | **第十三波施工契约（运行时实例设置、admin/meta 与 update-meta 子集），见 §12AC** |
 | `docs/research/2026-11-06-firefish-port-wave14-contract.md` | **第十四波施工契约（blockedHosts、策略与入站拒绝、实例屏蔽页），见 §12AD** |
 | `docs/research/2026-11-06-firefish-port-wave15-contract.md` | **第十五波施工契约（MiAuth check、fetched 标记与授权页），见 §12AE** |
+| `docs/research/2026-11-06-firefish-port-wave16-contract.md` | **第十六波施工契约（notes/mentions、unreadOnly 与通知页签），见 §12AF** |
 
 ## 14. 已知的未验证项
 
@@ -2196,6 +2257,8 @@ cd web && pnpm build                    # exit 0
   子域匹配的运维体验未验证。
 - **第十五波未测边角（2026-11-06，见 §12AE.4）**：未登录授权衔接、callback 跳转未走查；OAuth 同意页、
   拒绝回执、scope 强制按设计未做。
+- **第十六波未测边角（2026-11-06，见 §12AF.4）**：远端提及、流式推送下的未读实时插入、directNotes
+  与类型过滤组合未验证。
 - **仍未移植的设置页**：邮箱、整合、安全（2FA）、导入导出、迁移、Webhook、插件、自定义 KaTeX、状态栏、
   删除账号、应用授权以外的账号操作；对应后端端点不存在或前端缺少依赖（见第五波契约 §3.3）。
 - **仍缺的 widgets**：rss、rss-ticker、server-metric、online-users、federation、job-queue、aiscript、

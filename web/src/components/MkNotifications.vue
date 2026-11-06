@@ -59,6 +59,8 @@ import MkNote from "@/components/MkNote.vue";
 
 const props = defineProps<{
 	includeTypes?: NotificationType[] | null;
+	/** Only unread notifications (`i/notifications`'s unreadOnly). */
+	unreadOnly?: boolean;
 }>();
 
 interface NotificationsPaging {
@@ -90,6 +92,7 @@ const pagination: Paging = {
 			: mutedTypes.length > 0
 				? mutedTypes
 				: undefined,
+		...(props.unreadOnly === true ? { unreadOnly: true } : {}),
 	},
 };
 
