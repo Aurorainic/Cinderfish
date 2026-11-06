@@ -5708,7 +5708,8 @@ CINDERFISH_TEST_DATABASE_URL=... go test ./... -count=1         # 全绿
 `/my/drive`、`/notes/<id>`。结果全部 `scrollWidth - clientWidth = 0`，无未捕获异常。
 截图在 `/tmp/w105-shots`。
 
-仍未验证：更窄的 280px、平板宽度、Deck 列布局在窄屏的行为（Deck 自身按桌面设计）。
+280px 与 1024px 平板宽度、Deck 在 390/1400 下的行为已由 §12DY 测量（均无溢出/异常）；
+仍未验证：Deck 的列拖拽与多列组合。
 
 ## 12DS. 第一百零六波：多账号切换（2026-11-07）
 
@@ -5765,3 +5766,15 @@ CINDERFISH_TEST_DATABASE_URL=... go test ./... -count=1         # 全绿
 `/tmp/w110-shots/theme-nord.png`。
 
 仍未验证：其余 26 个调色板的逐一看色（解析、变量校验与打包已有构建覆盖）、移动端主题页排版。
+
+## 12DY. 第一百一十波：280px、1024px 与 Deck 壳（2026-11-07）
+
+| 视口 | 路由 | 横向溢出 | 异常 |
+|------|------|----------|------|
+| 280×600 | `/`、`/settings/privacy`、`/settings/security`、`/settings/notifications`、`/explore`、`/my/drive` | 全 0 | 无 |
+| 1024×768 | `/`、`/settings/privacy`、`/settings/import-export`、`/explore`、`/my/drive` | 全 0 | 无 |
+| 390×844 | `/deck` | 0 | 无 |
+| 1400×900 | `/deck` | 0 | 无 |
+
+Deck 在 390 宽退化为「主列」单列，1400 宽显示主列 + 侧栏，均渲染正常。
+仍未验证：Deck 的列拖拽、列增减与 profile 切换。
