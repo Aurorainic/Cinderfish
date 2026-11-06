@@ -77,3 +77,42 @@ func TestAppShowSecretOwnerOnly(t *testing.T) {
 		t.Errorf("unknown app code = %v, want NO_SUCH_APP", e["code"])
 	}
 }
+
+// TestAppShowSecretHidesFromAccessTokens proves an app-session access token
+// does not see the secret even when it belongs to the owning user; only the
+// native user token does.
+func TestAppShowSecretHidesFromAccessTokens(t *testing.T) {
+	ts, _ := adminTestServer(t, "open")
+	_, aliceToken := createUser(t, ts, uniqueName(t)+"a")
+
+	resp, created := postWithToken(t, ts, "/api/app/create", aliceToken, map[string]any{
+		"name": "Access Token App", "permission": []string{"read"},
+	})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("app/create = %d %v", resp.StatusCode, created)
+	}
+	appID, _ := created["id"].(string)
+	appSecret, _ := created["secret"].(string)
+
+	resp, session := post(t, ts, "/api/auth/session/generate", map[string]any{"appSecret": appSecret})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("session/generate = %d %v", resp.StatusCode, session)
+	}
+	sessionToken, _ := session["token"].(string)
+	resp, issued := postWithToken(t, ts, "/api/miauth/gen-token", aliceToken, map[string]any{
+		"session": sessionToken, "name": "Access Token App", "permission": []string{"read"},
+	})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("gen-token = %d %v", resp.StatusCode, issued)
+	}
+	accessToken, _ := issued["token"].(string)
+
+	_, shown := postWithToken(t, ts, "/api/app/show", accessToken, map[string]any{"appId": appID})
+	if shown["secret"] != nil {
+		t.Errorf("access token saw the secret: %v", shown["secret"])
+	}
+	_, native := postWithToken(t, ts, "/api/app/show", aliceToken, map[string]any{"appId": appID})
+	if native["secret"] == nil {
+		t.Errorf("native token did not see the secret")
+	}
+}

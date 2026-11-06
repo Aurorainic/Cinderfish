@@ -2491,7 +2491,7 @@ cd web && pnpm build                    # exit 0
 
 - 保存资料（含附加信息增删）后 `users/show` 与 `POST /api/i` 的回读。
 - 日期/语言非法值的 400 分支与清空语义。
-- 推荐笔记开关的写入与时间线表现（时间线本身还没有插入推荐笔记的逻辑）。
+- 推荐笔记开关的写入；注入是客户端行为，Misskey 后端同样只存储该开关（本实现一致）。
 - `go test` 与浏览器走查未执行。
 
 ## 12AM. 批次：通知类型静音（2026-11-06）
@@ -4540,7 +4540,7 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
   「已配置 / smtp.example」）。账号级 CSS 覆盖见 §12DO（修掉插入顺序相反的缺陷）。
 - **第四十五波已补验证（2026-11-07，见 §12BI.4）**：`admin/drive/show-file` 有端点用例；
   文件详情的四类预览、字段与「详情」入口均走查通过；敏感文件的模糊预览也已验证
-  （§12DM：`blur(24px)`）。仍未验证的：真实音视频播放。`user: null` 分支因外键级联
+  （§12DM）与真实音视频播放（§12EJ）均验证。`user: null` 分支因外键级联
   在正常流程下不可达，仅作防御保留。
 - **第四十六波已补验证（2026-11-07，见 §12BJ.4）**：缩略图生成/跳过/删除与 `/media` 的
   Content-Type 都有用例；真实 PNG/JPEG 上传得到 512 长边缩略图并在 `/my/drive` 实际加载。
@@ -4559,7 +4559,8 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
   窄屏（280px）排版已由 §12EK 测量（六页均无横向溢出，说明区完整、无表单控件）。
 - **第五十波已补验证（2026-11-07，见 §12BN.4）**：状态栏在真实二进制下添加、着色、滚动与
   刷新保留均走查通过；期间发现固定条使用了不存在的 `block-end` 属性、导致贴在左上角，
-  已修为 `inset-block-end`。仍未验证的：移动端/Deck/Zen、多条目叠加、减少动画偏好。
+  已修为 `inset-block-end`；多条目叠加已由 §12EI 覆盖。仍未验证的：移动端/Deck/Zen 下的状态栏、
+  减少动画偏好（无头环境无法确认）。
 - **第五十一波部分补验证（2026-11-07 对账 §12CB/§12CC）**：迁移页表单、本地目标拒绝、`MkMoved`
   横幅（含本地目标的 `MkMention` 多余 `@` 修复）都已走查；`i/move` 的双实例投递已于
   2026-11-07 补齐（§12DI）；跨实例「关注者改关」由 §12EN 覆盖（本地关注者被迁移到新远端账号并
@@ -4576,7 +4577,7 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
   `following/list` 与 `users/following|followers` 的 `sinceDate`/`untilDate` 已实现并有用例。
 - **第五十七波部分补验证（2026-11-07，见 §12CB/§12CL）**：`follow` 与 `note` 两类通知在通知页渲染
   已走查；`homeTimeline` 的 withReplies 过滤新增了真实 WebSocket 端到端用例。仍未验证的：
-  远端导入通知的双实例用例已由 §12CX 覆盖；仍未验证的是 directNotes 与类型过滤组合的推送。
+  远端导入通知的双实例用例已由 §12CX 覆盖；`directNotes` 属于聊天范围，首版不做。
 - **第五十八波已补验证**：`Question` 入站（§12CE）、笔记正文与反应里的远端自定义表情
   （§12CJ/§12DC）都已实现并有用例。仍未验证的：真实异种软件互投。
 - **第五十九波部分补验证（2026-11-07 对账 §12CC）**：`/admin/abuses` 的举报者、被举报者、内容与
@@ -4816,7 +4817,7 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
 ### 12CF.4 仍未验证
 
 - 大表（万级标签/关注）下的聚合与分页耗时。
-- 日期边界（恰好等于 createdAt 的毫秒）没有单独断言，只有窗口两侧的用例。
+- 日期边界已由 §12EO 的 `TestFollowListDateBoundary` 覆盖（>= / <= 均包含相等毫秒）。
 
 ## 12CG. 第六十八波：官方 misskey-js 客户端联调（2026-11-07）
 
@@ -4981,7 +4982,7 @@ CINDERFISH_TEST_DATABASE_URL=... go test ./... -count=1         # 全绿
 ### 12CK.3 仍未验证
 
 - 真实第三方客户端（Misskey Web、misskey-js 之外的实现）跑完整 OAuth 登录。
-- `includeSecret` 在通过 access token（而非原生 token）调用时的行为只用代码阅读确认。
+- `includeSecret` 对 access token 的行为已由 §12EO 的用例固定（access token 看不到 secret）。
 
 ## 12CL. 第七十三波：homeTimeline 的 withReplies 端到端用例（2026-11-07）
 
@@ -5946,6 +5947,19 @@ CINDERFISH_TEST_DATABASE_URL=... go test ./... -count=1         # 全绿
 
 共享库里之所以先 `ap/show`，是为了拿到带 host 的远端行，否则 beta 的本地行会被当成「本地目标」
 直接插入关注关系。生产库中 alpha 关注的本来就是远端行。
+
+```
+gofmt -l internal/ cmd/                                        # 空
+go vet ./...                                                   # exit 0
+CINDERFISH_TEST_DATABASE_URL=... go test ./... -count=1         # 全绿
+```
+
+## 12EO. 第一百二十五波：日期边界与 app/show 的 access token 分支（2026-11-07）
+
+- `TestFollowListDateBoundary`：关注行的 `created_at` 固定到毫秒，`sinceDate`/`untilDate`
+  等于该毫秒都包含；早/晚一毫秒即排除（`>=` / `<=` 语义）。
+- `TestAppShowSecretHidesFromAccessTokens`：用 MiAuth 为同一用户签发 access token，
+  `app/show` 不返回 secret；原生 token 仍返回。
 
 ```
 gofmt -l internal/ cmd/                                        # 空

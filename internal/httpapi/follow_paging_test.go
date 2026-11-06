@@ -107,3 +107,39 @@ func TestFollowListDateCursors(t *testing.T) {
 		t.Errorf("users/followers untilDate = %v, want just bob", got)
 	}
 }
+
+// TestFollowListDateBoundary pins the inclusive bounds: sinceDate uses >= and
+// untilDate <=, so a row exactly on the millisecond is included.
+func TestFollowListDateBoundary(t *testing.T) {
+	f := newFederationServer(t, "public")
+	aliceToken, aliceID := f.registerUser(t, "alice")
+	_, bobID := f.registerUser(t, "bob")
+	if resp, out := postWithToken(t, f.ts, "/api/following/create", aliceToken, map[string]any{"userId": bobID}); resp.StatusCode != http.StatusOK {
+		t.Fatalf("follow = %d %v", resp.StatusCode, out)
+	}
+	// A fixed millisecond timestamp on the row.
+	const at = int64(1_800_000_000_123)
+	if _, err := f.pool.Exec(context.Background(),
+		`UPDATE followings SET created_at = to_timestamp($1 / 1000.0) WHERE follower_id = $2 AND followee_id = $3`,
+		at, aliceID, bobID); err != nil {
+		t.Fatalf("set timestamp: %v", err)
+	}
+
+	includes := func(body map[string]any) bool {
+		t.Helper()
+		list := postListWithToken(t, f.ts, "/api/following/list", aliceToken, body)
+		return len(followIDs(t, list, "followeeId")) == 1
+	}
+	if !includes(map[string]any{"sinceDate": at}) {
+		t.Error("sinceDate at the exact millisecond excluded the row")
+	}
+	if !includes(map[string]any{"untilDate": at}) {
+		t.Error("untilDate at the exact millisecond excluded the row")
+	}
+	if includes(map[string]any{"sinceDate": at + 1}) {
+		t.Error("sinceDate one millisecond later kept the row")
+	}
+	if includes(map[string]any{"untilDate": at - 1}) {
+		t.Error("untilDate one millisecond earlier kept the row")
+	}
+}
