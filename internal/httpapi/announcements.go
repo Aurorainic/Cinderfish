@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"net/http"
 	"strings"
 	"time"
@@ -16,9 +17,8 @@ const (
 )
 
 // packAnnouncement renders the shape Firefish/Misskey clients read. isRead is
-// always false: this port does not track per-user read state yet, and claiming
-// "read" would hide the notice.
-func packAnnouncement(a *announcement.Announcement) map[string]any {
+// resolved per caller; anonymous requests always get false.
+func packAnnouncement(a *announcement.Announcement, isRead bool) map[string]any {
 	var imageURL any
 	if a.ImageURL != nil {
 		imageURL = *a.ImageURL
@@ -36,8 +36,20 @@ func packAnnouncement(a *announcement.Announcement) map[string]any {
 		"createdAt": a.CreatedAt.UTC().Format(time.RFC3339Nano),
 		"updatedAt": a.UpdatedAt.UTC().Format(time.RFC3339Nano),
 		"expiresAt": expires,
-		"isRead":    false,
+		"isRead":    isRead,
 	}
+}
+
+// applyUnreadAnnouncements fills hasUnreadAnnouncement from the read marks.
+func (s *Server) applyUnreadAnnouncements(ctx context.Context, userID string, packed map[string]any) {
+	if s.announcements == nil {
+		return
+	}
+	count, err := s.announcements.UnreadCount(ctx, userID)
+	if err != nil {
+		return
+	}
+	packed["hasUnreadAnnouncement"] = count > 0
 }
 
 // handleAnnouncements is POST /api/announcements: the public, active notices.
@@ -60,11 +72,54 @@ func (s *Server) handleAnnouncements(w http.ResponseWriter, r *http.Request) {
 		writeInternalServerError(w)
 		return
 	}
+
+	// Read state is only meaningful for a signed-in caller; an expired or
+	// invalid token falls back to the anonymous view instead of failing.
+	read := map[string]bool{}
+	if info, err := s.authenticate(r.Context(), r, bodyAsMap(r)); err == nil && info != nil {
+		ids := make([]string, 0, len(rows))
+		for _, a := range rows {
+			ids = append(ids, a.ID)
+		}
+		if resolved, err := s.announcements.ReadIDs(r.Context(), info.User.ID, ids); err == nil {
+			read = resolved
+		}
+	}
+
 	out := make([]map[string]any, 0, len(rows))
 	for _, a := range rows {
-		out = append(out, packAnnouncement(a))
+		out = append(out, packAnnouncement(a, read[a.ID]))
 	}
 	writeJSON(w, http.StatusOK, out)
+}
+
+// handleIReadAnnouncement implements POST /api/i/read-announcement.
+func (s *Server) handleIReadAnnouncement(w http.ResponseWriter, r *http.Request) {
+	if s.announcements == nil {
+		writeInternalServerError(w)
+		return
+	}
+	var body struct {
+		AnnouncementID string `json:"announcementId"`
+	}
+	if err := decodeOptionalJSON(r, &body); err != nil {
+		writeAPIError(w, err)
+		return
+	}
+	info, err := s.authenticate(r.Context(), r, bodyAsMap(r))
+	if err != nil || info == nil {
+		writeAuthenticationError(w)
+		return
+	}
+	if body.AnnouncementID == "" {
+		writeAPIError(w, invalidParamError("announcementId is required"))
+		return
+	}
+	if err := s.announcements.MarkRead(r.Context(), info.User.ID, body.AnnouncementID); err != nil {
+		writeInternalServerError(w)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // handleAdminAnnouncementsCreate is POST /api/admin/announcements/create.
@@ -129,7 +184,7 @@ func (s *Server) handleAdminAnnouncementsCreate(w http.ResponseWriter, r *http.R
 		writeInternalServerError(w)
 		return
 	}
-	writeJSON(w, http.StatusOK, packAnnouncement(created))
+	writeJSON(w, http.StatusOK, packAnnouncement(created, false))
 }
 
 // handleAdminAnnouncementsList is POST /api/admin/announcements/list.
@@ -156,7 +211,7 @@ func (s *Server) handleAdminAnnouncementsList(w http.ResponseWriter, r *http.Req
 	}
 	out := make([]map[string]any, 0, len(rows))
 	for _, a := range rows {
-		out = append(out, packAnnouncement(a))
+		out = append(out, packAnnouncement(a, false))
 	}
 	writeJSON(w, http.StatusOK, out)
 }

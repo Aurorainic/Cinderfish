@@ -226,6 +226,7 @@ func (s *Server) handleI(w http.ResponseWriter, r *http.Request) {
 	packed := packMeDetailed(info.User, info.User.CreatedAt, includeSecrets, loadProfile(r.Context(), s, info.User.ID))
 	s.applyUserCounts(r.Context(), info.User.ID, packed)
 	s.applyUnreadNotifications(r.Context(), info.User.ID, packed)
+	s.applyUnreadAnnouncements(r.Context(), info.User.ID, packed)
 	s.applyPinnedNotes(r.Context(), info.User.ID, info.User.ID, packed)
 	writeJSON(w, http.StatusOK, packed)
 }

@@ -124,3 +124,58 @@ func (s *Service) Delete(ctx context.Context, id string) (bool, error) {
 	}
 	return tag.RowsAffected() > 0, nil
 }
+
+// MarkRead records that the user has seen an announcement. Revising an
+// announcement does not clear the mark; a new notice is a new id.
+func (s *Service) MarkRead(ctx context.Context, userID, announcementID string) error {
+	_, err := s.pool.Exec(ctx, `
+INSERT INTO announcement_reads (user_id, announcement_id) VALUES ($1, $2)
+ON CONFLICT (user_id, announcement_id) DO NOTHING
+`, userID, announcementID)
+	if err != nil {
+		return fmt.Errorf("announcement: mark read: %w", err)
+	}
+	return nil
+}
+
+// ReadIDs returns which of the given announcement ids the user has read.
+func (s *Service) ReadIDs(ctx context.Context, userID string, ids []string) (map[string]bool, error) {
+	out := make(map[string]bool, len(ids))
+	if len(ids) == 0 {
+		return out, nil
+	}
+	rows, err := s.pool.Query(ctx, `
+SELECT announcement_id FROM announcement_reads
+WHERE user_id = $1 AND announcement_id = ANY($2)
+`, userID, ids)
+	if err != nil {
+		return nil, fmt.Errorf("announcement: read ids: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("announcement: scan read id: %w", err)
+		}
+		out[id] = true
+	}
+	return out, rows.Err()
+}
+
+// UnreadCount counts active, unexpired announcements the user has not read.
+func (s *Service) UnreadCount(ctx context.Context, userID string) (int, error) {
+	var n int
+	err := s.pool.QueryRow(ctx, `
+SELECT count(*) FROM announcements a
+WHERE a.is_active = TRUE
+  AND (a.expires_at IS NULL OR a.expires_at > now())
+  AND NOT EXISTS (
+      SELECT 1 FROM announcement_reads r
+      WHERE r.user_id = $1 AND r.announcement_id = a.id
+  )
+`, userID).Scan(&n)
+	if err != nil {
+		return 0, fmt.Errorf("announcement: unread count: %w", err)
+	}
+	return n, nil
+}

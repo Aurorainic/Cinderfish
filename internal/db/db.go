@@ -515,6 +515,17 @@ CREATE INDEX IF NOT EXISTS idx_note_edits_note ON note_edits (note_id, id DESC);
 	16: `
 ALTER TABLE drive_files ADD COLUMN IF NOT EXISTS comment TEXT;
 `,
+
+	// v17: per-user announcement read marks. The announcements list is public;
+	// isRead is only filled for a signed-in caller.
+	17: `
+CREATE TABLE IF NOT EXISTS announcement_reads (
+    user_id         TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    announcement_id TEXT NOT NULL REFERENCES announcements (id) ON DELETE CASCADE,
+    read_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (user_id, announcement_id)
+);
+`,
 }
 
 // Migrate applies pending migrations in order and returns the version

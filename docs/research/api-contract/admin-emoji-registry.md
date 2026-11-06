@@ -1045,8 +1045,14 @@ UserLite 部分也有简化：`name`/`avatarUrl` 只从 profile 行来，没有 
 | `limit` | 默认 10，上限 100 |
 | `untilId` | 公告 id 游标 |
 
-返回 `Announcement[]`，只含 `is_active = TRUE` 且未过期的行，id 倒序。`isRead` 恒为 false
-（没有已读跟踪）。
+返回 `Announcement[]`，只含 `is_active = TRUE` 且未过期的行，id 倒序。带有效 token 时按
+`announcement_reads`（迁移 v17）填充 `isRead`；匿名或 token 无效时恒为 false。
+
+### POST /api/i/read-announcement（需登录）
+
+请求 `{announcementId}`，写入 `announcement_reads`（幂等），返回 `204`。缺 id 400 `INVALID_PARAM`。
+`MeDetailed.hasUnreadAnnouncement` 由「有效公告数 − 已读数 > 0」计算；公告页打开时会把显示的公告
+逐条标记已读。
 
 ### POST /api/admin/announcements/create（管理员）
 

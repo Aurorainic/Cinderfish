@@ -210,6 +210,7 @@ func (s *Server) handleIUpdate(w http.ResponseWriter, r *http.Request) {
 	packed := packMeDetailed(info.User, info.User.CreatedAt, info.Token == nil, loadProfile(r.Context(), s, info.User.ID))
 	s.applyUserCounts(r.Context(), info.User.ID, packed)
 	s.applyUnreadNotifications(r.Context(), info.User.ID, packed)
+	s.applyUnreadAnnouncements(r.Context(), info.User.ID, packed)
 	writeJSON(w, http.StatusOK, packed)
 }
 

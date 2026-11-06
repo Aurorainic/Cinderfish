@@ -243,6 +243,7 @@ func (s *Server) registerRoutes() {
 
 	// Instance announcements: public list plus the admin console.
 	s.mux.HandleFunc("POST /api/announcements", s.handleAnnouncements)
+	s.mux.HandleFunc("POST /api/i/read-announcement", s.handleIReadAnnouncement)
 	s.mux.HandleFunc("POST /api/admin/announcements/create", s.handleAdminAnnouncementsCreate)
 	s.mux.HandleFunc("POST /api/admin/announcements/list", s.handleAdminAnnouncementsList)
 	s.mux.HandleFunc("POST /api/admin/announcements/delete", s.handleAdminAnnouncementsDelete)

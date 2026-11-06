@@ -15,15 +15,15 @@
 | 指标 | 数量 |
 |------|------|
 | Misskey 端点总数 | 440 |
-| Cinderfish 已注册路由 | 123 |
-| 其中 Misskey 同名路径 | 116 |
+| Cinderfish 已注册路由 | 124 |
+| 其中 Misskey 同名路径 | 117 |
 | 其中 Cinderfish 自有路径/别名 | 7（`notifications` 别名、`admin/federation/mode`、`admin/federation/allowlist`、`miauth/{session}/check`、`admin/object-storage`、`admin/deliver-queue`、`notes/history`） |
-| 未实现（Misskey 同名） | 324 |
+| 未实现（Misskey 同名） | 323 |
 
 统计口径：`internal/httpapi/server.go` 里 `HandleFunc("METHOD /api/…")` 的去重路径；
 GET 与 POST 同名路径只算一个。
 
-## 2. 已实现（123 条注册路由）
+## 2. 已实现（124 条注册路由）
 
 ```
 admin/accounts/create       admin/announcements/create  admin/announcements/delete
@@ -54,9 +54,10 @@ i/signin-history
 i/notifications             i/pin                       i/registry/clear
 i/registry/get              i/registry/get-all          i/registry/get-detail
 i/registry/keys             i/registry/remove           i/registry/scopes
-i/registry/set              i/revoke-token              i/unpin
-i/update                    i/webhooks/create           i/webhooks/delete
-i/webhooks/list             i/webhooks/show             i/webhooks/update
+i/read-announcement         i/registry/set              i/revoke-token
+i/unpin                     i/update                    i/webhooks/create
+i/webhooks/delete           i/webhooks/list             i/webhooks/show
+i/webhooks/update
 meta                        mute/create
 mute/delete                 mute/list
 miauth/gen-token            miauth/{session}/check*            notes/children              notes/conversation
@@ -90,6 +91,8 @@ users/update
 
 2026-11-06 第十九波新增：`stats`（公开计数）；`admin/update-meta` 增加六个合规 URL 与
 `serverRules`（不是新路由）。
+
+2026-11-06 第三十六波新增：`i/read-announcement`（迁移 v17：`announcement_reads`）；公告列表按登录用户返回 `isRead`。
 
 2026-11-06 第三十五波新增：`drive/files/upload-from-url`（仅 http(s)，拒绝私有/环回目标与重定向，30 秒超时）。
 
