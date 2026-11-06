@@ -4172,8 +4172,11 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
 - **第十波的部分边角（2026-11-06，见 §12Z.4）**：远端举报已由 `TestInboundFlagCreatesReport`
   覆盖（第五十九波），分页游标与 `state` 过滤已由 `TestAbuseReportPagination` 覆盖（2026-11-07）。
   仍未验证的：toast 文案、转发（forward）；通知与自动处置按设计未做。
-- **第十一波未测边角（2026-11-06，见 §12AA.4）**：失败/超时路径、重试与投递顺序、编辑页内删除、
-  未产生的事件类型没有实测。
+- **第十一波的部分边角（2026-11-06，见 §12AA.4）**：失败路径已由
+  `TestWebhookDeliveryFailureStatus` 覆盖（接收端 500 → `latestStatus=500`；
+  连接失败 → `1`），未产生的事件类型由 `TestWebhookIgnoresUnproducedEvents` 覆盖
+  （订阅 follow 的 webhook 在关注发生时收不到投递）。仍未验证的：投递重试与顺序
+  （实现上不重试，一条事件一条独立请求）、编辑页内删除。
 - **第十二波未测边角（2026-11-06，见 §12AB.4）**：reltuples 估算与实际行数的偏差、大 schema 渲染性能
   未验证；vacuum 与索引维护按设计未做。
 - **第十三波未测边角（2026-11-06，见 §12AC.4）**：邀请码注册未走查、没有审计日志、公开页缓存需刷新；

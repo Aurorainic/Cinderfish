@@ -167,3 +167,103 @@ func waitForDelivery(t *testing.T, ch <-chan delivered) delivered {
 		return delivered{}
 	}
 }
+
+// TestWebhookDeliveryFailureStatus covers the two failure outcomes: a receiver
+// that answers 500 records that status, and an unreachable receiver records 1
+// (the port's marker for a transport error).
+func TestWebhookDeliveryFailureStatus(t *testing.T) {
+	f := newFederationServer(t, "public")
+	token, _ := f.registerUser(t, "alice")
+
+	failing := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer failing.Close()
+
+	resp, out := postWithToken(t, f.ts, "/api/i/webhooks/create", token, map[string]any{
+		"name": "failing", "url": failing.URL, "secret": "s", "on": []string{"note"},
+	})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("create failing hook: %d %v", resp.StatusCode, out)
+	}
+	hookID, _ := out["id"].(string)
+
+	createSearchNote(t, f, token, "failure delivery", "public")
+	if status := waitForLatestStatus(t, f, token, hookID, func(v float64) bool { return v == 500 }); status != 500 {
+		t.Errorf("latestStatus after 500 = %v, want 500", status)
+	}
+
+	// A closed port refuses the connection; the marker is 1.
+	dead := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	deadURL := dead.URL
+	dead.Close()
+
+	resp, out = postWithToken(t, f.ts, "/api/i/webhooks/create", token, map[string]any{
+		"name": "unreachable", "url": deadURL, "secret": "s", "on": []string{"note"},
+	})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("create unreachable hook: %d %v", resp.StatusCode, out)
+	}
+	deadID, _ := out["id"].(string)
+
+	createSearchNote(t, f, token, "unreachable delivery", "public")
+	if status := waitForLatestStatus(t, f, token, deadID, func(v float64) bool { return v == 1 }); status != 1 {
+		t.Errorf("latestStatus after transport error = %v, want 1", status)
+	}
+}
+
+// TestWebhookIgnoresUnproducedEvents documents the port's limit: only note,
+// reply and renote events are produced, so a hook subscribed to follow hears
+// nothing even when a follow happens.
+func TestWebhookIgnoresUnproducedEvents(t *testing.T) {
+	f := newFederationServer(t, "public")
+	aliceToken, aliceID := f.registerUser(t, "alice")
+	bobToken, _ := f.registerUser(t, "bob")
+
+	ch := make(chan delivered, 4)
+	receiver := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]any
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		ch <- delivered{headers: r.Header.Clone(), body: body}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer receiver.Close()
+
+	resp, out := postWithToken(t, f.ts, "/api/i/webhooks/create", aliceToken, map[string]any{
+		"name": "follow only", "url": receiver.URL, "secret": "s", "on": []string{"follow"},
+	})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("create: %d %v", resp.StatusCode, out)
+	}
+
+	if resp, body := postWithToken(t, f.ts, "/api/following/create", bobToken, map[string]any{"userId": aliceID}); resp.StatusCode != http.StatusOK {
+		t.Fatalf("follow: %d %v", resp.StatusCode, body)
+	}
+	select {
+	case got := <-ch:
+		t.Errorf("follow delivered to a webhook that should not hear it: %v", got.body)
+	case <-time.After(700 * time.Millisecond):
+	}
+}
+
+// waitForLatestStatus polls one webhook until its latestStatus satisfies done,
+// returning the last value it saw.
+func waitForLatestStatus(t *testing.T, f *fedInstance, token, hookID string, done func(float64) bool) float64 {
+	t.Helper()
+	deadline := time.Now().Add(4 * time.Second)
+	var last any
+	for time.Now().Before(deadline) {
+		resp, out := postWithToken(t, f.ts, "/api/i/webhooks/show", token, map[string]any{"webhookId": hookID})
+		if resp.StatusCode == http.StatusOK {
+			last = out["latestStatus"]
+			if v, ok := last.(float64); ok && done(v) {
+				return v
+			}
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	if v, ok := last.(float64); ok {
+		return v
+	}
+	return 0
+}
