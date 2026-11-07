@@ -34,6 +34,10 @@ JSON 对象 `{"type": string, "body": ...}`，parse 失败直接忽略。
 | `unsubNote` | `un` | `{id}` | 退订单条笔记 |
 | `readNotification` | — | — | 全部通知标记已读；body 被忽略 |
 
+Cinderfish 在此之上兼容 Firefish 的客户端：`{"id": string}` 只标记该条，`{"notificationIds": string[]}`
+标记一组（通知列表把同一帖子上的同类通知折叠成一行后，用这一帧标记整组），无 body 或 id 为空时仍是
+「全部已读」。
+
 `connect` 参数校验（`onChannelConnectRequested`）：`id` 必须 string，`channel` 必须 string，`pong` 只允许 boolean/undefined/null，`params` 只允许对象/undefined。任一条不满足就**静默丢弃**。
 
 ## 3. 服务端 → 客户端消息

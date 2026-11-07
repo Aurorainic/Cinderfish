@@ -71,9 +71,10 @@
 			<CfSwitch v-model="foldNotification" class="_formBlock">
 				合并重复通知
 				<template #caption>
-					同一帖子收到的多条相同通知合并成一条显示。偏好写入本地 store 的
-					<code>foldNotification</code>（Firefish 同名键）；通知列表尚未读取它，
-					所以暂时只保存偏好、不改变渲染。
+					同一帖子上的同类通知（如同一个表情的多条回应、同一帖被多次转贴）合并成一条
+					并显示条数；回复、提及这类每帖只会发生一次的通知不合并。偏好保存在本地
+					store 的 <code>foldNotification</code>（Firefish 同名键）。合并后的行进入
+					视口时会把整组标记已读。
 				</template>
 			</CfSwitch>
 			<CfInfo class="note">

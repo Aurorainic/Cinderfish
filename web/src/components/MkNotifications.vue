@@ -14,28 +14,31 @@
 
 		<template #default="{ items: notifications }">
 			<CfDateSeparatedList
-				v-slot="{ item: notification }"
+				v-slot="{ item: row }"
 				class="elsfgstc"
-				:items="notificationItems(notifications)"
+				:items="notificationRows(notifications)"
 				:no-gap="true"
 			>
 				<MkNote
 					v-if="
-						notification.note != null &&
-						['reply', 'quote', 'mention'].includes(notification.type)
+						row.notification.note != null &&
+						['reply', 'quote', 'mention'].includes(
+							row.notification.type,
+						)
 					"
-					:key="notification.id"
-					:note="notification.note"
+					:key="row.id"
+					:note="row.notification.note"
 					:collapsedReply="
-						notification.type === 'reply' ||
-						(notification.type === 'mention' &&
-							notification.note.replyId != null)
+						row.notification.type === 'reply' ||
+						(row.notification.type === 'mention' &&
+							row.notification.note.replyId != null)
 					"
 				/>
 				<MkNotification
 					v-else
-					:key="notification.id"
-					:notification="notification"
+					:key="row.id"
+					:notification="row.notification"
+					:ids="row.ids"
 					:with-time="true"
 					:full="true"
 					class="_panel notification"
@@ -52,6 +55,7 @@ import type { Notification, NotificationType } from "@/api/types";
 import { me } from "@/account";
 import { t } from "@/i18n";
 import { stream } from "@/stream";
+import { defaultStore } from "@/store/base";
 import { CfDateSeparatedList, CfPagination } from "@/components/ui";
 import type { Paging } from "@/components/ui";
 import MkNotification from "@/components/MkNotification.vue";
@@ -99,8 +103,63 @@ const pagination: Paging = {
 // CfPagination is generic over `{ id: string }` when instantiated from a
 // template, so the slot payload is re-typed here instead of relying on
 // inference that cannot see through the `pagination` prop.
-function notificationItems(items: readonly { id: string }[]): Notification[] {
-	return items as Notification[];
+interface NotificationRow {
+	id: string;
+	createdAt: string;
+	notification: Notification;
+	/** Every notification id the row stands for, newest first. */
+	ids: string[];
+}
+
+/**
+ * Fold notifications that describe the same thing on the same note: five
+ * people reacting with 🎉 to one post become one row with a `×5` badge. Only
+ * types that can legitimately repeat are folded; a reply or a mention happens
+ * once per note and stays on its own.
+ *
+ * Folding happens here rather than on the server because it is a display
+ * preference (`foldNotification`) and the unread list still needs every row to
+ * be marked read, which the row does with its whole `ids` group.
+ */
+function foldKey(n: Notification): string | null {
+	if (n.note == null) return null;
+	if (n.type !== "reaction" && n.type !== "renote") return null;
+	return `${n.type}:${n.note.id}:${n.reaction ?? ""}`;
+}
+
+function notificationRows(items: readonly { id: string }[]): NotificationRow[] {
+	const notifications = items as Notification[];
+	const rows: NotificationRow[] = [];
+	if (!defaultStore.reactiveState.foldNotification.value) {
+		for (const n of notifications) {
+			rows.push({
+				id: n.id,
+				createdAt: n.createdAt,
+				notification: n,
+				ids: [n.id],
+			});
+		}
+		return rows;
+	}
+
+	const byKey = new Map<string, NotificationRow>();
+	for (const n of notifications) {
+		const key = foldKey(n);
+		const existing = key == null ? undefined : byKey.get(key);
+		if (existing != null) {
+			existing.ids.push(n.id);
+			continue;
+		}
+		const row: NotificationRow = {
+			id: n.id,
+			createdAt: n.createdAt,
+			notification: n,
+			ids: [n.id],
+		};
+		rows.push(row);
+		if (key != null) byKey.set(key, row);
+	}
+	return rows;
 }
 
 const isMuted = computed(

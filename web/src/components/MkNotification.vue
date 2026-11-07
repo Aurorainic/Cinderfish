@@ -65,6 +65,12 @@
 					><MkUserName :user="notification.user"
 				/></MkA>
 				<span v-else class="name">{{ t("unknown") }}</span>
+				<span
+					v-if="count > 1"
+					class="count"
+					:title="`${count} 条相同的通知`"
+					>×{{ count }}</span
+				>
 				<MkTime
 					v-if="withTime"
 					:time="notification.createdAt"
@@ -168,11 +174,27 @@ const props = withDefaults(
 		notification: Notification;
 		withTime?: boolean;
 		full?: boolean;
+		/**
+		 * Every notification id this row stands for. The notification list
+		 * folds identical notifications into one row when the
+		 * `foldNotification` preference is on, and the whole group must be
+		 * marked read together.
+		 */
+		ids?: string[];
 	}>(),
 	{
 		withTime: false,
 		full: false,
+		ids: () => [],
 	},
+);
+
+const count = computed(() =>
+	props.ids.length > 0 ? props.ids.length : 1,
+);
+
+const rowIDs = computed(() =>
+	props.ids.length > 0 ? props.ids : [props.notification.id],
 );
 
 const elRef = ref<HTMLElement | null>(null);
@@ -235,7 +257,13 @@ onMounted(() => {
 
 	readObserver = new IntersectionObserver((entries, observer) => {
 		if (!entries.some((entry) => entry.isIntersecting)) return;
-		stream.send("readNotification", { id: props.notification.id });
+		if (rowIDs.value.length === 1) {
+			stream.send("readNotification", { id: rowIDs.value[0] });
+		} else {
+			// One frame for the whole folded group; the server accepts the
+			// same `notificationIds` shape Firefish broadcasts.
+			stream.send("readNotification", { notificationIds: rowIDs.value });
+		}
 		observer.disconnect();
 	});
 	if (elRef.value != null) readObserver.observe(elRef.value);
@@ -355,6 +383,17 @@ onUnmounted(() => {
 				white-space: nowrap;
 				min-width: 0;
 				overflow: hidden;
+			}
+
+			> .count {
+				margin-left: 6px;
+				padding: 0 6px;
+				border-radius: 999px;
+				background: var(--bg);
+				color: var(--fg);
+				font-size: 0.8em;
+				line-height: 1.6;
+				opacity: 0.8;
 			}
 
 			> .time {

@@ -197,6 +197,81 @@ func TestStreamingSubNoteVisibility(t *testing.T) {
 	}
 }
 
+// TestStreamingReadNotificationIDs checks the `notificationIds` body: a folded
+// notification row marks its whole group in one frame, and ids that are not
+// listed stay unread.
+func TestStreamingReadNotificationIDs(t *testing.T) {
+	ts := newStreamingServer(t, "open")
+	_, aliceToken := signup(t, ts, "alice")
+	_, bobToken := signup(t, ts, "bob")
+	_, carolToken := signup(t, ts, "carol")
+
+	_, created := post(t, ts, "/api/notes/create", map[string]any{
+		"i": aliceToken, "text": "fold me",
+	})
+	noteID := created["createdNote"].(map[string]any)["id"].(string)
+	for _, token := range []string{bobToken, carolToken} {
+		if resp, body := post(t, ts, "/api/notes/reactions/create", map[string]any{
+			"i": token, "noteId": noteID, "reaction": "⭐",
+		}); resp.StatusCode != http.StatusOK {
+			t.Fatalf("reaction failed: %v", body)
+		}
+	}
+
+	// Wait for both notifications, then pick the older one.
+	var ids []string
+	deadline := time.Now().Add(wsWait)
+	for {
+		_, raw := postRaw(t, ts, "/api/notifications", map[string]any{"i": aliceToken, "markAsRead": false})
+		list, _ := raw.([]any)
+		ids = ids[:0]
+		for _, item := range list {
+			m, _ := item.(map[string]any)
+			id, _ := m["id"].(string)
+			if id != "" {
+				ids = append(ids, id)
+			}
+		}
+		if len(ids) == 2 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("notifications = %v, want 2", list)
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	// The list is newest first, so ids[1] is the older notification.
+	target := ids[1]
+
+	conn := dial(t, ts, aliceToken)
+	sendFrame(t, conn, map[string]any{
+		"type": "readNotification",
+		"body": map[string]any{"notificationIds": []string{target}},
+	})
+
+	deadline = time.Now().Add(wsWait)
+	for {
+		_, raw := postRaw(t, ts, "/api/notifications", map[string]any{"i": aliceToken, "markAsRead": false})
+		list, _ := raw.([]any)
+		read := map[string]bool{}
+		for _, item := range list {
+			m, _ := item.(map[string]any)
+			id, _ := m["id"].(string)
+			read[id] = m["isRead"] == true
+		}
+		if read[target] {
+			if read[ids[0]] {
+				t.Fatalf("notification %s was not listed but is read: %v", ids[0], read)
+			}
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("notification %s was not marked read: %v", target, read)
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+}
+
 // TestStreamingReadNotification checks the readNotification frame.
 func TestStreamingReadNotification(t *testing.T) {
 	ts := newStreamingServer(t, "open")
@@ -220,7 +295,7 @@ func TestStreamingReadNotification(t *testing.T) {
 	// API, which is the observable effect of the frame.
 	deadline := time.Now().Add(wsWait)
 	for {
-		_, raw := postRaw(t, ts, "/api/notifications", map[string]any{"i": aliceToken})
+		_, raw := postRaw(t, ts, "/api/notifications", map[string]any{"i": aliceToken, "markAsRead": false})
 		list, _ := raw.([]any)
 		allRead := len(list) > 0
 		for _, item := range list {

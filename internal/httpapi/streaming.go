@@ -18,13 +18,13 @@ func (s *Server) AttachStreaming(logf func(string, ...any)) *streaming.Bus {
 		followers = s
 	}
 
-	var markRead func(ctx context.Context, userID, notificationID string) error
+	var markRead func(ctx context.Context, userID string, notificationIDs []string) error
 	if s.notifications != nil {
-		markRead = func(ctx context.Context, userID, notificationID string) error {
-			if notificationID == "" {
+		markRead = func(ctx context.Context, userID string, notificationIDs []string) error {
+			if len(notificationIDs) == 0 {
 				return s.markAllNotificationsRead(ctx, userID)
 			}
-			return s.notifications.MarkRead(ctx, userID, []string{notificationID})
+			return s.notifications.MarkRead(ctx, userID, notificationIDs)
 		}
 	}
 

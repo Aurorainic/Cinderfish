@@ -30,8 +30,9 @@ type Connection struct {
 	// noteUnsubs maps a subscribed note id to its bus unsubscribe.
 	noteUnsubs map[string]func()
 
-	// Hooks installed by the Server.
-	onReadNotification func(userID, notificationID string)
+	// Hooks installed by the Server. onReadNotification receives every id the
+	// client asked to mark read; an empty slice means "all notifications".
+	onReadNotification func(userID string, notificationIDs []string)
 	refreshViewer      func(*Connection)
 }
 
@@ -143,15 +144,24 @@ func (c *Connection) onMessage(data []byte) {
 	case "readNotification":
 		if c.onReadNotification != nil {
 			if uid := c.viewerSnapshot().UserID; uid != "" {
+				// Firefish sends `{ id }`; its own broadcast payload (and
+				// Misskey's client) uses `notificationIds`. Accept both so a
+				// folded row can mark its whole group in one frame.
 				var b struct {
-					ID *string `json:"id"`
+					ID              *string  `json:"id"`
+					NotificationIDs []string `json:"notificationIds"`
 				}
 				_ = json.Unmarshal(env.Body, &b)
-				notificationID := ""
-				if b.ID != nil {
-					notificationID = *b.ID
+				ids := make([]string, 0, len(b.NotificationIDs)+1)
+				if b.ID != nil && *b.ID != "" {
+					ids = append(ids, *b.ID)
 				}
-				c.onReadNotification(uid, notificationID)
+				for _, id := range b.NotificationIDs {
+					if id != "" {
+						ids = append(ids, id)
+					}
+				}
+				c.onReadNotification(uid, ids)
 			}
 		}
 	}

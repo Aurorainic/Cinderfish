@@ -7120,3 +7120,46 @@ cw: useCw.value && cw.value.trim() !== "" ? cw.value : null,
 - 真实二进制 + 无头浏览器：打开发帖框 → 点 CW 按钮（眼睛图标）→ 正文输入
   「w161 cw test body」、CW 留空 → 提交成功，`users/notes` 返回的帖子 `cw: null`。
   截图 `/tmp/w161-shots/cw-empty.png`（不入库）。
+
+## 12FZ. 第一百六十二波：合并重复通知与 readNotification 的多 id 帧（2026-11-07）
+
+`/settings/notifications` 的「合并重复通知」（`foldNotification`，deviceAccount，默认开）只写本地
+store，通知列表从不读取它——设置页的说明自己写着「暂时只保存偏好、不改变渲染」。这一轮让偏好真正
+生效，并补上它需要的服务端能力。
+
+### 12FZ.1 落地清单
+
+| 层 | 文件 | 内容 |
+|----|------|------|
+| 帧解析 | `internal/streaming/connection.go` | `readNotification` 同时接受 Firefish 的 `{id}` 与 `{notificationIds: string[]}`；两者合并成 id 列表，空列表表示「全部已读」 |
+| 回调 | `internal/streaming/server.go` | `Options.MarkRead` 与内部字段改为 `func(ctx, userID string, ids []string) error` |
+| 接线 | `internal/httpapi/streaming.go` | 空列表 → `markAllNotificationsRead`；否则 `NotificationService.MarkRead(…, ids)`（SQL 已是 `ANY($2)`） |
+| 折行 | `web/src/components/MkNotifications.vue` | `notificationRows()`：`foldNotification` 开时把同类型 + 同帖子 + 同表情的回应/转贴合成一行（`ids` 保存整组），关时一行一条 |
+| 行渲染 | `web/src/components/MkNotification.vue` | 新 prop `ids`；`count > 1` 显示 `×N` 角标（title「N 条相同的通知」）；进入视口时单条发 `{id}`、整组发 `{notificationIds}` |
+| 说明 | `web/src/pages/SettingsNotifications.vue` | 去掉「尚未读取」的说明，写清合并粒度与整组已读 |
+| 研究记录 | `docs/research/2026-10-28-m4-streaming-source-calibration.md` | 在 `readNotification` 一行下记录 Cinderfish 的两种 body |
+
+### 12FZ.2 有意的限制
+
+- 只合并 `reaction` 与 `renote`：回复、提及、引用、新帖通知每帖最多发生一次，合并没有意义。
+  回应按表情区分——同一个帖子上的 🎉 与 ❤️ 是两组。
+- 合并在已加载的窗口内进行，不跨分页；新通知经 `main` 频道到达时先 `prepend`，随后重新折行，
+  所以会自然并入已有分组。
+- 折叠行显示最新一条的发送者与时间，其余发送者只在计数里体现（没有 Firefish 那样的堆叠头像）。
+- 未读列表（`unreadOnly`）同样折叠；整组已读由进入视口的行一次性提交，服务端逐 id 更新。
+- `readNotifications` 广播（Firefish 在标记后推送 `notificationIds`）我们仍不发送；其它标签页要等
+  下一次列表刷新才看到已读状态。
+
+### 12FZ.3 验证证据
+
+- `go vet ./...`、含数据库的全量 `go test ./...` 全绿；`vue-tsc --noEmit`、`check:port`
+  （hardTotal 0）、`pnpm build` 全绿。
+- `TestStreamingReadNotificationIDs`：两条同帖回应通知，只发 `{notificationIds:[旧的那条]}` →
+  该条 `isRead=true`，另一条仍为 false。`TestStreamingReadNotification`（无 body → 全部已读）
+  改为用 `markAsRead:false` 轮询，不再依赖列表的自动已读副作用。
+- 真实二进制 + 无头浏览器（1400×900，`/my/notifications`）：
+  - bob 与 carol 对同一帖回应 🎉 后，列表只有 **1** 行，文本为
+    「🎉 w162carol ×2 3 分前 回应了您的帖子 w162 fold me」，角标 `×2`；
+  - 该行进入视口后 `POST /api/notifications {markAsRead:false}` 两条均为 `isRead: true`；
+  - 到 `/settings/notifications` 关掉「合并重复通知」后回到列表，变成 **2** 行、没有角标。
+  截图 `/tmp/w162-shots/folded.png`（不入库）。
