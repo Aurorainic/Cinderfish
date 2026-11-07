@@ -53,7 +53,7 @@ func (s *Server) registryAuth(w http.ResponseWriter, r *http.Request, body *regi
 func writeNoSuchRegistryKey(w http.ResponseWriter) {
 	writeAPIError(w, &APIError{
 		Message: "No such key.", Code: "NO_SUCH_KEY",
-		ID: errIDNoSuchRegistryKey, Kind: "client", Status: http.StatusNotFound,
+		ID: errIDNoSuchRegistryKey, Kind: "client", Status: http.StatusBadRequest,
 	})
 }
 

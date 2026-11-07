@@ -35,8 +35,8 @@ func TestRegistryRoundTrip(t *testing.T) {
 	}
 
 	// A different scope does not see the key.
-	if resp, _ := post(t, ts, "/api/i/registry/get", map[string]any{"i": token, "key": "colors", "scope": []string{"other"}}); resp.StatusCode != http.StatusNotFound {
-		t.Errorf("other scope get = %d, want 404", resp.StatusCode)
+	if resp, _ := post(t, ts, "/api/i/registry/get", map[string]any{"i": token, "key": "colors", "scope": []string{"other"}}); resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("other scope get = %d, want 400", resp.StatusCode)
 	}
 	// ... and the scope order does not matter.
 	if resp, _ := post(t, ts, "/api/i/registry/get", map[string]any{"i": token, "key": "colors", "scope": []string{"theme", "client"}}); resp.StatusCode != http.StatusOK {
@@ -74,8 +74,8 @@ func TestRegistryRoundTrip(t *testing.T) {
 	if resp, out := post(t, ts, "/api/i/registry/remove", map[string]any{"i": token, "key": "colors", "scope": scope}); resp.StatusCode != http.StatusOK {
 		t.Fatalf("remove: %d %v", resp.StatusCode, out)
 	}
-	if resp, _ := post(t, ts, "/api/i/registry/get", map[string]any{"i": token, "key": "colors", "scope": scope}); resp.StatusCode != http.StatusNotFound {
-		t.Errorf("get after remove = %d, want 404", resp.StatusCode)
+	if resp, _ := post(t, ts, "/api/i/registry/get", map[string]any{"i": token, "key": "colors", "scope": scope}); resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("get after remove = %d, want 400", resp.StatusCode)
 	}
 	if resp, _ := post(t, ts, "/api/i/registry/set", map[string]any{"i": token, "key": "a", "scope": scope, "value": 1}); resp.StatusCode != http.StatusOK {
 		t.Fatalf("set a: %d", resp.StatusCode)
@@ -105,13 +105,13 @@ func TestRegistryIsolationAndErrors(t *testing.T) {
 	if resp, _ := post(t, ts, "/api/i/registry/set", map[string]any{"i": aliceToken, "key": "secret", "scope": scope, "value": "mine"}); resp.StatusCode != http.StatusOK {
 		t.Fatalf("alice set: %d", resp.StatusCode)
 	}
-	if resp, _ := post(t, ts, "/api/i/registry/get", map[string]any{"i": bobToken, "key": "secret", "scope": scope}); resp.StatusCode != http.StatusNotFound {
-		t.Errorf("bob get = %d, want 404", resp.StatusCode)
+	if resp, _ := post(t, ts, "/api/i/registry/get", map[string]any{"i": bobToken, "key": "secret", "scope": scope}); resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("bob get = %d, want 400", resp.StatusCode)
 	}
 
 	resp, out := post(t, ts, "/api/i/registry/get", map[string]any{"i": bobToken, "key": "missing", "scope": scope})
-	if resp.StatusCode != http.StatusNotFound {
-		t.Fatalf("missing key = %d %v, want 404", resp.StatusCode, out)
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("missing key = %d %v, want 400", resp.StatusCode, out)
 	}
 	e, _ := out["error"].(map[string]any)
 	if e["code"] != "NO_SUCH_KEY" || e["id"] != "ac3ed68a-62f0-422b-a7bc-d5e09e8f6a6a" {
