@@ -7490,3 +7490,39 @@ Firefish 的 `init.ts` 在 `main` 频道上监听 `meUpdated` 并 `updateAccount
 - `go vet ./...`、含数据库的全量 `go test ./...` 全绿。
 - `TestStreamingMeUpdatedOnTwoFactor`：启用 TOTP 后 `meUpdated` 帧里的 `twoFactorEnabled` 为 true。
 - `TestStreamingMeUpdated`（第 168 波）继续通过，说明新增发布点没有破坏原有路径。
+
+## 12GJ. 第一百七十二波：pollVoted 与实时票数（2026-11-07）
+
+`notes/polls/vote` 只回 `{}`，客户端靠「投票后自己重取笔记」更新票数；别人在时间线里投票时，
+已经打开的这条笔记不会变。Misskey 在投票成功后向该笔记的订阅者发 `pollVoted`，本实现没有。
+
+### 12GJ.1 落地清单
+
+| 层 | 文件 | 内容 |
+|----|------|------|
+| 发布 | `internal/httpapi/streaming_publish.go` | `publishNotePollVoted(note, userID, choice)`：按笔记可见性发 `pollVoted {choice, userId}` |
+| 投票 | `internal/httpapi/notes_polls.go` | 投票成功后调用，位置与 Misskey 的 `publishNoteStream` 一致 |
+| 事件类型 | `web/src/api/stream.ts` | `NoteUpdatedEvent.type` 增加 `pollVoted` |
+| 客户端 | `web/src/composables/use-note-capture.ts` | 收到后给对应选项与 `votesCount` 各加一；选项越界、无投票时忽略 |
+| 笔记 | `web/src/i18n/PORTING-NOTES.md` | 流式缺口清单移除 `pollVoted` |
+
+### 12GJ.2 有意的限制
+
+- 只处理「加一」：Misskey 的 `pollVoted` 也只表示新增一票（没有撤回投票的端点），所以不会出现
+  减少的事件。
+- 自己去投票时，本地已乐观加一，随后还会收到自己的 `pollVoted`，于是显示为 +2 直到下一次取数。
+  上游同样如此（它也在投票前乐观更新）；这里没有做去重，因为服务端帧不带「是谁的客户端」标记。
+- 结果对未投票者仍然默认隐藏：本次只让已显示结果的视图实时更新，没有改变「投票前是否可见」的策略。
+- 多次投票的 poll 会逐票加一，没有做「同一用户同一选项」的去重（服务端已拒绝重复）。
+
+### 12GJ.3 验证证据
+
+- `go vet ./...`、含数据库的全量 `go test ./...` 全绿；`vue-tsc --noEmit`、`check:port`
+  （hardTotal 0）、`pnpm build` 全绿。
+- `TestStreamingPollVoted`：订阅笔记 → 另一账号投第二项 → 收到 `noteUpdated`（`type=pollVoted`，
+  `choice=1`，带 `userId`）。
+- 真实二进制 + 无头浏览器（1400×900，`/notes/<id>`）：
+  - 打开笔记 → 点「显示结果」，初始为 `yes(0 票) no(1 票) 总票数 1`；
+  - 第三个账号投票给 `yes`（API 200），无需刷新，页面变为
+    `yes(1 票) no(1 票) 总票数 2`。
+  截图 `/tmp/w172-shots/poll-voted.png`（不入库）。

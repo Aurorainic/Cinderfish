@@ -89,7 +89,10 @@ func (s *Server) handleNotesPollsVote(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// The client refetches the note for the new counts, as upstream does.
+	// Everyone with the note open sees the new counts; the voter's own client
+	// already applied them optimistically, so a duplicate is harmless.
+	s.publishNotePollVoted(n, info.User.ID, *body.Choice)
+
 	writeJSON(w, http.StatusOK, struct{}{})
 }
 

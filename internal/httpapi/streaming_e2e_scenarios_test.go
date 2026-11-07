@@ -341,6 +341,57 @@ func TestStreamingMainChannelNotification(t *testing.T) {
 	}
 }
 
+// TestStreamingPollVoted checks that a vote reaches the note's subscribers,
+// which is how an open poll shows the new counts without a refresh.
+func TestStreamingPollVoted(t *testing.T) {
+	ts := newStreamingServer(t, "open")
+	_, aliceToken := signup(t, ts, "alice")
+	_, bobToken := signup(t, ts, "bob")
+
+	_, created := post(t, ts, "/api/notes/create", map[string]any{
+		"i": aliceToken, "text": "vote on this",
+		"poll": map[string]any{
+			"choices":  []string{"yes", "no"},
+			"multiple": false,
+		},
+	})
+	noteID := created["createdNote"].(map[string]any)["id"].(string)
+
+	conn := dial(t, ts, aliceToken)
+	sendFrame(t, conn, map[string]any{"type": "subNote", "body": map[string]any{"id": noteID}})
+
+	resp, out := post(t, ts, "/api/notes/polls/vote", map[string]any{
+		"i": bobToken, "noteId": noteID, "choice": 1,
+	})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("vote: status %d body %v", resp.StatusCode, out)
+	}
+
+	deadline := time.Now().Add(wsWait)
+	for {
+		m, ok := readWithTimeout(t, conn, time.Until(deadline))
+		if !ok {
+			t.Fatal("no pollVoted event for the subNote subscription")
+		}
+		if m.Type != "noteUpdated" {
+			continue
+		}
+		var body map[string]any
+		_ = json.Unmarshal(m.Body, &body)
+		if body["id"] != noteID || body["type"] != "pollVoted" {
+			continue
+		}
+		payload, _ := body["body"].(map[string]any)
+		if payload["choice"] != float64(1) {
+			t.Errorf("choice = %v, want 1", payload["choice"])
+		}
+		if _, ok := payload["userId"].(string); !ok {
+			t.Errorf("pollVoted has no userId: %v", payload)
+		}
+		return
+	}
+}
+
 // TestStreamingSubNoteVisibility checks that a private note's updates do
 // not reach an unentitled subscriber.
 func TestStreamingSubNoteVisibility(t *testing.T) {

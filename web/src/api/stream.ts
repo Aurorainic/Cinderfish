@@ -47,7 +47,7 @@ export interface ChannelEventMap {
 
 export interface NoteUpdatedEvent {
 	id: string;
-	type: "reacted" | "unreacted" | "deleted";
+	type: "reacted" | "unreacted" | "deleted" | "pollVoted";
 	body: unknown;
 }
 

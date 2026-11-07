@@ -111,6 +111,18 @@ func (s *Server) publishNoteReaction(n *note.Note, typ, emoji, userID string) {
 		s.notes.VisibleUserIDs(context.Background(), n.ID), typ, body)
 }
 
+// publishNotePollVoted emits "pollVoted" on the note's stream, which is how
+// Misskey lets everyone looking at a poll see the new counts. The body carries
+// the choice index and the voter, matching GlobalEventService.
+func (s *Server) publishNotePollVoted(n *note.Note, userID string, choice int) {
+	if s.streamBus == nil {
+		return
+	}
+	s.streamBus.PublishNoteStream(n.ID, n.UserID, n.Visibility,
+		s.notes.VisibleUserIDs(context.Background(), n.ID), "pollVoted",
+		map[string]any{"choice": choice, "userId": userID})
+}
+
 // publishNoteDeleted emits the deletion event on a note's stream.
 func (s *Server) publishNoteDeleted(n *note.Note) {
 	if s.streamBus == nil {

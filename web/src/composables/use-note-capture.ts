@@ -6,10 +6,10 @@ import { api } from "../api/client";
 /**
  * Port of Firefish `scripts/use-note-capture.ts`.
  *
- * Cinderfish's `subNote` stream emits `reacted`, `unreacted` and `deleted`
- * (see docs/research/api-contract/streaming.md). Firefish also handled
- * `replied`, `updated` and `pollVoted`; the backend does not send those, so the
- * switch below only reacts to what actually arrives.
+ * Cinderfish's `subNote` stream emits `reacted`, `unreacted`, `deleted` and
+ * (since wave 172) `pollVoted` (see docs/research/api-contract/streaming.md).
+ * Firefish also handled `replied` and `updated`; the backend does not send
+ * those, so the switch below only reacts to what actually arrives.
  */
 
 export const deletedNoteIds = new Map<string, boolean>();
@@ -92,6 +92,20 @@ export function useNoteCapture(options: UseNoteCaptureOptions): { close: () => v
 			else reactions[body.reaction] = next;
 			note.value.reactions = reactions;
 			note.value.reactionCount = Math.max(0, note.value.reactionCount - 1);
+			return;
+		}
+
+		if (event.type === "pollVoted") {
+			// Everyone looking at the poll sees the new counts; the voter's own
+			// client already applied its vote, so the duplicate is corrected
+			// only when the numbers would otherwise drift (a second vote on a
+			// multiple-choice poll arrives here as well).
+			const body = event.body as { choice?: unknown };
+			const choice = typeof body.choice === "number" ? body.choice : -1;
+			const poll = note.value.poll;
+			if (poll == null || choice < 0 || poll.choices[choice] == null) return;
+			poll.choices[choice].votes += 1;
+			poll.votesCount += 1;
 			return;
 		}
 
