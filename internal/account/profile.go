@@ -18,6 +18,7 @@ type Profile struct {
 	Name        string
 	Description string
 	AvatarURL   string
+	BannerURL   string
 	// FollowersVisibility / FollowingVisibility are Misskey's
 	// "public" | "followers" | "private" switches. An empty value reads as
 	// "public", which is the column default.
@@ -76,6 +77,31 @@ type ProfileField struct {
 // an existing drive file.
 var ErrNoSuchAvatarFile = errors.New("account: no such avatar file")
 
+// ErrNoSuchBannerFile is the banner counterpart.
+var ErrNoSuchBannerFile = errors.New("account: no such banner file")
+
+// resolveImageURL turns an empty id into NULL (clearing the column) and a file
+// id into the drive URL. label only shapes the error message.
+func (s *Service) resolveImageURL(ctx context.Context, fileID, label string) (any, error) {
+	if fileID == "" {
+		return nil, nil
+	}
+	if s.drive == nil {
+		return nil, fmt.Errorf("account: no drive service attached to resolve %s", label)
+	}
+	f, err := s.drive.Get(ctx, fileID)
+	if err != nil {
+		if errors.Is(err, media.ErrNotFound) {
+			if label == "banner" {
+				return nil, ErrNoSuchBannerFile
+			}
+			return nil, ErrNoSuchAvatarFile
+		}
+		return nil, fmt.Errorf("account: resolve %s: %w", label, err)
+	}
+	return f.URL, nil
+}
+
 // AttachDrive wires the drive service used to resolve avatar files.
 // UpdateProfile reports an error when an avatar is set without one.
 func (s *Service) AttachDrive(drive *media.DriveService) {
@@ -85,15 +111,15 @@ func (s *Service) AttachDrive(drive *media.DriveService) {
 // GetProfile loads a user's profile. A user without a profile row reads
 // as the zero value instead of failing.
 func (s *Service) GetProfile(ctx context.Context, userID string) (*Profile, error) {
-	var name, description, avatarURL, followersVis, followingVis, email *string
+	var name, description, avatarURL, bannerURL, followersVis, followingVis, email *string
 	var settings []byte
 	var twoFactorEnabled, usePasswordLessLogin, emailVerified, isLocked bool
 	err := s.pool.QueryRow(ctx, `
-SELECT name, description, avatar_url, followers_visibility, following_visibility, settings,
+SELECT name, description, avatar_url, banner_url, followers_visibility, following_visibility, settings,
        two_factor_enabled, use_password_less_login, email, email_verified,
        COALESCE((SELECT is_locked FROM users WHERE id = $1), FALSE)
 FROM user_profiles WHERE user_id = $1
-`, userID).Scan(&name, &description, &avatarURL, &followersVis, &followingVis, &settings,
+`, userID).Scan(&name, &description, &avatarURL, &bannerURL, &followersVis, &followingVis, &settings,
 		&twoFactorEnabled, &usePasswordLessLogin, &email, &emailVerified, &isLocked)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return &Profile{}, nil
@@ -133,6 +159,7 @@ FROM user_profiles WHERE user_id = $1
 		Name:                     derefString(name),
 		Description:              derefString(description),
 		AvatarURL:                derefString(avatarURL),
+		BannerURL:                derefString(bannerURL),
 		FollowersVisibility:      derefString(followersVis),
 		FollowingVisibility:      derefString(followingVis),
 		MutedInstances:           stored.MutedInstances,
@@ -166,7 +193,7 @@ FROM user_profiles WHERE user_id = $1
 // resolved through the attached drive service: an empty string clears
 // avatar_url, a non-empty id must name an existing drive file whose URL
 // becomes avatar_url.
-func (s *Service) UpdateProfile(ctx context.Context, userID string, name, description, avatarFileID *string) error {
+func (s *Service) UpdateProfile(ctx context.Context, userID string, name, description, avatarFileID, bannerFileID *string) error {
 	var sets []string
 	var args []any
 
@@ -179,23 +206,20 @@ func (s *Service) UpdateProfile(ctx context.Context, userID string, name, descri
 		sets = append(sets, fmt.Sprintf("description = $%d", len(args)))
 	}
 	if avatarFileID != nil {
-		if *avatarFileID == "" {
-			args = append(args, nil)
-			sets = append(sets, fmt.Sprintf("avatar_url = $%d", len(args)))
-		} else {
-			if s.drive == nil {
-				return fmt.Errorf("account: no drive service attached to resolve avatar")
-			}
-			f, err := s.drive.Get(ctx, *avatarFileID)
-			if err != nil {
-				if errors.Is(err, media.ErrNotFound) {
-					return ErrNoSuchAvatarFile
-				}
-				return fmt.Errorf("account: resolve avatar: %w", err)
-			}
-			args = append(args, f.URL)
-			sets = append(sets, fmt.Sprintf("avatar_url = $%d", len(args)))
+		url, err := s.resolveImageURL(ctx, *avatarFileID, "avatar")
+		if err != nil {
+			return err
 		}
+		args = append(args, url)
+		sets = append(sets, fmt.Sprintf("avatar_url = $%d", len(args)))
+	}
+	if bannerFileID != nil {
+		url, err := s.resolveImageURL(ctx, *bannerFileID, "banner")
+		if err != nil {
+			return err
+		}
+		args = append(args, url)
+		sets = append(sets, fmt.Sprintf("banner_url = $%d", len(args)))
 	}
 
 	if len(sets) == 0 {

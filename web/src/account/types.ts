@@ -47,6 +47,7 @@ export interface ProfileUpdateRequest {
 	name?: string | null;
 	description?: string | null;
 	avatarId?: string | null;
+	bannerId?: string | null;
 	followersVisibility?: UserVisibility | null;
 	followingVisibility?: UserVisibility | null;
 	location?: string | null;

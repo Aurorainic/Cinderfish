@@ -12,7 +12,7 @@
 					/>
 					<div :key="user.id" class="card _block">
 						<div class="banner-container">
-							<div class="banner"></div>
+							<div class="banner" :style="bannerStyle"></div>
 							<div class="fade"></div>
 							<div class="title">
 								<div class="nameColumn">
@@ -204,7 +204,7 @@
 
 <script lang="ts" setup>
 // Degradations versus Firefish home.vue (contract §2 and the API contract):
-//   * no banner image and no scroll parallax: `bannerUrl` is always null;
+//   * no scroll parallax (the banner is a static background);
 //   * no location / birthday rows and no "their local time": both fields are
 //     always null and `city-timezones` is not a dependency;
 //   * no `patrons` badge: the endpoint does not exist;
@@ -237,6 +237,16 @@ const props = defineProps<{
 const emit = defineEmits<{
 	refresh: [];
 }>();
+
+const bannerStyle = computed(() =>
+	props.user.bannerUrl == null || props.user.bannerUrl === ""
+		? undefined
+		: {
+				backgroundImage: `url(${props.user.bannerUrl})`,
+				backgroundSize: "cover",
+				backgroundPosition: "center",
+			},
+);
 
 const rootEl = ref<HTMLElement | null>(null);
 const narrow = ref(window.innerWidth < 1000);

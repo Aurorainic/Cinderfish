@@ -72,7 +72,7 @@ func TestUpdateProfileTextFields(t *testing.T) {
 		t.Fatalf("Register: %v", err)
 	}
 
-	if err := svc.UpdateProfile(ctx, user.ID, strPtr("Tuna"), strPtr("self intro"), nil); err != nil {
+	if err := svc.UpdateProfile(ctx, user.ID, strPtr("Tuna"), strPtr("self intro"), nil, nil); err != nil {
 		t.Fatalf("UpdateProfile: %v", err)
 	}
 	prof, err := svc.GetProfile(ctx, user.ID)
@@ -84,7 +84,7 @@ func TestUpdateProfileTextFields(t *testing.T) {
 	}
 
 	// A nil field is left untouched; an empty string clears the field.
-	if err := svc.UpdateProfile(ctx, user.ID, strPtr("Maguro"), nil, nil); err != nil {
+	if err := svc.UpdateProfile(ctx, user.ID, strPtr("Maguro"), nil, nil, nil); err != nil {
 		t.Fatalf("UpdateProfile partial: %v", err)
 	}
 	prof, _ = svc.GetProfile(ctx, user.ID)
@@ -92,7 +92,7 @@ func TestUpdateProfileTextFields(t *testing.T) {
 		t.Errorf("partial update = %+v, want name changed, description kept", prof)
 	}
 
-	if err := svc.UpdateProfile(ctx, user.ID, strPtr(""), strPtr(""), nil); err != nil {
+	if err := svc.UpdateProfile(ctx, user.ID, strPtr(""), strPtr(""), nil, nil); err != nil {
 		t.Fatalf("UpdateProfile clear: %v", err)
 	}
 	prof, _ = svc.GetProfile(ctx, user.ID)
@@ -122,7 +122,7 @@ func TestUpdateProfileAvatar(t *testing.T) {
 		t.Fatalf("drive.Save: %v", err)
 	}
 
-	if err := svc.UpdateProfile(ctx, user.ID, nil, nil, strPtr(file.ID)); err != nil {
+	if err := svc.UpdateProfile(ctx, user.ID, nil, nil, strPtr(file.ID), nil); err != nil {
 		t.Fatalf("UpdateProfile avatar: %v", err)
 	}
 	prof, _ := svc.GetProfile(ctx, user.ID)
@@ -131,7 +131,7 @@ func TestUpdateProfileAvatar(t *testing.T) {
 	}
 
 	// An empty avatarId clears the URL.
-	if err := svc.UpdateProfile(ctx, user.ID, nil, nil, strPtr("")); err != nil {
+	if err := svc.UpdateProfile(ctx, user.ID, nil, nil, strPtr(""), nil); err != nil {
 		t.Fatalf("UpdateProfile clear avatar: %v", err)
 	}
 	prof, _ = svc.GetProfile(ctx, user.ID)
@@ -140,7 +140,7 @@ func TestUpdateProfileAvatar(t *testing.T) {
 	}
 
 	// Re-setting the avatar keeps the other fields intact.
-	if err := svc.UpdateProfile(ctx, user.ID, strPtr("Tuna"), nil, strPtr(file.ID)); err != nil {
+	if err := svc.UpdateProfile(ctx, user.ID, strPtr("Tuna"), nil, strPtr(file.ID), nil); err != nil {
 		t.Fatalf("UpdateProfile combined: %v", err)
 	}
 	prof, _ = svc.GetProfile(ctx, user.ID)
@@ -149,7 +149,7 @@ func TestUpdateProfileAvatar(t *testing.T) {
 	}
 
 	// An unknown file id is an error.
-	if err := svc.UpdateProfile(ctx, user.ID, nil, nil, strPtr("nosuchfile")); err == nil {
+	if err := svc.UpdateProfile(ctx, user.ID, nil, nil, strPtr("nosuchfile"), nil); err == nil {
 		t.Error("UpdateProfile with a missing avatar file must fail")
 	}
 

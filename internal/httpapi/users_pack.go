@@ -108,7 +108,11 @@ func packUserDetailed(u *account.User, createdAt time.Time, isMe bool, prof *acc
 	packed["createdAt"] = createdAt.UTC().Format(time.RFC3339Nano)
 	packed["updatedAt"] = nil
 	packed["lastFetchedAt"] = nil
-	packed["bannerUrl"] = nil
+	if prof != nil && prof.BannerURL != "" {
+		packed["bannerUrl"] = prof.BannerURL
+	} else {
+		packed["bannerUrl"] = nil
+	}
 	packed["bannerBlurhash"] = nil
 	packed["isLocked"] = prof != nil && prof.IsLocked
 	packed["isModerator"] = u.IsAdmin

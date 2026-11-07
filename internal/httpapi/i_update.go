@@ -70,6 +70,7 @@ func (s *Server) handleIUpdate(w http.ResponseWriter, r *http.Request) {
 		Name        nullableField `json:"name"`
 		Description nullableField `json:"description"`
 		AvatarID    nullableField `json:"avatarId"`
+		BannerID    nullableField `json:"bannerId"`
 		// Misskey's users/update privacy switches.
 		FollowersVisibility nullableField `json:"followersVisibility"`
 		FollowingVisibility nullableField `json:"followingVisibility"`
@@ -193,7 +194,13 @@ func (s *Server) handleIUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if avatarID := body.AvatarID.asUpdatePointer(); avatarID != nil && *avatarID != "" {
-		if err := s.checkOwnAvatarFile(r, info.User.ID, *avatarID); err != nil {
+		if err := s.checkOwnProfileFile(r, info.User.ID, *avatarID); err != nil {
+			writeAPIError(w, err)
+			return
+		}
+	}
+	if bannerID := body.BannerID.asUpdatePointer(); bannerID != nil && *bannerID != "" {
+		if err := s.checkOwnProfileFile(r, info.User.ID, *bannerID); err != nil {
 			writeAPIError(w, err)
 			return
 		}
@@ -218,8 +225,8 @@ func (s *Server) handleIUpdate(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if err := s.accounts.UpdateProfile(r.Context(), info.User.ID, body.Name.asUpdatePointer(), body.Description.asUpdatePointer(), body.AvatarID.asUpdatePointer()); err != nil {
-		if errors.Is(err, media.ErrNotFound) || errors.Is(err, account.ErrNoSuchAvatarFile) {
+	if err := s.accounts.UpdateProfile(r.Context(), info.User.ID, body.Name.asUpdatePointer(), body.Description.asUpdatePointer(), body.AvatarID.asUpdatePointer(), body.BannerID.asUpdatePointer()); err != nil {
+		if errors.Is(err, media.ErrNotFound) || errors.Is(err, account.ErrNoSuchAvatarFile) || errors.Is(err, account.ErrNoSuchBannerFile) {
 			writeAPIError(w, &APIError{
 				Message: "No such file.", Code: "NO_SUCH_FILE",
 				ID: errIDInvalidParam, Kind: "client", Status: http.StatusBadRequest,
@@ -442,9 +449,9 @@ func validFollowVisibility(v string) bool {
 	return false
 }
 
-// checkOwnAvatarFile verifies that the given drive file exists and
-// belongs to the caller before it can become their avatar.
-func (s *Server) checkOwnAvatarFile(r *http.Request, userID, fileID string) *APIError {
+// checkOwnProfileFile verifies that the given drive file exists and belongs to
+// the caller before it can become their avatar or banner.
+func (s *Server) checkOwnProfileFile(r *http.Request, userID, fileID string) *APIError {
 	if s.drive == nil {
 		return &APIError{
 			Message: "Not available.", Code: "INTERNAL_ERROR",

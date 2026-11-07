@@ -6797,3 +6797,42 @@ Firefish 的 `ui/_common_/common.vue` 在 `main` 频道上处理新通知：页�
   - 聚焦笔记卡片后按 `r` → 回复编辑器对话框出现；
   - 关闭后按 `m` → 笔记菜单出现，含「添加到书签 / 置顶 / 复制内容 / 复制链接 / 编辑 / 编辑历史 / 删除」。
   截图 `/tmp/w150-shots/hotkeys.png`（不入库）。
+
+## 12FO. 第一百五十一波：资料横幅（bannerId / bannerUrl）（2026-11-07）
+
+`user_profiles.banner_url` 列一直存在，但 `i/update` 不接受 `bannerId`、`users_pack` 把
+`bannerUrl` 固定为 null、主页横幅是空 div、导航栏也标注「banner 永远为 null」。这一轮补齐整条链路。
+
+### 12FO.1 落地清单
+
+| 层 | 文件 | 内容 |
+|----|------|------|
+| 资料读取 | `internal/account/profile.go` | `Profile.BannerURL`；SELECT/Scan 增加 `banner_url` |
+| 写入 | 同上 | `UpdateProfile(..., bannerFileID *string)`；`resolveImageURL` 统一 avatar/banner 的空值清空与文件解析；新增 `ErrNoSuchBannerFile` |
+| 端点 | `internal/httpapi/i_update.go` | `bannerId` 参数；归属检查复用 `checkOwnProfileFile`；错误映射 `NO_SUCH_FILE` |
+| 打包 | `internal/httpapi/users_pack.go` | `bannerUrl` 来自 `prof.BannerURL` |
+| 设置页 | `web/src/pages/SettingsProfile.vue` | 横幅预览 + 「修改横幅」上传（走 `drive/files/create` 再 `i/update`） |
+| 主页 | `web/src/components/user/UserHome.vue` | 横幅渲染为 `background-image`（cover/center） |
+| 导航栏 | `web/src/components/MkNavbar.vue` | 顶部横幅（与上游相同的绝对定位 + 渐变遮罩） |
+| 类型 | `web/src/account/types.ts` | `ProfileUpdateRequest.bannerId` |
+
+### 12FO.2 有意的限制
+
+- 与 avatar 一致，只保存解析后的 URL；`bannerId` 在 MeDetailed 里仍返回 null（上游返回文件 id，
+  本实现没有保存 id 列）。
+- 没有 `bannerBlurhash`（打包固定 null）。
+- 横幅不支持 NSFW 模糊或裁切位置调整。
+- 上传复用 drive 的 20 MiB 上限与缩略图流程。
+
+### 12FO.3 验证证据
+
+- `go vet ./...`、含数据库的全量 `go test ./...` 全绿；`vue-tsc --noEmit`、`check:port`
+  （hardTotal 0）、`pnpm build` 全绿。
+- `TestIUpdateBanner`：上传 PNG → `i/update {bannerId}` → MeDetailed 与 `users/show` 的
+  `bannerUrl` 等于文件 URL；`bannerId: null` 清空；他人文件 403、缺失文件 400。
+- 无头浏览器：
+  - `/settings/profile` 点击「修改横幅」→「本地上传」→ 选图后预览背景变为 `/media/...`，
+    `users/show.bannerUrl` 同步；
+  - `/@user` 页 `.banner` 的 `background-image` 为该 URL；
+  - 导航栏 `.mvcprjjd .top .banner` 出现，背景图片与渐变遮罩生效。
+  截图 `/tmp/w151-shots/banner.png`、`/tmp/w152-shots/navbar-banner.png`（不入库）。

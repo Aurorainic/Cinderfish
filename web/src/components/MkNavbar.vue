@@ -4,6 +4,11 @@
 	<header class="mvcprjjd sidebar" :class="{ iconOnly, drawer }">
 		<div class="body">
 			<div class="top">
+				<div
+					v-if="me != null && me.bannerUrl != null && me.bannerUrl !== ''"
+					class="banner"
+					:style="{ backgroundImage: `url(${me.bannerUrl})` }"
+				></div>
 				<button
 					class="item _button account"
 					:title="accountLabel"
@@ -112,9 +117,9 @@
 // menu leaves out stay reachable through the "more" menu, as MkLaunchPad does
 // upstream.
 //
-// DEGRADED: `$i.bannerUrl` is always null in Cinderfish (no banner upload), so
-// the header banner is not rendered. MkLaunchPad is replaced by `os.popupMenu`,
-// and the unread indicators come from the counts on `POST /api/i`.
+// The header banner uses `$i.bannerUrl` like upstream; MkLaunchPad is replaced
+// by `os.popupMenu`, and the unread indicators come from the counts on
+// `POST /api/i`.
 import { computed } from "vue";
 import { useRouter } from "vue-router";
 import { popupMenu, type MenuItem } from "@/os";
@@ -406,9 +411,22 @@ function openPost(): void {
 	}
 
 	> .body > .top {
+		position: relative;
+		z-index: 1;
 		padding: 2rem 0;
 
+		> .banner {
+			position: absolute;
+			inset: 0;
+			background-size: cover;
+			background-position: center;
+			mask-image: linear-gradient(to bottom, #000 0%, transparent 100%);
+			-webkit-mask-image: linear-gradient(to bottom, #000 0%, transparent 100%);
+			pointer-events: none;
+		}
+
 		> .account {
+			position: relative;
 			display: block;
 			width: 100%;
 			text-align: center;

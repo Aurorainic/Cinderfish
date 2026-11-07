@@ -26,6 +26,14 @@
 				</CfButton>
 			</div>
 
+			<div class="bannerBlock">
+				<div class="bannerPreview" :style="bannerPreviewStyle" />
+				<CfButton rounded :disabled="bannerSaving" @click="changeBanner">
+					<i class="ph-image ph-bold ph-lg"></i>
+					{{ t("_profile.changeBanner") }}
+				</CfButton>
+			</div>
+
 			<FormInput
 				v-model="name"
 				class="_formBlock"
@@ -157,6 +165,17 @@ const loading = ref(true);
 const loadFailed = ref(false);
 const saving = ref(false);
 const avatarSaving = ref(false);
+const bannerSaving = ref(false);
+
+const bannerPreviewStyle = computed(() =>
+	user.value?.bannerUrl == null || user.value.bannerUrl === ""
+		? undefined
+		: {
+				backgroundImage: `url(${user.value.bannerUrl})`,
+				backgroundSize: "cover",
+				backgroundPosition: "center",
+			},
+);
 const saveFailed = ref(false);
 const saveErrorText = ref("");
 
@@ -240,6 +259,24 @@ async function save(): Promise<void> {
 	}
 }
 
+async function changeBanner(event: MouseEvent): Promise<void> {
+	if (bannerSaving.value) return;
+	const file = await selectFile({ label: t("banner"), src: event });
+	if (file == null) return;
+
+	bannerSaving.value = true;
+	saveFailed.value = false;
+	try {
+		await updateProfile({ bannerId: file.id });
+		success();
+	} catch (error) {
+		saveFailed.value = true;
+		saveErrorText.value = errorText(error);
+	} finally {
+		bannerSaving.value = false;
+	}
+}
+
 async function changeAvatar(event: MouseEvent): Promise<void> {
 	if (avatarSaving.value) return;
 	const file = await selectFile({ label: t("avatar"), src: event });
@@ -278,6 +315,23 @@ definePageMetadata({
 	background: var(--panel);
 	border: solid 1px var(--divider);
 	border-radius: var(--radius);
+
+	.bannerBlock {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		margin-block-start: 12px;
+
+		> .bannerPreview {
+			flex: 1;
+			block-size: 80px;
+			border-radius: var(--radius);
+			background: linear-gradient(120deg, var(--accentedBg), var(--buttonBg));
+			background-size: cover;
+			background-position: center;
+			box-shadow: inset 0 0 0 0.5px var(--divider);
+		}
+	}
 
 	> .avatar {
 		inline-size: 72px;
