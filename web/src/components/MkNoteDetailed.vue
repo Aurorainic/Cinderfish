@@ -262,7 +262,12 @@ function reply(_viaKeyboard = false): void {
 	pleaseLogin();
 	// Firefish passes `animation: !viaKeyboard` too; the dialog owns its own
 	// transition in this port.
-	void os.post({ reply: note.value as unknown as NoteDetailed });
+	// The reply list is fetched once, so a posted reply refetches it and shows
+	// the tab it landed in; without this the new note is invisible until reload.
+	void os.post({ reply: note.value as unknown as NoteDetailed }).then(() => {
+		tab.value = "replies";
+		void loadChildren();
+	});
 }
 
 function react(_viaKeyboard = false): void {

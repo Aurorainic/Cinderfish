@@ -32,7 +32,11 @@
 								{{ `${t("loadMore")} (${t("newer")})` }}
 							</CfButton>
 							<div class="note _gap">
-								<MkNoteDetailed :key="appearNote.id" :note="appearNote" class="note" />
+								<MkNoteDetailed
+									:key="`${appearNote.id}:${repliesRefresh}`"
+									:note="appearNote"
+									class="note"
+								/>
 							</div>
 							<!-- Firefish has no reply entry on this page (only the keymap
 							     shortcut and MkNote's footer button); the composer is
@@ -106,6 +110,7 @@ const hasPrev = ref(false);
 const hasNext = ref(false);
 const showPrev = ref(false);
 const showNext = ref(false);
+const repliesRefresh = ref(0);
 const error = ref<unknown>(null);
 const animation = computed(
 	() => defaultStore.reactiveState.animation.value,
@@ -183,13 +188,15 @@ watch(noteId, fetchNote, { immediate: true });
 /**
  * Open the composer as a reply to the note being read. Mirrors MkNote.reply:
  * `pleaseLogin` throws for visitors, so the composer is only opened signed in.
- * The posted reply is not spliced in here — MkNoteDetailed owns its reply list,
- * and Streaming delivers the new note to it.
+ * MkNoteDetailed owns the reply list and does not watch the note, so a posted
+ * reply bumps `repliesRefresh`, which remounts it and refetches `notes/children`.
  */
 function reply(): void {
 	if (appearNote.value == null) return;
 	pleaseLogin();
-	void post({ reply: appearNote.value });
+	void post({ reply: appearNote.value }).then(() => {
+		repliesRefresh.value += 1;
+	});
 }
 
 const headerActions = computed<

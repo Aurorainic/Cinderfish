@@ -57,7 +57,7 @@
 // records the mark, so the list and `hasUnreadAnnouncement` stay in sync.
 import { onMounted, ref } from "vue";
 import { ApiError, api, resolveMediaUrl } from "@/api/client";
-import { updateMe } from "@/account";
+import { signedIn, updateMe } from "@/account";
 import type { Announcement } from "@/api/types";
 import MkPageHeader from "@/components/global/MkPageHeader.vue";
 import MkSpacer from "@/components/global/MkSpacer.vue";
@@ -121,6 +121,9 @@ async function loadMore(): Promise<void> {
 }
 
 async function markRead(items: Announcement[]): Promise<void> {
+	// i/read-announcement needs a credential; a visitor sees the list but
+	// nothing is marked, and the unread badge is not theirs to clear anyway.
+	if (!signedIn.value) return;
 	for (const item of items) {
 		if (item.isRead) continue;
 		try {

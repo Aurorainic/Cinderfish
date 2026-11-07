@@ -79,6 +79,7 @@
 import { onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { api } from "@/api/client";
+import { signedIn } from "@/account";
 import type { FederationInstance } from "@/api/types";
 import { definePageMetadata } from "@/scripts/page-metadata";
 import CfButton from "@/components/ui/CfButton.vue";
@@ -113,9 +114,15 @@ async function load(): Promise<void> {
 	const target = normalize(host.value);
 	if (target === "") return;
 	lastHost.value = target;
-	loading.value = true;
 	errorText.value = null;
 	instance.value = null;
+	// federation/show-instance requires a credential (Misskey's endpoint is
+	// `read:account`), so a visitor gets an explanation instead of a 401.
+	if (!signedIn.value) {
+		errorText.value = "登录后可查询实例信息。";
+		return;
+	}
+	loading.value = true;
 	try {
 		instance.value = await api("federation/show-instance", { host: target });
 		if (target !== String(route.params.host ?? "")) {

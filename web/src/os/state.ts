@@ -63,9 +63,18 @@ export function popup(
 		id,
 		component,
 		props,
+		// A caller may register a handler for the dispose event itself; it has to
+		// run as well, otherwise `post()` (which resolves on `closed`) would never
+		// settle. The spread order used to drop that handler.
 		events: disposeEvent == null
 			? events
-			: { ...events, [disposeEvent]: dispose },
+			: {
+					...events,
+					[disposeEvent]: (...args: never[]) => {
+						events[disposeEvent]?.(...args);
+						dispose();
+					},
+				},
 	};
 
 	popups.value = [...popups.value, entry];
