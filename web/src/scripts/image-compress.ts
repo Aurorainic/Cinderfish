@@ -1,7 +1,7 @@
-// Port of firefish@b425f61:packages/client/src/scripts/upload.ts's compression
-// step (AGPL-3.0-only). Upstream calls `browser-image-resizer`; Cinderfish has
-// no such dependency, so the same pipeline (2048 px box, quality 0.85) runs on
-// a canvas.
+// Ported from firefish@b425f61:packages/client/src/scripts/upload.ts (AGPL-3.0-only)
+// — the compression step only. Upstream calls `browser-image-resizer`;
+// Cinderfish has no such dependency, so the same pipeline (2048 px box, quality
+// 0.85) runs on a canvas.
 //
 // Differences from upstream:
 //   * only JPEG and WebP are re-encoded; upstream also converts SVG to PNG,
