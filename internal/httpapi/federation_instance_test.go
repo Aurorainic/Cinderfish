@@ -13,12 +13,13 @@ func TestFederationShowInstance(t *testing.T) {
 	f := newFederationServer(t, "public")
 	token, _ := f.registerUser(t, "alice")
 
-	// The local host is the configured host, answered with live counts.
-	resp, local := postWithToken(t, f.ts, "/api/federation/show-instance", token, map[string]any{"host": "127.0.0.1"})
+	// The local host is the public domain, answered with live counts. The
+	// listen address in cfg.Host must not be treated as the instance's host.
+	resp, local := postWithToken(t, f.ts, "/api/federation/show-instance", token, map[string]any{"host": "fish.example"})
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("local instance = %d %v", resp.StatusCode, local)
 	}
-	if local["host"] != "127.0.0.1" || local["softwareName"] != "cinderfish" {
+	if local["host"] != "fish.example" || local["softwareName"] != "cinderfish" {
 		t.Errorf("local instance = %v", local)
 	}
 	if local["usersCount"] != float64(1) {

@@ -4,10 +4,12 @@ import (
 	"context"
 	"net/http"
 
+	"github.com/Aurorainic/cinderfish/internal/buildinfo"
 	"github.com/Aurorainic/cinderfish/internal/federation"
+	"github.com/Aurorainic/cinderfish/internal/media"
+	"github.com/Aurorainic/cinderfish/internal/note"
 )
 
-const softwareVersion = "0.1.1"
 const repositoryURL = "https://github.com/Aurorainic/Cinderfish"
 
 // themeColorOrDefault keeps the historical default when no colour is set.
@@ -38,7 +40,7 @@ func (s *Server) handleMeta(w http.ResponseWriter, r *http.Request) {
 	meta := map[string]any{
 		"maintainerName":               settings.MaintainerName,
 		"maintainerEmail":              settings.MaintainerEmail,
-		"version":                      softwareVersion,
+		"version":                      buildinfo.Version,
 		"providesTarball":              false,
 		"name":                         settings.Name,
 		"shortName":                    "cinderfish",
@@ -66,7 +68,7 @@ func (s *Server) handleMeta(w http.ResponseWriter, r *http.Request) {
 		"googleAnalyticsMeasurementId": "",
 		"swPublickey":                  "",
 		"themeColor":                   themeColorOrDefault(settings.ThemeColor),
-		"mascotImageUrl":               "/assets/ai.png",
+		"mascotImageUrl":               "",
 		"bannerUrl":                    settings.BannerURL,
 		"infoImageUrl":                 "",
 		"serverErrorImageUrl":          "",
@@ -74,7 +76,7 @@ func (s *Server) handleMeta(w http.ResponseWriter, r *http.Request) {
 		"iconUrl":                      settings.IconURL,
 		"backgroundImageUrl":           "",
 		"logoImageUrl":                 "",
-		"maxNoteTextLength":            3000,
+		"maxNoteTextLength":            note.MaxTextLength,
 		"defaultLightTheme":            nil,
 		"defaultDarkTheme":             nil,
 		"clientOptions":                map[string]any{},
@@ -88,9 +90,11 @@ func (s *Server) handleMeta(w http.ResponseWriter, r *http.Request) {
 		"policies":                     defaultPolicies(),
 		"sentryForFrontend":            nil,
 		"mediaProxy":                   "",
-		"enableUrlPreview":             true,
-		"noteSearchableScope":          "global",
-		"maxFileSize":                  20 * 1024 * 1024,
+		// No URL preview endpoint exists; claiming one would make clients
+		// request an API this instance does not answer.
+		"enableUrlPreview":    false,
+		"noteSearchableScope": "global",
+		"maxFileSize":         media.DefaultMaxFileSize,
 		// Misskey exposes the instance's federation mode to clients.
 		"federation": mode.MisskeyMode(),
 	}
@@ -109,9 +113,11 @@ func (s *Server) handleMeta(w http.ResponseWriter, r *http.Request) {
 	meta["requireSetup"] = false
 	meta["proxyAccountName"] = ""
 	meta["features"] = map[string]bool{
-		"localTimeline":          true,
-		"globalTimeline":         mode != federation.ModeNone,
-		"registration":           s.cfg.RegistrationMode == "open",
+		"localTimeline":  true,
+		"globalTimeline": mode != federation.ModeNone,
+		// Registration mode is runtime state (admin/update-meta writes it), so
+		// this must read the same value as disableRegistration above.
+		"registration":           settings.RegistrationMode == "open",
 		"emailRequiredForSignup": false,
 		"hcaptcha":               false,
 		"recaptcha":              false,

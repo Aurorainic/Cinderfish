@@ -34,6 +34,21 @@ ON CONFLICT (key) DO NOTHING
 		return fmt.Errorf("federation: seed mode: %w", err)
 	}
 
+	// Seed the allowlist once, on the start that creates the marker. Re-adding
+	// the configured hosts on every start would resurrect a host the
+	// administrator removed through the API, which the table is supposed to
+	// outlive.
+	tag, err := s.pool.Exec(ctx, `
+INSERT INTO instance_meta (key, value) VALUES ('federationAllowlistSeeded', to_jsonb(true))
+ON CONFLICT (key) DO NOTHING
+	`)
+	if err != nil {
+		return fmt.Errorf("federation: seed allowlist marker: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return nil
+	}
+
 	for _, host := range s.cfg.Federation.AllowlistHosts {
 		host = strings.ToLower(strings.TrimSpace(host))
 		if host == "" {

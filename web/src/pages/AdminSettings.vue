@@ -126,6 +126,7 @@
 import { computed, onMounted, ref } from "vue";
 import { ApiError, api } from "@/api/client";
 import type { AdminInstanceMeta } from "@/api/types";
+import { updateInstance } from "@/instance";
 import { isAdmin } from "@/account";
 import MkPageHeader from "@/components/global/MkPageHeader.vue";
 import MkSpacer from "@/components/global/MkSpacer.vue";
@@ -230,6 +231,9 @@ async function save(): Promise<void> {
 				.filter((line) => line !== ""),
 		});
 		apply(updated);
+		// The shared instance object feeds the header, the welcome page and the
+		// about page; refresh it so the change is visible without a reload.
+		void updateInstance(true);
 		saved.value = true;
 	} catch (cause) {
 		error.value = errorText(cause);

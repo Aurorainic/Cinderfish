@@ -272,14 +272,14 @@
 
 | 字段 | 类型 | 实际值 / 说明 |
 |------|------|----------------|
-| `maintainerName` | string | 恒 `""` |
-| `maintainerEmail` | string | 恒 `""` |
-| `version` | string | 恒 `"0.1.0"`（与 NodeInfo 的 `software.version` 不一致，见缺口） |
+| `maintainerName` | string | 运行时 `maintainerName`，未设置为 `""` |
+| `maintainerEmail` | string | 运行时 `maintainerEmail`，未设置为 `""` |
+| `version` | string | `buildinfo.Version`（当前 `"0.1.1"`），与 NodeInfo 的 `software.version`、User-Agent 同源 |
 | `providesTarball` | bool | 恒 `false` |
-| `name` | string | 恒 `"Cinderfish"` |
+| `name` | string | 运行时 `instanceName`，未设置为 `"Cinderfish"` |
 | `shortName` | string | 恒 `"cinderfish"` |
 | `uri` | string | `"https://" + cfg.Domain`（**恒为 https**，即使 domain 是 localhost） |
-| `description` | string | 恒 `""` |
+| `description` | string | 运行时 `instanceDescription`，未设置为 `""` |
 | `langs` | string[] | 恒 `["en"]` |
 | `tosUrl` | null | 恒 `null` |
 | `repositoryUrl` | string | 恒 `""` |
@@ -302,7 +302,7 @@
 | `googleAnalyticsMeasurementId` | string | 恒 `""` |
 | `swPublickey` | string | 恒 `""` |
 | `themeColor` | string | 运行时 `themeColor`，未设置为 `"#86b300"` |
-| `mascotImageUrl` | string | 恒 `"/assets/ai.png"` |
+| `mascotImageUrl` | string | 恒 `""`（仓库里没有 mascot 资源，不能再指向 404 的 `/assets/ai.png`） |
 | `bannerUrl` | string | 运行时 `bannerUrl`，未设置为 `""` |
 | `infoImageUrl` | string | 恒 `""` |
 | `serverErrorImageUrl` | string | 恒 `""` |
@@ -310,13 +310,12 @@
 | `iconUrl` | string | 运行时 `iconUrl`，未设置为 `""` |
 | `backgroundImageUrl` | string | 恒 `""` |
 | `logoImageUrl` | string | 恒 `""` |
-| `maxNoteTextLength` | number | 恒 `3000` |
+| `maxNoteTextLength` | number | `note.MaxTextLength`（目前 `3000`），与发帖校验同源 |
 | `defaultLightTheme` | null | 恒 `null` |
 | `defaultDarkTheme` | null | 恒 `null` |
 | `clientOptions` | object | 恒 `{}`（Misskey 默认为 `{}`，一致） |
 | `ads` | array | 恒 `[]` |
 | `notesPerOneAd` | number | 恒 `0` |
-| `enableEmail` | bool | 恒 `false` |
 | `enableServiceWorker` | bool | 恒 `false` |
 | `translatorAvailable` | bool | 恒 `false` |
 | `serverRules` | array | 运行时 `serverRules`（迁移 v13 后的实例设置），默认 `[]` |
@@ -325,9 +324,9 @@
 | `policies` | object | 只有 `canUseFederation: true`、`canCreateInstantNote: true` 两个键（`internal/httpapi/meta.go:121`–`126`） |
 | `sentryForFrontend` | null | 恒 `null` |
 | `mediaProxy` | string | 恒 `""` |
-| `enableUrlPreview` | bool | 恒 `true` |
+| `enableUrlPreview` | bool | 恒 `false`（没有 URL preview 端点，不能声明支持） |
 | `noteSearchableScope` | string | 恒 `"global"` |
-| `maxFileSize` | number | 恒 `20971520`（20 MiB） |
+| `maxFileSize` | number | `media.DefaultMaxFileSize`（20 MiB），与上传限制同源 |
 | `federation` | string | 运行时联邦模式：`public` → `"all"`；`allowlist` → `"specified"`；其它 → `"none"`（读 `instance_meta.federationMode`，见上文“联邦开关”） |
 
 `detail: true` 额外字段：
@@ -346,7 +345,7 @@
 |----|----------|
 | `localTimeline` | 恒 `true` |
 | `globalTimeline` | 运行时联邦模式 != `none`（`public` 与 `allowlist` 均为 `true`） |
-| `registration` | `registration_mode == "open"` |
+| `registration` | 运行时 `registrationMode == "open"`，与 `disableRegistration` 同源（2026-11-07 修复：此前读配置文件） |
 | `emailRequiredForSignup` | 恒 `false` |
 | `hcaptcha` | 恒 `false` |
 | `recaptcha` | 恒 `false` |
@@ -363,10 +362,10 @@
 
 1. **`federation` 与 `features.globalTimeline` 读运行时值（2026-11-07 修复）。** 模式来自 `instance_meta.federationMode`，配置文件只在启动时播种；`meta` 与 AP 路由现在看同一个值，管理员通过 `POST /api/admin/federation/mode` 切换后，匿名访客的首页下一个请求即更新。数据库不可用时回退到配置值。
 2. **`policies` 只有 2 个键。** Misskey 的 `DEFAULT_POLICIES` 有 40 多个（`gtlAvailable`、`ltlAvailable`、`canPublicNote`、`pinLimit`、`driveCapacityMb`、`maxFileSizeMb`、`uploadableFileTypes` 等，见 `packages/backend/src/core/RoleService.ts:78`–`124`）。Firefish 客户端若读 `policies.canPublicNote` 之类会拿到 `undefined`，需要前端兜底默认值。
-3. **`version` 是 `"0.1.0"`，NodeInfo 的 `software.version` 是 `"0.0.1"`**，两处写死且不同。
+3. ~~`version` 两处写死且不同~~（2026-11-07 修复：`buildinfo.Version` 统一供给 `meta.version`、NodeInfo 与 User-Agent）。
 4. **`uri` 恒为 `https://`**，而 `baseURL()`（AP 用）在 localhost 下会降级成 `http://`。本地开发时 `meta.uri` 与 actor URI 的 scheme 不同。
 5. **`cacheRemoteFiles: true` 与实际行为矛盾**：远端媒体不缓存也不代理（`docs/HANDOVER.md` §12.4）。
-6. 站点名、描述、maintainer、主题色全部写死，没有 `admin/meta/update` 端点。
+6. 站点名、描述、maintainer、主题色、图标、banner、serverRules、hiddenTags 由 `POST /api/admin/update-meta` 写入 `instance_meta`，本端点每次请求读库，与 `admin/meta` 同源（2026-11-07 文档更正：此前误记为全部写死）。域名、媒体后端、SMTP 仍来自 `config.toml`，改动需要重启。
 
 ---
 
@@ -579,8 +578,8 @@ base URL 直接字符串拼接进 XML，没有做 XML 转义；因为值来自�
 | `usage.users.total` | number | `SELECT count(*) FROM users WHERE host IS NULL`（含停用账户） |
 | `usage.localPosts` | number | `SELECT count(*) FROM notes WHERE user_host IS NULL AND deleted_at IS NULL`（**含所有可见性**） |
 | `usage.localComments` | number | 恒 `0` |
-| `metadata.maxNoteTextLength` | number | 恒 `3000` |
-| `metadata.disableRegistration` | bool | `registration_mode != "open"` |
+| `metadata.maxNoteTextLength` | number | `note.MaxTextLength`（目前 `3000`） |
+| `metadata.disableRegistration` | bool | 运行时 `registrationMode != "open"` |
 
 `software` 对象只有 `name` 与 `version`；`metadata` 只有 `maxNoteTextLength` 与 `disableRegistration`。
 

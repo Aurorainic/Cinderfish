@@ -61,10 +61,10 @@ func (s *Server) handleFederationShowInstance(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	localHost := normalizeHost(s.cfg.Host)
-	if localHost == "" {
-		localHost = "localhost"
-	}
+	// The public hostname is the domain, not cfg.Host: that field is the
+	// listen address (usually 127.0.0.1), so comparing against it never
+	// recognises the instance's own domain.
+	localHost := normalizeHost(s.cfg.Domain)
 	if host == localHost {
 		settings := s.liveInstanceSettings(r.Context())
 		usersCount, _ := s.accounts.CountUsers(r.Context())

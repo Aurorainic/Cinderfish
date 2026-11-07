@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/Aurorainic/cinderfish/internal/buildinfo"
 	"github.com/Aurorainic/cinderfish/internal/config"
 )
 
@@ -56,7 +57,7 @@ func TestMetaDetailed(t *testing.T) {
 	if m["federation"] != "all" {
 		t.Errorf("meta.federation = %v, want all for public mode", m["federation"])
 	}
-	if m["version"] != softwareVersion || m["repositoryUrl"] != repositoryURL {
+	if m["version"] != buildinfo.Version || m["repositoryUrl"] != repositoryURL {
 		t.Errorf("meta version/repository = %v/%v", m["version"], m["repositoryUrl"])
 	}
 

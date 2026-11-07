@@ -56,7 +56,9 @@ func (s *Server) handleI2FARegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	issuer := s.cfg.Host
+	// The issuer is what the user sees in their authenticator app, so it has
+	// to be the public domain rather than the listen address in cfg.Host.
+	issuer := s.cfg.Domain
 	if issuer == "" {
 		issuer = "localhost"
 	}

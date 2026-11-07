@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/Aurorainic/cinderfish/internal/account"
+	"github.com/Aurorainic/cinderfish/internal/buildinfo"
 	"github.com/Aurorainic/cinderfish/internal/federation"
 	"github.com/Aurorainic/cinderfish/internal/note"
 )
@@ -232,7 +233,7 @@ func (s *Server) serveNodeInfo(w http.ResponseWriter, r *http.Request, version s
 
 	doc := map[string]any{
 		"version":           version,
-		"software":          map[string]any{"name": "cinderfish", "version": softwareVersion},
+		"software":          map[string]any{"name": "cinderfish", "version": buildinfo.Version},
 		"protocols":         []string{"activitypub"},
 		"services":          map[string]any{"inbound": []string{}, "outbound": []string{}},
 		"openRegistrations": s.liveInstanceSettings(r.Context()).RegistrationMode == "open",
@@ -242,7 +243,7 @@ func (s *Server) serveNodeInfo(w http.ResponseWriter, r *http.Request, version s
 			"localComments": 0,
 		},
 		"metadata": map[string]any{
-			"maxNoteTextLength":   3000,
+			"maxNoteTextLength":   note.MaxTextLength,
 			"disableRegistration": s.liveInstanceSettings(r.Context()).RegistrationMode != "open",
 		},
 	}

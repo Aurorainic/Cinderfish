@@ -14,6 +14,8 @@ import (
 	"path"
 	"strings"
 	"time"
+
+	"github.com/Aurorainic/cinderfish/internal/buildinfo"
 )
 
 // Errors returned by outbound resolution.
@@ -24,7 +26,7 @@ var (
 )
 
 // UserAgent identifies this instance to peers.
-const UserAgent = "Cinderfish/0.1.1"
+const UserAgent = "Cinderfish/" + buildinfo.Version
 
 // Client performs signed outbound requests and remote resolution.
 //

@@ -7,7 +7,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/Aurorainic/cinderfish/internal/config"
 	"github.com/Aurorainic/cinderfish/internal/federation"
+	"github.com/Aurorainic/cinderfish/internal/httpapi"
 )
 
 // getAPIWithToken issues a GET with a bearer token and decodes a JSON object.
@@ -114,6 +116,48 @@ ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
 		if want := tc.mode != "none"; features["globalTimeline"] != want {
 			t.Errorf("features.globalTimeline after %s = %v, want %v", tc.mode, features["globalTimeline"], want)
 		}
+	}
+}
+
+// The configured allowlist hosts are a first-start seed. Re-running the seed
+// must not resurrect a host the administrator removed through the API, which
+// is what the config comment promises.
+func TestFederationConfigSeedsAllowlistOnce(t *testing.T) {
+	pool := testPool(t)
+	cfg := &config.Config{
+		Domain:         "fish.example",
+		FederationMode: "allowlist",
+		Federation:     config.Federation{AllowlistHosts: []string{"Seed.Example"}},
+	}
+	srv := httpapi.NewServerWithDB(cfg, pool)
+	srv.AttachFederation()
+	ctx := context.Background()
+
+	seeded := func() bool {
+		t.Helper()
+		var count int
+		if err := pool.QueryRow(ctx, "SELECT count(*) FROM federation_allowlist WHERE host = 'seed.example'").Scan(&count); err != nil {
+			t.Fatalf("count allowlist: %v", err)
+		}
+		return count == 1
+	}
+
+	if err := srv.ApplyFederationConfig(ctx); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	if !seeded() {
+		t.Fatal("configured host was not seeded on the first start")
+	}
+
+	// The admin removes it; a restart must leave it removed.
+	if _, err := pool.Exec(ctx, "DELETE FROM federation_allowlist WHERE host = 'seed.example'"); err != nil {
+		t.Fatalf("remove seeded host: %v", err)
+	}
+	if err := srv.ApplyFederationConfig(ctx); err != nil {
+		t.Fatalf("reseed: %v", err)
+	}
+	if seeded() {
+		t.Error("removed host was re-seeded on the next start")
 	}
 }
 

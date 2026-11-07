@@ -8,7 +8,7 @@
 			<div class="_formRoot cf-about-firefish">
 				<section class="hero">
 					<div class="name">Cinderfish</div>
-					<div class="version">v{{ softwareVersion }}</div>
+					<div v-if="softwareVersion" class="version">v{{ softwareVersion }}</div>
 					<p class="instance">{{ instance.name || host }}</p>
 				</section>
 
@@ -94,7 +94,9 @@ import { definePageMetadata } from "@/scripts/page-metadata";
 
 defineOptions({ name: "CfPageAboutFirefish" });
 
-const softwareVersion = "0.1.1";
+// The backend reports the version through meta, so the page never carries a
+// second copy that could drift from the release.
+const softwareVersion = computed(() => instance.version);
 const repositoryUrl = computed(() => instance.repositoryUrl || "https://github.com/Aurorainic/Cinderfish");
 
 definePageMetadata({

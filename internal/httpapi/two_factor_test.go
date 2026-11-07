@@ -45,6 +45,11 @@ func TestTwoFactorLifecycle(t *testing.T) {
 	if url, _ := registered["url"].(string); url == "" || registered["qr"] != "" {
 		t.Errorf("register url/qr = %v/%v", registered["url"], registered["qr"])
 	}
+	// The authenticator app shows the issuer, so it must be the public domain
+	// rather than the listen address in cfg.Host.
+	if registered["issuer"] != "fish.example" {
+		t.Errorf("issuer = %v, want fish.example", registered["issuer"])
+	}
 
 	// A wrong code does not enable it.
 	resp, out = postWithToken(t, ts, "/api/i/2fa/done", token, map[string]any{"token": "000000"})

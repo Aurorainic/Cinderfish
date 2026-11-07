@@ -60,6 +60,18 @@ func TestInstanceRegistrationModeIsRuntime(t *testing.T) {
 		t.Errorf("signup in admin mode = %d, want 400", resp.StatusCode)
 	}
 
+	// meta says the same thing in both of its spellings; features.registration
+	// used to read the startup configuration and disagree with
+	// disableRegistration after a runtime switch.
+	_, meta := post(t, ts, "/api/meta", map[string]any{"detail": true})
+	if meta["disableRegistration"] != true {
+		t.Errorf("disableRegistration = %v after switching to admin", meta["disableRegistration"])
+	}
+	features, _ := meta["features"].(map[string]any)
+	if features["registration"] != false {
+		t.Errorf("features.registration = %v after switching to admin", features["registration"])
+	}
+
 	// Invite mode still refuses a signup without a code.
 	postWithToken(t, ts, "/api/admin/update-meta", "admintoken000000", map[string]any{"registrationMode": "invite"})
 	if resp, _ := post(t, ts, "/api/signup", map[string]any{"username": "carol", "password": "password123"}); resp.StatusCode != http.StatusBadRequest {
