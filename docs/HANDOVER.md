@@ -4815,7 +4815,7 @@ Create/Announce/Undo/Update 投递与按作者签名、缩略图生成与删除�
 ### 12CE.4 仍未验证
 
 - 与真实 Misskey / Firefish 实例互投投票（全部证据来自本实现的双实例）。
-- 多选投票在界面上的多勾选交互（只验证了单选）。
+- ~~多选投票在界面上的多勾选交互（只验证了单选）。~~ 2026-11-07 已走查，见 §12FS。
 - `Question` 的入站 `Update` 与远端投票关闭后的展示。
 
 ## 12CF. 第六十七波：follow 日期游标与 hashtags 全排序（2026-11-07）
@@ -6924,3 +6924,28 @@ Firefish 的 `ui/_common_/common.vue` 在 `main` 频道上处理新通知：页�
 - 编辑路径：`notes/edit`（`editId` 即笔记 id）把 3000 汉字改为 200、3001 汉字为 400。
 - 真实二进制：同一组请求得到一致状态码（3000 CJK 200、3001 400 `NOTE_TOO_LONG`、CW 100 200、
   CW 101 400 `INVALID_PARAM`、poll 1 400 `INVALID_PARAM`、poll 2 200）。
+
+## 12FS. 第一百五十五波：多选投票的界面多勾选（2026-11-07）
+
+第六十六波只验证了单选投票，`MkPoll` 的多选交互一直是「未验证」。这一轮用真实二进制走查。
+
+### 12FS.1 走查结果
+
+创建 `multiple: true`、选项 alpha/beta/gamma 的投票，在 `/notes/<id>`：
+
+1. 点 alpha → 确认框 → 选项显示勾选；
+2. 点 beta → 再次确认 → 两个选项都显示勾选，未自动展示结果（多选语义）；
+3. `notes/show`（带令牌）返回 `alpha votes=1 isVoted=true`、`beta votes=1 isVoted=true`、
+   `gamma votes=0 isVoted=false`。
+
+### 12FS.2 说明
+
+`MkPoll` 的 `isVoted` 计算对多选恒为 false，因此第一次投票后不会锁住其余选项；`showResult`
+也只在单选时自动显示结果。行为与 Misskey/Firefish 一致，**不需要改代码**。
+
+### 12FS.3 验证证据
+
+- 真实二进制 + 无头浏览器（1400×900）：两次 `li` 点击 + 两次确认框主按钮，DOM 中 alpha/beta
+  的 `li.voted` 为 true、gamma 为 false。
+- 带令牌的 `notes/show` 断言计票与 `isVoted` 如上；匿名调用只返回计票、`isVoted=false`（预期）。
+- 截图 `/tmp/w156-shots/multi-poll.png`（不入库）。
