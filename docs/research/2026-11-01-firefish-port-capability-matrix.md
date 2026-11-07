@@ -70,7 +70,7 @@ grep -n 'HandleFunc(' internal/httpapi/server.go  # Cinderfish 路由
 | 5 | 发帖 | `components/MkPostForm*.vue` | `notes/create`、`drive/files/create`、`drive/files/show`、`drive/files` | 附件上传走 XHR | `notes/polls/vote` | 投票写入、`notes/edit`、`notes/make-private`、草稿同步 |
 | 6 | 反应 | `components/MkReactionsViewer*.vue` | `notes/reactions/create`、`notes/reactions/delete` | — | `notes/reactions`（反应者列表） | 反应者浮层逐人列表 |
 | 7 | 通知 | `pages/notifications.vue`、`components/MkNotifications.vue` | `notifications/mark-all-as-read` | `i/notifications` 路径（后端 alias） | — | 消息类通知、`i/read-all-*` |
-| 8 | 媒体 | `components/MkDrive*.vue`、`pages/settings/drive.vue` | `drive/files`、`drive/files/create`、`drive/files/show`、`drive/files/delete`、`GET /media/*` | — | `drive/files/update`、`drive/folders/*` | `drive/files/upload-from-url`、`drive/stream` |
+| 8 | 媒体 | `components/MkDrive*.vue`、`pages/settings/drive.vue` | `drive/files`、`drive/files/create`、`drive/files/show`、`drive/files/delete`、`GET /media/*`、`drive/files/upload-from-url` | — | `drive/files/update`、`drive/folders/*` | `drive/stream` |
 | 9 | Profile | `pages/user/index.vue`、`components/MkInfo.vue` | `users/show`、`users/notes`、`following/create`、`following/delete` | 计数/字段空缺 | `users/followers`、`users/following`、`users/search` | `following/requests/*`、`blocking/*`、`mute/*` |
 | 10 | Settings | `pages/settings/*.vue`（39 页） | `i/update`（3 字段）、`notifications/mark-all-as-read` | 8 个 tab 中按字段裁剪 | `i/registry/*` 等 | 其余 27 页 |
 | 11 | 主题 | `themes/`、`theme-store.ts` | 纯客户端（`data-theme` + token） | token 语义映射 | — | 主题编辑器、自定义 CSS |
@@ -214,7 +214,7 @@ Unicode emoji，`reactionEmojis` 恒为 `[]`。这是字段缺失，不是「返
 | `drive/files/delete` | 1 | `POST /api/drive/files/delete` | 已支持 | — |
 | `drive/files/update` | **11** | — | 需新增后端 | 重命名/说明/NSFW 开关不可用 → Drive 页只读列表 + 删除 |
 | `drive/folders/*` | 5 | — | 需新增后端 | 文件夹树整体移除，Drive 是平铺列表 |
-| `drive/files/upload-from-url` | 2 | — | 隐藏 | 按钮不渲染 |
+| `drive/files/upload-from-url` | 2 | `POST /api/drive/files/upload-from-url` | 已支持（2026-11-07，§12GE） | 附件菜单「从 URL 上传」，用响应里的文件而不是流事件 |
 | `drive/stream` | 1 | — | 隐藏 | 上传进度用本地状态 |
 | `GET /media/{path...}` | — | 已支持 | 媒体 URL 由 `packDriveFile` 生成，无需改写 |
 
@@ -395,7 +395,7 @@ Firefish 使用的频道与频道内事件（实测行号）对照 `internal/str
 | `reply` | | `:37` | 保留 |
 | `renote` | | `:43` | 保留 |
 | `follow` / `followed` / `unfollow` | `MkFollowButton.vue:102` | `:110-119` | 保留 |
-| `meUpdated` | `init.ts:503` | 缺 | shim 在 `i/update` 成功后本地更新；不依赖流事件 |
+| `meUpdated` | `init.ts:503` | **已发布**（2026-11-07，§12GF）：`i/update`、`i/pin`/`i/unpin`、`following/*`、`blocking/*` 后推送 MeDetailed | `main.ts` 订阅并 `updateMe(fresh)` |
 | `readAllNotifications` | `init.ts:507`、`MkNotifications.vue:150` | **已发布**：`notifications.go:19` 广播 `NullMessage("readAllNotifications")` | 保留，直接接 |
 | `unreadNotification` | `init.ts:511` | 缺（客户端事件） | 由 `stores/streaming.ts` 的 `unreadNotifications` 在收到 `notification` 时本地置位 |
 | `readNotifications`（按 id 置读） | `MkNotifications.vue:158` | **已处理但语义更粗**：`connection.go:143-149` 对 `readNotification` 执行「该用户全部标读」 | 保留事件名；不实现「按 id 单条置读」，UI 上只有「全部已读」 |
@@ -448,7 +448,7 @@ Firefish 使用的频道与频道内事件（实测行号）对照 `internal/str
 | Note 关系 | `notes/children`、`notes/conversation`、`notes/renotes`、`notes/replies`、`notes/mentions`、`notes/reactions`（列表）、`notes/unrenote` | Note 详情、回复 tab、通知 mentions、反应者浮层 |
 | 关注关系 | `users/followers`、`users/following`、`following/requests/*` | Profile 列表、锁定账号 |
 | 社交图 | `users/search`、`users/search-by-username-and-host` | 搜索、@ 补全 |
-| 媒体 | `drive/files/update`、`drive/folders/*`、`drive/files/upload-from-url`、`drive/stream`、`drive/files/attached-notes` | Drive、文件时间线 |
+| 媒体 | `drive/files/update`、`drive/folders/*`、`drive/files/attached-notes` | Drive、文件时间线（`upload-from-url` 已于 §12GE 接上） |
 | 偏好与安全 | `mute/*`、`blocking/*`、`i/registry/*`、`i/regenerate-token`、`i/revoke-token`、`i/webhooks/*` | 设置 |
 | 数据迁移 | `i/export-*`、`i/import-*`、`ap/show` | 设置 |
 | 内容类型 | `notes/polls/vote`、`notes/translate`、`pages/*`、`gallery/*`、`channels/*`、`antennas/*`、`clips/*`、`users/groups/*`、`messaging/*` | 对应页面（已隐藏） |
