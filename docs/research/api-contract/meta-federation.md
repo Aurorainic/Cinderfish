@@ -274,7 +274,7 @@
 |------|------|----------------|
 | `maintainerName` | string | 运行时 `maintainerName`，未设置为 `""` |
 | `maintainerEmail` | string | 运行时 `maintainerEmail`，未设置为 `""` |
-| `version` | string | `buildinfo.Version`（当前 `"0.1.1"`），与 NodeInfo 的 `software.version`、User-Agent 同源 |
+| `version` | string | `buildinfo.Version`（当前 `"0.1.2"`），与 NodeInfo 的 `software.version`、User-Agent 同源 |
 | `providesTarball` | bool | 恒 `false` |
 | `name` | string | 运行时 `instanceName`，未设置为 `"Cinderfish"` |
 | `shortName` | string | 恒 `"cinderfish"` |
