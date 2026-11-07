@@ -617,6 +617,10 @@ ALTER TABLE notes
 ALTER TABLE abuse_reports
     ADD COLUMN IF NOT EXISTS forwarded BOOLEAN NOT NULL DEFAULT FALSE;
 `,
+	24: `
+ALTER TABLE abuse_reports
+    ADD COLUMN IF NOT EXISTS moderation_note TEXT NOT NULL DEFAULT '';
+`,
 }
 
 // Migrate applies pending migrations in order and returns the version

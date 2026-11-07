@@ -3,6 +3,7 @@ package httpapi_test
 import (
 	"context"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -189,4 +190,80 @@ func reportByID(t *testing.T, reports []any, id string) map[string]any {
 	}
 	t.Fatalf("report %s not found in %v", id, reports)
 	return nil
+}
+
+// TestAdminUpdateAbuseReportNote covers admin/update-abuse-user-report: the
+// note is stored, returned by the list and can be cleared, while unknown ids
+// and non-administrators are rejected.
+func TestAdminUpdateAbuseReportNote(t *testing.T) {
+	ts, pool := newTestServerWithPool(t, "open")
+	adminID, adminToken := createUser(t, ts, "noteadmin")
+	if _, err := pool.Exec(context.Background(),
+		`UPDATE users SET is_admin = TRUE WHERE id = $1`, adminID); err != nil {
+		t.Fatalf("promote: %v", err)
+	}
+	targetID, _ := createUser(t, ts, "notetarget")
+	_, outsiderToken := createUser(t, ts, "noteoutsider")
+
+	if status := postNoContentWithToken(t, ts, "/api/users/report-abuse", adminToken, map[string]any{
+		"userId": targetID, "comment": "note me",
+	}); status != http.StatusNoContent {
+		t.Fatalf("report-abuse = %d, want 204", status)
+	}
+	reports := postListWithToken(t, ts, "/api/admin/abuse-user-reports", adminToken, nil)
+	if len(reports) != 1 {
+		t.Fatalf("reports = %v, want one", reports)
+	}
+	row := reports[0].(map[string]any)
+	reportID, _ := row["id"].(string)
+	if row["moderationNote"] != "" {
+		t.Errorf("moderationNote = %v, want empty", row["moderationNote"])
+	}
+
+	if status := postNoContentWithToken(t, ts, "/api/admin/update-abuse-user-report", adminToken, map[string]any{
+		"reportId": reportID, "moderationNote": "keep an eye on this account",
+	}); status != http.StatusNoContent {
+		t.Fatalf("update note = %d, want 204", status)
+	}
+	reports = postListWithToken(t, ts, "/api/admin/abuse-user-reports", adminToken, nil)
+	if note := reports[0].(map[string]any)["moderationNote"]; note != "keep an eye on this account" {
+		t.Errorf("moderationNote = %v, want the saved note", note)
+	}
+
+	// An empty note clears it; an omitted one would leave it alone.
+	if status := postNoContentWithToken(t, ts, "/api/admin/update-abuse-user-report", adminToken, map[string]any{
+		"reportId": reportID, "moderationNote": "",
+	}); status != http.StatusNoContent {
+		t.Fatalf("clear note = %d, want 204", status)
+	}
+	reports = postListWithToken(t, ts, "/api/admin/abuse-user-reports", adminToken, nil)
+	if note := reports[0].(map[string]any)["moderationNote"]; note != "" {
+		t.Errorf("moderationNote = %v after clearing, want empty", note)
+	}
+
+	// Unknown report.
+	if resp, body := postWithToken(t, ts, "/api/admin/update-abuse-user-report", adminToken, map[string]any{
+		"reportId": "00000000000000000000000000", "moderationNote": "x",
+	}); resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("unknown report = %d %v, want 404", resp.StatusCode, body)
+	}
+	// Missing reportId.
+	if resp, body := postWithToken(t, ts, "/api/admin/update-abuse-user-report", adminToken, map[string]any{
+		"moderationNote": "x",
+	}); resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("missing reportId = %d %v, want 400", resp.StatusCode, body)
+	}
+	// Overlong note.
+	long := strings.Repeat("あ", 2049)
+	if resp, body := postWithToken(t, ts, "/api/admin/update-abuse-user-report", adminToken, map[string]any{
+		"reportId": reportID, "moderationNote": long,
+	}); resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("overlong note = %d %v, want 400", resp.StatusCode, body)
+	}
+	// A non-administrator is refused.
+	if resp, body := postWithToken(t, ts, "/api/admin/update-abuse-user-report", outsiderToken, map[string]any{
+		"reportId": reportID, "moderationNote": "x",
+	}); resp.StatusCode != http.StatusForbidden {
+		t.Fatalf("non-admin = %d %v, want 403", resp.StatusCode, body)
+	}
 }

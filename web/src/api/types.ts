@@ -556,6 +556,8 @@ export interface AbuseReport {
 	resolved: boolean;
 	createdAt: string;
 	forwarded: boolean;
+	/** Administrator-only note; empty when none was written. */
+	moderationNote: string;
 }
 
 /** One outbound webhook from `i/webhooks/*`. */

@@ -123,13 +123,14 @@ func (s *Server) handleAdminAbuseReports(w http.ResponseWriter, r *http.Request)
 			return packUserDetailed(u, u.CreatedAt, false, loadProfile(r.Context(), s, u.ID))
 		}
 		out = append(out, map[string]any{
-			"id":         item.ID,
-			"targetUser": packUser(item.TargetUserID),
-			"reporter":   packUser(item.ReporterID),
-			"comment":    item.Comment,
-			"resolved":   item.Resolved,
-			"createdAt":  item.CreatedAt.UTC().Format(time.RFC3339Nano),
-			"forwarded":  item.Forwarded,
+			"id":             item.ID,
+			"targetUser":     packUser(item.TargetUserID),
+			"reporter":       packUser(item.ReporterID),
+			"comment":        item.Comment,
+			"resolved":       item.Resolved,
+			"moderationNote": item.ModerationNote,
+			"createdAt":      item.CreatedAt.UTC().Format(time.RFC3339Nano),
+			"forwarded":      item.Forwarded,
 		})
 	}
 	writeJSON(w, http.StatusOK, out)
@@ -158,6 +159,55 @@ func (s *Server) handleAdminResolveAbuseReport(w http.ResponseWriter, r *http.Re
 		return
 	}
 	if _, err := s.reports.Resolve(r.Context(), body.ReportID); err != nil {
+		writeInternalServerError(w)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// handleAdminUpdateAbuseReport is POST /api/admin/update-abuse-user-report.
+//
+// Misskey stores the note without requiring it: an omitted moderationNote
+// leaves the column alone, an empty string clears it. There is no moderation
+// log in Cinderfish, so nothing else is recorded.
+func (s *Server) handleAdminUpdateAbuseReport(w http.ResponseWriter, r *http.Request) {
+	if !s.requireAdmin(w, r) {
+		return
+	}
+	if s.reports == nil {
+		writeInternalServerError(w)
+		return
+	}
+	var body struct {
+		ReportID       string  `json:"reportId"`
+		ModerationNote *string `json:"moderationNote"`
+	}
+	if err := decodeOptionalJSON(r, &body); err != nil {
+		writeAPIError(w, err)
+		return
+	}
+	if body.ReportID == "" {
+		writeAPIError(w, invalidParamError("reportId is required"))
+		return
+	}
+	if body.ModerationNote != nil {
+		if utf8.RuneCountInString(*body.ModerationNote) > maxReportComment {
+			writeAPIError(w, invalidParamError("the moderation note is too long"))
+			return
+		}
+		if _, err := s.reports.UpdateNote(r.Context(), body.ReportID, *body.ModerationNote); err != nil {
+			writeInternalServerError(w)
+			return
+		}
+	}
+	if _, err := s.reports.Get(r.Context(), body.ReportID); err != nil {
+		if errors.Is(err, report.ErrNotFound) {
+			writeAPIError(w, &APIError{
+				Message: "No such abuse report.", Code: "NO_SUCH_ABUSE_REPORT",
+				ID: "15f51cf5-46d1-4b1d-a618-b35bcbed0662", Kind: "server", Status: http.StatusNotFound,
+			})
+			return
+		}
 		writeInternalServerError(w)
 		return
 	}

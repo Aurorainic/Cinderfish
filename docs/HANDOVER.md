@@ -7389,3 +7389,37 @@ Firefish 的 `init.ts` 在 `main` 频道上监听 `meUpdated` 并 `updateAccount
     200；
   - 不刷新 A，A 的 `account` 存储里 `name` 变为 `w168 cross-tab`（订阅把 `$i` 更新并写回）。
   截图 `/tmp/w168-shots/me-updated.png`（不入库）。
+
+## 12GG. 第一百六十九波：举报的版务备注（2026-11-07）
+
+管理台的举报只有「标记已处理」与「转发」，没有地方记下处理理由；Misskey 的
+`admin/update-abuse-user-report` 与 `moderationNote` 字段在台账里一直没有实现。
+
+### 12GG.1 落地清单
+
+| 层 | 文件 | 内容 |
+|----|------|------|
+| 迁移 | `internal/db/db.go` | v24：`abuse_reports.moderation_note TEXT NOT NULL DEFAULT ''` |
+| 存储 | `internal/report/service.go` | `Report.ModerationNote`、SELECT/Scan、`UpdateNote`（返回行是否存在） |
+| 端点 | `internal/httpapi/reports.go` | `admin/update-abuse-user-report`：管理员校验、`reportId` 必填、`moderationNote` 可选（缺省不动、空串清除、≤2048 码点）、未知 id 404 `NO_SUCH_ABUSE_REPORT`（Misskey 该端点的错误 id） |
+| 列表 | 同上 | `moderationNote` 进入响应 |
+| 管理台 | `web/src/pages/AdminAbuses.vue` | 每行「版务备注」按钮 → 段落对话框（预填当前备注）→ 保存后就地显示备注块 |
+| 类型 | `web/src/api/{types,endpoints}.ts` | `AbuseReport.moderationNote`、`adminUpdateAbuseReport` 常量与 `EndpointMap` 条目 |
+| 台账 | `docs/research/2026-11-04-misskey-api-coverage.md` | 165 → 166 路由、157 → 158 同名、283 → 282 未实现 |
+
+### 12GG.2 有意的限制
+
+- 没有版务日志：Misskey 的 `moderationLogService` 会记 `updateAbuseReportNote`，本实现没有日志表。
+- 备注只有管理员能看到，不加进通知或举报人回执。
+- 长度上限沿用举报正文的 2048 码点（Misskey 未给该字段单独设限）。
+- 并发保存是「后写覆盖」，没有版本号或冲突提示。
+
+### 12GG.3 验证证据
+
+- `go vet ./...`、含数据库的全量 `go test ./...` 全绿；`vue-tsc --noEmit`、`check:port`
+  （hardTotal 0）、`pnpm build` 全绿。
+- `TestAdminUpdateAbuseReportNote`：新举报的 `moderationNote` 为空串 → 保存后列表回读一致 →
+  空串清除 → 未知 id 404、缺 `reportId` 400、2049 个字符 400、非管理员 403。
+- 真实二进制 + 无头浏览器（1400×900，`/admin/abuses`）：点「版务备注」→ 段落对话框 → 输入
+  `w169 keep an eye` → 好 → 该行出现备注块，`admin/abuse-user-reports` 回读同一文本。
+  截图 `/tmp/w169-shots/moderation-note.png`（不入库）。

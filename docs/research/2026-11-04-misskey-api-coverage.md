@@ -15,15 +15,15 @@
 | 指标 | 数量 |
 |------|------|
 | Misskey 端点总数 | 440 |
-| Cinderfish 已注册路由 | 165 |
-| 其中 Misskey 同名路径 | 157 |
+| Cinderfish 已注册路由 | 166 |
+| 其中 Misskey 同名路径 | 158 |
 | 其中 Cinderfish 自有路径/别名 | 8（`notifications` 别名、`admin/federation/mode`、`admin/federation/allowlist`、`miauth/{session}/check`、`admin/object-storage`、`admin/deliver-queue`、`notes/history`、`oauth/authorize`（同意页调用）） |
-| 未实现（Misskey 同名） | 283 |
+| 未实现（Misskey 同名） | 282 |
 
 统计口径：`internal/httpapi/server.go` 里 `HandleFunc("METHOD /api/…")` 的去重路径；
 GET 与 POST 同名路径只算一个。
 
-## 2. 已实现（165 条注册路由）
+## 2. 已实现（166 条注册路由）
 
 ```
 admin/accounts/create       admin/announcements/create  admin/announcements/delete
@@ -32,6 +32,7 @@ admin/get-table-stats
 admin/meta                  admin/object-storage*       admin/update-meta
 admin/resolve-abuse-user-report
 admin/forward-abuse-user-report
+admin/update-abuse-user-report
 admin/announcements/list    admin/announcements/update  admin/emoji/add
 admin/emoji/delete          admin/emoji/list            admin/federation/allowlist*
 admin/drive/show-file       admin/federation/mode*      admin/show-users
@@ -167,6 +168,9 @@ notes/history*
 
 2026-11-06 第十四波新增：`admin/update-meta` 增加 `blockedHosts`（不是新路由），策略层在出站与入站
 按精确主机拒绝。
+
+2026-11-07 第一百六十九波新增：`admin/update-abuse-user-report`（迁移 v24 增加
+`abuse_reports.moderation_note`；`admin/abuse-user-reports` 回读该字段）。
 
 2026-11-07 第一百六十五波新增：`admin/forward-abuse-user-report`（迁移 v23 增加
 `abuse_reports.forwarded`；远端目标的举报转发为 ActivityPub `Flag`，本地的返回 400 `CANNOT_FORWARD`）。

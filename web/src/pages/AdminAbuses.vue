@@ -72,6 +72,10 @@
 								<MkTime class="date" :time="item.createdAt" mode="absolute" />
 							</div>
 							<p class="comment">{{ item.comment }}</p>
+							<p v-if="item.moderationNote !== ''" class="note">
+								<span class="noteLabel">版务备注</span>
+								{{ item.moderationNote }}
+							</p>
 							<div class="actions">
 								<CfButton
 									v-if="!item.resolved"
@@ -88,6 +92,13 @@
 									@click="forward(item)"
 								>
 									{{ forwardingId === item.id ? "转发中…" : "转发到对方实例" }}
+								</CfButton>
+								<CfButton
+									mini
+									:disabled="notingId === item.id"
+									@click="editNote(item)"
+								>
+									{{ notingId === item.id ? "保存中…" : "版务备注" }}
 								</CfButton>
 								<span v-if="item.forwarded" class="badge forwarded">已转发</span>
 								<CfA class="profile" :to="userPage(item.targetUser)">
@@ -127,6 +138,7 @@
 // the page instead of being drawn as a dead button.
 import { computed, onMounted, ref } from "vue";
 import { ApiError, api } from "@/api/client";
+import { inputParagraph } from "@/os";
 import type { AbuseReport } from "@/api/types";
 import { isAdmin } from "@/account";
 import MkPageHeader from "@/components/global/MkPageHeader.vue";
@@ -155,6 +167,7 @@ const reporterOrigin = ref("combined");
 const targetOrigin = ref("combined");
 const resolvingId = ref<string | null>(null);
 const forwardingId = ref<string | null>(null);
+const notingId = ref<string | null>(null);
 const actionError = ref<string | null>(null);
 
 const { items, fetching, moreFetching, hasMore, error, reload, loadMore } =
@@ -188,6 +201,30 @@ async function resolve(item: AbuseReport): Promise<void> {
 		actionError.value = errorText(cause);
 	} finally {
 		resolvingId.value = null;
+	}
+}
+
+async function editNote(item: AbuseReport): Promise<void> {
+	if (notingId.value !== null) return;
+	const { canceled, result } = await inputParagraph({
+		title: "版务备注",
+		text: "只有管理员能看到这条备注。留空并保存会清除它。",
+		default: item.moderationNote,
+	});
+	if (canceled) return;
+	const note = result ?? "";
+	notingId.value = item.id;
+	actionError.value = null;
+	try {
+		await api("admin/update-abuse-user-report", {
+			reportId: item.id,
+			moderationNote: note,
+		});
+		item.moderationNote = note;
+	} catch (cause) {
+		actionError.value = errorText(cause);
+	} finally {
+		notingId.value = null;
 	}
 }
 
@@ -301,6 +338,26 @@ definePageMetadata({
 		margin: 8px 0 0;
 		white-space: pre-wrap;
 		overflow-wrap: anywhere;
+	}
+
+	.note {
+		margin: 8px 0 0;
+		padding: 6px 10px;
+		border-radius: 6px;
+		background: var(--bg);
+		font-size: 0.85em;
+		white-space: pre-wrap;
+		overflow-wrap: anywhere;
+
+		> .noteLabel {
+			display: inline-block;
+			margin-right: 6px;
+			padding: 0 6px;
+			border-radius: 999px;
+			background: var(--panel);
+			font-size: 0.85em;
+			opacity: 0.8;
+		}
 	}
 
 	.actions {
