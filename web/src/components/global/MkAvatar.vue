@@ -2,6 +2,7 @@
 <template>
 	<span
 		v-if="disableLink"
+		v-user-preview="disablePreview ? undefined : user.id"
 		class="eiwwqkts _noSelect"
 		:class="{ cat: user.isCat, square, noAvatar }"
 		:style="{ color }"
@@ -17,6 +18,7 @@
 	</span>
 	<MkA
 		v-else
+		v-user-preview="disablePreview ? undefined : user.id"
 		class="eiwwqkts _noSelect"
 		:class="{ cat: user.isCat, square, noAvatar }"
 		:style="{ color }"
@@ -42,10 +44,10 @@ import { acct, userPage } from "../ui/user";
 import { defaultStore } from "../../store";
 import MkA from "./MkA.vue";
 
-// Degraded versus Firefish: MkUserOnlineIndicator, the blurhash average colour
-// and the user-preview popup are not ported. The online dot is drawn from
-// user.onlineStatus; avatarBlurhash is always null on Cinderfish, so no
-// placeholder colour is derived.
+// Degraded versus Firefish: MkUserOnlineIndicator and the blurhash average
+// colour are not ported. The online dot is drawn from user.onlineStatus;
+// avatarBlurhash is always null on Cinderfish, so no placeholder colour is
+// derived. The hover preview is provided by v-user-preview.
 const props = withDefaults(
 	defineProps<{
 		user: UserLite;

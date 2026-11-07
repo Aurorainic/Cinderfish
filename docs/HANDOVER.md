@@ -6836,3 +6836,30 @@ Firefish 的 `ui/_common_/common.vue` 在 `main` 频道上处理新通知：页�
   - `/@user` 页 `.banner` 的 `background-image` 为该 URL；
   - 导航栏 `.mvcprjjd .top .banner` 出现，背景图片与渐变遮罩生效。
   截图 `/tmp/w151-shots/banner.png`、`/tmp/w152-shots/navbar-banner.png`（不入库）。
+
+## 12FP. 第一百五十二波：头像悬浮预览（v-user-preview）（2026-11-07）
+
+`directives/user-preview.ts` 一直是 no-op，注释写着「需要 MkUserPreview 与 users/show 接线」。
+但 `users/show` 早已实现，`MkUserInfo` 也在。这一轮把预览补上。
+
+### 12FP.1 改动
+
+| 层 | 文件 | 内容 |
+|----|------|------|
+| 组件 | `web/src/components/MkUserPreview.vue`（新） | 300px 悬浮卡片，`users/show` 取详情，`MkUserInfo detailed` 渲染；`claimZIndex("middle")` |
+| 指令 | `web/src/directives/user-preview.ts` | 500ms 进入显示、500ms 离开关闭、卡片悬停保持、点击关闭、元素移除轮询清理；WeakMap 保存实例，支持 `updated` 重绑 |
+| 头像 | `web/src/components/global/MkAvatar.vue` | 两个分支都加 `v-user-preview="disablePreview ? undefined : user.id"`，并修正过时注释 |
+
+### 12FP.2 有意的限制
+
+- 定位与上游一致（头像下方居中、绝对定位），但不做视口边缘翻转/避让。
+- 卡片内容为 `MkUserInfo`（头像、昵称、账号、简介、计数），没有关注按钮（与上游预览一致）。
+- 取数失败时卡片保持 loading 直到指令关闭；没有错误文案。
+
+### 12FP.3 验证证据
+
+- `vue-tsc --noEmit`、`check:port`（hardTotal 0）、`pnpm build` 全绿；Go 侧未改动。
+- 真实二进制 + 无头浏览器：在首页把鼠标移到 bob 笔记的头像上（CDP `Input.dispatchMouseEvent`），
+  约 500ms 后出现 `.cf-user-preview`，宽 300px，内容为
+  「w153bob / @w153bob / 这个人很懒… / 1 帖子 · 0 关注中 · 1 关注者」；移开鼠标后卡片消失。
+  截图 `/tmp/w153-shots/user-preview.png`（不入库）。
