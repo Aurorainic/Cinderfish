@@ -46,6 +46,7 @@ ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
 		t.Fatalf("seed federation mode: %v", err)
 	}
 
+	srv.AllowPrivateWebhookTargets()
 	ts := httptest.NewServer(srv)
 	t.Cleanup(ts.Close)
 	return &fedInstance{ts: ts, srv: srv, pool: pool, domain: domain}

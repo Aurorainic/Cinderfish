@@ -166,6 +166,13 @@ func (i *Inbox) accept(ctx context.Context, actor *RemoteUser, activity Object) 
 	if !obj.IsType("Follow") {
 		return "skip: accept is not for a Follow", nil
 	}
+	// The embedded Follow must name this signer as its followee; an Accept
+	// for any other pair is not the signer's to accept. Without the check a
+	// peer could bind any local user as its follower out of thin air.
+	followee := obj.Ref("object")
+	if followee == "" || !strings.EqualFold(followee, actor.URI) {
+		return "skip: accepted follow does not target the signer", nil
+	}
 	// The follower is us: the local user id is the last path segment
 	// of the actor URI we sent.
 	followerURI := obj.Ref("actor")
@@ -190,11 +197,15 @@ func (i *Inbox) accept(ctx context.Context, actor *RemoteUser, activity Object) 
 	return "ok", nil
 }
 
-// reject handles a Reject of a Follow this instance sent.
+// reject handles a Reject of a Follow this instance sent. The embedded
+// Follow must target the signer, the same rule accept applies.
 func (i *Inbox) reject(ctx context.Context, actor *RemoteUser, activity Object) (string, error) {
 	obj := activity.Object("object")
 	if obj == nil {
 		return "skip: reject has no embedded object", nil
+	}
+	if followee := obj.Ref("object"); followee == "" || !strings.EqualFold(followee, actor.URI) {
+		return "skip: rejected follow does not target the signer", nil
 	}
 	followerID := lastPathSegment(obj.Ref("actor"))
 	if followerID == "" {
@@ -214,6 +225,11 @@ func (i *Inbox) undo(ctx context.Context, actor *RemoteUser, activity Object) (s
 	}
 	switch {
 	case obj.IsType("Follow"):
+		// The undo must speak for the signer: the embedded Follow's actor
+		// is whoever originally followed, and only that actor may undo it.
+		if follower := obj.Ref("actor"); follower != "" && !strings.EqualFold(follower, actor.URI) {
+			return "skip: undone follow does not belong to the signer", nil
+		}
 		// The remote actor was following one of our users.
 		target, err := i.localUserByURI(ctx, obj.Ref("object"))
 		if err != nil {
@@ -568,6 +584,16 @@ func (i *Inbox) announce(ctx context.Context, actor *RemoteUser, activity Object
 		CreatedAt:   publishedOrNow(activity),
 	}
 	i.resolveLocalTargets(ctx, &data)
+	// A renote of a local note must not widen its audience: followers-only
+	// and specified notes stay off the public timeline, and a local-only
+	// note never leaves. The remote actor learned the URL somehow; the
+	// visibility the author chose still rules.
+	if data.QuoteLocalID != "" {
+		visibility, localOnly, err := i.store.NoteAudience(ctx, data.QuoteLocalID)
+		if err == nil && (localOnly || visibility == "followers" || visibility == "specified") {
+			return "skip: target note is not publicly renotable", nil
+		}
+	}
 	storedID, err := i.store.InsertRemoteNote(ctx, data)
 	if err != nil {
 		return "", err
@@ -636,10 +662,11 @@ func (i *Inbox) updateNote(ctx context.Context, actor *RemoteUser, note Object) 
 		cw = &value
 	}
 
-	if _, err := i.store.UpdateRemoteNote(ctx, apID, text, cw, note.Bool("sensitive"), updatedAt); err != nil {
+	if _, err := i.store.UpdateRemoteNote(ctx, apID, actor.ID, text, cw, note.Bool("sensitive"), updatedAt); err != nil {
 		if errors.Is(err, ErrRemoteNotFound) {
 			// The peer edited a note this instance never stored (or already
-			// dropped); nothing to apply.
+			// dropped), or the editor is not the note's author; nothing to
+			// apply.
 			return "skip: note unknown", nil
 		}
 		return "", err
@@ -761,6 +788,13 @@ func (i *Inbox) ResolveAcct(ctx context.Context, user, host string) (*RemoteUser
 	self := wf.Self()
 	if self == "" {
 		return nil, fmt.Errorf("federation: webfinger for %s@%s has no self link", user, host)
+	}
+	// The self link must live on the host the query named: a WebFinger
+	// answer pointing at another host's actor would let that host
+	// impersonate the account (cross-origin actor substitution).
+	selfHost, err := HostOf(self)
+	if err != nil || !strings.EqualFold(selfHost, host) {
+		return nil, fmt.Errorf("federation: webfinger self %s is not on %s", self, host)
 	}
 	return i.resolveActor(ctx, self)
 }

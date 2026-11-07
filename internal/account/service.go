@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"golang.org/x/crypto/bcrypt"
 
 	"github.com/Aurorainic/cinderfish/internal/auth"
 	"github.com/Aurorainic/cinderfish/internal/idgen"
@@ -300,10 +301,27 @@ func scanUser(row pgx.Row) (*User, error) {
 	return &u, nil
 }
 
-// Authenticate verifies a username and password and returns the user.
+// dummyPasswordHash is the bcrypt hash the Authenticate path compares
+// against when the username does not exist, so both failure paths cost one
+// bcrypt verification and a timing probe cannot enumerate accounts. The
+// response still distinguishes the two cases with Misskey's error ids
+// (noSuchUser vs incorrectPassword, SigninApiService.ts); the ids are
+// public knowledge and username availability is leaked by
+// username/available anyway, so only the timing channel is closed here.
+var dummyPasswordHash, dummyHashErr = bcrypt.GenerateFromPassword([]byte("cinderfish-dummy-password"), auth.BcryptCost)
+
+// Authenticate verifies a username and password and returns the user. A
+// missing username burns the same bcrypt work as a real check before the
+// caller answers with Misskey's noSuchUser error.
 func (s *Service) Authenticate(ctx context.Context, username, password string) (*User, error) {
 	user, err := s.GetByUsername(ctx, username)
 	if err != nil {
+		if errors.Is(err, ErrUserNotFound) {
+			if dummyHashErr == nil {
+				_ = bcrypt.CompareHashAndPassword(dummyPasswordHash, []byte(password))
+			}
+			return nil, ErrUserNotFound
+		}
 		return nil, err
 	}
 	if !auth.CheckPassword(user.PasswordHash, password) {

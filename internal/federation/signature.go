@@ -268,11 +268,17 @@ func VerifyRequest(req *http.Request, opts VerifyOptions) (string, error) {
 	if opts.Now != nil {
 		now = opts.Now
 	}
-	if dateStr := req.Header.Get("Date"); dateStr != "" {
-		date, err := http.ParseTime(dateStr)
-		if err != nil {
-			return "", ErrStaleSignature
-		}
+
+	// The signature must cover the Date header, so the request carries one;
+	// a request without it has an empty date line in the signing string and
+	// would otherwise escape the freshness window entirely.
+	dateStr := req.Header.Get("Date")
+	if dateStr == "" {
+		return "", ErrStaleSignature
+	}
+	if date, err := http.ParseTime(dateStr); err != nil {
+		return "", ErrStaleSignature
+	} else {
 		delta := now().Sub(date)
 		if delta > maxSignatureAge || delta < -maxSignatureAge {
 			return "", ErrStaleSignature

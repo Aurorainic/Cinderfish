@@ -34,10 +34,12 @@ func TestPackNoteFiles(t *testing.T) {
 		t.Fatalf("notes/show: status %d, body %v", resp.StatusCode, body)
 	}
 
-	// fileIds keeps every id, including the one with no drive file.
+	// fileIds keeps only the ids that resolve to the author's drive files:
+	// Misskey drops what does not belong to the author at create time
+	// (NoteCreateService), so the unknown id never reaches the note.
 	fileIDs, ok := body["fileIds"].([]any)
-	if !ok || len(fileIDs) != 3 {
-		t.Fatalf("fileIds = %v, want 3 ids", body["fileIds"])
+	if !ok || len(fileIDs) != 2 {
+		t.Fatalf("fileIds = %v, want the 2 owned ids", body["fileIds"])
 	}
 
 	// Missing drive files are skipped; existing ones keep their order.
@@ -85,5 +87,43 @@ func TestPackNoteWithoutFiles(t *testing.T) {
 	files, ok := body["files"].([]any)
 	if !ok || len(files) != 0 {
 		t.Errorf("files = %v, want an empty array", body["files"])
+	}
+}
+
+// TestCreateNoteRejectsForeignFile proves a fileIds entry from another
+// account's drive is dropped, not mounted: the note carries no file and the
+// file stays with its owner.
+func TestCreateNoteRejectsForeignFile(t *testing.T) {
+	ts := newTestServer(t, "open")
+	base := uniqueName(t)
+	if len(base) > 15 {
+		base = base[:15]
+	}
+	_, aliceToken := createUser(t, ts, base+"a")
+	_, bobToken := createUser(t, ts, base+"b")
+
+	respA, fileA := uploadFile(t, ts.URL, aliceToken, "secret.png", bytes.NewBufferString("private bytes"))
+	if respA.StatusCode != http.StatusOK {
+		t.Fatalf("upload: status %d, body %v", respA.StatusCode, fileA)
+	}
+	fileID, _ := fileA["id"].(string)
+	if fileID == "" {
+		t.Fatalf("upload returned no id: %v", fileA)
+	}
+
+	noteID := createNote(t, ts, bobToken, map[string]any{
+		"text":    "stealing the file",
+		"fileIds": []string{fileID},
+	})
+
+	resp, body := post(t, ts, "/api/notes/show", map[string]any{"noteId": noteID})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("notes/show: status %d, body %v", resp.StatusCode, body)
+	}
+	if files, ok := body["files"].([]any); !ok || len(files) != 0 {
+		t.Errorf("foreign file attached to the note: %v", body["files"])
+	}
+	if ids, ok := body["fileIds"].([]any); !ok || len(ids) != 0 {
+		t.Errorf("foreign fileId stored on the note: %v", body["fileIds"])
 	}
 }

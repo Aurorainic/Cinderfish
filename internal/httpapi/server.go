@@ -143,6 +143,15 @@ func (s *Server) SetStorage(storage media.Storage) {
 	}
 }
 
+// AllowPrivateWebhookTargets disables the public-address validation of
+// webhook URLs. The HTTP tests deliver against loopback servers; a real
+// deployment must keep the default.
+func (s *Server) AllowPrivateWebhookTargets() {
+	if s.webhooks != nil {
+		s.webhooks.AllowPrivateTargets = true
+	}
+}
+
 func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("POST /api/meta", s.handleMeta)
 	s.mux.HandleFunc("POST /api/stats", s.handleStats)

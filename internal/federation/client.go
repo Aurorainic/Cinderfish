@@ -54,10 +54,16 @@ func NewClient(policy *Policy, renderer *Renderer, keySource func(context.Contex
 		http: &http.Client{
 			Timeout: 15 * time.Second,
 			// ActivityPub identity is the URL, so following redirects is
-			// normal; the limit stops a redirect loop.
+			// normal; the limit stops a redirect loop. Every hop is
+			// checked against the live policy, so a redirect from an
+			// allowed host cannot carry the request to a blocked host or
+			// an internal address.
 			CheckRedirect: func(req *http.Request, via []*http.Request) error {
 				if len(via) >= 5 {
 					return errors.New("too many redirects")
+				}
+				if err := policy.CheckURLAllowed(req.Context(), req.URL.String()); err != nil {
+					return err
 				}
 				return nil
 			},
@@ -195,20 +201,8 @@ func (c *Client) FetchMedia(ctx context.Context, target string, maxBytes int64) 
 	if err := c.policy.CheckURLAllowed(ctx, target); err != nil {
 		return "", nil, "", err
 	}
+	// The shared client's CheckRedirect re-checks every hop.
 	client := *c.http
-	checkRedirect := client.CheckRedirect
-	client.CheckRedirect = func(req *http.Request, via []*http.Request) error {
-		if len(via) >= 5 {
-			return errors.New("too many redirects")
-		}
-		if err := c.policy.CheckURLAllowed(req.Context(), req.URL.String()); err != nil {
-			return err
-		}
-		if checkRedirect != nil {
-			return checkRedirect(req, via)
-		}
-		return nil
-	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, target, nil)
 	if err != nil {
 		return "", nil, "", err
@@ -304,12 +298,25 @@ func isAPContentType(ct string) bool {
 		strings.HasPrefix(ct, "application/ld+json")
 }
 
-// SplitAcct splits "user@host" into its parts.
+// SplitAcct splits "user@host" into its parts. The host is restricted to
+// hostname characters so a crafted acct ("user@evil.com/path#x") cannot
+// steer the WebFinger URL elsewhere.
 func SplitAcct(acct string) (user, host string, ok bool) {
 	acct = strings.TrimPrefix(strings.TrimSpace(acct), "@")
 	user, host, ok = strings.Cut(acct, "@")
 	if !ok || user == "" || host == "" {
 		return "", "", false
 	}
-	return user, strings.ToLower(host), true
+	host = strings.ToLower(host)
+	for _, r := range host {
+		if r >= 'a' && r <= 'z' || r >= '0' && r <= '9' || r == '.' || r == '-' {
+			continue
+		}
+		// An IPv6 literal in brackets is legal too; anything else is not.
+		if r == ':' || r == '[' || r == ']' {
+			continue
+		}
+		return "", "", false
+	}
+	return user, host, true
 }

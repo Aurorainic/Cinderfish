@@ -212,6 +212,22 @@ func (s *Store) NoteOwnerByAPID(ctx context.Context, apID string) (string, *stri
 	return userID, host, nil
 }
 
+// NoteAudience reports a local note's visibility and local-only flag, so an
+// inbound Announce can refuse to widen the audience of a followers-only or
+// specified note.
+func (s *Store) NoteAudience(ctx context.Context, noteID string) (visibility string, localOnly bool, err error) {
+	err = s.pool.QueryRow(ctx,
+		`SELECT visibility, local_only FROM notes WHERE id = $1 AND deleted_at IS NULL`,
+		noteID).Scan(&visibility, &localOnly)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", false, ErrRemoteNotFound
+	}
+	if err != nil {
+		return "", false, fmt.Errorf("federation: note audience: %w", err)
+	}
+	return visibility, localOnly, nil
+}
+
 // MarkUserDeleted flags a remote actor deleted after an inbound Delete.
 func (s *Store) MarkUserDeleted(ctx context.Context, id string) error {
 	if _, err := s.pool.Exec(ctx, "UPDATE users SET is_deleted = TRUE WHERE id = $1", id); err != nil {
@@ -462,13 +478,16 @@ INSERT INTO polls (id, choices, multiple, expires_at) VALUES ($1,$2,$3,$4)
 // reports its local id. Only content moves: visibility and audience stay as
 // stored, because a peer need not resend them and guessing wrong would either
 // leak a followers-only note or hide it from the people already addressed.
-func (s *Store) UpdateRemoteNote(ctx context.Context, apID string, text, cw *string, sensitive bool, updatedAt time.Time) (string, error) {
+// The user_id condition binds the edit to its author: without it a sibling
+// account on the same host could rewrite someone else's note by omitting
+// attributedTo (the host check is per host, not per account).
+func (s *Store) UpdateRemoteNote(ctx context.Context, apID, actorID string, text, cw *string, sensitive bool, updatedAt time.Time) (string, error) {
 	var id string
 	err := s.pool.QueryRow(ctx, `
 UPDATE notes SET text = $2, cw = $3, is_sensitive = $4, updated_at = $5
-WHERE ap_id = $1 AND deleted_at IS NULL
+WHERE ap_id = $1 AND deleted_at IS NULL AND user_id = $6
 RETURNING id
-`, apID, text, cw, sensitive, updatedAt).Scan(&id)
+`, apID, text, cw, sensitive, updatedAt, actorID).Scan(&id)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return "", ErrRemoteNotFound
 	}

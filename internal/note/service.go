@@ -347,6 +347,25 @@ SELECT id FROM users WHERE username_lower = lower($1) AND host IS NULL
 		// than a nil slice.
 		p.FileIDs = []string{}
 	}
+	// Misskey resolves fileIds against the author's drive and silently
+	// drops what does not belong to them (NoteCreateService resolves the
+	// Files relation from the user's drive files), so a foreign or missing
+	// id never attaches a file to this note.
+	if len(p.FileIDs) > 0 {
+		owned := make([]string, 0, len(p.FileIDs))
+		for _, fileID := range p.FileIDs {
+			tag, err := tx.Exec(ctx, `
+UPDATE drive_files SET id = id WHERE id = $1 AND user_id = $2
+`, fileID, p.UserID)
+			if err != nil {
+				return nil, fmt.Errorf("note: check file: %w", err)
+			}
+			if tag.RowsAffected() > 0 {
+				owned = append(owned, fileID)
+			}
+		}
+		p.FileIDs = owned
+	}
 	tags := []string{}
 	if p.Text != nil {
 		tags = ExtractHashtags(*p.Text)
@@ -391,14 +410,6 @@ INSERT INTO note_visibilities (note_id, visible_user_id) VALUES ($1,$2)
 ON CONFLICT DO NOTHING
 `, n.ID, uid); err != nil {
 			return nil, fmt.Errorf("note: insert visibility: %w", err)
-		}
-	}
-
-	for _, fileID := range p.FileIDs {
-		if _, err := tx.Exec(ctx, `
-UPDATE drive_files SET id = id WHERE id = $1
-`, fileID); err != nil {
-			return nil, fmt.Errorf("note: check file: %w", err)
 		}
 	}
 

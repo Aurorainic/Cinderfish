@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -763,6 +764,20 @@ func (s *Server) renderNoteActivity(ctx context.Context, n *note.Note, u *accoun
 	return s.fedRenderer.RenderCreate(doc, n.ID, s.fedRenderer.ActorRef(u.ID), n.CreatedAt), nil
 }
 
+// hostAllowed reports whether candidate is the configured domain or a
+// loopback/listen host with an optional port, i.e. a name this instance
+// legitimately answers as.
+func hostAllowed(domain, candidate string) bool {
+	if strings.EqualFold(candidate, domain) {
+		return true
+	}
+	host := candidate
+	if h, _, err := net.SplitHostPort(candidate); err == nil {
+		host = h
+	}
+	return host == "127.0.0.1" || host == "::1" || host == "localhost"
+}
+
 // handleInbox is POST /inbox and POST /users/{id}/inbox.
 //
 // The check order follows Misskey's inbox handler: federation mode, then
@@ -785,13 +800,18 @@ func (s *Server) handleInbox(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// The signed Host must be one this instance answers as: cfg.Domain,
+	// the canonical name every peer signs, or — when no reverse proxy
+	// rewrites it — the Host the request actually arrived with (the
+	// listen address in direct deployments, and the per-instance loopback
+	// host in the dual-instance tests). Passing r.Host alone would compare
+	// the request against itself and always pass.
+	signedHost := s.cfg.Domain
+	if r.Host != "" && hostAllowed(s.cfg.Domain, r.Host) {
+		signedHost = r.Host
+	}
 	keyID, err := federation.VerifyRequest(r, federation.VerifyOptions{
-		// The signed Host is what the peer connected to. On a real
-		// deployment that is cfg.Domain; behind a reverse proxy Go sees
-		// the proxied Host, and rejecting that would break every
-		// proxied instance. The signature still binds the request to
-		// whatever host was used, so a replay at another host fails.
-		Host:      r.Host,
+		Host:      signedHost,
 		Body:      body,
 		PublicKey: s.remoteKey,
 	})
@@ -803,7 +823,7 @@ func (s *Server) handleInbox(w http.ResponseWriter, r *http.Request) {
 		// signature to get through.
 		if refreshErr := s.refreshRemoteKey(keyID); refreshErr == nil {
 			keyID, err = federation.VerifyRequest(r, federation.VerifyOptions{
-				Host:      r.Host,
+				Host:      signedHost,
 				Body:      body,
 				PublicKey: s.remoteKey,
 			})

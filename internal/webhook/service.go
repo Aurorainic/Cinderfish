@@ -46,6 +46,9 @@ type Webhook struct {
 type Service struct {
 	pool   *pgxpool.Pool
 	client *http.Client
+	// AllowPrivateTargets disables the public-address validation, for
+	// tests that deliver against a loopback HTTP server.
+	AllowPrivateTargets bool
 }
 
 // NewService returns a Service backed by the given pool.
@@ -76,8 +79,10 @@ var ErrInvalidURL = errors.New("webhook: URL is not a reachable public http(s) a
 
 // Create stores a webhook for the user.
 func (s *Service) Create(ctx context.Context, userID, name, url, secret string, on []string) (*Webhook, error) {
-	if err := ValidateURL(ctx, url); err != nil {
-		return nil, err
+	if !s.AllowPrivateTargets {
+		if err := ValidateURL(ctx, url); err != nil {
+			return nil, err
+		}
 	}
 	row := s.pool.QueryRow(ctx, `
 INSERT INTO webhooks (id, user_id, name, url, secret, events)
@@ -118,8 +123,10 @@ SELECT `+webhookColumns+` FROM webhooks WHERE id = $1 AND user_id = $2`, id, use
 
 // Update rewrites the editable fields of one webhook.
 func (s *Service) Update(ctx context.Context, userID, id, name, url, secret string, on []string, active bool) (*Webhook, error) {
-	if err := ValidateURL(ctx, url); err != nil {
-		return nil, err
+	if !s.AllowPrivateTargets {
+		if err := ValidateURL(ctx, url); err != nil {
+			return nil, err
+		}
 	}
 	row := s.pool.QueryRow(ctx, `
 UPDATE webhooks SET name = $3, url = $4, secret = $5, events = $6, active = $7
@@ -181,9 +188,11 @@ func (s *Service) deliver(hook *Webhook, userID, eventType string, body any) {
 	// The URL was validated at registration, but the row may predate that
 	// check or the DNS may have changed; re-checking at delivery keeps the
 	// endpoint from probing internal addresses.
-	if err := ValidateURL(context.Background(), hook.URL); err != nil {
-		s.record(hook.ID, 0)
-		return
+	if !s.AllowPrivateTargets {
+		if err := ValidateURL(context.Background(), hook.URL); err != nil {
+			s.record(hook.ID, 0)
+			return
+		}
 	}
 
 	req, err := http.NewRequest(http.MethodPost, hook.URL, bytes.NewReader(payload))
