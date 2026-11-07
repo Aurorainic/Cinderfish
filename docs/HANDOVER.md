@@ -7559,3 +7559,20 @@ Firefish 的 `init.ts` 在 `main` 频道上监听 `meUpdated` 并 `updateAccount
 **就绪检查用 `document.body.innerText`，不要用 `#app.innerText`。** 本应用的 `#app` 在访客壳与
 弹层场景下不承载全部文本，用 `#app` 判定会得到「页面永远不会渲染」的假象——这正是 §12GI 那次
 误判的根因。其余配方（注入 `cinderfish.token` / `account` / `accounts` 后 `Page.reload`）继续有效。
+
+## 12GL. 第一百七十四波：390px 移动端的 17 个页面巡检（2026-11-07）
+
+桌面巡检（§12GK）之外补一遍移动端：同样的真实二进制与无头 Helium，视口改为 390×844、
+`deviceScaleFactor: 2`、`mobile: true`。
+
+### 12GL.1 结果
+
+| 项 | 结果 |
+|----|------|
+| 页面 | 17 个（首页/时间线、通知、搜索、发现、关于、网盘、关注请求、6 个设置页、3 个管理页） |
+| 渲染成功 | 17 / 17 |
+| 横向溢出（`documentElement.scrollWidth > innerWidth`） | 0（每页都是 390 / 390） |
+| 控制台 error / 未捕获异常 | 0 |
+| ≥400 响应 | 0 |
+
+没有发现缺陷，本波只记录结果。移动端底部导航、设置页表单与管理页表格在 390 宽下都不溢出。
