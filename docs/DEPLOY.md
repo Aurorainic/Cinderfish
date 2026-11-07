@@ -232,6 +232,16 @@ prefix = "cinderfish"
 - 投递 worker 仍是"每实例一个"的设计；Redis 唤醒只是降低延迟，不会让多个进程安全地重复消费同一批投递。
 - 至少保留 `maxmemory-policy noeviction`：Pub/Sub 不占内存，但同库里的其它数据不应被误逐出。
 
+安装（Debian/Ubuntu 系，Redis 7/8 都可）：
+
+```bash
+sudo apt-get install -y redis-server
+sudo systemctl enable --now redis-server
+redis-cli ping   # PONG
+```
+
+需要一个带密码的实例时，在 `/etc/redis/redis.conf` 里设 `requirepass`（或 `/etc/redis/redis.conf.d/auth.conf`）后 `sudo systemctl restart redis-server`，再把上面的 URL 改成 `redis://:密码@127.0.0.1:6379/0`。
+
 systemd 里可以用环境变量覆盖：
 
 ```ini

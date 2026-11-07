@@ -108,10 +108,11 @@ These decisions are settled; do not reopen them without an explicit request.
 ```bash
 go vet ./...
 go test ./...
-CINDERFISH_TEST_DATABASE_URL="postgres://cinderfish:cinderfish@localhost:5432/cinderfish_test" go test ./...
+CINDERFISH_TEST_DATABASE_URL="postgres://cinderfish:cinderfish@localhost:5432/cinderfish_test" \
+CINDERFISH_TEST_REDIS_URL="redis://127.0.0.1:6379/0" go test ./...
 ```
 
-Database tests skip themselves when `CINDERFISH_TEST_DATABASE_URL` is unset.
+Database tests skip themselves when `CINDERFISH_TEST_DATABASE_URL` is unset; Redis integration tests skip when `CINDERFISH_TEST_REDIS_URL` is unset. The other Redis tests use `miniredis` and always run.
 
 ## Work Records
 
