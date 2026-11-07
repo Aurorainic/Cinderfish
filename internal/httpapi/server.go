@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -378,11 +379,40 @@ func (s *Server) registerRoutes() {
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if strings.HasPrefix(r.URL.Path, "/api/") {
+		setAPICORS(w, r)
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+	}
 	if s.web != nil && s.web.handles(r) {
 		s.web.serve(w, r)
 		return
 	}
 	s.mux.ServeHTTP(w, r)
+}
+
+// setAPICORS lets browser clients call the API from another origin.
+// Misskey registers @fastify/cors with origin "*" on its API server
+// (server/api/ApiServerService.ts), and web clients rely on it: without the
+// preflight answer the browser blocks the call and the client can only
+// report a generic load failure (misskey-hub's follow flow is one).
+// A star origin is sent without Access-Control-Allow-Credentials, so
+// cross-origin callers cannot reuse a session cookie; tokens still travel
+// in the request body or an Authorization header.
+func setAPICORS(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	if r.Method != http.MethodOptions {
+		return
+	}
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
+	if h := r.Header.Get("Access-Control-Request-Headers"); h != "" {
+		w.Header().Set("Access-Control-Allow-Headers", h)
+	} else {
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+	}
+	w.Header().Set("Access-Control-Max-Age", "86400")
 }
 
 // writeJSON emits a Misskey-shaped success response.

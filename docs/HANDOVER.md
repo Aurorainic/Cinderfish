@@ -7,7 +7,8 @@
   已由 `main` 上更新的版本取代（保留分支仅作历史）。
 - 最后更新：2026-11-07（目标模式第一百六十二至一百七十六波：通知合并与多 id 已读、状态栏 RSS、
   `driveFileCreated`、举报转发与 `Flag`、客户端图片压缩、从 URL 上传、`meUpdated`、举报备注、
-  默认肤色、`pollVoted`、32 页与 390px 巡检、`registryUpdated` 跨设备同步、v0.1.0 端到端回归。
+  默认肤色、`pollVoted`、32 页与 390px 巡检、`registryUpdated` 跨设备同步、v0.1.0 端到端回归、
+  `/api/*` 的 CORS 预检修复（§12GP）。
   更早的第五十一至六十四波（账号迁移、OAuth 同意页、`ap/show`、`app/*` 授权、关注关系设置、
   schema v20/v21 等）见 §12BP–§12CB）
 - 项目名 **Cinderfish**（2026-10-28 定名，Go module `github.com/Aurorainic/cinderfish`）
@@ -7687,3 +7688,30 @@ Firefish 的 `init.ts` 在 `main` 频道上监听 `meUpdated` 并 `updateAccount
 - 关于页面显示 Cinderfish 固定版本、仓库默认链接和软件/协议信息；本站自定义仓库链接仍可覆盖默认值。NodeInfo 与 `/api/meta` 版本统一。
 - GHCR 生产镜像工作流只响应 `v*` 标签 push，发布 semver 与 `latest` 标签；后续版本 tag 构建自动更新 `latest`。
 - 覆盖测试：远端 WebFinger 用户解析、入站及 `ap/show` 附件缓存、长文与段落解析、meta 版本/仓库回退。
+
+## 12GP. `/api/*` 的 CORS 预检（2026-11-07）
+
+- **症状**：在 `@palomiku@mi.rfs.im` 的用户页点「申请关注」→「转到所在服务器继续」，hub
+  （`misskey-hub.net/ja/mi-web/?path=/@palomiku@mi.rfs.im`）里填入本实例域名后弹出
+  「データの読み込みに失敗しました。後でもう一度お試しください。」。
+- **定位**：hub 用 `POST https://<host>/api/meta` 校验实例，请求带 `Content-Type: application/json`
+  因而先发预检。`OPTIONS /api/meta` 没有对应路由，落到 `notFoundHandler` 返回 404
+  （`NO_SUCH_ENDPOINT`）且没有任何 `Access-Control-*` 头，浏览器据此拦下真正的 POST，
+  hub 的 `catch` 只弹通用失败提示。本地新构建的二进制与线上 `fedi.lainns.xyz` 完全一致，
+  所以与部署和版本无关。**这类缺陷只有浏览器网络面板能定位**，前端提示语不含任何线索。
+- **修复**：`internal/httpapi/server.go` 的 `ServeHTTP` 对 `/api/` 前缀先过 `setAPICORS`——
+  响应统一带 `Access-Control-Allow-Origin: *`；`OPTIONS` 直接 204，回显
+  `Access-Control-Request-Headers`（缺省 `Content-Type, Authorization`），并给出
+  `Access-Control-Allow-Methods` 与 `Access-Control-Max-Age: 86400`。与上游
+  `@fastify/cors { origin: '*' }`（`server/api/ApiServerService.ts`）一致；通配来源按规范
+  不发 `Access-Control-Allow-Credentials`，跨域调用取不到会话 Cookie，凭据仍走请求体或
+  `Authorization`。Miuno 的 `backend/internal/server/middleware.go` 是同一做法的 Go 版本。
+- **测试**：`internal/httpapi/cors_test.go` 两条用例先红后绿（预检 404 → 204；POST 响应
+  无 ACAO → `*`）。证据：`gofmt -l internal/ cmd/` 空、`go vet ./...` 干净、
+  带 `CINDERFISH_TEST_DATABASE_URL`/`CINDERFISH_TEST_REDIS_URL` 的 `go test ./... -count=1` 全绿；
+  真实二进制 curl 复核预检与响应头；浏览器里由 `http://127.0.0.1:3100` 页面跨域
+  `POST /api/meta` 能解析出 `name`/`version`（能读到正文即证明预检通过——`Access-Control-*`
+  响应头按 Fetch 规范不对脚本暴露，`headers.get()` 为 null 属正常）。
+- **待办**：线上 `fedi.lainns.xyz` 仍跑旧版本，重新发布后这条接续流程才会恢复；
+  Misskey 的 `signin`/`signin-with-passkey` 另有「ACAO 设为 `config.url` + credentials」的
+  特例（`SigninApiService.ts`），本站前端同源调用，暂无需求，未跟进。
