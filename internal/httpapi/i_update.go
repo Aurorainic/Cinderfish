@@ -241,6 +241,7 @@ func (s *Server) handleIUpdate(w http.ResponseWriter, r *http.Request) {
 	s.applyUserCounts(r.Context(), info.User.ID, packed)
 	s.applyUnreadNotifications(r.Context(), info.User.ID, packed)
 	s.applyUnreadAnnouncements(r.Context(), info.User.ID, packed)
+	s.publishMeUpdated(r.Context(), info.User.ID)
 	writeJSON(w, http.StatusOK, packed)
 }
 

@@ -84,5 +84,6 @@ func (s *Server) pinNote(w http.ResponseWriter, r *http.Request, pin bool) {
 	// response, and an empty pinnedNoteIds would blank the footer's
 	// pinned/unpinned label until the next /api/i.
 	s.applyPinnedNotes(r.Context(), info.User.ID, info.User.ID, packed)
+	s.publishMeUpdated(r.Context(), info.User.ID)
 	writeJSON(w, http.StatusOK, packed)
 }

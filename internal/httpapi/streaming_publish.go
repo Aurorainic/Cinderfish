@@ -79,6 +79,21 @@ func (s *Server) publishDriveFileCreated(userID string, file map[string]any) {
 	s.streamBus.PublishTyped(streaming.MainSubject(userID), "driveFileCreated", file)
 }
 
+// publishMeUpdated emits the main channel "meUpdated" event, which Firefish's
+// init.ts uses to keep `$i` in step when another tab changes the account.
+// A missing account (deleted between the write and the push) is ignored.
+func (s *Server) publishMeUpdated(ctx context.Context, userID string) {
+	if s.streamBus == nil || s.accounts == nil {
+		return
+	}
+	u, err := s.accounts.GetByID(ctx, userID)
+	if err != nil {
+		return
+	}
+	s.streamBus.PublishTyped(streaming.MainSubject(userID), "meUpdated",
+		s.meDetailed(ctx, u, true))
+}
+
 // publishNoteReaction emits a reaction change on a note's stream.
 func (s *Server) publishNoteReaction(n *note.Note, typ, emoji, userID string) {
 	if s.streamBus == nil {

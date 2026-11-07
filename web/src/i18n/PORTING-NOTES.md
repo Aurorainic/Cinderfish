@@ -254,9 +254,10 @@ chooses between the timeline and welcome layouts.
   (ASC) for followers/following. `users/notes` never flips.
 - **Streaming liveness**: server pongs do not refresh `lastSeen`; a data frame
   every <120s is mandatory. 30s heartbeat implemented.
-- **Streaming gaps**: no `registryUpdated`, `pollVoted`, `meUpdated`; only the
-  five channels above. UI must poll or refetch. `driveFileCreated` is published
-  on `main` since wave 164 (drive upload and upload-from-url).
+- **Streaming gaps**: no `registryUpdated` or `pollVoted`; only the five
+  channels above. UI must poll or refetch. `driveFileCreated` is published on
+  `main` since wave 164 (drive upload and upload-from-url) and `meUpdated` since
+  wave 168 (profile, pinned notes, follow and block writes).
 
 ## 4. Verification performed
 

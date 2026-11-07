@@ -97,6 +97,7 @@ func (s *Server) handleFollowingCreate(w http.ResponseWriter, r *http.Request) {
 	} else {
 		s.sendRemoteFollow(r.Context(), info.User.ID, target.ID, *target.Host)
 	}
+	s.publishMeUpdated(r.Context(), info.User.ID)
 
 	writeJSON(w, http.StatusOK, packUserLite(target, s.cfg.Domain, nil))
 }
@@ -153,6 +154,7 @@ func (s *Server) handleFollowingDelete(w http.ResponseWriter, r *http.Request) {
 	if target.Host != nil {
 		s.sendRemoteUndoFollow(r.Context(), info.User.ID, target.ID, *target.Host)
 	}
+	s.publishMeUpdated(r.Context(), info.User.ID)
 
 	writeJSON(w, http.StatusOK, packUserLite(target, s.cfg.Domain, nil))
 }

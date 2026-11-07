@@ -177,6 +177,7 @@ func (s *Server) handleBlockingCreate(w http.ResponseWriter, r *http.Request) {
 	// is what `isBlocked` reports, so it is true here even though the generic
 	// packer defaults it to false.
 	packed["isBlocked"] = true
+	s.publishMeUpdated(r.Context(), info.User.ID)
 	writeJSON(w, http.StatusOK, packed)
 }
 
@@ -214,6 +215,7 @@ func (s *Server) handleBlockingDelete(w http.ResponseWriter, r *http.Request) {
 		writeInternalServerError(w)
 		return
 	}
+	s.publishMeUpdated(r.Context(), info.User.ID)
 	w.WriteHeader(http.StatusNoContent)
 }
 

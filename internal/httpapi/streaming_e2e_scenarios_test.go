@@ -12,6 +12,60 @@ import (
 
 const wsWait = 5 * time.Second
 
+// TestStreamingMeUpdated checks that a profile write reaches the account's own
+// main channel: Firefish's init.ts replaces `$i` from this event, which is what
+// keeps a second tab in step.
+func TestStreamingMeUpdated(t *testing.T) {
+	ts := newStreamingServer(t, "open")
+	_, aliceToken := signup(t, ts, "alice")
+
+	conn := dial(t, ts, aliceToken)
+	sendFrame(t, conn, map[string]any{
+		"type": "connect",
+		"body": map[string]any{"channel": "main", "id": "main1", "pong": true},
+	})
+	connected := false
+	for deadline := time.Now().Add(wsWait); time.Now().Before(deadline); {
+		msg, ok := readWithTimeout(t, conn, time.Until(deadline))
+		if !ok {
+			break
+		}
+		if msg.Type == "connected" {
+			connected = true
+			break
+		}
+	}
+	if !connected {
+		t.Fatal("main channel did not connect")
+	}
+
+	resp, updated := post(t, ts, "/api/i/update", map[string]any{
+		"i": aliceToken, "name": "w168 renamed",
+	})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("i/update = %d %v", resp.StatusCode, updated)
+	}
+
+	deadline := time.Now().Add(wsWait)
+	for {
+		msg, ok := waitForChannelMessage(t, conn, "main1", time.Until(deadline))
+		if !ok {
+			t.Fatal("no meUpdated frame")
+		}
+		if msg["type"] != "meUpdated" {
+			continue
+		}
+		body, _ := msg["body"].(map[string]any)
+		if body["name"] != "w168 renamed" {
+			t.Errorf("meUpdated name = %v, want w168 renamed", body["name"])
+		}
+		if _, ok := body["followingCount"]; !ok {
+			t.Errorf("meUpdated is missing the derived counters: %v", body)
+		}
+		return
+	}
+}
+
 // TestStreamingDriveFileCreated checks that an upload reaches the uploader's
 // main channel: Firefish's photos widget inserts the file from this event.
 func TestStreamingDriveFileCreated(t *testing.T) {

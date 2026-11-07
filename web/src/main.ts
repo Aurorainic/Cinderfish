@@ -11,7 +11,7 @@ import "./styles/index.scss";
 
 import { computed, createApp, defineAsyncComponent, markRaw, type Component } from "vue";
 import App from "./App.vue";
-import { me, refreshAccount, restoreSession } from "./account";
+import { me, refreshAccount, restoreSession, updateMe } from "./account";
 import { install as installComponents } from "./components";
 import { initCustomCss } from "./composables/use-custom-css";
 import { initTheme } from "./composables/use-theme";
@@ -19,6 +19,7 @@ import { install as installDirectives } from "./directives";
 import { updateInstance } from "./instance";
 import { router } from "./router";
 import { store } from "./store/base";
+import { stream } from "./stream";
 import { ShellKey, SHELL_STORAGE_KEY, type ShellMode, type ShellRegistry } from "./ui/tokens";
 
 // Apply the persisted theme before the first paint of the SPA (index.html has
@@ -93,7 +94,17 @@ void updateInstance();
 // Rehydrate the session from storage, then refresh the cached profile in the
 // background; a stale token simply leaves the stored object in place until the
 // next API call clears it.
-void restoreSession().catch(() => undefined);
+// Another tab's write (profile, pinned notes, follow or block counts) arrives on
+// the main channel; Firefish's init.ts keeps `$i` in step the same way. The
+// subscription waits for the session because the channel needs a credential.
+void restoreSession()
+  .catch(() => undefined)
+  .then(() => {
+    if (me.value == null) return;
+    stream.useChannel("main").on("meUpdated", (fresh) => {
+      if (me.value != null) updateMe(fresh);
+    });
+  });
 if (me.value != null) {
   void refreshAccount().catch(() => undefined);
 }

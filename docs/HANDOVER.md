@@ -120,6 +120,10 @@ go run ./cmd/cinderfish-admin --config config.toml create --username root --pass
 
 只跑 API 时可以不构建前端：`web_dist` 目录不存在，服务器自动退回纯 API 模式。
 
+**跑数据库测试前先停掉正在运行的真实二进制**（`fuser -k 3999/tcp`）：它连的也是
+`cinderfish_test`，投递 worker 会抢测试刚写入的 `deliver_queue` 行，表现为随机的单点失败
+（2026-11-07 第一百六十八波遇到一次：二进制在跑时 httpapi 随机 FAIL，停掉后全绿）。
+
 前端单独开发（vite dev server 反代到 3000 端口，见 `web/vite.config.ts`）：
 
 ```bash
@@ -7348,3 +7352,40 @@ store，通知列表从不读取它——设置页的说明自己写着「暂时
   - 编辑器里出现该图缩略图（带移除按钮），`drive/files` 回读
     `python-logo.png`、`image/png`、`15770` 字节。
   截图 `/tmp/w167-shots/url-upload.png`（不入库）。
+
+## 12GF. 第一百六十八波：meUpdated 与跨标签页的账号同步（2026-11-07）
+
+Firefish 的 `init.ts` 在 `main` 频道上监听 `meUpdated` 并 `updateAccount(i)`；本实现从未发过这个事件，
+所以一个标签页改了昵称、置顶、关注数或屏蔽数，其它标签页要等手动刷新。
+
+### 12GF.1 落地清单
+
+| 层 | 文件 | 内容 |
+|----|------|------|
+| 打包 | `internal/httpapi/migration.go` | `writeMe` 的内联打包抽成 `meDetailed(ctx, user, includeSecrets)`，`i` 响应与事件共用一份，防止两边漂移 |
+| 事件 | `internal/httpapi/streaming_publish.go` | `publishMeUpdated(ctx, userID)`：重新读账号 → 打包 → 发 `meUpdated` 到本人 `main`；账号已删则静默忽略 |
+| 触发 | `i_update.go`、`i_pin.go`、`following.go`、`relations.go` | `i/update`、`i/pin`、`i/unpin`、`following/create|delete`、`blocking/create|delete` 成功后发布 |
+| 事件表 | `web/src/api/stream.ts` | `ChannelEventMap.meUpdated: MeDetailed` |
+| 订阅 | `web/src/main.ts` | `restoreSession()` 之后（需要凭证）订阅 `main`，用 `updateMe(fresh)` 合并；`setMe` 会写回 `account` 存储，所以同一浏览器的其它标签页也同步 |
+| 笔记 | `web/src/i18n/PORTING-NOTES.md` | 流式缺口清单移除 `meUpdated` |
+
+### 12GF.2 有意的限制
+
+- 只在上面六个写操作后发布；`2fa/*`、`i/registry/set`、`i/update-email` 等 Misskey 也会发的地方暂未接
+  （其中 2FA 状态由设置页自己回读，不受影响）。
+- 关注远端账号时本地只写待审行，`followingCount` 不变，但仍会推一次（无害的重新取数）。
+- 事件里带的是本人视角的 MeDetailed（含邮箱等私密字段）：频道只投递给本人的连接。
+- 多标签页之间通过 localStorage 的 `account` 键同步；`updateMe` 合并后 `setMe` 覆盖写入，
+  因此另一个标签页的「未读通知数」等计数也会被这次写入刷新（与 Firefish 相同）。
+
+### 12GF.3 验证证据
+
+- `go vet ./...`、含数据库的全量 `go test ./...` 全绿；`vue-tsc --noEmit`、`check:port`
+  （hardTotal 0）、`pnpm build` 全绿。
+- `TestStreamingMeUpdated`：连接 `main`（`pong:true` 收到 `connected`）→ `i/update {name}` 200 →
+  收到 `meUpdated`，`name` 为新值且带 `followingCount` 等派生计数。
+- 真实二进制 + 无头浏览器（1400×900，同一 profile 两个标签页）：
+  - 标签页 A 与 B 都登录同一账号；B 通过真实客户端 API 调 `i/update {name:"w168 cross-tab"}` 返回
+    200；
+  - 不刷新 A，A 的 `account` 存储里 `name` 变为 `w168 cross-tab`（订阅把 `$i` 更新并写回）。
+  截图 `/tmp/w168-shots/me-updated.png`（不入库）。

@@ -274,13 +274,20 @@ func (s *Server) handleIMove(w http.ResponseWriter, r *http.Request) {
 // writeMe answers with the packed MeDetailed entity, applying the derived
 // counters the i endpoints fill.
 func (s *Server) writeMe(w http.ResponseWriter, r *http.Request, u *account.User, includeSecrets bool) {
-	packed := packMeDetailed(u, u.CreatedAt, includeSecrets, loadProfile(r.Context(), s, u.ID))
-	s.packMovedTo(r.Context(), u, packed)
-	s.applyUserCounts(r.Context(), u.ID, packed)
-	s.applyUnreadNotifications(r.Context(), u.ID, packed)
-	s.applyUnreadAnnouncements(r.Context(), u.ID, packed)
-	s.applyPinnedNotes(r.Context(), u.ID, u.ID, packed)
-	writeJSON(w, http.StatusOK, packed)
+	writeJSON(w, http.StatusOK, s.meDetailed(r.Context(), u, includeSecrets))
+}
+
+// meDetailed packs a user as MeDetailed, with the counters that only the
+// owner's own view carries. Every i endpoint and the meUpdated stream event
+// go through it so the two can never drift apart.
+func (s *Server) meDetailed(ctx context.Context, u *account.User, includeSecrets bool) map[string]any {
+	packed := packMeDetailed(u, u.CreatedAt, includeSecrets, loadProfile(ctx, s, u.ID))
+	s.packMovedTo(ctx, u, packed)
+	s.applyUserCounts(ctx, u.ID, packed)
+	s.applyUnreadNotifications(ctx, u.ID, packed)
+	s.applyUnreadAnnouncements(ctx, u.ID, packed)
+	s.applyPinnedNotes(ctx, u.ID, u.ID, packed)
+	return packed
 }
 
 // migrateFollowersOf moves the local followers of oldID to newID. It is the
