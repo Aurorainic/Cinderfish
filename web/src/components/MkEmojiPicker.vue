@@ -106,6 +106,9 @@
 					:skin-tone-selector="category === 'people'"
 					:skin-tones="unicodeEmojiSkinTones"
 					:skin-tone-labels="unicodeEmojiSkinToneLabels"
+					:default-skin-tone="
+						defaultStore.state.reactionPickerSkinTone
+					"
 					:emojis="
 						emojilist
 							.filter((e) => e.category === category)

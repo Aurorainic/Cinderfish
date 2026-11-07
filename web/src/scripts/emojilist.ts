@@ -427,8 +427,10 @@ export function addSkinTone(emoji: string, skinTone?: number): string {
 	const def = byEmoji.get(stripped);
 	if (def == null || !def.skin_tone_support) return emoji;
 
+	// Tone 1 is the yellow default (no modifier), matching both Firefish's
+	// `skinToneModifiers[chosenSkinTone - 1]` and the picker's six swatches.
 	const tone = skinTone ?? 1;
-	return stripped + (skinToneModifiers[tone] ?? "");
+	return stripped + (skinToneModifiers[tone - 1] ?? "");
 }
 
 export function getNicelyLabeledCategory(internalName: string): string {

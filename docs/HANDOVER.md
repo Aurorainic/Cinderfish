@@ -7423,3 +7423,35 @@ Firefish 的 `init.ts` 在 `main` 频道上监听 `meUpdated` 并 `updateAccount
 - 真实二进制 + 无头浏览器（1400×900，`/admin/abuses`）：点「版务备注」→ 段落对话框 → 输入
   `w169 keep an eye` → 好 → 该行出现备注块，`admin/abuse-user-reports` 回读同一文本。
   截图 `/tmp/w169-shots/moderation-note.png`（不入库）。
+
+## 12GH. 第一百七十波：默认肤色（reactionPickerSkinTone）与肤色映射修复（2026-11-07）
+
+`reactionPickerSkinTone` 在 store 里存在（account 作用域，默认 1），但选择器永远从自己的色块开始，
+设置页也只写着「肤色由色块手动选择」。接上这个偏好的过程中发现一个更早的移植缺陷：肤色映射差一档。
+
+### 12GH.1 落地清单
+
+| 层 | 文件 | 内容 |
+|----|------|------|
+| 选择器 | `web/src/components/MkEmojiPicker.section.vue` | 新 prop `defaultSkinTone`（默认 1）；挂载与 emoji 列表变化时按它初始化 |
+| 选择器 | `web/src/components/MkEmojiPicker.vue` | 传 `defaultStore.state.reactionPickerSkinTone` |
+| 设置页 | `web/src/pages/SettingsReaction.vue` | 「默认肤色」下拉（六个 `_skinTones` 标签），写入 store；说明与头注更正 |
+| 缺陷修复 | `web/src/scripts/emojilist.ts` | `addSkinTone` 的修饰符索引由 `tone` 改为 `tone - 1`：1 = 黄色（无修饰符），与 Firefish 的 `skinToneModifiers[chosenSkinTone - 1]` 和选择器六个色块一致 |
+
+**修复前的表现**：默认肤色 1 被当作 `🏻`（浅色），所以「人物」分类一打开就是浅肤色；点第一个
+「黄色」色块同样得到浅肤色，点「深色」则完全不加修饰符。走查记录见下。
+
+### 12GH.2 有意的限制
+
+- 只影响「人物」分类（唯一带肤色选择器的分类），与上游一致；自定义表情不受影响。
+- 选择器顶部的色块仍可临时切换，本次选择不写回偏好（上游同样只在设置页保存）。
+- 偏好是 account 作用域：换账号会跟随注册表里的值，不跟浏览器。
+
+### 12GH.3 验证证据
+
+- `vue-tsc --noEmit`、`check:port`（hardTotal 0）、`pnpm build` 全绿；Go 侧未改动。
+- 真实二进制 + 无头浏览器（1400×900）：
+  - `/settings/reaction` 把「默认肤色」设为「中」(4) → 打开某条笔记的回应选择器 → 展开
+    「People & Body」→ 57 个按钮里 32 个带修饰符，样本为 `👋🏽`/`🤚🏽`/`✋🏽`（中等肤色）；
+  - 改回默认 (1) 再打开同一分类：带修饰符的按钮数为 **0**（修复前为 32，且 4 号档得到 `🏾`）。
+  截图 `/tmp/w170-shots/skin-tone.png`（不入库）。

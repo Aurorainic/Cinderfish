@@ -80,6 +80,17 @@
 
 		<div class="pickerPrefs _formBlock">
 			<label class="pref">
+				<span>默认肤色</span>
+				<select
+					:value="reactionPickerSkinTone"
+					@change="setPicker('reactionPickerSkinTone', $event)"
+				>
+					<option v-for="(label, index) in skinToneLabels" :key="label" :value="index + 1">
+						{{ label }}
+					</option>
+				</select>
+			</label>
+			<label class="pref">
 				<span>表情尺寸</span>
 				<select :value="reactionPickerSize" @change="setPicker('reactionPickerSize', $event)">
 					<option :value="1">小</option>
@@ -105,8 +116,8 @@
 		</div>
 
 		<CfInfo class="note">
-			尺寸/列数/高度会实时作用到回应选择器。默认肤色仍由选择器内的色块手动选择；
-			自定义 MFM 主题与声音同样未实现。
+			尺寸/列数/高度会实时作用到回应选择器；默认肤色是「人物」分类打开时的初始肤色，
+			选择器顶部仍可临时切换。自定义 MFM 主题与声音未实现。
 		</CfInfo>
 	</div>
 </template>
@@ -118,8 +129,8 @@
 //   * no `vue-draggable-plus`: ordering moves into the per-item context menu;
 //   * the emoji picker is composer-core's `MkEmojiPickerDialog` opened through
 //     `os.popup`, which is what the contract fixes for reaction pickers;
-//   * picker tone/size/width/height have no consumer yet, so they are not
-//     exposed as controls (a switch that changes nothing would be a fake).
+//   * picker tone/size/width/height are all real consumers now: MkEmojiPicker
+//     reads size/width/height and the tone it starts the people category with.
 // `reactions` and `recentlyUsedEmojis` are both real consumers: MkEmojiPicker
 // pins the former and lists the latter.
 import { computed } from "vue";
@@ -132,6 +143,7 @@ import { confirm, popup, popupMenu, type MenuItem } from "@/os";
 import { definePageMetadata } from "@/scripts/page-metadata";
 import { defaultReactions, defaultStore } from "@/store";
 
+const reactionPickerSkinTone = defaultStore.reactiveState.reactionPickerSkinTone;
 const reactionPickerSize = defaultStore.reactiveState.reactionPickerSize;
 const reactionPickerWidth = defaultStore.reactiveState.reactionPickerWidth;
 const reactionPickerHeight = defaultStore.reactiveState.reactionPickerHeight;
@@ -281,7 +293,21 @@ function clearRecentlyUsed(): void {
 	defaultStore.set("recentlyUsedEmojis", []);
 }
 
-type PickerKey = "reactionPickerSize" | "reactionPickerWidth" | "reactionPickerHeight";
+// The picker's tone buttons use the same six labels; 1 is the yellow default.
+const skinToneLabels = [
+	t("_skinTones.yellow"),
+	t("_skinTones.light"),
+	t("_skinTones.mediumLight"),
+	t("_skinTones.medium"),
+	t("_skinTones.mediumDark"),
+	t("_skinTones.dark"),
+];
+
+type PickerKey =
+	| "reactionPickerSkinTone"
+	| "reactionPickerSize"
+	| "reactionPickerWidth"
+	| "reactionPickerHeight";
 
 function setPicker(key: PickerKey, event: Event): void {
 	const value = Number((event.target as HTMLSelectElement).value);

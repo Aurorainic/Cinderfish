@@ -56,12 +56,15 @@ const props = withDefaults(
 		skinToneSelector?: boolean;
 		skinTones?: string[];
 		skinToneLabels?: string[];
+		/** 1-based tone used before the reader picks one; 1 is the yellow default. */
+		defaultSkinTone?: number;
 	}>(),
 	{
 		initialShown: false,
 		skinToneSelector: false,
 		skinTones: undefined,
 		skinToneLabels: undefined,
+		defaultSkinTone: 1,
 	},
 );
 
@@ -79,14 +82,14 @@ function applyUnicodeSkinTone(tone?: number): void {
 }
 
 onMounted(() => {
-	if (props.skinToneSelector) applyUnicodeSkinTone();
+	if (props.skinToneSelector) applyUnicodeSkinTone(props.defaultSkinTone);
 });
 
 watch(
 	() => props.emojis,
 	(next) => {
 		localEmojis.value = [...next];
-		if (props.skinToneSelector) applyUnicodeSkinTone();
+		if (props.skinToneSelector) applyUnicodeSkinTone(props.defaultSkinTone);
 	},
 );
 </script>
