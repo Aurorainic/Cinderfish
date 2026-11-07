@@ -7283,3 +7283,36 @@ store，通知列表从不读取它——设置页的说明自己写着「暂时
   - 远端行按钮为「标记已处理」「转发到对方实例」，本地行只有「标记已处理」；
   - 点击转发 → 按钮消失、出现「已转发」，`admin/abuse-user-reports` 回读 `forwarded: true`。
   截图 `/tmp/w165-shots/forward.png`（不入库）。
+
+## 12GD. 第一百六十六波：上传时的客户端图片压缩（2026-11-07）
+
+`/settings/drive` 的「保留原图」（`keepOriginalUploading`，account 作用域，默认关闭）此前只存偏好，
+上传管线注释也写着「没有 `browser-image-resizer`，原字节总是原样上传」。
+
+### 12GD.1 落地清单
+
+| 层 | 文件 | 内容 |
+|----|------|------|
+| 压缩 | `web/src/scripts/image-compress.ts`（新） | `createImageBitmap` → canvas → `toBlob`；最长边 2048、质量 0.85、只处理 JPEG/WebP；文件名随输出类型改扩展名 |
+| 上传 | `web/src/scripts/upload.ts` | 偏好关闭时先压缩再上传；解压/编码失败回退原文件（不阻断上传）；头注改写 |
+| 设置页 | `web/src/pages/SettingsDrive.vue` | 说明改为「关闭时重编码到 2048/0.85，其它类型原样上传」 |
+| 注释 | `web/src/scripts/select-file.ts` | 更正两条过期说明（`upload-from-url` 已存在、压缩已回到 `uploadFile`） |
+
+### 12GD.2 有意的限制
+
+- 只重编码 JPEG 与 WebP。Firefish 的 `compressTypeMap` 还会把 SVG 转成 PNG；`createImageBitmap`
+  对 SVG 的支持依浏览器而定，这里不处理，SVG 按原样上传。PNG 与 GIF 也不处理（与上游一致）。
+- 不做渐进式 JPEG/EXIF 方向校正之外的处理：`createImageBitmap` 默认按 EXIF 方向解码，方向因此正确，
+  但 EXIF 本身（相机型号、GPS）会被丢弃——与上游的 canvas 路径相同。
+- 压缩在浏览器里做，服务端不做二次处理；同一张图上传两次得到相同字节，去重仍按内容哈希。
+- 上传进度条仍然没有（Fetch 没有上传进度事件，与上一波一致）。
+
+### 12GD.3 验证证据
+
+- `vue-tsc --noEmit`、`check:port`（hardTotal 0）、`pnpm build` 全绿；Go 侧未改动。
+- 真实二进制 + 无头浏览器（1400×900，`/my/drive` 的 file input）：
+  - 默认偏好上传 3000×2000 / 1,461,490 字节的 JPEG：入库 `size` 与下载字节均为 **597,187**，
+    JPEG 头解析为 **2048×1365**；
+  - 在 `/settings/drive` 打开「保留原图」（开关状态确认 `toggled: true`）后上传同一文件：
+    入库 **1,461,490 字节**、**3000×2000**，与原始文件逐字节一致。
+  截图 `/tmp/w166-shots/compressed-upload.png`（不入库）。

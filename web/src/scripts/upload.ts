@@ -7,15 +7,18 @@
 //   * no progress events: the Fetch API reports no upload progress, so
 //     `progressMax` / `progressValue` stay undefined until a streaming upload
 //     transport exists;
-//   * no client-side recompression: `browser-image-resizer` is not a dependency,
-//     so the original bytes are always uploaded (the `keepOriginalUploading`
-//     setting therefore has no effect here);
+//   * client-side recompression is `scripts/image-compress.ts`: the same
+//     2048 px / 0.85 pipeline upstream gets from `browser-image-resizer`, on a
+//     canvas instead of a dependency. `keepOriginalUploading` (account scope,
+//     default off, like Firefish) decides whether it runs;
 //   * `force`, `name`, `comment` and `isSensitive` are not sent: the backend
 //     ignores them, and the returned file always carries `isSensitive: false`;
 //   * the only size limit is `meta.maxFileSize` (20 MiB, not configurable), the
 //     error code is `FILE_TOO_LARGE` instead of upstream's 413.
 import { ref, type Ref } from "vue";
 import { apiForm, ApiError } from "@/api/client";
+import { compressImage } from "@/scripts/image-compress";
+import { defaultStore } from "@/store/base";
 import type { DriveFile } from "@/api/types";
 import { fetchMeta } from "@/account";
 import { alert } from "@/os";
@@ -91,10 +94,22 @@ export async function uploadFile(
 		throw new Error("FILE_TOO_LARGE");
 	}
 
+	// The preference is account-scoped and defaults to false, so images are
+	// re-encoded for the web unless the user asked to keep the original bytes.
+	let outgoing = file;
+	if (!defaultStore.state.keepOriginalUploading) {
+		try {
+			outgoing = (await compressImage(file)) ?? file;
+		} catch (error) {
+			// A decode failure must not block the upload: send the original.
+			console.error("Failed to compress image", error);
+		}
+	}
+
 	const id = Math.random().toString();
 	const ctx: Uploading = {
 		id,
-		name: options.name ?? (file.name === "" ? "untitled" : file.name),
+		name: options.name ?? (outgoing.name === "" ? "untitled" : outgoing.name),
 		progressMax: undefined,
 		progressValue: undefined,
 		img: URL.createObjectURL(file),
@@ -103,7 +118,7 @@ export async function uploadFile(
 	uploads.value.push(ctx);
 
 	const formData = new FormData();
-	formData.append("file", file);
+	formData.append("file", outgoing);
 	if (options.folderId != null && options.folderId !== "") {
 		formData.append("folderId", options.folderId);
 	}

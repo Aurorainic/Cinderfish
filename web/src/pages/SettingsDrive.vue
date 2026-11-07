@@ -62,7 +62,8 @@
 				{{ t("keepOriginalUploading") }}
 				<template #caption>
 					{{ t("keepOriginalUploadingDescription") }}
-					当前上传管线直接把原文件写入存储，不做压缩，因此该偏好已保存但暂不改变上传结果。
+					关闭时浏览器会在上传前把 JPEG / WebP 重编码到最长边 2048、质量 0.85；
+					打开时上传原始字节。其它类型（PNG、GIF、SVG 等）始终按原样上传。
 				</template>
 			</CfSwitch>
 		</section>

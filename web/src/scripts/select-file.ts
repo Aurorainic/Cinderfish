@@ -1,10 +1,11 @@
 // Ported from firefish@b425f61:packages/client/src/scripts/select-file.ts (AGPL-3.0-only)
 //
 // Wave-2 differences from upstream (contract §5):
-//   * `drive/files/upload-from-url` does not exist, so the "from URL" menu item
-//     is dropped (there is no `urlUploadFinished` stream event either);
-//   * the post-upload recompression switch is dropped together with the
-//     `browser-image-resizer` dependency (see scripts/upload.ts);
+//   * the "from URL" menu item is not ported yet: `drive/files/upload-from-url`
+//     exists since wave 46, but it has no `urlUploadFinished` stream event, so
+//     the dialog would have to poll for the created file;
+//   * recompression now happens inside `uploadFile` (scripts/image-compress.ts),
+//     so the per-upload switch upstream shows is redundant here;
 //   * the drive picker is our own MkDriveSelectDialog instead of
 //     `os.selectDriveFile`; selecting *folders* is not needed by this wave and
 //     `drive/folders` has no "choose" surface, so only files are selectable;
