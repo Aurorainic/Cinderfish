@@ -1,17 +1,17 @@
 # Cinderfish 交接说明
 
-- 最后更新：2026-11-07（目标模式第五十一至六十四波：账号迁移、KaTeX 宏页与集成说明页、
-  OAuth 交互式同意页、`ap/show` 与远程互动页、第三方应用授权全流程（`app/*` 与 `auth/session/*`，
-  schema v20）、关注关系设置与其消费方（schema v21）、入站反应修复与 `EmojiReact`、入站 `Flag`、
-  范围内占位页清零（24 个剩余占位页全部在首版范围外）、hashtags 三端点、`users/relation`
-  与频繁回复用户、真实二进制浏览器走查（修掉登录 token 缓存与本地 Actor URI 两个缺陷）。
-  恢复目标模式时先补了 §12BO.3 的验证债，
-  `go test ./...`（含数据库）已全绿，
-  详见 §12BP–§12CB。第五十一至六十二波的桌面/移动浏览器走查已在第六十三波补完
-  （真实二进制 + Helium 156），当时发现并修复了登录 token 缓存与本地 Actor URI 解析两个缺陷）
+- **发布状态：v0.1.0（2026-11-07）**。全部工作已并入 `main` 并推送，tag `v0.1.0`。
+  发布前做了一整轮端到端浏览器回归（85 个路由 + 12 条交互流程），修掉 5 个缺陷，其中
+  `os.post()` 的 Promise 永不 resolve 是此前所有后端测试与手工走查都看不出来的一条；记录见 §12GN。
+  `frontend-ui-redesign` 的全部提交已包含在 `main` 内（可删），`naming/project-name` 的文档内容
+  已由 `main` 上更新的版本取代（保留分支仅作历史）。
+- 最后更新：2026-11-07（目标模式第一百六十二至一百七十六波：通知合并与多 id 已读、状态栏 RSS、
+  `driveFileCreated`、举报转发与 `Flag`、客户端图片压缩、从 URL 上传、`meUpdated`、举报备注、
+  默认肤色、`pollVoted`、32 页与 390px 巡检、`registryUpdated` 跨设备同步、v0.1.0 端到端回归。
+  更早的第五十一至六十四波（账号迁移、OAuth 同意页、`ap/show`、`app/*` 授权、关注关系设置、
+  schema v20/v21 等）见 §12BP–§12CB）
 - 项目名 **Cinderfish**（2026-10-28 定名，Go module `github.com/Aurorainic/cinderfish`）
-- 仓库：当前目录 `/home/lainsaka/文档/MilnFish`，分支 `main`；远程 `origin` 为
-  `https://github.com/Aurorainic/Cinderfish.git`（GitHub 仓库已更名，本地目录改名待办）
+- 仓库：`https://github.com/Aurorainic/Cinderfish.git`，工作表分支 `main`；当前 schema **v24**
 
 ## 1. 一句话说明
 
@@ -39,6 +39,7 @@ Go 单二进制的个人/极小规模联邦社交实例。后端契约是 **Miss
 | **前端第一波：骨架重建**（themes/styles/api/store/router/ui/os/account/i18n + 21 个 `Cf*` 原子组件，123 个占位页） | ✅ | `6910c41`，记录见 §12Q |
 | **前端第二波：Note 组件树 + 时间线/通知/Drive**（+48 个 `Mk*` 组件、MFM 渲染器、单 `defaultStore`、`check-port` 门禁、浏览器走查） | ✅ | `6007474`（文档 `a723987`），记录见 §12R |
 | **前端第三波：发帖链路 + 个人页/关注列表 + 设置 + 内容页 + 导航壳/deck/widgets**（13 个并行作用域，浏览器实测发帖与设置保存落库） | ✅ | 见 §12S |
+| **v0.1.0 端到端回归与发布**（85 路由巡检 85/85 干净、12 条交互流程 12/12 通过、5 个缺陷修复、README 重写、`main` 合并与 tag） | ✅ | `9c541f8`、`f448204`、`50c2fdf`，记录见 §12GN |
 
 - Firefish 字典来源：`firefish@02c31e0a2804de48c9d73028df525e197d8df622:locales/zh-CN.yml`；第一波的 `web/src/i18n/zh-CN.ts` 已随旧前端删除（`9ce4a00`），现在是 `web/src/i18n/locales/{zh-CN,ja-JP}.json`（扁平键，由 `web/scripts/gen-locale.mjs` 从 Firefish locales 生成，见 §12Q）。
 - **提交号的权威来源是 `git log`**：本文件按批次记录做了什么、证据是什么；M3 笔记、M4 Streaming、M5 联邦等后端批次的提交号以 `git log` 为准，前端两波移植的提交号已在 §2 里程碑与 §12Q/§12R 中列明。
