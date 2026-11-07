@@ -2,7 +2,7 @@
 <template>
 	<div
 		class="omfetrab"
-		:class="{ asDrawer }"
+		:class="['s' + size, 'w' + width, 'h' + height, { asDrawer }]"
 		:style="maxHeight != null ? { maxHeight: `${maxHeight}px` } : undefined"
 		tabindex="-1"
 	>
@@ -167,6 +167,18 @@ const emojisEl = ref<HTMLDivElement | null>(null);
 
 const pinned = defaultStore.reactiveState.reactions;
 const recentlyUsedEmojis = defaultStore.reactiveState.recentlyUsedEmojis;
+
+// The reaction picker honours the settings page preferences; every other use
+// of the picker keeps the compact default (1/3/2) like upstream.
+const size = computed<number>(() =>
+	props.asReactionPicker ? defaultStore.reactiveState.reactionPickerSize.value : 1,
+);
+const width = computed<number>(() =>
+	props.asReactionPicker ? defaultStore.reactiveState.reactionPickerWidth.value : 3,
+);
+const height = computed<number>(() =>
+	props.asReactionPicker ? defaultStore.reactiveState.reactionPickerHeight.value : 2,
+);
 
 const unicodeEmojiSkinTones = [
 	"#FFDC5E",
@@ -399,6 +411,54 @@ defineExpose({ focus, reset });
 	inline-size: calc(var(--eachSize) * 7 + var(--pad) * 2);
 	box-sizing: border-box;
 	overflow: hidden;
+
+	&.s1 {
+		--eachSize: 40px;
+	}
+
+	&.s2 {
+		--eachSize: 45px;
+	}
+
+	&.s3 {
+		--eachSize: 50px;
+	}
+
+	&.w1 {
+		inline-size: calc(var(--eachSize) * 5 + var(--pad) * 2);
+	}
+
+	&.w2 {
+		inline-size: calc(var(--eachSize) * 6 + var(--pad) * 2);
+	}
+
+	&.w3 {
+		inline-size: calc(var(--eachSize) * 7 + var(--pad) * 2);
+	}
+
+	&.w4 {
+		inline-size: calc(var(--eachSize) * 8 + var(--pad) * 2);
+	}
+
+	&.w5 {
+		inline-size: calc(var(--eachSize) * 9 + var(--pad) * 2);
+	}
+
+	&.h1 {
+		block-size: calc(var(--eachSize) * 4 + var(--pad) * 2);
+	}
+
+	&.h2 {
+		block-size: calc(var(--eachSize) * 6 + var(--pad) * 2);
+	}
+
+	&.h3 {
+		block-size: calc(var(--eachSize) * 8 + var(--pad) * 2);
+	}
+
+	&.h4 {
+		block-size: calc(var(--eachSize) * 10 + var(--pad) * 2);
+	}
 
 	&.asDrawer {
 		inline-size: 100%;

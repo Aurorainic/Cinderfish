@@ -78,11 +78,34 @@
 			</CfSwitch>
 		</template>
 
+		<div class="pickerPrefs _formBlock">
+			<label class="pref">
+				<span>表情尺寸</span>
+				<select :value="reactionPickerSize" @change="setPicker('reactionPickerSize', $event)">
+					<option :value="1">小</option>
+					<option :value="2">中</option>
+					<option :value="3">大</option>
+				</select>
+			</label>
+			<label class="pref">
+				<span>每行列数</span>
+				<select :value="reactionPickerWidth" @change="setPicker('reactionPickerWidth', $event)">
+					<option v-for="n in 5" :key="n" :value="n">{{ n + 4 }}</option>
+				</select>
+			</label>
+			<label class="pref">
+				<span>可见行数</span>
+				<select :value="reactionPickerHeight" @change="setPicker('reactionPickerHeight', $event)">
+					<option :value="1">4</option>
+					<option :value="2">6</option>
+					<option :value="3">8</option>
+					<option :value="4">10</option>
+				</select>
+			</label>
+		</div>
+
 		<CfInfo class="note">
-			选择器的皮肤色、尺寸、列数与高度偏好保存在 <code>defaultStore</code>
-			（<code>reactionPickerSkinTone</code> / <code>reactionPickerSize</code> /
-			<code>reactionPickerWidth</code> / <code>reactionPickerHeight</code>），
-			但当前表情选择器不读取它们，因此本页<strong>未提供</strong>这些控件；
+			尺寸/列数/高度会实时作用到回应选择器。默认肤色仍由选择器内的色块手动选择；
 			自定义 MFM 主题与声音同样未实现。
 		</CfInfo>
 	</div>
@@ -108,6 +131,10 @@ import { t } from "@/i18n";
 import { confirm, popup, popupMenu, type MenuItem } from "@/os";
 import { definePageMetadata } from "@/scripts/page-metadata";
 import { defaultReactions, defaultStore } from "@/store";
+
+const reactionPickerSize = defaultStore.reactiveState.reactionPickerSize;
+const reactionPickerWidth = defaultStore.reactiveState.reactionPickerWidth;
+const reactionPickerHeight = defaultStore.reactiveState.reactionPickerHeight;
 
 defineOptions({ name: "CfPageSettingsReaction" });
 
@@ -254,6 +281,13 @@ function clearRecentlyUsed(): void {
 	defaultStore.set("recentlyUsedEmojis", []);
 }
 
+type PickerKey = "reactionPickerSize" | "reactionPickerWidth" | "reactionPickerHeight";
+
+function setPicker(key: PickerKey, event: Event): void {
+	const value = Number((event.target as HTMLSelectElement).value);
+	defaultStore.set(key, value);
+}
+
 definePageMetadata({ title: t("reaction"), icon: "ph-smiley ph-bold ph-lg" });
 </script>
 
@@ -318,6 +352,29 @@ definePageMetadata({ title: t("reaction"), icon: "ph-smiley ph-bold ph-lg" });
 		flex-wrap: wrap;
 		gap: 8px;
 		margin-block-start: 12px;
+	}
+
+	.pickerPrefs {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 12px;
+		margin-block-start: 12px;
+
+		> .pref {
+			display: flex;
+			flex-direction: column;
+			gap: 4px;
+			font-size: 0.85em;
+			opacity: 0.85;
+
+			> select {
+				padding: 4px 8px;
+				border-radius: 6px;
+				border: solid 0.5px var(--divider);
+				background: var(--panel);
+				color: var(--fg);
+			}
+		}
 	}
 
 	.note {

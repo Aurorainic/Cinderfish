@@ -7007,3 +7007,29 @@ Firefish 的 `ui/_common_/common.vue` 在 `main` 频道上处理新通知：页�
   一条、删除后从列表消失、他人文件 404 `NO_SUCH_FILE`、匿名 401。
 - 真实二进制 + 无头浏览器：`/my/drive/file/<id>/attached` 显示文件元数据（名称/类型/大小/日期）与
   两条 `w158 attached note` 笔记。截图 `/tmp/w158-shots/attached-notes.png`（不入库）。
+
+## 12FV. 第一百五十八波：回应选择器的尺寸偏好与完整对话框（2026-11-07）
+
+`SettingsReaction` 原本注明「皮肤色/尺寸/列数/高度偏好没有消费者，不提供控件」。原因有两层：
+`MkEmojiPicker` 不读这些 store 值，而笔记上的回应按钮用的还是 `reaction-picker.ts` 自建的紧凑面板。
+
+### 12FV.1 改动
+
+| 层 | 文件 | 内容 |
+|----|------|------|
+| 选择器 | `web/src/components/MkEmojiPicker.vue` | `asReactionPicker` 时读取 `reactionPickerSize/Width/Height`，根节点加 `s/w/h` 类；补齐 `s1–s3`、`w1–w5`、`h1–h4` 的尺寸规则 |
+| 回应按钮 | `web/src/scripts/reaction-picker.ts` | 重写为打开 `MkEmojiPickerDialog`（`asReactionPicker: true`），与 Firefish 一致；移除自建面板 |
+| 设置页 | `web/src/pages/SettingsReaction.vue` | 增加「表情尺寸 / 每行列数 / 可见行数」三个下拉，写入同一 store；说明改为「实时作用」 |
+
+### 12FV.2 有意的限制
+
+- 默认肤色 `reactionPickerSkinTone` 仍不自动套用到选择器；肤色仍由选择器内的色块手动选择。
+- 移动端（smartphone）走 drawer 全宽布局，尺寸类只影响每格大小与行数。
+- 对话框的 `max-height` 仍限制为 `min(70vh, 480px)`，所以「10 行」在矮视口会被截短。
+
+### 12FV.3 验证证据
+
+- `vue-tsc --noEmit`、`check:port`（hardTotal 0）、`pnpm build` 全绿；Go 侧未改动。
+- 真实二进制 + 无头浏览器：设置页把尺寸/列数/行数设为 3/5/4 后，在笔记上点回应按钮，
+  `.omfetrab` 的类为 `omfetrab s3 w5 h4`，`--eachSize: 50px`，宽度 466px（50×9+16），
+  高度受对话框 `max-height` 限制为 480px。截图 `/tmp/w159-shots/picker-prefs.png`（不入库）。
