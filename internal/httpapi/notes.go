@@ -259,6 +259,8 @@ func (s *Server) writeNoteError(w http.ResponseWriter, err error) {
 			Message: "Invalid visibility.", Code: "INVALID_VISIBILITY",
 			ID: errIDInvalidParam, Kind: "client", Status: http.StatusBadRequest,
 		})
+	case errors.Is(err, note.ErrInvalidCW), errors.Is(err, note.ErrTooManyFiles), errors.Is(err, note.ErrInvalidPoll):
+		writeAPIError(w, invalidParamError("invalid parameter"))
 	case errors.Is(err, note.ErrPollExpired):
 		writeAPIError(w, &APIError{
 			Message: "Poll is already expired.", Code: "CANNOT_CREATE_ALREADY_EXPIRED_POLL",

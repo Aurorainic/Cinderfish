@@ -17,6 +17,7 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -37,6 +38,15 @@ const MaxTextLength = 3000
 
 // MaxMentions matches the default of Misskey's role policy mentionLimit.
 const MaxMentions = 20
+
+// Parameter limits from notes/create's paramDef.
+const (
+	MaxCWLength         = 100
+	MaxFileIDs          = 16
+	MaxPollChoices      = 10
+	MinPollChoices      = 2
+	MaxPollChoiceLength = 50
+)
 
 // Note is a stored note.
 type Note struct {
@@ -137,7 +147,11 @@ var (
 	// Mirrors Misskey's role policy mentionLimit (default 20): a note that
 	// addresses more people than that is rejected before it is stored
 	// (core/NoteCreateService.ts "Note contains too many mentions").
-	ErrTooManyMentions   = errors.New("note: too many mentions")
+	ErrTooManyMentions = errors.New("note: too many mentions")
+	// Parameter limits from notes/create's paramDef.
+	ErrInvalidCW         = errors.New("note: invalid content warning")
+	ErrTooManyFiles      = errors.New("note: too many files")
+	ErrInvalidPoll       = errors.New("note: invalid poll")
 	ErrTextTooLong       = errors.New("note: text is too long")
 	ErrInvalidVisibility = errors.New("note: invalid visibility")
 	ErrPollExpired       = errors.New("note: poll is already expired")
@@ -145,6 +159,26 @@ var (
 	ErrAlreadyVoted      = errors.New("note: already voted in this poll")
 	ErrChoiceOutOfRange  = errors.New("note: poll choice is out of range")
 )
+
+// validatePollParam enforces notes/create's poll schema: 2–10 distinct
+// choices, each 1–50 code points.
+func validatePollParam(poll *PollParams) error {
+	if poll == nil {
+		return nil
+	}
+	if len(poll.Choices) < MinPollChoices || len(poll.Choices) > MaxPollChoices {
+		return ErrInvalidPoll
+	}
+	seen := make(map[string]bool, len(poll.Choices))
+	for _, choice := range poll.Choices {
+		n := utf8.RuneCountInString(choice)
+		if n < 1 || n > MaxPollChoiceLength || seen[choice] {
+			return ErrInvalidPoll
+		}
+		seen[choice] = true
+	}
+	return nil
+}
 
 // Create stores a new note.
 func (s *Service) Create(ctx context.Context, p CreateParams) (*Note, error) {
@@ -161,8 +195,22 @@ func (s *Service) Create(ctx context.Context, p CreateParams) (*Note, error) {
 	if p.Text == nil && len(p.FileIDs) == 0 && p.Poll == nil && p.RenoteID == nil {
 		return nil, ErrEmptyNote
 	}
-	if p.Text != nil && len(*p.Text) > MaxTextLength {
+	// Misskey validates against the JSON Schema maxLength, which counts
+	// Unicode code points; len() counts bytes and would cut CJK notes at a
+	// third of the upstream limit.
+	if p.Text != nil && utf8.RuneCountInString(*p.Text) > MaxTextLength {
 		return nil, ErrTextTooLong
+	}
+	if p.CW != nil {
+		if *p.CW == "" || utf8.RuneCountInString(*p.CW) > MaxCWLength {
+			return nil, ErrInvalidCW
+		}
+	}
+	if len(p.FileIDs) > MaxFileIDs {
+		return nil, ErrTooManyFiles
+	}
+	if err := validatePollParam(p.Poll); err != nil {
+		return nil, err
 	}
 	if p.Visibility == VisibilitySpecified && len(p.VisibleUserIDs) == 0 {
 		return nil, ErrInvalidVisibility

@@ -6889,3 +6889,36 @@ Firefish 的 `ui/_common_/common.vue` 在 `main` 频道上处理新通知：页�
 - 真实二进制 + 无头浏览器：带两张图的笔记在首页点击图片 → `.cf-lightbox` 打开，显示第 1 张与
   `1 / 2`；按 `ArrowRight` 后 `src` 变为第二张、计数 `2 / 2`；按 `Escape` 后灯箱消失。
   截图 `/tmp/w154-shots/lightbox.png`（不入库）。
+
+## 12FR. 第一百五十四波：notes/create 的参数上限（2026-11-07）
+
+`note.Create` 用 `len(text)`（字节）对比 Misskey 的 3000 字符上限：一条 1000 个汉字的笔记就达到
+3000 字节并被拒，而上游允许 3000 个码点。同时 notes/create 的 CW、fileIds、投票校验都缺失。
+
+### 12FR.1 改动
+
+| 检查 | 规则（来自 Misskey paramDef） | 错误 |
+|------|------------------------------|------|
+| text | ≤ 3000 个 Unicode 码点（原为字节） | `NOTE_TOO_LONG` |
+| cw | 1–100 个码点（空串视为非法） | `INVALID_PARAM` |
+| fileIds | ≤ 16 个 | `INVALID_PARAM` |
+| poll.choices | 2–10 项、每项 1–50 个码点、不得重复 | `INVALID_PARAM` |
+
+实现放在 `internal/note/service.go`（`validatePollParam` 与常量），HTTP 层在 `writeNoteError`
+映射为 `INVALID_PARAM`；新增 `ErrInvalidCW`、`ErrTooManyFiles`、`ErrInvalidPoll`。
+
+### 12FR.2 有意的限制
+
+- `fileIds` 只限制数量，不校验文件归属或存在性（与上游一致，列表里可保留已删除 id）。
+- 空 CW 直接拒绝而不是自动转 null；客户端应发送 `null` 清除。
+- 文本仍允许纯空白（上游在「仅文本」时要求匹配 `[^\s]+`，这里未加）。
+- 编辑路径（notes/update）没有同步这些上限，仍按原有逻辑处理。
+
+### 12FR.3 验证证据
+
+- `go vet ./...`、含数据库的全量 `go test ./...` 全绿。
+- `TestNotesCreateParamLimits`：3000 汉字 200、3001 400 `NOTE_TOO_LONG`；CW 100 通过、101 与空串
+  400 `INVALID_PARAM`；17 个 fileIds 400；投票 1 项/11 项/重复/空项/51 码点均 400，2 项与
+  50 码点通过。
+- 真实二进制：同一组请求得到一致状态码（3000 CJK 200、3001 400 `NOTE_TOO_LONG`、CW 100 200、
+  CW 101 400 `INVALID_PARAM`、poll 1 400 `INVALID_PARAM`、poll 2 200）。
