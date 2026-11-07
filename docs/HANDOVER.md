@@ -7316,3 +7316,35 @@ store，通知列表从不读取它——设置页的说明自己写着「暂时
   - 在 `/settings/drive` 打开「保留原图」（开关状态确认 `toggled: true`）后上传同一文件：
     入库 **1,461,490 字节**、**3000×2000**，与原始文件逐字节一致。
   截图 `/tmp/w166-shots/compressed-upload.png`（不入库）。
+
+## 12GE. 第一百六十七波：附件菜单的「从 URL 上传」（2026-11-07）
+
+`scripts/select-file.ts` 的附件菜单只有「上传」与「从网盘选择」。参考实现还有「从 URL 上传」，
+但上游等的是 `urlUploadFinished` 流事件；本实现不推送该事件，而 `drive/files/upload-from-url`
+（第四十六波）直接返回创建好的文件，所以一直没接。
+
+### 12GE.1 落地清单
+
+| 层 | 文件 | 内容 |
+|----|------|------|
+| URL 上传 | `web/src/scripts/select-file.ts` | `chooseFromUrl()`：`inputText` 取地址 → `api("drive/files/upload-from-url", {url, folderId})` → 直接返回响应里的文件；成功 toast、失败对话框 |
+| 菜单 | 同上 | 第三项「从 URL 上传」（`ph-link`），与上传 / 从网盘选择并列 |
+| 注释 | 同上 | 说明改为「用响应而不是流事件」 |
+
+### 12GE.2 有意的限制
+
+- 一次只处理一个地址（上游也是）：即使调用方要求 `multiple`，URL 上传最多返回 1 个文件。
+- 上传在服务端串行抓取，最长 30 秒；界面在这段时间里没有进度条，只有最终的 toast 或错误框。
+- 目标地址仍受 SSRF 防护限制：回环、内网、`file:` 等会被服务端以 400 拒绝，错误信息原样显示。
+- 上传目标文件夹沿用 `uploadFolder` 偏好（与「上传」一致）。
+- 没有把 URL 上传的文件名/敏感标记作为参数暴露，用的是服务端从 URL 推导的名字。
+
+### 12GE.3 验证证据
+
+- `vue-tsc --noEmit`、`check:port`（hardTotal 0）、`pnpm build` 全绿；Go 侧未改动。
+- 真实二进制 + 无头浏览器（1400×900）：
+  - 打开发帖框 → 点附件按钮 → 菜单出现「上传」「从网盘选择」「从 URL 上传」；
+  - 选「从 URL 上传」→ 对话框输入 `https://www.python.org/static/img/python-logo.png` → 好；
+  - 编辑器里出现该图缩略图（带移除按钮），`drive/files` 回读
+    `python-logo.png`、`image/png`、`15770` 字节。
+  截图 `/tmp/w167-shots/url-upload.png`（不入库）。

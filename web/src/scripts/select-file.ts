@@ -1,11 +1,12 @@
 // Ported from firefish@b425f61:packages/client/src/scripts/select-file.ts (AGPL-3.0-only)
 //
 // Wave-2 differences from upstream (contract §5):
-//   * the "from URL" menu item is not ported yet: `drive/files/upload-from-url`
-//     exists since wave 46, but it has no `urlUploadFinished` stream event, so
-//     the dialog would have to poll for the created file;
-//   * recompression now happens inside `uploadFile` (scripts/image-compress.ts),
-//     so the per-upload switch upstream shows is redundant here;
+//   * "from URL" calls `drive/files/upload-from-url` and uses its response
+//     directly: upstream waits for the `urlUploadFinished` stream event, which
+//     this instance does not publish because the endpoint already answers with
+//     the created file;
+//   * recompression happens inside `uploadFile` (scripts/image-compress.ts), so
+//     the per-upload switch upstream shows is redundant here;
 //   * the drive picker is our own MkDriveSelectDialog instead of
 //     `os.selectDriveFile`; selecting *folders* is not needed by this wave and
 //     `drive/folders` has no "choose" surface, so only files are selectable;
@@ -13,7 +14,8 @@
 //
 // Signature fixed by the wave-2 contract for the PostForm port:
 //   selectFiles(opts?: { multiple?: boolean; label?: string }): Promise<DriveFile[]>
-import { popup, popupMenu, type MenuItem } from "@/os";
+import { alert, inputText, popup, popupMenu, success, type MenuItem } from "@/os";
+import { api, ApiError } from "@/api/client";
 import type { DriveFile } from "@/api/types";
 import { defaultStore } from "@/store/base";
 import { t } from "@/i18n";
@@ -77,6 +79,36 @@ function chooseFromPc(multiple: boolean): Promise<DriveFile[]> {
 	});
 }
 
+/**
+ * Asks for a URL and lets the server fetch it. The endpoint answers with the
+ * created file, so there is nothing to wait for beyond the request itself.
+ */
+async function chooseFromUrl(): Promise<DriveFile[]> {
+	const { canceled, result } = await inputText({
+		title: t("uploadFromUrl"),
+		text: t("uploadFromUrlDescription"),
+		placeholder: "https://",
+	});
+	const url = canceled || result == null ? "" : result.trim();
+	if (url === "") return [];
+
+	try {
+		const file = await api("drive/files/upload-from-url", {
+			url,
+			folderId: defaultStore.state.uploadFolder,
+		});
+		void success();
+		return [file];
+	} catch (cause) {
+		const text =
+			cause instanceof ApiError && cause.message !== ""
+				? cause.message
+				: t("failedToUpload");
+		void alert({ type: "error", title: t("failedToUpload"), text });
+		return [];
+	}
+}
+
 export function selectFiles(options: SelectFilesOptions = {}): Promise<DriveFile[]> {
 	const multiple = options.multiple === true;
 
@@ -108,6 +140,14 @@ export function selectFiles(options: SelectFilesOptions = {}): Promise<DriveFile
 			action: () => {
 				actionTaken = true;
 				void chooseFromDrive(multiple).then(finish);
+			},
+		});
+		items.push({
+			text: t("uploadFromUrl"),
+			icon: "ph-link ph-bold ph-lg",
+			action: () => {
+				actionTaken = true;
+				void chooseFromUrl().then(finish);
 			},
 		});
 
