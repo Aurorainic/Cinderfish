@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Aurorainic/cinderfish/internal/auth"
 	"github.com/gorilla/websocket"
 )
 
@@ -61,6 +62,65 @@ func TestStreamingMeUpdated(t *testing.T) {
 		}
 		if _, ok := body["followingCount"]; !ok {
 			t.Errorf("meUpdated is missing the derived counters: %v", body)
+		}
+		return
+	}
+}
+
+// TestStreamingMeUpdatedOnTwoFactor checks that enabling TOTP reaches the
+// account's main channel: the settings page in another tab reads
+// `twoFactorEnabled` from `$i`, and Misskey publishes meUpdated here too.
+func TestStreamingMeUpdatedOnTwoFactor(t *testing.T) {
+	ts := newStreamingServer(t, "open")
+	_, aliceToken := signup(t, ts, "alice")
+
+	conn := dial(t, ts, aliceToken)
+	sendFrame(t, conn, map[string]any{
+		"type": "connect",
+		"body": map[string]any{"channel": "main", "id": "main1", "pong": true},
+	})
+	connected := false
+	for deadline := time.Now().Add(wsWait); time.Now().Before(deadline); {
+		msg, ok := readWithTimeout(t, conn, time.Until(deadline))
+		if !ok {
+			break
+		}
+		if msg.Type == "connected" {
+			connected = true
+			break
+		}
+	}
+	if !connected {
+		t.Fatal("main channel did not connect")
+	}
+
+	resp, registered := post(t, ts, "/api/i/2fa/register", map[string]any{
+		"i": aliceToken, "password": "correct horse battery staple",
+	})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("2fa/register = %d %v", resp.StatusCode, registered)
+	}
+	secret, _ := registered["secret"].(string)
+	code, err := auth.TOTPCode(secret, time.Now())
+	if err != nil {
+		t.Fatalf("totp code: %v", err)
+	}
+	if status := postNoContentWithToken(t, ts, "/api/i/2fa/done", aliceToken, map[string]any{"token": code}); status != http.StatusNoContent {
+		t.Fatalf("2fa/done = %d, want 204", status)
+	}
+
+	deadline := time.Now().Add(wsWait)
+	for {
+		msg, ok := waitForChannelMessage(t, conn, "main1", time.Until(deadline))
+		if !ok {
+			t.Fatal("no meUpdated frame after enabling 2FA")
+		}
+		if msg["type"] != "meUpdated" {
+			continue
+		}
+		body, _ := msg["body"].(map[string]any)
+		if body["twoFactorEnabled"] != true {
+			t.Errorf("meUpdated twoFactorEnabled = %v, want true", body["twoFactorEnabled"])
 		}
 		return
 	}

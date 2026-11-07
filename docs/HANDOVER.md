@@ -7373,8 +7373,8 @@ Firefish 的 `init.ts` 在 `main` 频道上监听 `meUpdated` 并 `updateAccount
 
 ### 12GF.2 有意的限制
 
-- 只在上面六个写操作后发布；`2fa/*`、`i/registry/set`、`i/update-email` 等 Misskey 也会发的地方暂未接
-  （其中 2FA 状态由设置页自己回读，不受影响）。
+- 只在上面六个写操作后发布；`2fa/*` 已于第一百七十一波补上（见 §12GI），`i/registry/set`、
+  `i/update-email` 等 Misskey 也会发的地方仍未接（这些值由各自的设置页回读）。
 - 关注远端账号时本地只写待审行，`followingCount` 不变，但仍会推一次（无害的重新取数）。
 - 事件里带的是本人视角的 MeDetailed（含邮箱等私密字段）：频道只投递给本人的连接。
 - 多标签页之间通过 localStorage 的 `account` 键同步；`updateMe` 合并后 `setMe` 覆盖写入，
@@ -7457,3 +7457,36 @@ Firefish 的 `init.ts` 在 `main` 频道上监听 `meUpdated` 并 `updateAccount
     「People & Body」→ 57 个按钮里 32 个带修饰符，样本为 `👋🏽`/`🤚🏽`/`✋🏽`（中等肤色）；
   - 改回默认 (1) 再打开同一分类：带修饰符的按钮数为 **0**（修复前为 32，且 4 号档得到 `🏾`）。
   截图 `/tmp/w170-shots/skin-tone.png`（不入库）。
+
+## 12GI. 第一百七十一波：2FA 的 meUpdated 与无头环境的一次踩坑记录（2026-11-07）
+
+第一百六十八波把 `meUpdated` 接到六个写操作上，并记录「`2fa/*` 暂未接」。这一轮补齐
+`i/2fa/done` 与 `i/2fa/unregister` 两处（Misskey 在这两处同样发 `meUpdated`）。本轮还尝试做整站
+路由巡检，结果暴露的是测试环境的坑而不是产品缺陷，一并记下来。
+
+### 12GI.1 落地清单
+
+| 层 | 文件 | 内容 |
+|----|------|------|
+| 发布 | `internal/httpapi/two_factor.go` | `i/2fa/done` 启用成功、`i/2fa/unregister` 停用成功后各调一次 `publishMeUpdated` |
+| 用例 | `internal/httpapi/streaming_e2e_scenarios_test.go` | `TestStreamingMeUpdatedOnTwoFactor`：连 `main` → register + done → 收到 `meUpdated` 且 `twoFactorEnabled: true` |
+| 文档 | `docs/HANDOVER.md` | §12GF 的「2fa 未接」改为已接；补充下节的走查环境说明 |
+
+### 12GI.2 巡检尝试与结论
+
+用真实二进制 + 无头 Helium 逐页打开 36 个路由（1400×900，收集 console error / 未捕获异常 /
+≥400 响应）。结果不可用，原因是**全新 user-data-dir 的第一次导航在这个环境里经常
+`net::ERR_ABORTED`，或者页面到达 `readyState=complete` 但 `#app` 为空**；只有紧跟一次
+`Page.reload` 才会渲染。因此所有路由都被记成 TIMEOUT，得到的唯一「异常」是
+`/settings/theme` 的 `404 /api/i/registry/get`——查证后是 Misskey 的正常语义（键不存在返回
+`NO_SUCH_KEY` 404），客户端本来就有回退。
+
+以后要做类似巡检，应按每个路由「导航 → 轮询 → 失败则 reload 一次」重试，并把首次导航失败计为
+环境问题而不是页面问题。本轮没有发现产品缺陷；`meUpdated` 的真实走查仍沿用第 168 波的两标签页
+方法（那里是注入 storage 后 reload，因而绕开了这个坑）。
+
+### 12GI.3 验证证据
+
+- `go vet ./...`、含数据库的全量 `go test ./...` 全绿。
+- `TestStreamingMeUpdatedOnTwoFactor`：启用 TOTP 后 `meUpdated` 帧里的 `twoFactorEnabled` 为 true。
+- `TestStreamingMeUpdated`（第 168 波）继续通过，说明新增发布点没有破坏原有路径。

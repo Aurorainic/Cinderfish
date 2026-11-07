@@ -121,6 +121,9 @@ func (s *Server) handleI2FADone(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, internalError("Could not enable two-factor authentication."))
 		return
 	}
+	// Other tabs show the two-factor state from `$i`; Misskey publishes
+	// meUpdated from i/2fa/done for the same reason.
+	s.publishMeUpdated(r.Context(), info.User.ID)
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -157,6 +160,7 @@ func (s *Server) handleI2FAUnregister(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, internalError("Could not disable two-factor authentication."))
 		return
 	}
+	s.publishMeUpdated(r.Context(), info.User.ID)
 	w.WriteHeader(http.StatusNoContent)
 }
 
