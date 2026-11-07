@@ -6912,7 +6912,8 @@ Firefish 的 `ui/_common_/common.vue` 在 `main` 频道上处理新通知：页�
 - `fileIds` 只限制数量，不校验文件归属或存在性（与上游一致，列表里可保留已删除 id）。
 - 空 CW 直接拒绝而不是自动转 null；客户端应发送 `null` 清除。
 - 文本仍允许纯空白（上游在「仅文本」时要求匹配 `[^\s]+`，这里未加）。
-- 编辑路径（notes/update）没有同步这些上限，仍按原有逻辑处理。
+- 编辑路径（`notes/edit`）的文本长度同样改为按码点计数；CW 在编辑里仍按「空串即清除」处理，
+  没有套用创建时的 1–100 限制。
 
 ### 12FR.3 验证证据
 
@@ -6920,5 +6921,6 @@ Firefish 的 `ui/_common_/common.vue` 在 `main` 频道上处理新通知：页�
 - `TestNotesCreateParamLimits`：3000 汉字 200、3001 400 `NOTE_TOO_LONG`；CW 100 通过、101 与空串
   400 `INVALID_PARAM`；17 个 fileIds 400；投票 1 项/11 项/重复/空项/51 码点均 400，2 项与
   50 码点通过。
+- 编辑路径：`notes/edit`（`editId` 即笔记 id）把 3000 汉字改为 200、3001 汉字为 400。
 - 真实二进制：同一组请求得到一致状态码（3000 CJK 200、3001 400 `NOTE_TOO_LONG`、CW 100 200、
   CW 101 400 `INVALID_PARAM`、poll 1 400 `INVALID_PARAM`、poll 2 200）。

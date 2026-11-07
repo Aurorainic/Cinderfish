@@ -47,6 +47,19 @@ func TestNotesCreateParamLimits(t *testing.T) {
 		t.Errorf("17 files: status = %d, want 400", resp.StatusCode)
 	}
 
+	// The edit path counts code points too.
+	noteID := createNote(t, ts, token, map[string]any{"text": "edit me"})
+	if resp, body := post(t, ts, "/api/notes/edit", map[string]any{
+		"i": token, "editId": noteID, "text": strings.Repeat("漢", 3000),
+	}); resp.StatusCode != http.StatusOK {
+		t.Fatalf("edit 3000 CJK: status %d body %v", resp.StatusCode, body)
+	}
+	if resp, _ := post(t, ts, "/api/notes/edit", map[string]any{
+		"i": token, "editId": noteID, "text": strings.Repeat("漢", 3001),
+	}); resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("edit 3001 CJK: status = %d, want 400", resp.StatusCode)
+	}
+
 	polls := []struct {
 		name    string
 		choices []string
