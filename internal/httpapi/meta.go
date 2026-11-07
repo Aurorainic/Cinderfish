@@ -1,7 +1,10 @@
 package httpapi
 
 import (
+	"context"
 	"net/http"
+
+	"github.com/Aurorainic/cinderfish/internal/federation"
 )
 
 const softwareVersion = "0.1.1"
@@ -31,6 +34,7 @@ func (s *Server) handleMeta(w http.ResponseWriter, r *http.Request) {
 	}
 
 	settings := s.liveInstanceSettings(r.Context())
+	mode := s.liveFederation(r.Context())
 	meta := map[string]any{
 		"maintainerName":               settings.MaintainerName,
 		"maintainerEmail":              settings.MaintainerEmail,
@@ -88,7 +92,7 @@ func (s *Server) handleMeta(w http.ResponseWriter, r *http.Request) {
 		"noteSearchableScope":          "global",
 		"maxFileSize":                  20 * 1024 * 1024,
 		// Misskey exposes the instance's federation mode to clients.
-		"federation": s.federationMode(),
+		"federation": mode.MisskeyMode(),
 	}
 
 	if !detail {
@@ -106,7 +110,7 @@ func (s *Server) handleMeta(w http.ResponseWriter, r *http.Request) {
 	meta["proxyAccountName"] = ""
 	meta["features"] = map[string]bool{
 		"localTimeline":          true,
-		"globalTimeline":         s.cfg.FederationMode == "public",
+		"globalTimeline":         mode != federation.ModeNone,
 		"registration":           s.cfg.RegistrationMode == "open",
 		"emailRequiredForSignup": false,
 		"hcaptcha":               false,
@@ -126,18 +130,16 @@ func repositoryURLOrDefault(value string) string {
 	return repositoryURL
 }
 
-// federationMode maps the configured mode onto Misskey's own vocabulary
-// (all | specified | none), so clients can read the instance's federation
-// state the same way they read a real Misskey instance.
-func (s *Server) federationMode() string {
-	switch s.cfg.FederationMode {
-	case "public":
-		return "all"
-	case "allowlist":
-		return "specified"
-	default:
-		return "none"
+// liveFederation reads the runtime federation switch. The mode lives in
+// instance_meta while the instance runs; configuration only seeds that row,
+// and an administrator can change it without a restart, so reading cfg here
+// would report the startup value after a switch.
+func (s *Server) liveFederation(ctx context.Context) federation.Mode {
+	mode, err := federation.ParseMode(s.liveFederationMode(ctx))
+	if err != nil {
+		return federation.ModeNone
 	}
+	return mode
 }
 
 // defaultPolicies mirrors Misskey's DEFAULT_POLICIES shape for the fields

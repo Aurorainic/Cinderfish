@@ -328,7 +328,7 @@
 | `enableUrlPreview` | bool | 恒 `true` |
 | `noteSearchableScope` | string | 恒 `"global"` |
 | `maxFileSize` | number | 恒 `20971520`（20 MiB） |
-| `federation` | string | `public` → `"all"`；`allowlist` → `"specified"`；其它 → `"none"`（`internal/httpapi/meta.go:105`–`117`） |
+| `federation` | string | 运行时联邦模式：`public` → `"all"`；`allowlist` → `"specified"`；其它 → `"none"`（读 `instance_meta.federationMode`，见上文“联邦开关”） |
 
 `detail: true` 额外字段：
 
@@ -345,7 +345,7 @@
 | 键 | 计算方式 |
 |----|----------|
 | `localTimeline` | 恒 `true` |
-| `globalTimeline` | `federation_mode == "public"`（**配置文件的值**） |
+| `globalTimeline` | 运行时联邦模式 != `none`（`public` 与 `allowlist` 均为 `true`） |
 | `registration` | `registration_mode == "open"` |
 | `emailRequiredForSignup` | 恒 `false` |
 | `hcaptcha` | 恒 `false` |
@@ -357,11 +357,11 @@
 
 ### 错误
 
-**没有成功路径以外的错误。** 本端点不读数据库、不鉴权、连 JSON 解码失败都忽略，所以只要路由命中就是 `200`。
+**没有成功路径以外的错误。** 本端点不鉴权、连 JSON 解码失败都忽略，所以只要路由命中就是 `200`。`federation` / `features.globalTimeline` 需要读运行时模式，数据库出错时回退到配置文件的值。
 
 ### 已知限制
 
-1. **`federation` 与 `features.globalTimeline` 读的是配置文件，不是运行时值。** 管理员通过 `POST /api/admin/federation/mode` 切换模式只写数据库 `instance_meta`（`internal/httpapi/federation_admin.go`），`meta` 的这两处仍用 `s.cfg`（`internal/httpapi/meta.go:78`、`92`），重启前一直报旧值。**而 AP 路由读的是数据库**（`internal/federation/policy.go:86`–`96`），两者会不一致。需要运行期值时应读 `GET /api/admin/federation/mode`（2026-11-06 新增，管理员端点）；普通客户端仍只能从 AP 路由是否 403 推断。
+1. **`federation` 与 `features.globalTimeline` 读运行时值（2026-11-07 修复）。** 模式来自 `instance_meta.federationMode`，配置文件只在启动时播种；`meta` 与 AP 路由现在看同一个值，管理员通过 `POST /api/admin/federation/mode` 切换后，匿名访客的首页下一个请求即更新。数据库不可用时回退到配置值。
 2. **`policies` 只有 2 个键。** Misskey 的 `DEFAULT_POLICIES` 有 40 多个（`gtlAvailable`、`ltlAvailable`、`canPublicNote`、`pinLimit`、`driveCapacityMb`、`maxFileSizeMb`、`uploadableFileTypes` 等，见 `packages/backend/src/core/RoleService.ts:78`–`124`）。Firefish 客户端若读 `policies.canPublicNote` 之类会拿到 `undefined`，需要前端兜底默认值。
 3. **`version` 是 `"0.1.0"`，NodeInfo 的 `software.version` 是 `"0.0.1"`**，两处写死且不同。
 4. **`uri` 恒为 `https://`**，而 `baseURL()`（AP 用）在 localhost 下会降级成 `http://`。本地开发时 `meta.uri` 与 actor URI 的 scheme 不同。
@@ -1099,7 +1099,7 @@ page：
 | # | 缺口 | 证据 |
 |---|------|------|
 | 1 | `meta.policies` 只有 2 个键，Misskey 有 40+；Firefish 客户端读 `policies.*` 会拿到 `undefined` | `internal/httpapi/meta.go:121`–`126` |
-| 2 | `meta.federation` 与 `features.globalTimeline` 读配置文件，运行时切换模式后不更新 | `internal/httpapi/meta.go:78`、`92` 对照 `internal/httpapi/federation_admin.go:66` |
+| 2 | ~~`meta.federation` 与 `features.globalTimeline` 读配置文件~~（2026-11-07 已改为运行时值） | `internal/httpapi/meta.go` 经 `liveFederationMode` 读 `instance_meta` |
 | 3 | `/api/*` 没有 CORS，前端必须同源 | 全仓库仅 AP 路由设 ACAO |
 | 4 | `WWW-Authenticate` 的 `error_description` 被覆盖，客户端只能看到 `Bearer realm="Misskey"` | `internal/httpapi/server.go:305` 与 `283`–`285` |
 | 5 | 令牌来源优先级与 Misskey 相反（body `i` 优先于 Header），且不支持 GET query 里的 `i` | `internal/httpapi/auth.go:30`–`46` |

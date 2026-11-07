@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -157,7 +158,7 @@ func TestFederationModeMapping(t *testing.T) {
 	for mode, want := range cases {
 		cfg := &config.Config{Domain: "d.example", FederationMode: mode}
 		srv := NewServer(cfg)
-		if got := srv.federationMode(); got != want {
+		if got := srv.liveFederation(context.Background()).MisskeyMode(); got != want {
 			t.Errorf("federation mode %q maps to %q, want %q", mode, got, want)
 		}
 	}

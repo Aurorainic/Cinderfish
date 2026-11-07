@@ -86,6 +86,37 @@ func TestAdminCanSwitchFederationMode(t *testing.T) {
 	}
 }
 
+// The visitor homepage reads meta.federation, so it has to follow the runtime
+// switch rather than the startup configuration: an administrator switching to
+// the allowlist must be reflected for anonymous clients immediately.
+func TestMetaReportsLiveFederationMode(t *testing.T) {
+	f := newFederationServer(t, "public")
+
+	if _, meta := post(t, f.ts, "/api/meta", map[string]any{"detail": true}); meta["federation"] != "all" {
+		t.Fatalf("meta.federation = %v, want all before the switch", meta["federation"])
+	}
+
+	for _, tc := range []struct{ mode, want string }{
+		{"allowlist", "specified"},
+		{"none", "none"},
+	} {
+		if _, err := f.pool.Exec(context.Background(), `
+INSERT INTO instance_meta (key, value) VALUES ('federationMode', to_jsonb($1::text))
+ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
+		`, tc.mode); err != nil {
+			t.Fatalf("switch mode to %s: %v", tc.mode, err)
+		}
+		_, meta := post(t, f.ts, "/api/meta", map[string]any{"detail": true})
+		if meta["federation"] != tc.want {
+			t.Errorf("meta.federation after %s = %v, want %s", tc.mode, meta["federation"], tc.want)
+		}
+		features, _ := meta["features"].(map[string]any)
+		if want := tc.mode != "none"; features["globalTimeline"] != want {
+			t.Errorf("features.globalTimeline after %s = %v, want %v", tc.mode, features["globalTimeline"], want)
+		}
+	}
+}
+
 func TestAllowlistGatesFederation(t *testing.T) {
 	f := newFederationServer(t, "allowlist")
 	token, id := f.registerUser(t, "alice")
