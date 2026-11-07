@@ -77,7 +77,9 @@ func (s *Server) handleDriveFilesCreate(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	writeJSON(w, http.StatusOK, packDriveFile(stored))
+	packed := packDriveFile(stored)
+	s.publishDriveFileCreated(info.User.ID, packed)
+	writeJSON(w, http.StatusOK, packed)
 }
 
 // checkOwnFolder verifies a folder id belongs to the caller before an upload

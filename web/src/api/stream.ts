@@ -1,5 +1,5 @@
 import { getAuthToken } from "./client";
-import type { NoteDetailed, Notification } from "./types";
+import type { DriveFile, NoteDetailed, Notification } from "./types";
 
 /**
  * Cinderfish Streaming API client.
@@ -39,6 +39,7 @@ export interface ChannelEventMap {
 	followed: FollowEvent;
 	unfollow: FollowEvent;
 	readAllNotifications: null;
+	driveFileCreated: DriveFile;
 	connected: { id: string };
 	unavailable: { id: string };
 }

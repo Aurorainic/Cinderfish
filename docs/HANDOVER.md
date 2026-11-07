@@ -7201,3 +7201,39 @@ store，通知列表从不读取它——设置页的说明自己写着「暂时
   - 条目数被截断：`.cf-statusbars .item` 共 101 个（50 条 × 2 份副本 + 1 条状态栏本身）；
   - 刷新页面后 2 秒内底栏仍在并重新拉取成功（`v17.0.1 | v16.0.7 | v15.0.11`）。
   截图 `/tmp/w163-shots/rss-statusbar.png`（不入库）。
+
+## 12GB. 第一百六十四波：driveFileCreated 与照片小部件的实时插入（2026-11-07）
+
+`widgets/photos.vue` 的注释写着「Firefish 走 `main` 频道的 `driveFileCreated`，Cinderfish 没有，
+所以只在重新挂载时刷新」。服务端从未发过这个事件，照片栏只能靠手动刷新。
+
+### 12GB.1 落地清单
+
+| 层 | 文件 | 内容 |
+|----|------|------|
+| 事件 | `internal/httpapi/streaming_publish.go` | `publishDriveFileCreated(userID, packed)` → `mainStream:<uid>` 的 `driveFileCreated` |
+| 上传 | `internal/httpapi/drive.go` | `drive/files/create` 成功、写响应前发布（连同打包好的 DriveFile） |
+| 抓取上传 | `internal/httpapi/drive_url_upload.go` | `drive/files/upload-from-url` 同样发布 |
+| 事件表 | `web/src/api/stream.ts` | `ChannelEventMap.driveFileCreated: DriveFile` |
+| 小部件 | `web/src/widgets/photos.vue` | 订阅 `main`，图片类型去重后前插、上限 9 张；卸载时解绑；注释改为现状 |
+| 笔记 | `web/src/i18n/PORTING-NOTES.md` | 流式缺口清单里移除 `driveFileCreated` |
+
+### 12GB.2 有意的限制
+
+- 只对上传者本人推送（与 Firefish 一致）：别人的新图不会出现在你的照片栏。
+- `drive/files/update`（改名、移动、标记敏感）不发事件；Firefish 也不发。
+- 没有 `drive/stream` 端点，初始列表仍是最近 24 个文件里过滤出的图片（最多 9 张）。
+- 事件在 HTTP 响应之前发布，所以客户端可能先收到帧、后收到响应；两者内容一致，顺序无害。
+- 多进程部署时事件经 Redis pub/sub 中继，前提是 Redis 已配置（与其它 main 频道事件相同）。
+
+### 12GB.3 验证证据
+
+- `go vet ./...`、含数据库的全量 `go test ./...` 全绿；`vue-tsc --noEmit`、`check:port`
+  （hardTotal 0）、`pnpm build` 全绿。
+- `TestStreamingDriveFileCreated`：连接 `main` 频道（`pong:true` 收到 `connected`）→ 上传
+  `photo.png` → 收到 `driveFileCreated`，其中 `id` 与上传响应一致、`name` 为 `photo.png`、`type` 非空。
+- 真实二进制 + 无头浏览器（1400×900，全新空网盘账号）：
+  - 打开首页，照片小部件显示「网盘里还没有图片」；
+  - 上传第一张 PNG → `.widgets .stream .img` 变为 1，背景为 `/media/c4/14/…`；
+  - 上传第二张不同内容的 PNG → 变为 2，最左一张的背景是第二张的 `/media/97/a3/…`（新图在前）；
+  - 截图 `/tmp/w164-shots/photos-widget.png`（不入库）。

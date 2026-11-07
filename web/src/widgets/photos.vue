@@ -27,10 +27,9 @@
 
 <script setup lang="ts">
 // Firefish streams `driveFileCreated` over the `main` channel and paginates
-// `drive/stream`. Cinderfish has neither (api/endpoints.ts), so the widget takes
-// the newest files from `drive/files` and keeps the image ones. Streaming
-// insertion is not implemented; the list refreshes when the widget remounts.
-import { onMounted, ref } from "vue";
+// `drive/stream`. Cinderfish has no `drive/stream`, so the newest images come
+// from `drive/files`; the live insertion uses the same stream event.
+import { onMounted, onUnmounted, ref } from "vue";
 import WidgetCard from "./WidgetCard.vue";
 import { CfInfo, CfLoading } from "@/components/ui";
 import { api, resolveMediaUrl } from "@/api/client";
@@ -38,6 +37,7 @@ import { ENDPOINTS } from "@/api/endpoints";
 import type { DriveFile } from "@/api/types";
 import { me } from "@/account";
 import { t } from "@/i18n";
+import { stream } from "@/stream";
 import { useWidgetPropsManager, type WidgetComponentExpose, type WidgetField } from "./index";
 import type { Widget } from "@/store/widgets";
 
@@ -62,16 +62,32 @@ const images = ref<DriveFile[]>([]);
 const fetching = ref(true);
 const failed = ref(false);
 
+const MAX_IMAGES = 9;
+
+/** New uploads arrive on `main`; only images take part in the grid. */
+function onDriveFileCreated(file: DriveFile): void {
+	if (!/^image\//.test(file.type)) return;
+	images.value = [
+		file,
+		...images.value.filter((image) => image.id !== file.id),
+	].slice(0, MAX_IMAGES);
+}
+
+let offDriveFileCreated: (() => void) | null = null;
+
 onMounted(() => {
 	if (me.value == null) {
 		fetching.value = false;
 		return;
 	}
+	offDriveFileCreated = stream
+		.useChannel("main")
+		.on("driveFileCreated", onDriveFileCreated);
 	api(ENDPOINTS.driveFiles, { limit: 24 })
 		.then((files) => {
 			images.value = files
 				.filter((file) => /^image\//.test(file.type))
-				.slice(0, 9);
+				.slice(0, MAX_IMAGES);
 		})
 		.catch(() => {
 			failed.value = true;
@@ -79,6 +95,11 @@ onMounted(() => {
 		.finally(() => {
 			fetching.value = false;
 		});
+});
+
+onUnmounted(() => {
+	offDriveFileCreated?.();
+	offDriveFileCreated = null;
 });
 
 defineExpose<WidgetComponentExpose>({

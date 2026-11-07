@@ -1,6 +1,7 @@
 package httpapi_test
 
 import (
+	"bytes"
 	"encoding/json"
 	"net/http"
 	"testing"
@@ -10,6 +11,65 @@ import (
 )
 
 const wsWait = 5 * time.Second
+
+// TestStreamingDriveFileCreated checks that an upload reaches the uploader's
+// main channel: Firefish's photos widget inserts the file from this event.
+func TestStreamingDriveFileCreated(t *testing.T) {
+	ts := newStreamingServer(t, "open")
+	_, aliceToken := signup(t, ts, "alice")
+
+	conn := dial(t, ts, aliceToken)
+	sendFrame(t, conn, map[string]any{
+		"type": "connect",
+		"body": map[string]any{"channel": "main", "id": "main1", "pong": true},
+	})
+	connected := false
+	for deadline := time.Now().Add(wsWait); time.Now().Before(deadline); {
+		msg, ok := readWithTimeout(t, conn, time.Until(deadline))
+		if !ok {
+			break
+		}
+		if msg.Type == "connected" {
+			connected = true
+			break
+		}
+	}
+	if !connected {
+		t.Fatal("main channel did not connect")
+	}
+
+	resp, uploaded := uploadFile(t, ts.URL, aliceToken, "photo.png",
+		bytes.NewBufferString("\x89PNG\r\n\x1a\nfake"))
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("upload: status %d (%v)", resp.StatusCode, uploaded)
+	}
+	fileID, _ := uploaded["id"].(string)
+	if fileID == "" {
+		t.Fatalf("upload response has no id: %v", uploaded)
+	}
+
+	deadline := time.Now().Add(wsWait)
+	for {
+		msg, ok := waitForChannelMessage(t, conn, "main1", time.Until(deadline))
+		if !ok {
+			t.Fatalf("no driveFileCreated frame for %s", fileID)
+		}
+		if msg["type"] != "driveFileCreated" {
+			continue
+		}
+		body, _ := msg["body"].(map[string]any)
+		if body["id"] != fileID {
+			t.Fatalf("driveFileCreated id = %v, want %s", body["id"], fileID)
+		}
+		if name, _ := body["name"].(string); name != "photo.png" {
+			t.Errorf("driveFileCreated name = %q, want photo.png", name)
+		}
+		if typ, _ := body["type"].(string); typ == "" {
+			t.Errorf("driveFileCreated has no type: %v", body)
+		}
+		return
+	}
+}
 
 // TestStreamingHandshake covers the HTTP-level outcomes of the upgrade.
 func TestStreamingHandshake(t *testing.T) {

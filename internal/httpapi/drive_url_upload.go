@@ -140,7 +140,9 @@ func (s *Server) handleDriveFilesUploadFromURL(w http.ResponseWriter, r *http.Re
 		writeInternalServerError(w)
 		return
 	}
-	writeJSON(w, http.StatusOK, packDriveFile(stored))
+	packed := packDriveFile(stored)
+	s.publishDriveFileCreated(info.User.ID, packed)
+	writeJSON(w, http.StatusOK, packed)
 }
 
 // checkFetchTarget rejects hosts that resolve to loopback, private or

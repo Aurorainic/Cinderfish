@@ -69,6 +69,16 @@ func (s *Server) publishNotificationCreated(notificationID, recipientID string) 
 	s.streamBus.PublishTyped(streaming.MainSubject(recipientID), "notification", packed)
 }
 
+// publishDriveFileCreated emits the main channel "driveFileCreated" event.
+// Firefish's photos widget listens for it to insert a new image without a
+// reload; Misskey publishes the same event from its drive service.
+func (s *Server) publishDriveFileCreated(userID string, file map[string]any) {
+	if s.streamBus == nil {
+		return
+	}
+	s.streamBus.PublishTyped(streaming.MainSubject(userID), "driveFileCreated", file)
+}
+
 // publishNoteReaction emits a reaction change on a note's stream.
 func (s *Server) publishNoteReaction(n *note.Note, typ, emoji, userID string) {
 	if s.streamBus == nil {
