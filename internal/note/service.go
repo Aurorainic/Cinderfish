@@ -195,6 +195,12 @@ func (s *Service) Create(ctx context.Context, p CreateParams) (*Note, error) {
 	if p.Text == nil && len(p.FileIDs) == 0 && p.Poll == nil && p.RenoteID == nil {
 		return nil, ErrEmptyNote
 	}
+	// When text is the only content, Misskey's schema also requires it to
+	// match [^\s]+; a note of spaces alone is refused.
+	if p.Text != nil && len(p.FileIDs) == 0 && p.Poll == nil && p.RenoteID == nil &&
+		strings.TrimSpace(*p.Text) == "" {
+		return nil, ErrEmptyNote
+	}
 	// Misskey validates against the JSON Schema maxLength, which counts
 	// Unicode code points; len() counts bytes and would cut CJK notes at a
 	// third of the upstream limit.

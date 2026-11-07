@@ -47,6 +47,11 @@ func TestNotesCreateParamLimits(t *testing.T) {
 		t.Errorf("17 files: status = %d, want 400", resp.StatusCode)
 	}
 
+	// Text-only notes may not be whitespace.
+	if resp, _ := postWithToken(t, ts, "/api/notes/create", token, map[string]any{"text": "   "}); resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("whitespace-only text: status = %d, want 400", resp.StatusCode)
+	}
+
 	// The edit path counts code points too.
 	noteID := createNote(t, ts, token, map[string]any{"text": "edit me"})
 	if resp, body := post(t, ts, "/api/notes/edit", map[string]any{
