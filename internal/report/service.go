@@ -22,7 +22,10 @@ type Report struct {
 	TargetUserID string
 	Comment      string
 	Resolved     bool
-	CreatedAt    time.Time
+	// Forwarded is true when an administrator sent the complaint to the
+	// reported account's instance as an ActivityPub Flag.
+	Forwarded bool
+	CreatedAt time.Time
 }
 
 // Service reads and writes reports.
@@ -40,10 +43,10 @@ func (s *Service) Create(ctx context.Context, reporterID, targetUserID, comment 
 	row := s.pool.QueryRow(ctx, `
 INSERT INTO abuse_reports (id, reporter_id, target_user_id, comment)
 VALUES ($1, $2, $3, $4)
-RETURNING id, reporter_id, target_user_id, comment, resolved, created_at
+RETURNING id, reporter_id, target_user_id, comment, resolved, forwarded, created_at
 `, idgen.New(), reporterID, targetUserID, comment)
 	var r Report
-	if err := row.Scan(&r.ID, &r.ReporterID, &r.TargetUserID, &r.Comment, &r.Resolved, &r.CreatedAt); err != nil {
+	if err := row.Scan(&r.ID, &r.ReporterID, &r.TargetUserID, &r.Comment, &r.Resolved, &r.Forwarded, &r.CreatedAt); err != nil {
 		return nil, fmt.Errorf("report: create: %w", err)
 	}
 	return &r, nil
@@ -111,7 +114,7 @@ func (s *Service) List(ctx context.Context, p ListParams) ([]*Report, error) {
 	}
 
 	query := `
-SELECT r.id, r.reporter_id, r.target_user_id, r.comment, r.resolved, r.created_at
+SELECT r.id, r.reporter_id, r.target_user_id, r.comment, r.resolved, r.forwarded, r.created_at
 FROM abuse_reports r
 JOIN users reporter ON reporter.id = r.reporter_id
 JOIN users target ON target.id = r.target_user_id`
@@ -129,7 +132,7 @@ JOIN users target ON target.id = r.target_user_id`
 	var out []*Report
 	for rows.Next() {
 		var r Report
-		if err := rows.Scan(&r.ID, &r.ReporterID, &r.TargetUserID, &r.Comment, &r.Resolved, &r.CreatedAt); err != nil {
+		if err := rows.Scan(&r.ID, &r.ReporterID, &r.TargetUserID, &r.Comment, &r.Resolved, &r.Forwarded, &r.CreatedAt); err != nil {
 			return nil, fmt.Errorf("report: scan: %w", err)
 		}
 		out = append(out, &r)
@@ -146,16 +149,39 @@ func (s *Service) Resolve(ctx context.Context, id string) (bool, error) {
 	return tag.RowsAffected() > 0, nil
 }
 
+// MarkForwarded flags a report as forwarded and reports whether this call
+// performed the transition: a second call is a no-op, so a retried request
+// cannot send the same Flag twice.
+func (s *Service) MarkForwarded(ctx context.Context, id string) (bool, error) {
+	tag, err := s.pool.Exec(ctx,
+		`UPDATE abuse_reports SET forwarded = TRUE WHERE id = $1 AND NOT forwarded`, id)
+	if err != nil {
+		return false, fmt.Errorf("report: mark forwarded: %w", err)
+	}
+	return tag.RowsAffected() > 0, nil
+}
+
+// UnmarkForwarded clears the flag after a failed delivery, so the
+// administrator can retry the same report.
+func (s *Service) UnmarkForwarded(ctx context.Context, id string) (bool, error) {
+	tag, err := s.pool.Exec(ctx,
+		`UPDATE abuse_reports SET forwarded = FALSE WHERE id = $1 AND forwarded`, id)
+	if err != nil {
+		return false, fmt.Errorf("report: unmark forwarded: %w", err)
+	}
+	return tag.RowsAffected() > 0, nil
+}
+
 // ErrNotFound is returned by Get when the id does not exist.
 var ErrNotFound = errors.New("report: not found")
 
 // Get loads one report.
 func (s *Service) Get(ctx context.Context, id string) (*Report, error) {
 	row := s.pool.QueryRow(ctx, `
-SELECT id, reporter_id, target_user_id, comment, resolved, created_at
+SELECT id, reporter_id, target_user_id, comment, resolved, forwarded, created_at
 FROM abuse_reports WHERE id = $1`, id)
 	var r Report
-	err := row.Scan(&r.ID, &r.ReporterID, &r.TargetUserID, &r.Comment, &r.Resolved, &r.CreatedAt)
+	err := row.Scan(&r.ID, &r.ReporterID, &r.TargetUserID, &r.Comment, &r.Resolved, &r.Forwarded, &r.CreatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrNotFound
 	}

@@ -81,6 +81,15 @@
 								>
 									{{ resolvingId === item.id ? "处理中…" : "标记已处理" }}
 								</CfButton>
+								<CfButton
+									v-if="item.targetUser.host != null && !item.forwarded"
+									mini
+									:disabled="forwardingId === item.id"
+									@click="forward(item)"
+								>
+									{{ forwardingId === item.id ? "转发中…" : "转发到对方实例" }}
+								</CfButton>
+								<span v-if="item.forwarded" class="badge forwarded">已转发</span>
 								<CfA class="profile" :to="userPage(item.targetUser)">
 									查看被举报者
 								</CfA>
@@ -100,7 +109,9 @@
 					{{ actionError }}
 				</CfInfo>
 				<CfInfo class="notice">
-					只实现「查看与标记已处理」：转发到对方实例（forward）与自动处置没有端点。
+					对远端账号的举报可以「转发到对方实例」：会以管理员的账号签名投递一条
+					ActivityPub <code>Flag</code>，并把该举报标记为已转发（重复点击不会重复发送）。
+					本地账号的举报不能转发；自动处置没有实现。
 				</CfInfo>
 			</div>
 		</MkSpacer>
@@ -110,8 +121,10 @@
 <script setup lang="ts">
 // Firefish's abuse list pages `admin/abuse-user-reports` with state / origin
 // filters and offers resolve + forward. Cinderfish implements the list, the
-// filters and resolve; forwarding to a remote instance is not implemented and
-// is called out in the page instead of being drawn as a dead button.
+// filters, resolve and forwarding a report about a remote account as a Flag;
+// the local-target refusal comes from the server and is shown verbatim.
+// Automatic moderation ("auto-handle") has no endpoint and is called out in
+// the page instead of being drawn as a dead button.
 import { computed, onMounted, ref } from "vue";
 import { ApiError, api } from "@/api/client";
 import type { AbuseReport } from "@/api/types";
@@ -141,6 +154,7 @@ const state = ref("unresolved");
 const reporterOrigin = ref("combined");
 const targetOrigin = ref("combined");
 const resolvingId = ref<string | null>(null);
+const forwardingId = ref<string | null>(null);
 const actionError = ref<string | null>(null);
 
 const { items, fetching, moreFetching, hasMore, error, reload, loadMore } =
@@ -174,6 +188,20 @@ async function resolve(item: AbuseReport): Promise<void> {
 		actionError.value = errorText(cause);
 	} finally {
 		resolvingId.value = null;
+	}
+}
+
+async function forward(item: AbuseReport): Promise<void> {
+	if (forwardingId.value !== null) return;
+	forwardingId.value = item.id;
+	actionError.value = null;
+	try {
+		await api("admin/forward-abuse-user-report", { reportId: item.id });
+		item.forwarded = true;
+	} catch (cause) {
+		actionError.value = errorText(cause);
+	} finally {
+		forwardingId.value = null;
 	}
 }
 

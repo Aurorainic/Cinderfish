@@ -613,6 +613,10 @@ ALTER TABLE followings
 ALTER TABLE notes
     ADD COLUMN IF NOT EXISTS remote_mentions JSONB NOT NULL DEFAULT '[]'::jsonb;
 `,
+	23: `
+ALTER TABLE abuse_reports
+    ADD COLUMN IF NOT EXISTS forwarded BOOLEAN NOT NULL DEFAULT FALSE;
+`,
 }
 
 // Migrate applies pending migrations in order and returns the version

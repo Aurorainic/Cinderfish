@@ -10,20 +10,20 @@
 - 本实现的路由：`internal/httpapi/server.go` 及同包各 handler 文件里的 `"POST /api/…"` 注册。
 - 统计口径：按 Misskey 端点路径逐一比对（不含 HTTP 方法差异；Misskey 全部为 POST）。
 
-## 1. 总量（2026-11-06 复核）
+## 1. 总量（2026-11-07 复核）
 
 | 指标 | 数量 |
 |------|------|
 | Misskey 端点总数 | 440 |
-| Cinderfish 已注册路由 | 164 |
-| 其中 Misskey 同名路径 | 156 |
+| Cinderfish 已注册路由 | 165 |
+| 其中 Misskey 同名路径 | 157 |
 | 其中 Cinderfish 自有路径/别名 | 8（`notifications` 别名、`admin/federation/mode`、`admin/federation/allowlist`、`miauth/{session}/check`、`admin/object-storage`、`admin/deliver-queue`、`notes/history`、`oauth/authorize`（同意页调用）） |
-| 未实现（Misskey 同名） | 284 |
+| 未实现（Misskey 同名） | 283 |
 
 统计口径：`internal/httpapi/server.go` 里 `HandleFunc("METHOD /api/…")` 的去重路径；
 GET 与 POST 同名路径只算一个。
 
-## 2. 已实现（164 条注册路由）
+## 2. 已实现（165 条注册路由）
 
 ```
 admin/accounts/create       admin/announcements/create  admin/announcements/delete
@@ -31,6 +31,7 @@ admin/abuse-user-reports    admin/deliver-queue*        admin/get-index-stats
 admin/get-table-stats
 admin/meta                  admin/object-storage*       admin/update-meta
 admin/resolve-abuse-user-report
+admin/forward-abuse-user-report
 admin/announcements/list    admin/announcements/update  admin/emoji/add
 admin/emoji/delete          admin/emoji/list            admin/federation/allowlist*
 admin/drive/show-file       admin/federation/mode*      admin/show-users
@@ -166,6 +167,9 @@ notes/history*
 
 2026-11-06 第十四波新增：`admin/update-meta` 增加 `blockedHosts`（不是新路由），策略层在出站与入站
 按精确主机拒绝。
+
+2026-11-07 第一百六十五波新增：`admin/forward-abuse-user-report`（迁移 v23 增加
+`abuse_reports.forwarded`；远端目标的举报转发为 ActivityPub `Flag`，本地的返回 400 `CANNOT_FORWARD`）。
 
 2026-11-06 第十三波新增：`admin/meta`、`admin/update-meta`（只覆盖名称/简介/维护者/邮箱/注册模式）。
 

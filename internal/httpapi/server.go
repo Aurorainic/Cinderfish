@@ -330,6 +330,7 @@ func (s *Server) registerRoutes() {
 	// Abuse reports: users file them, administrators resolve them.
 	s.mux.HandleFunc("POST /api/admin/abuse-user-reports", s.handleAdminAbuseReports)
 	s.mux.HandleFunc("POST /api/admin/resolve-abuse-user-report", s.handleAdminResolveAbuseReport)
+	s.mux.HandleFunc("POST /api/admin/forward-abuse-user-report", s.handleAdminForwardAbuseReport)
 
 	s.mux.HandleFunc("POST /api/drive/files/create", s.handleDriveFilesCreate)
 	s.mux.HandleFunc("POST /api/drive/files/upload-from-url", s.handleDriveFilesUploadFromURL)

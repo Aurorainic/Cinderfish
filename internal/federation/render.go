@@ -376,6 +376,18 @@ func (r *Renderer) RenderFollow(id, actorRef, objectRef string) Object {
 	})
 }
 
+// RenderFlag builds a Flag activity: a moderation complaint forwarded to the
+// instance hosting the reported account. Misskey's renderFlag carries actor,
+// content and object (the reported actor's URI) and no id, so this matches.
+func (r *Renderer) RenderFlag(actorRef, objectRef, content string) Object {
+	return withContext(Object{
+		"type":    "Flag",
+		"actor":   actorRef,
+		"content": content,
+		"object":  objectRef,
+	})
+}
+
 // RenderAccept builds an Accept activity for an inbound Follow. The
 // embedded object is the original Follow, which is what lets the peer
 // match the acceptance to its request.

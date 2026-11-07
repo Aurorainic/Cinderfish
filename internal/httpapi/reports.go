@@ -1,11 +1,15 @@
 package httpapi
 
 import (
+	"context"
+	"errors"
+	"log"
 	"net/http"
 	"strings"
 	"time"
 	"unicode/utf8"
 
+	"github.com/Aurorainic/cinderfish/internal/federation"
 	"github.com/Aurorainic/cinderfish/internal/report"
 )
 
@@ -125,9 +129,7 @@ func (s *Server) handleAdminAbuseReports(w http.ResponseWriter, r *http.Request)
 			"comment":    item.Comment,
 			"resolved":   item.Resolved,
 			"createdAt":  item.CreatedAt.UTC().Format(time.RFC3339Nano),
-			// Forwarding to a remote instance is not implemented; the field is
-			// part of the client shape, so it stays false rather than absent.
-			"forwarded": false,
+			"forwarded":  item.Forwarded,
 		})
 	}
 	writeJSON(w, http.StatusOK, out)
@@ -160,4 +162,104 @@ func (s *Server) handleAdminResolveAbuseReport(w http.ResponseWriter, r *http.Re
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// handleAdminForwardAbuseReport is POST /api/admin/forward-abuse-user-report.
+//
+// Misskey forwards the complaint to the reported account's instance as an
+// ActivityPub Flag, signed by the instance actor. Cinderfish has no instance
+// actor, so the acting administrator's own account authors and signs the Flag;
+// the receiving side only needs a verifiable actor.
+func (s *Server) handleAdminForwardAbuseReport(w http.ResponseWriter, r *http.Request) {
+	info, err := s.authenticate(r.Context(), r, bodyAsMap(r))
+	if err != nil || info == nil {
+		writeAuthenticationError(w)
+		return
+	}
+	if !info.User.IsAdmin {
+		writeAPIError(w, &APIError{
+			Message: "You are not an administrator.", Code: "FORBIDDEN",
+			ID: errIDForbidden, Kind: "permission", Status: http.StatusForbidden,
+		})
+		return
+	}
+	if s.reports == nil {
+		writeInternalServerError(w)
+		return
+	}
+	var body struct {
+		ReportID string `json:"reportId"`
+	}
+	if err := decodeOptionalJSON(r, &body); err != nil {
+		writeAPIError(w, err)
+		return
+	}
+	if body.ReportID == "" {
+		writeAPIError(w, invalidParamError("reportId is required"))
+		return
+	}
+	row, err := s.reports.Get(r.Context(), body.ReportID)
+	if errors.Is(err, report.ErrNotFound) {
+		writeAPIError(w, &APIError{
+			Message: "No such abuse report.", Code: "NO_SUCH_ABUSE_REPORT",
+			ID: "8763e21b-d9bc-40be-acf6-54c1a6986493", Kind: "server", Status: http.StatusNotFound,
+		})
+		return
+	}
+	if err != nil {
+		writeInternalServerError(w)
+		return
+	}
+	if s.federationStore == nil || s.fedRenderer == nil || s.federationDeliver == nil {
+		writeInternalServerError(w)
+		return
+	}
+
+	target, err := s.federationStore.UserByID(r.Context(), row.TargetUserID)
+	if err != nil || target.Host == "" {
+		// Misskey fails with a 500 here; a 400 says what is wrong instead.
+		writeAPIError(w, &APIError{
+			Message: "Only reports about remote accounts can be forwarded.",
+			Code:    "CANNOT_FORWARD", ID: errIDInternal, Kind: "client", Status: http.StatusBadRequest,
+		})
+		return
+	}
+
+	// Claim the forward first: a second request (or a double click) must not
+	// send the same Flag again.
+	claimed, err := s.reports.MarkForwarded(r.Context(), row.ID)
+	if err != nil {
+		writeInternalServerError(w)
+		return
+	}
+	if !claimed {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	if err := s.deliverReportFlag(r.Context(), info.User.ID, row, target); err != nil {
+		log.Printf("httpapi: forward report %s: %v", row.ID, err)
+		// Put the report back so the administrator can retry.
+		if _, revertErr := s.reports.UnmarkForwarded(r.Context(), row.ID); revertErr != nil {
+			log.Printf("httpapi: forward report %s: revert forwarded flag: %v", row.ID, revertErr)
+		}
+		writeInternalServerError(w)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// deliverReportFlag renders and queues the Flag for a report about a remote
+// account. The remote actor's shared inbox wins over its personal inbox, which
+// matches how every other activity is addressed.
+func (s *Server) deliverReportFlag(ctx context.Context, adminID string, row *report.Report, target *federation.RemoteUser) error {
+	inbox := target.SharedInbox
+	if inbox == "" {
+		inbox = target.Inbox
+	}
+	if inbox == "" {
+		return errors.New("the remote account has no inbox")
+	}
+	actor := s.fedRenderer.ActorRef(adminID)
+	flag := s.fedRenderer.RenderFlag(actor, target.URI, row.Comment)
+	return s.federationDeliver.Enqueue(context.WithoutCancel(ctx), inbox, "", s.fedRenderer.KeyID(adminID), adminID, flag)
 }

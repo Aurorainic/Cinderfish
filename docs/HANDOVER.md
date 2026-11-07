@@ -7237,3 +7237,49 @@ store，通知列表从不读取它——设置页的说明自己写着「暂时
   - 上传第一张 PNG → `.widgets .stream .img` 变为 1，背景为 `/media/c4/14/…`；
   - 上传第二张不同内容的 PNG → 变为 2，最左一张的背景是第二张的 `/media/97/a3/…`（新图在前）；
   - 截图 `/tmp/w164-shots/photos-widget.png`（不入库）。
+
+## 12GC. 第一百六十五波：举报转发（admin/forward-abuse-user-report）与 Flag 出站（2026-11-07）
+
+`admin/abuse-user-reports` 的 `forwarded` 一直是硬编码 `false`，注释写着「转发到远端实例未实现」，
+管理台也把转发列为「没有端点」。这一轮补上 Misskey 的转发端点与出站 `Flag`。
+
+### 12GC.1 落地清单
+
+| 层 | 文件 | 内容 |
+|----|------|------|
+| 迁移 | `internal/db/db.go` | v23：`abuse_reports.forwarded BOOLEAN NOT NULL DEFAULT FALSE` |
+| 存储 | `internal/report/service.go` | `Report.Forwarded`、SELECT/Scan 补齐、`MarkForwarded`（`WHERE NOT forwarded` 原子认领）、`UnmarkForwarded`（投递失败回滚） |
+| 渲染 | `internal/federation/render.go` | `RenderFlag(actorRef, objectRef, content)`：与 Misskey 的 `renderFlag` 同形（actor/content/object，无 id） |
+| 端点 | `internal/httpapi/reports.go` | `admin/forward-abuse-user-report`：管理员校验、`reportId` 必填、未知 404 `NO_SUCH_ABUSE_REPORT`（Misskey 的 id）、本地目标 400 `CANNOT_FORWARD`、已转发幂等 204 |
+| 投递 | 同上 | 优先 shared inbox，其次个人 inbox；`deliver_queue` 入队成功才保留 forwarded；失败回滚并返回 500 |
+| 列表 | `internal/httpapi/reports.go` | `forwarded` 改为读库 |
+| 管理台 | `web/src/pages/AdminAbuses.vue` | 远端账号的举报显示「转发到对方实例」；成功后就地变「已转发」；说明文字改写 |
+| 客户端类型 | `web/src/api/{endpoints,types}.ts` | `adminForwardAbuseReport` 路径常量与 `EndpointMap` 条目（`EmptyResponse`） |
+| 台账 | `docs/research/2026-11-04-misskey-api-coverage.md` | 164 → 165 路由、156 → 157 同名、284 → 283 未实现 |
+
+### 12GC.2 有意的限制
+
+- **署名者是操作的管理员，不是实例 actor。** Misskey 用 system account `actor` 签名；本实现没有实例
+  actor，用管理员自己的账号与密钥签名。对方只需要一个可验证的 actor，语义上仍是「本实例的版务」。
+- 本地目标的举报按 Misskey 的语义不可转发；Misskey 会抛 500，这里改为 400 `CANNOT_FORWARD` 并给出
+  原因，且不会把记录标成已转发。
+- 重复转发是幂等的（204），不会重复入队；并发双请求由 `WHERE NOT forwarded` 认领，只有一方发送。
+- 投递失败（入队本身失败）会把 `forwarded` 回滚，便于管理员重试；入队成功但后续 HTTP 投递失败
+  仍保持已转发（与其它活动的重试语义一致，队列里能看到失败行）。
+- 附带 note URI / 多个目标的 Flag 出站没有做：本端点只转发举报正文与被举报账号 URI。
+- 没有 moderation log（本实现没有版务日志表）。
+
+### 12GC.3 验证证据
+
+- `go vet ./...`、含数据库的全量 `go test ./...` 全绿；`vue-tsc --noEmit`、`check:port`
+  （hardTotal 0）、`pnpm build` 全绿。
+- `TestAdminForwardAbuseReport`（双实例，真实 HTTP + 签名 + 投递 worker）：
+  beta 的 bob 关注 alpha 管理员 → alpha 举报 bob（204）→ 转发（204）→ beta 收到
+  `inbox Flag … ok` 并生成目标为 bob 的举报行；alpha 列表 `forwarded` 由 false 变 true；
+  第二次转发 204 且 beta 仍只有 1 条；未知 id 404、缺参数 400、无效令牌 401。
+- `TestAdminForwardLocalReportRejected`：本地账号的举报转发返回 400 `CANNOT_FORWARD`，且
+  `forwarded` 保持 false。
+- 真实二进制 + 无头浏览器（1400×900，`/admin/abuses`）：
+  - 远端行按钮为「标记已处理」「转发到对方实例」，本地行只有「标记已处理」；
+  - 点击转发 → 按钮消失、出现「已转发」，`admin/abuse-user-reports` 回读 `forwarded: true`。
+  截图 `/tmp/w165-shots/forward.png`（不入库）。

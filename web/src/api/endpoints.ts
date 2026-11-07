@@ -205,6 +205,7 @@ export const ENDPOINTS = {
 	adminTableStats: "admin/get-table-stats",
 	adminIndexStats: "admin/get-index-stats",
 	adminResolveAbuseReport: "admin/resolve-abuse-user-report",
+	adminForwardAbuseReport: "admin/forward-abuse-user-report",
 	adminAnnouncementsCreate: "admin/announcements/create",
 	adminAnnouncementsList: "admin/announcements/list",
 	adminAnnouncementsUpdate: "admin/announcements/update",
@@ -914,6 +915,11 @@ export interface EndpointMap {
 		res: AbuseReport[];
 	};
 	[ENDPOINTS.adminResolveAbuseReport]: {
+		req: { reportId: string };
+		res: EmptyResponse;
+	};
+
+	[ENDPOINTS.adminForwardAbuseReport]: {
 		req: { reportId: string };
 		res: EmptyResponse;
 	};
