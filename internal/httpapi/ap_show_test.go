@@ -65,7 +65,7 @@ func TestAPShowResolvesRemoteObjects(t *testing.T) {
 func TestRemoteNoteMediaIsCachedAndPacked(t *testing.T) {
 	makeInstance := func(domain string) (*httpapi.Server, *httptest.Server, *pgxpool.Pool) {
 		pool := testPool(t)
-		cfg := &config.Config{Host: "127.0.0.1", Port: 0, Domain: domain, RegistrationMode: "open", FederationMode: "public"}
+		cfg := &config.Config{Host: "127.0.0.1", Port: 0, Domain: domain, RegistrationMode: "open", FederationMode: "public", SigninRateLimit: -1}
 		srv := httpapi.NewServerWithDB(cfg, pool)
 		srv.AttachStreaming(t.Logf)
 		srv.AttachFederation()
@@ -135,7 +135,7 @@ func TestRemoteNoteMediaIsCachedAndPacked(t *testing.T) {
 func TestFederationInboundNoteKeepsCachedAttachment(t *testing.T) {
 	makeInstance := func(domain string) (*httpapi.Server, *httptest.Server, *pgxpool.Pool) {
 		pool := testPool(t)
-		cfg := &config.Config{Host: "127.0.0.1", Port: 0, Domain: domain, RegistrationMode: "open", FederationMode: "public"}
+		cfg := &config.Config{Host: "127.0.0.1", Port: 0, Domain: domain, RegistrationMode: "open", FederationMode: "public", SigninRateLimit: -1}
 		srv := httpapi.NewServerWithDB(cfg, pool)
 		srv.AttachStreaming(t.Logf)
 		srv.AttachFederation()

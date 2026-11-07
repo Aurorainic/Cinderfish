@@ -22,7 +22,8 @@ func adminTestServer(t *testing.T, mode string) (*httptest.Server, *httpapi.Serv
 	cfg := &config.Config{
 		Host: "127.0.0.1", Port: 0, Domain: "fish.example",
 		RegistrationMode: mode, FederationMode: "none",
-		Media: config.Media{Backend: "local"},
+		Media:           config.Media{Backend: "local"},
+		SigninRateLimit: -1,
 	}
 	srv := httpapi.NewServerWithDB(cfg, pool)
 	// The binary always attaches the federation surface, even with federation

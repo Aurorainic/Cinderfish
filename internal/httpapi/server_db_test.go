@@ -59,6 +59,9 @@ func newTestServerWithPool(t *testing.T, mode string) (*httptest.Server, *pgxpoo
 		Host: "127.0.0.1", Port: 0, Domain: "fish.example",
 		RegistrationMode: mode, FederationMode: "public",
 		Media: config.Media{Backend: "local"},
+		// Signin tests loop attempts from one source address; the
+		// production cap of ten per hour would trip on them.
+		SigninRateLimit: -1,
 	}
 	srv := httpapi.NewServerWithDB(cfg, pool)
 	storage, err := media.NewLocalStorage(t.TempDir(), "/media")

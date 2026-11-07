@@ -25,6 +25,10 @@ type Config struct {
 	Media      Media      `toml:"media"`
 	Redis      Redis      `toml:"redis"`
 	Mail       Mail       `toml:"mail"`
+	// SigninRateLimit caps password attempts per source IP per hour, the
+	// cap Misskey's signin limiter uses. Zero means the default of 10;
+	// a negative value disables the cap (tests, sealed networks).
+	SigninRateLimit int `toml:"signin_rate_limit"`
 }
 
 // Mail configures outbound email. An empty Host means the server logs the

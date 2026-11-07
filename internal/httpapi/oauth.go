@@ -106,7 +106,36 @@ func parseOAuthAuthorize(q url.Values) (*oauthAuthorizeParams, *oauthRequestErro
 	if len(p.Scopes) == 0 {
 		p.Scopes = []string{"read"}
 	}
+	if err := validateRedirectURI(p.ClientID, p.RedirectURI); err != nil {
+		return nil, err
+	}
 	return p, nil
+}
+
+// validateRedirectURI pins the redirect to the client's own origin, the
+// rule Misskey's OAuth provider enforces by discovering the client's
+// registered redirect URIs from client_id (OAuth2ProviderService.ts:
+// `clientInfo.redirectUris.includes(redirectUriValue)`). Cinderfish has no
+// client discovery, so an https client_id URL stands in for the
+// registration: the redirect must land on the same host. Without this an
+// attacker could stage a consent page with their own redirect_uri and
+// collect the victim's authorization code.
+func validateRedirectURI(clientID, redirectURI string) *oauthRequestError {
+	client, err := url.Parse(clientID)
+	if err != nil || client.Scheme != "https" && client.Scheme != "http" || client.Host == "" {
+		return &oauthRequestError{"invalid_request", "client_id must be an https URL identifying the client"}
+	}
+	target, err := url.Parse(redirectURI)
+	if err != nil || (target.Scheme != "https" && target.Scheme != "http") || target.Host == "" {
+		return &oauthRequestError{"invalid_request", "redirect_uri must be an absolute http(s) URL"}
+	}
+	if !strings.EqualFold(target.Host, client.Host) {
+		return &oauthRequestError{"invalid_request", "redirect_uri must be on the client_id host"}
+	}
+	if target.Fragment != "" {
+		return &oauthRequestError{"invalid_request", "redirect_uri must not carry a fragment"}
+	}
+	return nil
 }
 
 // issueOAuthGrant records an authorization code for the user and returns it.

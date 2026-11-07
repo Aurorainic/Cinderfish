@@ -98,3 +98,35 @@ func TestOAuthAuthorizeConsentAPIRejectsBadParams(t *testing.T) {
 		t.Fatalf("plain PKCE = %d %v, want 400", resp.StatusCode, body)
 	}
 }
+
+// TestOAuthAuthorizeRejectsForeignRedirect proves the consent call cannot
+// send the authorization code to a host other than the client's own: a
+// staged consent page with the attacker's redirect_uri must fail.
+func TestOAuthAuthorizeRejectsForeignRedirect(t *testing.T) {
+	ts := newTestServer(t, "open")
+	_, signup := post(t, ts, "/api/signup", map[string]any{"username": uniqueName(t), "password": "hunter2"})
+	token := signup["token"].(string)
+
+	for _, tt := range []struct {
+		name        string
+		clientID    string
+		redirectURI string
+	}{
+		{"redirect on another host", "https://client.example/app", "https://evil.example/cb"},
+		{"non-URL client_id", "someapp", "https://client.example/callback"},
+		{"non-URL redirect", "https://client.example/app", "app://callback"},
+		{"redirect with fragment", "https://client.example/app", "https://client.example/cb#frag"},
+	} {
+		resp, body := post(t, ts, "/api/oauth/authorize", map[string]any{
+			"i":                     token,
+			"client_id":             tt.clientID,
+			"redirect_uri":          tt.redirectURI,
+			"response_type":         "code",
+			"code_challenge":        "challenge",
+			"code_challenge_method": "S256",
+		})
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Errorf("%s: = %d %v, want 400", tt.name, resp.StatusCode, body)
+		}
+	}
+}

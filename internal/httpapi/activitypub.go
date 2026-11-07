@@ -795,6 +795,20 @@ func (s *Server) handleInbox(w http.ResponseWriter, r *http.Request) {
 		Body:      body,
 		PublicKey: s.remoteKey,
 	})
+	if err != nil && s.storedKeyStale(r.Context(), keyID) {
+		// A stored key that no longer matches means the peer rotated its
+		// key. Fetching the actor document once refreshes the row and
+		// lets the retry verify; without it every later delivery would
+		// fail forever, because an Update activity needs a valid
+		// signature to get through.
+		if refreshErr := s.refreshRemoteKey(keyID); refreshErr == nil {
+			keyID, err = federation.VerifyRequest(r, federation.VerifyOptions{
+				Host:      r.Host,
+				Body:      body,
+				PublicKey: s.remoteKey,
+			})
+		}
+	}
 	if err != nil {
 		log.Printf("httpapi: inbox signature rejected: %v", err)
 		w.Header().Set("WWW-Authenticate", `Signature realm="Cinderfish"`)
@@ -813,7 +827,19 @@ func (s *Server) handleInbox(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Bad Request", http.StatusBadRequest)
 		return
 	}
-	_ = keyID
+	// The signature proves the request was made by the holder of keyId's
+	// private key, so the activity's actor must be that key's owner. A
+	// fragment is a specific key of the same actor. Misskey enforces the
+	// same equality in every handler (actor.uri !== getApId(activity.actor)
+	// → "invalid actor", ApInboxService.ts); without it any peer with a
+	// valid key of its own could deliver activities as another host's user.
+	signerURI, _, _ := strings.Cut(keyID, "#")
+	if signerURI != "" && !strings.EqualFold(signerURI, activity.Ref("actor")) {
+		log.Printf("httpapi: inbox rejected: signer %s does not match actor %s", signerURI, activity.Ref("actor"))
+		w.Header().Set("WWW-Authenticate", `Signature realm="Cinderfish"`)
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
 
 	// A blocked host may not deliver activities to this instance. The check
 	// happens after signature verification so an anonymous caller cannot probe
@@ -836,6 +862,35 @@ func (s *Server) handleInbox(w http.ResponseWriter, r *http.Request) {
 	// status is: a semantic failure is logged, never retried by the peer.
 	w.Header().Set("Content-Type", apContentType(r))
 	w.WriteHeader(http.StatusAccepted)
+}
+
+// storedKeyStale reports whether a signature rejection might be caused by
+// a stored key the peer has since replaced. Only a keyId whose actor row
+// exists locally can be stale; an unknown keyId goes straight to the
+// network path of remoteKey anyway.
+func (s *Server) storedKeyStale(ctx context.Context, keyID string) bool {
+	if s.federationStore == nil {
+		return false
+	}
+	actorURI, _, _ := strings.Cut(keyID, "#")
+	u, err := s.federationStore.UserByURI(ctx, actorURI)
+	return err == nil && u != nil && u.PublicKeyPEM != ""
+}
+
+// refreshRemoteKey refetches the actor document behind a keyId so a rotated
+// key replaces the stored one before the verification retry.
+func (s *Server) refreshRemoteKey(keyID string) error {
+	actorURI, _, _ := strings.Cut(keyID, "#")
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	actor, err := s.federationInbox.FetchActor(ctx, actorURI)
+	if err != nil {
+		return err
+	}
+	if actor.PublicKeyPEM == "" {
+		return fmt.Errorf("federation: actor %s publishes no public key", actorURI)
+	}
+	return nil
 }
 
 // remoteKey resolves the public key for a remote keyId. The key id is

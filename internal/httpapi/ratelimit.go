@@ -5,6 +5,8 @@ import (
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/Aurorainic/cinderfish/internal/config"
 )
 
 // rateLimit mirrors one of Misskey's per-endpoint `limit` blocks: a fixed
@@ -21,7 +23,24 @@ var (
 	limitFavoritesCreate = rateLimit{bucket: "notes/favorites/create", max: 20, duration: time.Hour}
 	limitDriveCreate     = rateLimit{bucket: "drive/files/create", max: 120, duration: time.Hour}
 	limitFollowingCreate = rateLimit{bucket: "following/create", max: 100, duration: time.Hour}
+	// signin is capped per source IP, like Misskey's SigninApiService:
+	// ten attempts per hour, at most one per second.
+	limitSigninInterval = rateLimit{bucket: "signin/interval", max: 1, duration: time.Second}
 )
+
+// signinHourLimit returns the hourly signin cap for this instance. The
+// configured value wins when set; a negative configuration disables the
+// cap.
+func signinHourLimit(cfg *config.Config) (rateLimit, bool) {
+	max := 10
+	if cfg != nil && cfg.SigninRateLimit != 0 {
+		max = cfg.SigninRateLimit
+	}
+	if max <= 0 {
+		return rateLimit{}, false
+	}
+	return rateLimit{bucket: "signin", max: max, duration: time.Hour}, true
+}
 
 type rateWindow struct {
 	start time.Time

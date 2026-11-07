@@ -14,8 +14,8 @@ func TestOAuthAuthorizeWithoutSession(t *testing.T) {
 	ts, _ := adminTestServer(t, "open")
 
 	q := url.Values{}
-	q.Set("client_id", "someapp")
-	q.Set("redirect_uri", "https://client.example/cb")
+	q.Set("client_id", "https://client.example/app")
+	q.Set("redirect_uri", "https://client.example/callback")
 	q.Set("response_type", "code")
 	q.Set("scope", "read write")
 	q.Set("code_challenge", "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk")

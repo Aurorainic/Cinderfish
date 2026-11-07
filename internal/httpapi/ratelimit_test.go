@@ -3,6 +3,8 @@ package httpapi
 import (
 	"testing"
 	"time"
+
+	"github.com/Aurorainic/cinderfish/internal/config"
 )
 
 func TestRateLimiterWindow(t *testing.T) {
@@ -37,5 +39,22 @@ func TestRateLimiterWindow(t *testing.T) {
 	now = now.Add(time.Hour)
 	if ok, _ := limiter.allow("alice", limit); !ok {
 		t.Error("call refused after the window reset")
+	}
+}
+
+func TestSigninHourLimit(t *testing.T) {
+	// Zero configuration means the Misskey default of ten per hour.
+	limit, enabled := signinHourLimit(nil)
+	if !enabled || limit.max != 10 {
+		t.Fatalf("default = %d enabled=%v, want 10 true", limit.max, enabled)
+	}
+	// A configured value wins.
+	limit, enabled = signinHourLimit(&config.Config{SigninRateLimit: 3})
+	if !enabled || limit.max != 3 {
+		t.Fatalf("configured = %d enabled=%v, want 3 true", limit.max, enabled)
+	}
+	// A negative configuration disables the cap, which the test servers use.
+	if _, enabled = signinHourLimit(&config.Config{SigninRateLimit: -1}); enabled {
+		t.Fatal("negative configuration must disable the cap")
 	}
 }

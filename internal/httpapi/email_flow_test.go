@@ -115,8 +115,9 @@ func TestEmailVerificationAndResetFlow(t *testing.T) {
 	cfg := &config.Config{
 		Host: "127.0.0.1", Port: 0, Domain: "fish.example",
 		RegistrationMode: "open", FederationMode: "public",
-		Media: config.Media{Backend: "local"},
-		Mail:  config.Mail{Host: smtpSrv.host, Port: smtpSrv.port, TLS: "none", From: "no-reply@fish.example"},
+		Media:           config.Media{Backend: "local"},
+		SigninRateLimit: -1,
+		Mail:            config.Mail{Host: smtpSrv.host, Port: smtpSrv.port, TLS: "none", From: "no-reply@fish.example"},
 	}
 	srv := httpapi.NewServerWithDB(cfg, pool)
 	storage, err := media.NewLocalStorage(t.TempDir(), "/media")

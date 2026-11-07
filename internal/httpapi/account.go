@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/Aurorainic/cinderfish/internal/account"
 	"github.com/Aurorainic/cinderfish/internal/auth"
@@ -134,6 +136,33 @@ func (s *Server) handleSignin(w http.ResponseWriter, r *http.Request) {
 	if body.Username == "" {
 		writeIDError(w, http.StatusBadRequest, errIDNoSuchUser)
 		return
+	}
+
+	// Misskey caps signin attempts per source IP: 10 per hour with at
+	// least a second between attempts (SigninApiService.ts, key
+	// 'signin'). Without it, password guessing runs unthrottled. A
+	// negative configured cap disables both checks.
+	ip := clientIP(r)
+	if hourLimit, enabled := signinHourLimit(s.cfg); enabled {
+		if ok, retry := s.rateLimiter.allow(ip, hourLimit); !ok {
+			seconds := int(retry.Round(time.Second) / time.Second)
+			if seconds < 1 {
+				seconds = 1
+			}
+			w.Header().Set("Retry-After", strconv.Itoa(seconds))
+			writeAPIError(w, &APIError{
+				Message: "Rate limit exceeded. Please try again later.",
+				Code:    "RATE_LIMIT_EXCEEDED", ID: errIDRateLimited,
+				Kind: "client", Status: http.StatusTooManyRequests,
+			})
+			return
+		}
+		if ok, _ := s.rateLimiter.allow(ip, limitSigninInterval); !ok {
+			// The one-second spacing only costs the client the attempt,
+			// like Misskey's minInterval; the hour window is the real cap.
+			writeIDError(w, http.StatusForbidden, errIDInvalidPassword)
+			return
+		}
 	}
 
 	user, err := s.accounts.Authenticate(r.Context(), body.Username, body.Password)
