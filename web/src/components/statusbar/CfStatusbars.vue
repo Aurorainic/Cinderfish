@@ -20,6 +20,15 @@
 				:marquee-duration="numberProp(item, 'marqueeDuration', 40)"
 				:marquee-reverse="item.props.marqueeReverse === true"
 			/>
+			<CfStatusbarRss
+				v-else-if="item.type === 'rss'"
+				class="body"
+				:url="stringProp(item, 'url', '')"
+				:shuffle="item.props.shuffle === true"
+				:refresh-interval-sec="numberProp(item, 'refreshIntervalSec', 300)"
+				:marquee-duration="numberProp(item, 'marqueeDuration', 40)"
+				:marquee-reverse="item.props.marqueeReverse === true"
+			/>
 			<span v-else class="body unknown">
 				未知的条目类型：{{ item.type ?? "（未设置）" }}
 			</span>
@@ -29,13 +38,13 @@
 
 <script lang="ts" setup>
 // Renders the status bar items configured in the settings page. Firefish also
-// supports `rss` (needs a media/RSS proxy this instance does not have) and
-// `userList` (lists are out of the first-release scope); an unknown type is
-// reported inline instead of rendering an empty box.
+// supports `userList` (lists are out of the first-release scope); an unknown
+// type is reported inline instead of rendering an empty box.
 import { computed } from "vue";
 import type { StatusbarItem } from "@/store";
 import { defaultStore } from "@/store";
 import CfStatusbarFederation from "./CfStatusbarFederation.vue";
+import CfStatusbarRss from "./CfStatusbarRss.vue";
 
 defineOptions({ name: "CfStatusbars" });
 
@@ -50,6 +59,15 @@ function numberProp(
 ): number {
 	const value = item.props[key];
 	return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+function stringProp(
+	item: StatusbarItem,
+	key: string,
+	fallback: string,
+): string {
+	const value = item.props[key];
+	return typeof value === "string" ? value : fallback;
 }
 </script>
 

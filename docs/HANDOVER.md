@@ -7163,3 +7163,41 @@ store，通知列表从不读取它——设置页的说明自己写着「暂时
   - 该行进入视口后 `POST /api/notifications {markAsRead:false}` 两条均为 `isRead: true`；
   - 到 `/settings/notifications` 关掉「合并重复通知」后回到列表，变成 **2** 行、没有角标。
   截图 `/tmp/w162-shots/folded.png`（不入库）。
+
+## 12GA. 第一百六十三波：状态栏的 RSS 条目（2026-11-07）
+
+第五十波把状态栏的 `rss` 类型列为禁用，理由是「没有媒体代理，浏览器直连会被 CORS 挡」。但
+第一百三十九波（§12FC）已经实现了 `fetch-rss`：服务端抓取、SSRF 防护、RSS/Atom 解析。缺口已经
+不存在，这一轮把条目类型接上。
+
+### 12GA.1 落地清单
+
+| 层 | 文件 | 内容 |
+|----|------|------|
+| 组件 | `web/src/components/statusbar/CfStatusbarRss.vue`（新） | `apiGet("fetch-rss")` 取条目，`MkMarquee` 滚动标题；读取中 / 失败（title 显示错误）/ 无条目三种状态；支持打乱、反向、滚动时长、刷新间隔 |
+| 渲染 | `web/src/components/statusbar/CfStatusbars.vue` | `type === 'rss'` 分支与 `stringProp` 读取订阅地址；未知类型提示保留 |
+| 设置页 | `web/src/pages/SettingsStatusbar.vue` | 「RSS」选项解禁；订阅地址（含 SSRF 说明）、打乱、反向、滚动时长、刷新间隔 |
+| 契约 | `docs/research/2026-11-06-firefish-port-wave50-contract.md` | 补一条更新说明，指出第 1 条限制已被本波解除 |
+
+### 12GA.2 有意的限制
+
+- **空标题丢弃、最多 50 条**。实测 Codeberg 的 `firefish/firefish/releases.rss` 809 条里 747 条
+  `<title>` 为空（原始 XML 即如此），而 Marquee 会复制一份内容：1618 个节点、轨道宽 37952px，
+  40 秒跑完等于每秒约 950px，既不可读也不该渲染。现在先过滤空标题再截断到 50 条。
+- 打乱在截断之前做（取「随机的 50 条」而不是「前 50 条再打乱」）。
+- 刷新靠 `setInterval`，最短 30 秒；一个条目一次刷新就重新走一遍服务端抓取（有时间上限 1 MiB）。
+- 仍然不支持 `userList`（首版范围外）；Deck / Zen 布局不挂状态栏（沿用第五十波）。
+- 失败只显示「无法读取订阅源」，完整错误放在 `title` 里；没有重试按钮（等下一个刷新周期）。
+
+### 12GA.3 验证证据
+
+- `vue-tsc --noEmit`、`check:port`（hardTotal 0）、`pnpm build` 全绿；Go 侧未改动。
+- 真实二进制 + 无头浏览器（1400×900）：
+  - `/settings/statusbar` → 「添加条目」→ 类型选 RSS → 填
+    `https://codeberg.org/forgejo/forgejo/releases.rss`，store 里写入
+    `pizzax::base::<uid>` 的 `statusbars[0].props.url`；
+  - 回到时间线：底栏出现 `.cf-statusbar-rss`，文本为
+    「v17.0.1 v16.0.7 v15.0.11 …」，链接指向 `…/releases/tag/v17.0.1` 等真实页面；
+  - 条目数被截断：`.cf-statusbars .item` 共 101 个（50 条 × 2 份副本 + 1 条状态栏本身）；
+  - 刷新页面后 2 秒内底栏仍在并重新拉取成功（`v17.0.1 | v16.0.7 | v15.0.11`）。
+  截图 `/tmp/w163-shots/rss-statusbar.png`（不入库）。

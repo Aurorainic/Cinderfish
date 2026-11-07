@@ -55,7 +55,7 @@
 			>
 				<template #label>类型</template>
 				<option value="federation">联邦实例</option>
-				<option value="" disabled>RSS（需要媒体代理，未实现）</option>
+				<option value="rss">RSS</option>
 				<option value="" disabled>用户列表（首版不做列表）</option>
 			</CfSelect>
 
@@ -122,6 +122,59 @@
 				>
 					<template #label>刷新间隔（秒）</template>
 					<template #caption>最短 30 秒；列表来自本地库，不会请求远端。</template>
+				</CfInput>
+			</template>
+
+			<template v-if="item.type === 'rss'">
+				<CfInput
+					:model-value="String(item.props.url ?? '')"
+					class="field"
+					@update:model-value="patchProps(item.id, { url: String($event ?? '').trim() })"
+				>
+					<template #label>订阅地址</template>
+					<template #caption>
+						由服务端抓取（<code>fetch-rss</code>），浏览器不会跨域请求；
+						地址必须是 http(s)，指向内网或回环地址会被拒绝。
+					</template>
+				</CfInput>
+				<CfSwitch
+					:model-value="item.props.shuffle === true"
+					class="field"
+					@update:model-value="patchProps(item.id, { shuffle: $event === true })"
+				>
+					打乱顺序
+				</CfSwitch>
+				<CfSwitch
+					:model-value="item.props.marqueeReverse === true"
+					class="field"
+					@update:model-value="
+						patchProps(item.id, { marqueeReverse: $event === true })
+					"
+				>
+					反向滚动
+				</CfSwitch>
+				<CfInput
+					:model-value="String(item.props.marqueeDuration ?? 40)"
+					class="field"
+					type="number"
+					@update:model-value="
+						patchProps(item.id, { marqueeDuration: clampNumber($event, 5, 600, 40) })
+					"
+				>
+					<template #label>滚动一轮秒数</template>
+				</CfInput>
+				<CfInput
+					:model-value="String(item.props.refreshIntervalSec ?? 300)"
+					class="field"
+					type="number"
+					@update:model-value="
+						patchProps(item.id, {
+							refreshIntervalSec: clampNumber($event, 30, 3600, 300),
+						})
+					"
+				>
+					<template #label>刷新间隔（秒）</template>
+					<template #caption>最短 30 秒；每次刷新都会由服务端重新抓取订阅源。</template>
 				</CfInput>
 			</template>
 		</section>
