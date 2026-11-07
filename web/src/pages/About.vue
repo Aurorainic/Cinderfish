@@ -30,7 +30,7 @@
 						<template #key>{{ t("version") }}</template>
 						<template #value>{{ version }}</template>
 					</CfKeyValue>
-					<CfKeyValue class="_formBlock">
+					<CfKeyValue class="_formBlock" :oneline="true">
 						<template #key>{{ t("host") }}</template>
 						<template #value>{{ host }}</template>
 					</CfKeyValue>

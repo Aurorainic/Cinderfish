@@ -210,7 +210,7 @@ const collapsed = ref(isLong.value);
 
 		.username {
 			display: block;
-			margin: 0;
+			margin: 4px 0 0;
 			font-size: 0.8em;
 			color: var(--fg);
 			font-weight: 500;

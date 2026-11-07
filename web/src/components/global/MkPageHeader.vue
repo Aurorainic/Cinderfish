@@ -648,6 +648,7 @@ onUnmounted(() => {
 
 			&:hover {
 				opacity: 1;
+				text-decoration: none;
 			}
 
 			&.active {
