@@ -38,10 +38,14 @@
 				<p>{{ t("notFound") }}</p>
 			</div>
 			<div class="notes">
-				<!-- drive/files/attached-notes does not exist (drive-media.md), so the
-				     list of notes that use this file cannot be fetched. -->
-				<div class="empty">
+				<MkNote v-for="note in notes" :key="note.id" :note="note" />
+				<div v-if="notes.length === 0 && !notesLoading" class="empty">
 					<p>{{ t("noNotes") }}</p>
+				</div>
+				<div v-if="hasMore" class="more">
+					<CfButton :disabled="notesLoading" @click="loadMore">
+						{{ notesLoading ? "加载中…" : "加载更多" }}
+					</CfButton>
 				</div>
 			</div>
 		</template>
@@ -51,17 +55,17 @@
 <script lang="ts" setup>
 // Route: /my/drive/file/:fileId/attached.
 //
-// Upstream lists the notes that reference a drive file. The backend has no
-// `drive/files/attached-notes` endpoint (see drive-media.md "已知缺口"), so this
-// page shows the file's own metadata (drive/files/show is anonymous) plus an
-// explicit empty state for the note list instead of pretending the list is
-// empty because nothing references the file.
+// The page shows the file's metadata plus the notes that reference it, paged
+// through `drive/files/attached-notes` (the endpoint Firefish's drive panel
+// uses for the same panel).
 import { computed, onMounted, ref } from "vue";
 import { useRoute } from "vue-router";
-import type { DriveFile } from "@/api/types";
+import type { DriveFile, Note } from "@/api/types";
 import { api, resolveMediaUrl } from "@/api/client";
+import CfButton from "@/components/ui/CfButton.vue";
 import CfKeyValue from "@/components/ui/CfKeyValue.vue";
 import CfLoading from "@/components/ui/CfLoading.vue";
+import MkNote from "@/components/MkNote.vue";
 import bytes from "@/filters/bytes";
 import { t } from "@/i18n";
 import { definePageMetadata } from "@/scripts/page-metadata";
@@ -73,6 +77,12 @@ const route = useRoute();
 const file = ref<DriveFile | null>(null);
 const loading = ref(true);
 const failed = ref(false);
+
+const notes = ref<Note[]>([]);
+const notesLoading = ref(false);
+const hasMore = ref(false);
+
+const PAGE_SIZE = 10;
 
 const fileId = computed(() => {
 	const raw = route.params.fileId;
@@ -93,7 +103,36 @@ definePageMetadata(
 	})),
 );
 
+function loadNotes(reset: boolean): void {
+	const id = fileId.value;
+	if (id === "") return;
+	notesLoading.value = true;
+	const untilId = reset || notes.value.length === 0
+		? undefined
+		: notes.value[notes.value.length - 1].id;
+	api<Note[]>("drive/files/attached-notes", {
+		fileId: id,
+		limit: PAGE_SIZE,
+		...(untilId == null ? {} : { untilId }),
+	})
+		.then((page) => {
+			notes.value = reset ? page : [...notes.value, ...page];
+			hasMore.value = page.length === PAGE_SIZE;
+		})
+		.catch(() => {
+			// The file metadata still renders; the note list stays as-is.
+		})
+		.finally(() => {
+			notesLoading.value = false;
+		});
+}
+
+function loadMore(): void {
+	loadNotes(false);
+}
+
 onMounted(async () => {
+	loadNotes(true);
 	try {
 		file.value = await api<DriveFile>("drive/files/show", {
 			fileId: fileId.value,

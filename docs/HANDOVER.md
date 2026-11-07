@@ -6976,3 +6976,34 @@ Firefish 的 `ui/_common_/common.vue` 在 `main` 频道上处理新通知：页�
 - 真实二进制 + 无头浏览器：悬停笔记的回复按钮（`.noDelay.bottom`）后立即出现 `.cf-tooltip`，
   文本「回复」，`top` 位于按钮底边之下；按钮的 `title` 为 null、`aria-label` 为「回复」；
   移开鼠标后气泡消失。截图 `/tmp/w157-shots/tooltip.png`（不入库）。
+
+## 12FU. 第一百五十七波：drive/files/attached-notes 与「使用此文件的笔记」页（2026-11-07）
+
+`/my/drive/file/:id/attached` 此前只显示文件元数据，注释写明缺 `drive/files/attached-notes`。
+该端点数据就在 `notes.file_ids` 里，这一轮补上。
+
+### 12FU.1 落地清单
+
+| 层 | 文件 | 内容 |
+|----|------|------|
+| 端点 | `internal/httpapi/drive_attached_notes.go`（新） | `POST /api/drive/files/attached-notes`：文件归属校验（他人的文件答 `NO_SUCH_FILE`）、`file_ids` 包含匹配、`deleted_at` 过滤、id/date 游标、limit 1–100 |
+| 路由 | `internal/httpapi/server.go` | 注册端点 |
+| 页面 | `web/src/pages/AttachedFiles.vue` | 用 `MkNote` 渲染笔记列表，`untilId` 加载更多，空态保留 |
+| 类型 | `web/src/api/endpoints.ts` | `driveAttachedNotes` → `Note[]` |
+| 台账 | `docs/research/2026-11-04-misskey-api-coverage.md` | 163 → 164 路由、155 → 156 同名、285 → 284 未实现 |
+
+### 12FU.2 有意的限制
+
+- 只返回查看者有权限读取的笔记；不可见笔记静默跳过（与列表端点一致）。
+- 游标与 `notes/mentions` 相同：`sinceId` 单独出现时升序，其余降序；日期为毫秒时间戳。
+- 没有按文件统计总数（Misskey 也没有）。
+- 页面每页 10 条，没有日期分隔（与文件面板的简单列表一致）。
+
+### 12FU.3 验证证据
+
+- `go vet ./...`、含数据库的全量 `go test ./...` 全绿；`vue-tsc --noEmit`、`check:port`
+  （hardTotal 0）、`pnpm build` 全绿。
+- `TestDriveAttachedNotes`：两个引用同一文件的笔记（新→旧）返回正确、`limit=1` + `untilId` 取到旧的
+  一条、删除后从列表消失、他人文件 404 `NO_SUCH_FILE`、匿名 401。
+- 真实二进制 + 无头浏览器：`/my/drive/file/<id>/attached` 显示文件元数据（名称/类型/大小/日期）与
+  两条 `w158 attached note` 笔记。截图 `/tmp/w158-shots/attached-notes.png`（不入库）。

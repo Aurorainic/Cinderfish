@@ -246,6 +246,7 @@ export const ENDPOINTS = {
 	serverInfo: "server-info",
 	usersReactions: "users/reactions",
 	getSounds: "get-sounds",
+	driveAttachedNotes: "drive/files/attached-notes",
 	fetchRss: "fetch-rss",
 	adminFederationMode: "admin/federation/mode",
 	adminFederationAllowlist: "admin/federation/allowlist",
@@ -1068,6 +1069,18 @@ export interface EndpointMap {
 	[ENDPOINTS.fetchRss]: {
 		req: { url: string };
 		res: FetchRssFeed;
+	};
+
+	[ENDPOINTS.driveAttachedNotes]: {
+		req: {
+			fileId: string;
+			limit?: number;
+			sinceId?: string;
+			untilId?: string;
+			sinceDate?: number;
+			untilDate?: number;
+		};
+		res: Note[];
 	};
 
 	[ENDPOINTS.getSounds]: {
