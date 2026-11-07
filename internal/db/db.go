@@ -621,6 +621,23 @@ ALTER TABLE abuse_reports
 ALTER TABLE abuse_reports
     ADD COLUMN IF NOT EXISTS moderation_note TEXT NOT NULL DEFAULT '';
 `,
+	25: `
+ALTER TABLE drive_files
+    ALTER COLUMN user_id DROP NOT NULL;
+CREATE OR REPLACE FUNCTION retain_remote_media() RETURNS trigger AS $$
+BEGIN
+    IF OLD.user_id IS NOT NULL AND EXISTS (
+        SELECT 1 FROM notes n WHERE OLD.id = ANY(n.file_ids) AND n.user_host IS NOT NULL
+    ) THEN
+        RETURN NULL;
+    END IF;
+    RETURN OLD;
+END;
+$$ LANGUAGE plpgsql;
+DROP TRIGGER IF EXISTS drive_files_retain_remote_media ON drive_files;
+CREATE TRIGGER drive_files_retain_remote_media
+    BEFORE DELETE ON drive_files FOR EACH ROW EXECUTE FUNCTION retain_remote_media();
+`,
 }
 
 // Migrate applies pending migrations in order and returns the version

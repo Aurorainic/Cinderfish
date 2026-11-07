@@ -28,12 +28,10 @@
 				<CfInfo v-else-if="status === 'remote'" warn icon="globe">
 					<div class="paragraphs">
 						<p class="paragraph">
-							远程账号请到对方实例关注本账号：<code>{{ rawAcct }}</code>
+							无法从本站解析远程账号：<code>{{ rawAcct }}</code>
 						</p>
 						<p class="paragraph">
-							Cinderfish 没有提供 <code>ap/show</code>
-							端点，无法按 URL 解析远程用户，因此本页只处理本站账号
-							<code>{{ host }}</code>。
+							{{ remoteError }}
 						</p>
 					</div>
 				</CfInfo>
@@ -108,13 +106,8 @@
 // /authorize-follow?acct=@user@host — the target of a "follow me" link that a
 // user shares (see FollowMe.vue).
 //
-// Firefish resolves the acct with firefish-js' Acct.parse, and for an https://
-// URI calls `ap/show`. Cinderfish has no `ap/show` endpoint (wave-4 contract
-// §2), so:
-//   * a remote acct is answered with "follow this account from your own
-//     instance" instead of a fake follow;
-//   * a local acct (`user`, `user@thishost`, `@user@thishost`) goes through
-//     `users/show` -> `following/create`.
+// Remote handles are resolved through WebFinger and users/show; local handles
+// keep the direct users/show path.
 // The acct parser is written here because the firefish-js Acct module is not
 // part of the dependency set.
 import { computed, onMounted, ref } from "vue";
@@ -156,6 +149,7 @@ const user = ref<UserDetailed | null>(null);
 const following = ref(false);
 const alreadyFollowing = ref(false);
 const actionError = ref("");
+const remoteError = ref("请检查账号写法和本站联邦配置后重试。");
 
 const myUsername = computed(() => me.value?.username ?? "");
 
@@ -218,37 +212,31 @@ async function load(): Promise<void> {
 		return;
 	}
 
-	// An ActivityPub object URL: `ap/show` is the only endpoint that could
-	// resolve it, and it does not exist.
-	if (/^https?:\/\//i.test(rawAcct.value.trim())) {
-		status.value = "remote";
-		return;
-	}
-
 	const parsed = parseAcct(rawAcct.value);
 	if (parsed == null) {
 		status.value = "invalid";
 		return;
 	}
 
-	if (!isLocal(parsed)) {
-		status.value = "remote";
-		return;
-	}
-
 	status.value = "loading";
 
 	try {
-		user.value = await api<UserDetailed>("users/show", {
-			username: parsed.username,
-		});
+		if (isLocal(parsed)) {
+			user.value = await api<UserDetailed>("users/show", { username: parsed.username });
+		} else {
+			user.value = await api<UserDetailed>("users/show", {
+				username: parsed.username,
+				host: parsed.host,
+			});
+		}
 		status.value = "found";
 	} catch (error) {
 		if (error instanceof ApiError && error.code === "NO_SUCH_USER") {
 			status.value = "notfound";
 			return;
 		}
-		status.value = "error";
+		remoteError.value = describeApiError(error);
+		status.value = isLocal(parsed) ? "error" : "remote";
 	}
 }
 

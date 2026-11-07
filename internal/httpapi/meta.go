@@ -4,6 +4,9 @@ import (
 	"net/http"
 )
 
+const softwareVersion = "0.1.0"
+const repositoryURL = "https://github.com/Aurorainic/Cinderfish"
+
 // themeColorOrDefault keeps the historical default when no colour is set.
 func themeColorOrDefault(value string) string {
 	if value == "" {
@@ -31,7 +34,7 @@ func (s *Server) handleMeta(w http.ResponseWriter, r *http.Request) {
 	meta := map[string]any{
 		"maintainerName":               settings.MaintainerName,
 		"maintainerEmail":              settings.MaintainerEmail,
-		"version":                      "0.1.0",
+		"version":                      softwareVersion,
 		"providesTarball":              false,
 		"name":                         settings.Name,
 		"shortName":                    "cinderfish",
@@ -39,7 +42,7 @@ func (s *Server) handleMeta(w http.ResponseWriter, r *http.Request) {
 		"description":                  settings.Description,
 		"langs":                        []string{"en"},
 		"tosUrl":                       nilOrString(settings.TosURL),
-		"repositoryUrl":                settings.RepositoryURL,
+		"repositoryUrl":                repositoryURLOrDefault(settings.RepositoryURL),
 		"feedbackUrl":                  settings.FeedbackURL,
 		"impressumUrl":                 settings.ImpressumURL,
 		"privacyPolicyUrl":             settings.PrivacyPolicyURL,
@@ -114,6 +117,13 @@ func (s *Server) handleMeta(w http.ResponseWriter, r *http.Request) {
 		"miauth":                 true,
 	}
 	writeJSON(w, http.StatusOK, meta)
+}
+
+func repositoryURLOrDefault(value string) string {
+	if value != "" {
+		return value
+	}
+	return repositoryURL
 }
 
 // federationMode maps the configured mode onto Misskey's own vocabulary

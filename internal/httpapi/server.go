@@ -73,12 +73,13 @@ type Server struct {
 
 	// ActivityPub. federationPolicy, fedRenderer and federationStore are
 	// populated by AttachFederation; the greenlet handlers check for nil.
-	federationPolicy  *federation.Policy
-	fedRenderer       *federation.Renderer
-	federationStore   *federation.Store
-	federationClient  *federation.Client
-	federationInbox   *federation.Inbox
-	federationDeliver *federation.Deliverer
+	federationPolicy     *federation.Policy
+	fedRenderer          *federation.Renderer
+	federationStore      *federation.Store
+	federationClient     *federation.Client
+	federationHTTPClient *http.Client
+	federationInbox      *federation.Inbox
+	federationDeliver    *federation.Deliverer
 }
 
 // NewServer returns a Server with no database backing. It serves the

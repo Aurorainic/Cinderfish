@@ -27,9 +27,11 @@ type Inbox struct {
 	// Hooks let the HTTP layer publish streaming events and create
 	// notifications; they are nil when there is nothing to notify.
 	OnNoteCreated func(ctx context.Context, noteID, userID string)
-	OnFollow      func(ctx context.Context, followerID, followeeID string)
-	OnUnfollow    func(ctx context.Context, followerID, followeeID string)
-	OnReaction    func(ctx context.Context, noteID, userID, reaction string)
+	// ImportAttachments caches remote note media and returns local drive ids.
+	ImportAttachments func(ctx context.Context, attachments []RemoteAttachment, ownerID string) []string
+	OnFollow          func(ctx context.Context, followerID, followeeID string)
+	OnUnfollow        func(ctx context.Context, followerID, followeeID string)
+	OnReaction        func(ctx context.Context, noteID, userID, reaction string)
 	// OnNotification fires after a stored notification so the host can push
 	// it to an open Streaming client.
 	OnNotification func(ctx context.Context, notificationID, recipientID string)
@@ -284,6 +286,9 @@ func (i *Inbox) create(ctx context.Context, actor *RemoteUser, activity Object) 
 
 	data := NoteDataFromAP(note, actor, i.renderer)
 	data.ActivityURI = activity.Ref("id")
+	if i.ImportAttachments != nil {
+		data.FileIDs = i.ImportAttachments(ctx, data.Attachments, actor.ID)
+	}
 	i.resolveLocalTargets(ctx, &data)
 	storedID, err := i.store.InsertRemoteNote(ctx, data)
 	if err != nil {
@@ -387,6 +392,9 @@ func (i *Inbox) ImportObject(ctx context.Context, uri string) (kind, id string, 
 	}
 
 	data := NoteDataFromAP(obj, author, i.renderer)
+	if i.ImportAttachments != nil {
+		data.FileIDs = i.ImportAttachments(ctx, data.Attachments, author.ID)
+	}
 	storedID, err := i.store.InsertRemoteNote(ctx, data)
 	if err != nil {
 		return "", "", err

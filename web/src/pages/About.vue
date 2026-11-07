@@ -26,7 +26,7 @@
 				</CfKeyValue>
 
 				<div class="_formBlock version">
-					<CfKeyValue v-if="version !== ''" :copy="version">
+					<CfKeyValue :copy="version">
 						<template #key>{{ t("version") }}</template>
 						<template #value>{{ version }}</template>
 					</CfKeyValue>
@@ -51,6 +51,14 @@
 						<template #value>{{
 							maintainerEmail !== "" ? maintainerEmail : "—"
 						}}</template>
+					</CfKeyValue>
+					<CfKeyValue>
+						<template #key>实例软件</template>
+						<template #value>Cinderfish（Go）</template>
+					</CfKeyValue>
+					<CfKeyValue>
+						<template #key>联邦协议</template>
+						<template #value>ActivityPub</template>
 					</CfKeyValue>
 					<div class="links">
 						<a

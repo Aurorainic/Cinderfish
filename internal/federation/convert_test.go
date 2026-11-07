@@ -1,6 +1,7 @@
 package federation
 
 import (
+	"strings"
 	"testing"
 	"time"
 )
@@ -154,5 +155,40 @@ func TestNoteDataFromAPEmojis(t *testing.T) {
 	}
 	if len(data.Tags) != 1 || data.Tags[0] != "tag" {
 		t.Errorf("tags = %v", data.Tags)
+	}
+}
+
+func TestNoteDataFromAPKeepsLongTextAndAttachments(t *testing.T) {
+	actor := &RemoteUser{ID: "u1", Host: "remote.example", URI: "https://remote.example/users/carol"}
+	longText := strings.Repeat("long text ", 100)
+	note := Object{
+		"id": "https://remote.example/notes/long", "type": "Note", "attributedTo": actor.URI,
+		"_misskey_content": longText, "content": "<p>short rendered fallback</p>", "to": []any{Public},
+		"attachment": []any{
+			map[string]any{"type": "Image", "url": "https://cdn.remote.example/media/photo.png", "mediaType": "image/png"},
+			map[string]any{"type": "Document", "url": "https://cdn.remote.example/media/file.bin", "mediaType": "application/octet-stream"},
+			map[string]any{"type": "Image", "url": "javascript:alert(1)"},
+		},
+	}
+	data := NoteDataFromAP(note, actor, NewRenderer("https://fish.example"))
+	if data.Text != longText {
+		t.Errorf("text length = %d, want original long body length %d", len(data.Text), len(longText))
+	}
+	if len(data.Attachments) != 2 {
+		t.Fatalf("attachments = %+v, want two safe media URLs", data.Attachments)
+	}
+	if data.Attachments[0].URL != "https://cdn.remote.example/media/photo.png" || data.Attachments[0].ContentType != "image/png" {
+		t.Errorf("image attachment = %+v", data.Attachments[0])
+	}
+}
+
+func TestNoteDataFromAPPreservesParagraphBreaks(t *testing.T) {
+	actor := &RemoteUser{ID: "u1", Host: "remote.example", URI: "https://remote.example/users/carol"}
+	data := NoteDataFromAP(Object{
+		"id": "https://remote.example/notes/paragraphs", "type": "Note", "attributedTo": actor.URI,
+		"content": "<p>first paragraph</p><p>second paragraph</p>", "to": []any{Public},
+	}, actor, NewRenderer("https://fish.example"))
+	if data.Text != "first paragraph\n\nsecond paragraph" {
+		t.Errorf("fallback text = %q", data.Text)
 	}
 }

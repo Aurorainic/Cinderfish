@@ -55,6 +55,9 @@ func TestMetaDetailed(t *testing.T) {
 	if m["federation"] != "all" {
 		t.Errorf("meta.federation = %v, want all for public mode", m["federation"])
 	}
+	if m["version"] != softwareVersion || m["repositoryUrl"] != repositoryURL {
+		t.Errorf("meta version/repository = %v/%v", m["version"], m["repositoryUrl"])
+	}
 
 	features, ok := m["features"].(map[string]any)
 	if !ok {

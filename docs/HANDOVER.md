@@ -7679,3 +7679,11 @@ Firefish 的 `init.ts` 在 `main` 频道上监听 `meUpdated` 并 `updateAccount
   （httpapi 47.7s、federation 3.2s、media 7.3s）。
 - `vue-tsc --noEmit`、`check:port`（421 文件，hardTotal 0）、`pnpm build` 全绿。
 - 巡检与流程报告：`/tmp/e2e/sweep.json`、`/tmp/e2e/flows.json`，截图在 `/tmp/e2e-shots/`（均不入库）。
+
+## 12GO. 远端关注、外站媒体与发布信息修正（2026-11-07）
+
+- `users/show` 支持同时传 `username` 与 `host`，通过 WebFinger 解析远端账号；关注确认页改用该接口，成功后仍通过已有 `following/create` 建立关注。
+- ActivityPub 笔记导入附件并缓存到本站 Drive；导出本地附件时使用绝对媒体 URL。HTML 纯文本回退保留段落换行，Misskey `_misskey_content` 保持完整，长帖展开组件收到原始全文。
+- 关于页面显示 Cinderfish 固定版本、仓库默认链接和软件/协议信息；本站自定义仓库链接仍可覆盖默认值。NodeInfo 与 `/api/meta` 版本统一。
+- GHCR 生产镜像工作流只响应 `v*` 标签 push，发布 semver 与 `latest` 标签；后续版本 tag 构建自动更新 `latest`。
+- 覆盖测试：远端 WebFinger 用户解析、入站及 `ap/show` 附件缓存、长文与段落解析、meta 版本/仓库回退。

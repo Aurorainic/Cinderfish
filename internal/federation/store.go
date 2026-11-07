@@ -362,12 +362,22 @@ type RemoteNote struct {
 	Tags         []string
 	Emojis       []EmojiRef
 	Sensitive    bool
+	Attachments  []RemoteAttachment
+	FileIDs      []string
 	CreatedAt    time.Time
 	// Poll is set for an inbound Question: the choices, whether more than one
 	// may be picked, and an optional closing time. Empty means a plain note.
 	PollChoices   []string
 	PollMultiple  bool
 	PollExpiresAt *time.Time
+}
+
+// RemoteAttachment describes a media reference on a remote ActivityPub note.
+type RemoteAttachment struct {
+	URL         string
+	Name        string
+	ContentType string
+	Sensitive   bool
 }
 
 // InsertRemoteNote stores a received note. Reply and renote targets are
@@ -405,6 +415,10 @@ func (s *Store) InsertRemoteNote(ctx context.Context, n RemoteNote) (string, err
 	if emojis == nil {
 		emojis = []EmojiRef{}
 	}
+	fileIDs := n.FileIDs
+	if fileIDs == nil {
+		fileIDs = []string{}
+	}
 
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
@@ -413,14 +427,19 @@ func (s *Store) InsertRemoteNote(ctx context.Context, n RemoteNote) (string, err
 	defer tx.Rollback(ctx)
 
 	if _, err := tx.Exec(ctx, `
-INSERT INTO notes (id, user_id, user_host, visibility, local_only, cw, text,
+INSERT INTO notes (id, user_id, user_host, visibility, local_only, cw, text, file_ids,
                    reply_id, renote_id, renote_user_id, ap_id, activity_uri,
                    tags, mentions, emojis, is_sensitive, created_at)
-VALUES ($1,$2,$3,$4,FALSE,$5,$6,$7,$8,$9,$10,$11,$12,'[]'::jsonb,$13,$14,$15)
+VALUES ($1,$2,$3,$4,FALSE,$5,$6,$7,$8,$9,$10,$11,$12,$13,'[]'::jsonb,$14,$15,$16)
 	`, id, n.UserID, n.UserHost, n.Visibility, nullIfEmpty(n.CW), nullIfEmpty(n.Text),
-		replyID, renoteID, renoteUserID, n.APID, n.ActivityURI,
+		fileIDs, replyID, renoteID, renoteUserID, n.APID, n.ActivityURI,
 		marshalStrings(tags), marshalAny(emojis), n.Sensitive, n.CreatedAt); err != nil {
 		return "", fmt.Errorf("federation: insert remote note: %w", err)
+	}
+	for _, fileID := range n.FileIDs {
+		if _, err := tx.Exec(ctx, `UPDATE drive_files SET user_id = NULL WHERE id = $1`, fileID); err != nil {
+			return "", fmt.Errorf("federation: assign remote media: %w", err)
+		}
 	}
 
 	// A Question stores its poll in the same table local polls use, so the

@@ -8,8 +8,8 @@
 			<div class="_formRoot cf-about-firefish">
 				<section class="hero">
 					<div class="name">Cinderfish</div>
-					<div class="version">v{{ instance.version }}</div>
-					<p class="instance">{{ instance.name }}</p>
+					<div class="version">v{{ softwareVersion }}</div>
+					<p class="instance">{{ instance.name || host }}</p>
 				</section>
 
 				<CfInfo class="intro">
@@ -19,14 +19,14 @@
 
 				<section class="links">
 					<CfA
-						v-if="instance.repositoryUrl !== ''"
+						v-if="repositoryUrl !== ''"
 						class="linkRow"
-						:to="instance.repositoryUrl"
+						:to="repositoryUrl"
 						behavior="browser"
 					>
 						<i class="ph-code ph-bold ph-lg"></i>
 						源码仓库
-						<span class="suffix">{{ instance.repositoryUrl }}</span>
+						<span class="suffix">{{ repositoryUrl }}</span>
 					</CfA>
 					<CfA class="linkRow" to="https://misskey-hub.net/" behavior="browser">
 						<i class="ph-book-open ph-bold ph-lg"></i>
@@ -81,7 +81,9 @@
 // Firefish project and its contributors; this port describes Cinderfish and
 // credits the three reference implementations instead, so it never claims to
 // be Firefish.
+import { computed } from "vue";
 import { instance } from "@/instance";
+import { host } from "@/config";
 import CfA from "@/components/ui/CfA.vue";
 import CfButton from "@/components/ui/CfButton.vue";
 import CfInfo from "@/components/ui/CfInfo.vue";
@@ -91,6 +93,9 @@ import MkStickyContainer from "@/components/global/MkStickyContainer.vue";
 import { definePageMetadata } from "@/scripts/page-metadata";
 
 defineOptions({ name: "CfPageAboutFirefish" });
+
+const softwareVersion = "0.1.0";
+const repositoryUrl = computed(() => instance.repositoryUrl || "https://github.com/Aurorainic/Cinderfish");
 
 definePageMetadata({
 	title: "关于 Cinderfish",

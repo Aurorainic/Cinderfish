@@ -65,6 +65,25 @@ func TestUsersNotesAndCounts(t *testing.T) {
 	}
 }
 
+func TestUsersShowResolvesRemoteAcct(t *testing.T) {
+	a := newInstance(t, "alpha")
+	b := newInstance(t, "beta")
+	routeTo(t, a, b)
+	_, bobID := b.signup(t, "betabob")
+	routeTo(t, b, b)
+
+	resp, out := post(t, a.ts, "/api/users/show", map[string]any{"username": "betabob", "host": "beta.example"})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("remote users/show = %d %v", resp.StatusCode, out)
+	}
+	if out["username"] != "betabob" {
+		t.Errorf("resolved user = %v", out)
+	}
+	if out["host"] != "beta.example" || out["id"] == bobID || out["uri"] != "https://beta.example/users/"+bobID {
+		t.Errorf("resolved remote identity = %v", out)
+	}
+}
+
 func TestUsersNotesRequiresIdentity(t *testing.T) {
 	ts := newFederationServer(t, "public").ts
 	resp, body := post(t, ts, "/api/users/notes", map[string]any{})

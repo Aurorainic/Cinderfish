@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"bytes"
 	"context"
 	"crypto/rsa"
 	"log"
@@ -10,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/Aurorainic/cinderfish/internal/federation"
+	"github.com/Aurorainic/cinderfish/internal/media"
 	"github.com/Aurorainic/cinderfish/internal/note"
 )
 
@@ -50,6 +52,7 @@ func (s *Server) AttachFederation() {
 	})
 
 	s.federationInbox = federation.NewInbox(s.federationStore, s.fedRenderer, s.federationClient, s.federationPolicy)
+	s.federationInbox.ImportAttachments = s.importRemoteAttachments
 	s.federationInbox.OnFollow = func(ctx context.Context, followerID, followeeID string) {
 		s.publishFollowEvent(followerID, followeeID)
 	}
@@ -77,6 +80,44 @@ func (s *Server) AttachFederation() {
 	if s.pool != nil {
 		s.federationDeliver = federation.NewDeliverer(s.pool, s.federationStore, s.federationClient, s.federationPolicy)
 	}
+}
+
+func (s *Server) importRemoteAttachments(ctx context.Context, attachments []federation.RemoteAttachment, ownerID string) []string {
+	if s.drive == nil || s.federationClient == nil {
+		return nil
+	}
+	ids := make([]string, 0, len(attachments))
+	for _, attachment := range attachments {
+		if len(ids) >= 16 {
+			break
+		}
+		name, data, contentType, err := s.federationClient.FetchMedia(ctx, attachment.URL, media.DefaultMaxFileSize)
+		if err != nil {
+			log.Printf("httpapi: fetch remote media %s: %v", attachment.URL, err)
+			continue
+		}
+		if contentType == "" || contentType == "application/octet-stream" {
+			contentType = attachment.ContentType
+		}
+		if name == "" {
+			name = attachment.Name
+		}
+		file, err := s.drive.Save(ctx, ownerID, name, bytes.NewReader(data), contentType, nil)
+		if err != nil {
+			log.Printf("httpapi: store remote media %s: %v", attachment.URL, err)
+			continue
+		}
+		if attachment.Sensitive {
+			sensitive := true
+			file, err = s.drive.Update(ctx, ownerID, file.ID, media.FileUpdate{IsSensitive: &sensitive})
+			if err != nil {
+				log.Printf("httpapi: mark remote media sensitive %s: %v", attachment.URL, err)
+				continue
+			}
+		}
+		ids = append(ids, file.ID)
+	}
+	return ids
 }
 
 // StartFederationWorkers runs the delivery worker until ctx is done.
@@ -131,6 +172,7 @@ func (s *Server) HasFollowingByActorURIIDs(ctx context.Context, followerID, foll
 // transport, which tests use to route one instance's domain to another's
 // httptest server.
 func (s *Server) SetFederationHTTPClient(c *http.Client) {
+	s.federationHTTPClient = c
 	if s.federationClient != nil {
 		s.federationClient.SetHTTPClient(c)
 	}

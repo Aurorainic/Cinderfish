@@ -192,7 +192,7 @@ func thumbnailContentType(ext string) string {
 // Get loads a file's metadata.
 func (s *DriveService) Get(ctx context.Context, id string) (*File, error) {
 	row := s.pool.QueryRow(ctx, `
-SELECT id, user_id, name, content_type, size, md5, storage_key, storage_backend,
+SELECT id, COALESCE(user_id, ''), name, content_type, size, md5, storage_key, storage_backend,
        thumbnail_key, is_sensitive, folder_id, COALESCE(comment, ''), created_at
 FROM drive_files WHERE id = $1
 `, id)
@@ -218,7 +218,7 @@ func (s *DriveService) GetMany(ctx context.Context, ids []string) ([]*File, erro
 		return nil, nil
 	}
 	rows, err := s.pool.Query(ctx, `
-SELECT id, user_id, name, content_type, size, md5, storage_key, storage_backend,
+SELECT id, COALESCE(user_id, ''), name, content_type, size, md5, storage_key, storage_backend,
        thumbnail_key, is_sensitive, folder_id, COALESCE(comment, ''), created_at
 FROM drive_files WHERE id = ANY($1)
 `, ids)
@@ -251,7 +251,7 @@ func (s *DriveService) List(ctx context.Context, userID string, limit int, since
 	}
 
 	query := `
-SELECT id, user_id, name, content_type, size, md5, storage_key, storage_backend,
+SELECT id, COALESCE(user_id, ''), name, content_type, size, md5, storage_key, storage_backend,
        thumbnail_key, is_sensitive, folder_id, COALESCE(comment, ''), created_at
 FROM drive_files WHERE user_id = $1`
 	args := []any{userID}

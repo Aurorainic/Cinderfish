@@ -8,8 +8,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"mime"
 	"net/http"
 	"net/url"
+	"path"
 	"strings"
 	"time"
 )
@@ -180,6 +182,58 @@ func (c *Client) FetchObject(ctx context.Context, target, objectID string) (Obje
 		}
 	}
 	return obj, nil
+}
+
+// FetchMedia downloads a public media object with a strict response-size
+// limit. Each redirect is checked against the live federation policy.
+func (c *Client) FetchMedia(ctx context.Context, target string, maxBytes int64) (string, []byte, string, error) {
+	if maxBytes <= 0 {
+		return "", nil, "", fmt.Errorf("federation: invalid media size limit")
+	}
+	if err := c.policy.CheckURLAllowed(ctx, target); err != nil {
+		return "", nil, "", err
+	}
+	client := *c.http
+	checkRedirect := client.CheckRedirect
+	client.CheckRedirect = func(req *http.Request, via []*http.Request) error {
+		if len(via) >= 5 {
+			return errors.New("too many redirects")
+		}
+		if err := c.policy.CheckURLAllowed(req.Context(), req.URL.String()); err != nil {
+			return err
+		}
+		if checkRedirect != nil {
+			return checkRedirect(req, via)
+		}
+		return nil
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, target, nil)
+	if err != nil {
+		return "", nil, "", err
+	}
+	req.Header.Set("User-Agent", UserAgent)
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", nil, "", err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return "", nil, "", fmt.Errorf("%w: media returned %d", ErrRemoteStatus, resp.StatusCode)
+	}
+	data, err := io.ReadAll(io.LimitReader(resp.Body, maxBytes+1))
+	if err != nil {
+		return "", nil, "", err
+	}
+	if int64(len(data)) > maxBytes {
+		return "", nil, "", fmt.Errorf("federation: media exceeds size limit")
+	}
+	parsed, _ := url.Parse(target)
+	name := path.Base(parsed.Path)
+	if name == "." || name == "/" || name == "" {
+		name = "remote-media"
+	}
+	contentType, _, _ := mime.ParseMediaType(resp.Header.Get("Content-Type"))
+	return name, data, contentType, nil
 }
 
 // PostActivity signs and POSTs an activity to inboxURL. asUserID names the

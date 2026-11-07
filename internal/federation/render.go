@@ -274,7 +274,18 @@ func (r *Renderer) RenderNote(n NoteData) Object {
 	if len(n.Attachments) > 0 {
 		atts := make([]any, 0, len(n.Attachments))
 		for _, a := range n.Attachments {
-			atts = append(atts, a)
+			if n.ActorHost != "" {
+				atts = append(atts, a)
+				continue
+			}
+			copy := Object{}
+			for key, value := range a {
+				copy[key] = value
+			}
+			if rawURL, ok := copy["url"].(string); ok && strings.HasPrefix(rawURL, "/") {
+				copy["url"] = r.BaseURL + rawURL
+			}
+			atts = append(atts, copy)
 		}
 		note["attachment"] = atts
 		// A note carrying a sensitive attachment is sensitive as a

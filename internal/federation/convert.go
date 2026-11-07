@@ -1,8 +1,12 @@
 package federation
 
 import (
+	"html"
+	"net/url"
+	"path"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 // NoteDataFromAP converts a received ActivityPub note into the data the
@@ -22,9 +26,7 @@ func NoteDataFromAP(note Object, actor *RemoteUser, r *Renderer) RemoteNote {
 		}
 	}
 	if text == "" {
-		// Fall back to the HTML body stripped of tags, so a Mastodon
-		// note still produces readable text.
-		text = StripHTML(note.String("content"))
+		text = TextFromHTML(note.String("content"))
 	}
 
 	tags := make([]string, 0, 4)
@@ -47,6 +49,35 @@ func NoteDataFromAP(note Object, actor *RemoteUser, r *Renderer) RemoteNote {
 			}
 			seenEmoji[name] = true
 			emojis = append(emojis, EmojiRef{Name: name, URL: url})
+		}
+	}
+
+	attachments := make([]RemoteAttachment, 0)
+	for _, attachment := range note.Objects("attachment") {
+		if !attachment.IsType("Image") && !attachment.IsType("Document") && !attachment.IsType("Video") && !attachment.IsType("Audio") {
+			continue
+		}
+		fileURL := attachment.Ref("url")
+		if fileURL == "" {
+			fileURL = attachment.Ref("href")
+		}
+		parsed, err := url.Parse(fileURL)
+		if err != nil || (parsed.Scheme != "https" && parsed.Scheme != "http") || parsed.Host == "" {
+			continue
+		}
+		name := path.Base(parsed.Path)
+		if name == "." || name == "/" || name == "" {
+			name = "remote-media"
+		}
+		contentType := attachment.String("mediaType")
+		if contentType == "" {
+			contentType = attachment.String("mimeType")
+		}
+		attachments = append(attachments, RemoteAttachment{
+			URL: fileURL, Name: name, ContentType: contentType, Sensitive: note.Bool("sensitive"),
+		})
+		if len(attachments) == 16 {
+			break
 		}
 	}
 
@@ -74,6 +105,7 @@ func NoteDataFromAP(note Object, actor *RemoteUser, r *Renderer) RemoteNote {
 		Tags:          tags,
 		Emojis:        emojis,
 		Sensitive:     note.Bool("sensitive"),
+		Attachments:   attachments,
 		CreatedAt:     publishedOrNow(note),
 		PollChoices:   poll.PollChoices,
 		PollMultiple:  poll.PollMultiple,
@@ -141,34 +173,47 @@ func containsRef(refs []string, want string) bool {
 	return false
 }
 
-// StripHTML removes tags from an HTML fragment, collapsing whitespace.
-// It is deliberately simple: the content field of a remote note is only
-// used as a text fallback.
-func StripHTML(s string) string {
+// TextFromHTML converts common ActivityPub HTML blocks to readable text while
+// retaining paragraph and line breaks for clients that provide no source.
+func TextFromHTML(s string) string {
 	var b strings.Builder
-	depth := 0
-	for _, r := range s {
-		switch {
-		case r == '<':
-			depth++
-		case r == '>':
-			if depth > 0 {
-				depth--
+	for i := 0; i < len(s); {
+		if s[i] == '<' {
+			end := strings.IndexByte(s[i:], '>')
+			if end < 0 {
+				break
 			}
-		case depth == 0:
-			b.WriteRune(r)
+			tag := strings.ToLower(strings.TrimSpace(s[i+1 : i+end]))
+			closing := strings.HasPrefix(tag, "/")
+			if closing {
+				tag = strings.TrimPrefix(tag, "/")
+			}
+			fields := strings.Fields(strings.TrimSuffix(tag, "/"))
+			if len(fields) == 0 {
+				i += end + 1
+				continue
+			}
+			tag = fields[0]
+			if closing && (tag == "p" || tag == "div" || tag == "li") || !closing && (tag == "br" || tag == "p" || tag == "div" || tag == "li") {
+				b.WriteString("\n")
+			}
+			i += end + 1
+			continue
 		}
+		r := rune(s[i])
+		if r >= 0x80 {
+			decoded, size := utf8.DecodeRuneInString(s[i:])
+			r = decoded
+			i += size
+		} else {
+			i++
+		}
+		b.WriteRune(r)
 	}
-	out := b.String()
-	out = strings.ReplaceAll(out, "&lt;", "<")
-	out = strings.ReplaceAll(out, "&gt;", ">")
-	out = strings.ReplaceAll(out, "&quot;", "\"")
-	out = strings.ReplaceAll(out, "&#39;", "'")
-	out = strings.ReplaceAll(out, "&amp;", "&")
-	for _, br := range []string{"<br>", "<br/>", "<br />", "</p>"} {
-		_ = br
+	out := html.UnescapeString(b.String())
+	lines := strings.Split(strings.ReplaceAll(out, "\r\n", "\n"), "\n")
+	for i := range lines {
+		lines[i] = strings.Join(strings.Fields(lines[i]), " ")
 	}
-	out = strings.ReplaceAll(out, "\r\n", "\n")
-	fields := strings.Fields(out)
-	return strings.Join(fields, " ")
+	return strings.TrimSpace(strings.Join(lines, "\n"))
 }

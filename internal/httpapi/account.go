@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/Aurorainic/cinderfish/internal/account"
 	"github.com/Aurorainic/cinderfish/internal/auth"
+	"github.com/Aurorainic/cinderfish/internal/federation"
 )
 
 // Error ids used by the account endpoints. Misskey's signin flow returns
@@ -278,6 +280,20 @@ func (s *Server) handleUsersShow(w http.ResponseWriter, r *http.Request) {
 	var user *account.User
 	var err error
 	switch {
+	case body.Username != "" && body.Host != "":
+		if s.federationInbox == nil {
+			err = account.ErrUserNotFound
+			break
+		}
+		if s.cfg != nil && strings.EqualFold(body.Host, s.cfg.Domain) {
+			user, err = s.accounts.GetByUsername(r.Context(), body.Username)
+		} else {
+			var remote *federation.RemoteUser
+			remote, err = s.federationInbox.ResolveAcct(r.Context(), body.Username, body.Host)
+			if err == nil && remote != nil {
+				user, err = s.accounts.GetByID(r.Context(), remote.ID)
+			}
+		}
 	case body.UserID != "":
 		user, err = s.accounts.GetByID(r.Context(), body.UserID)
 		if err != nil {
@@ -313,6 +329,12 @@ func (s *Server) handleUsersShow(w http.ResponseWriter, r *http.Request) {
 	}
 
 	packed := packUserDetailed(user, user.CreatedAt, false, loadProfile(r.Context(), s, user.ID))
+	if user.Host != nil && *user.Host != "" {
+		if remote, remoteErr := s.federationStore.UserByID(r.Context(), user.ID); remoteErr == nil {
+			packed["url"] = remote.URI
+			packed["uri"] = remote.URI
+		}
+	}
 	s.packMovedTo(r.Context(), user, packed)
 	// users/show does not require credentials, but an authenticated viewer
 	// gets their relationship with the target filled in. A missing or bad

@@ -232,7 +232,7 @@ func (s *Server) serveNodeInfo(w http.ResponseWriter, r *http.Request, version s
 
 	doc := map[string]any{
 		"version":           version,
-		"software":          map[string]any{"name": "cinderfish", "version": "0.0.1"},
+		"software":          map[string]any{"name": "cinderfish", "version": softwareVersion},
 		"protocols":         []string{"activitypub"},
 		"services":          map[string]any{"inbound": []string{}, "outbound": []string{}},
 		"openRegistrations": s.liveInstanceSettings(r.Context()).RegistrationMode == "open",
@@ -557,11 +557,29 @@ func (s *Server) renderNoteWithMentions(ctx context.Context, n *note.Note, cache
 		Sensitive:  n.IsSensitive,
 		Tags:       n.Tags,
 	}
+	if n.UserHost != nil {
+		data.ActorHost = *n.UserHost
+	}
 	if n.Text != nil {
 		data.Text = *n.Text
 	}
 	if n.CW != nil {
 		data.CW = *n.CW
+	}
+	if len(n.FileIDs) > 0 && s.drive != nil {
+		if files, err := s.drive.GetMany(ctx, n.FileIDs); err == nil {
+			for _, file := range files {
+				mediaURL := file.URL
+				if strings.HasPrefix(mediaURL, "/") {
+					mediaURL = s.baseURL() + mediaURL
+				}
+				data.Attachments = append(data.Attachments, federation.Object{
+					"type": "Document", "mediaType": file.ContentType,
+					"url": mediaURL, "name": file.Name,
+					"sensitive": file.IsSensitive,
+				})
+			}
+		}
 	}
 	// The target may be a remote copy: its ActivityPub id is the original
 	// URL, not the local /notes/<id> path.
