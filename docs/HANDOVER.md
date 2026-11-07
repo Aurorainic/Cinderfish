@@ -7728,3 +7728,31 @@ Firefish 的 `init.ts` 在 `main` 频道上监听 `meUpdated` 并 `updateAccount
 - **待办**：线上 `fedi.lainns.xyz` 仍跑旧版本，重新发布后这条接续流程才会恢复；
   Misskey 的 `signin`/`signin-with-passkey` 另有「ACAO 设为 `config.url` + credentials」的
   特例（`SigninApiService.ts`），本站前端同源调用，暂无需求，未跟进。
+
+## 12GQ. 全面代码审计与阶段性修复(2026-11-07)
+
+对全部 Go 后端做了一次四路并行审计(签名/认证链路、httpapi 核心、federation 与 account/note、支撑模块),
+以固定版本 Misskey 源码逐项对照契约。发现 8 项 P0、18 项 P1、40+ 项 P2,分四个提交完成 P0/P1 全部与 P2 择要的修复:
+
+- `7958cfa`:入站签名与 actor 绑定(身份伪造,`_ = keyID`)、Accept/Reject 之外的密钥轮换死锁恢复、signin 按 IP 限流
+  (`signin_rate_limit` 配置,负数关闭)、OAuth redirect_uri 同主机校验。
+- `f2840f8`:SVG/HTML 回源 XSS(`Content-Disposition: attachment` + CSP sandbox)、access_tokens 按 token_hash 查找、
+  webhook URL 三处 SSRF 校验(`webhook.ValidateURL`)、streaming 读帧 64 KiB 上限、SMTP 信封地址防注入、
+  drive 删除触发器一致性、媒体迁移补缩略图。
+- `f9a1684`:Accept/Reject/Undo 内嵌 Follow 必须指向签名者、Date 头强制、Host 绑定改 cfg.Domain(loopback 豁免)、
+  联邦客户端逐跳策略复查(`CheckURLRoutable`,含私网拒绝)、Update\<Note\> 按 user_id 归属、
+  入站 Announce 拒绝 followers/specified 目标(`Store.NoteAudience`)、WebFinger self 同主机 + SplitAcct 字符校验、
+  notes/create fileIds 按作者过滤(上游静默丢弃语义)。
+- `dbbb908`:drive/files/show 要求认证且仅属主可见(他人一律 404)、withRenotes=false 真正生效、
+  过期投票创建即拒、删除笔记回退父行计数、notifications 空数组=不过滤(上游 L302)、sinceDate 转换错误改 500、
+  folders 错误分流与状态码统一、LIKE 转义、multipart MaxBytesReader + form 内 i 令牌、setInt 用 Atoi、
+  本地存储原子写。
+
+完整清单、Misskey 对照出处、未修复的 12 项遗留(P2 级:token 过期、通知幂等、投票 TOCTOU、goroutine 无界等)
+与对接方可见的行为变化见 `docs/research/2026-11-07-full-code-audit-and-fixes.md`。
+
+```
+gofmt -l internal/ cmd/                                        # 空
+go vet ./...                                                   # exit 0
+CINDERFISH_TEST_DATABASE_URL=... CINDERFISH_TEST_REDIS_URL=... go test ./... -count=1   # 全绿
+```
