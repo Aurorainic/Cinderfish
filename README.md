@@ -1,6 +1,6 @@
 # Cinderfish
 
-**v0.1.0** — 单二进制的个人 / 极小规模联邦社交实例。后端按 Misskey 的 API 契约实现，前端是
+**v0.1.1** — 单二进制的个人 / 极小规模联邦社交实例。后端按 Misskey 的 API 契约实现，前端是
 Firefish 客户端结构的整体移植（Vue 3 + TypeScript）。
 
 - **API 契约**：Misskey 原生 RPC（`POST /api/<endpoint>`）+ Streaming WebSocket

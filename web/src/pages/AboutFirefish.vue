@@ -94,7 +94,7 @@ import { definePageMetadata } from "@/scripts/page-metadata";
 
 defineOptions({ name: "CfPageAboutFirefish" });
 
-const softwareVersion = "0.1.0";
+const softwareVersion = "0.1.1";
 const repositoryUrl = computed(() => instance.repositoryUrl || "https://github.com/Aurorainic/Cinderfish");
 
 definePageMetadata({

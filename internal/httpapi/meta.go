@@ -4,7 +4,7 @@ import (
 	"net/http"
 )
 
-const softwareVersion = "0.1.0"
+const softwareVersion = "0.1.1"
 const repositoryURL = "https://github.com/Aurorainic/Cinderfish"
 
 // themeColorOrDefault keeps the historical default when no colour is set.

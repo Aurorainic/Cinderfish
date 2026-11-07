@@ -24,7 +24,7 @@ var (
 )
 
 // UserAgent identifies this instance to peers.
-const UserAgent = "Cinderfish/0.0"
+const UserAgent = "Cinderfish/0.1.1"
 
 // Client performs signed outbound requests and remote resolution.
 //
