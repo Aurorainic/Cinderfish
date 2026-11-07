@@ -120,7 +120,7 @@ const menuDef = computed<MkSuperMenuGroup[]>(() => [
 				active: isActive("/settings/mute-block"),
 			},
 			{
-				icon: "ph-server ph-bold ph-lg",
+				icon: "ph-stack ph-bold ph-lg",
 				text: t("instanceMute"),
 				to: "/settings/instance-mute",
 				active: isActive("/settings/instance-mute"),

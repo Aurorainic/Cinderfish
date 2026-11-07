@@ -196,7 +196,7 @@ onMounted(async () => {
 
 definePageMetadata({
 	title: "应用授权",
-	icon: "ph-apps ph-bold ph-lg",
+	icon: "ph-app-window ph-bold ph-lg",
 });
 </script>
 

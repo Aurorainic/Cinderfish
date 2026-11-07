@@ -321,7 +321,11 @@ const collapsed = ref(isLong.value);
 		top: 8px;
 		inset-inline-end: 8px;
 		margin-bottom: 1rem;
-		z-index: 3;
+		// Above the title panel (z-index 4): the button sits in the title's
+		// corner, and with the lower z-index the title's opaque background
+		// painted over most of the round follow button, leaving only a
+		// crescent of its border visible.
+		z-index: 5;
 	}
 }
 </style>

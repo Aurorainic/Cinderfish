@@ -7756,3 +7756,26 @@ gofmt -l internal/ cmd/                                        # 空
 go vet ./...                                                   # exit 0
 CINDERFISH_TEST_DATABASE_URL=... CINDERFISH_TEST_REDIS_URL=... go test ./... -count=1   # 全绿
 ```
+
+## 12GR. 前端视觉审计与修复(2026-11-07)
+
+用内置浏览器对 `web/` 做了真实渲染巡检(暗/亮 × 桌面/390px 四象限,全程 console 零错误),
+发现并修复 5 项视觉/交互问题:
+
+- `MkUserInfo.vue`:发现页卡片"关注"圆钮被 `.title` 面板(z-index 4、不透明背景)盖住,
+  只剩 C 形边框残影——`.buttons` z-index 提到 5。初看像图标字体缺字形,
+  canvas 字形墨迹实测排除字体问题后定位为层叠遮挡。
+- 无效图标类清理:全项目 191 个 `ph-*` 类与 phosphor 2.0.3 样式表交叉比对,
+  `ph-apps`(Auth.vue)→ `ph-app-window`、`ph-server`(设置页"服务器静音")→ `ph-stack`,
+  其余 189 个全部有效。
+- `CfAvatar.vue`:无头像占位从"无样式的 ph-user 图标空块"改为与 `global/MkAvatar.vue`
+  同款的 avatar.svg 人形占位(panelHighlight 底 + divider 边),全应用头像视觉统一。
+- `MkWidgets.vue`:空状态面板已有"编辑小部件"按钮,footer 又渲染同一动作;
+  footer 现在仅在列表非空或编辑模式出现。
+- `page-metadata.ts`:页名等于实例名时不再拼出"实例名 | 实例名"。
+
+排查后确认非问题:`/notifications`、`/drive` 直链 404(路由为 `/my/*`,链接一致);
+个人页首次进入短暂空白(fade transition 瞬间态);图标字体无系统性缺字形。
+
+复验:`pnpm typecheck` 干净、构建成功,四象限截图逐项确认无回归。
+详见 `docs/research/2026-11-07-frontend-visual-audit.md`。

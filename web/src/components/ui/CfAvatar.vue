@@ -2,13 +2,12 @@
 	<component
 		:is="disableLink ? 'span' : CfA"
 		class="eiwwqkts _noSelect"
-		:class="{ square, cat: user.isCat }"
+		:class="{ square, cat: user.isCat, noAvatar }"
 		:to="disableLink ? undefined : userPage(user)"
 		:title="acct(user)"
 		@click.stop="emit('click', $event)"
 	>
 		<img v-if="!noAvatar" class="inner" :src="src" decoding="async" alt="" />
-		<span v-else class="inner no-avatar ph-bold ph-user"></span>
 		<span
 			v-if="showIndicator"
 			class="indicator"
@@ -47,8 +46,8 @@ const emit = defineEmits<{
 	click: [event: MouseEvent];
 }>();
 
-// Cinderfish accounts have no avatar upload yet (avatarUrl is always null), so
-// render a neutral placeholder instead of the browser's broken-image box.
+// avatarUrl comes from user_profiles.avatar_url; an account without one
+// falls back to the shared no-avatar placeholder (see the style block).
 const src = computed(() => resolveMediaUrl(props.user.avatarUrl) || "/favicon.svg");
 const noAvatar = computed(() => props.user.avatarUrl == null);
 
@@ -80,6 +79,19 @@ const square = computed(() =>
 		inline-size: 100%;
 		block-size: 100%;
 		object-fit: cover;
+	}
+
+	// No avatar image on this instance: draw the neutral user glyph shared
+	// with global/MkAvatar.vue, so the slot reads as a person rather than an
+	// empty box (the previous fallback span carried only a bare ph-user icon
+	// with no size or colour and rendered as a flat tone block).
+	&.noAvatar::before {
+		content: "";
+		position: absolute;
+		inset: 0;
+		border-radius: inherit;
+		background: url("/static-assets/avatar.svg") center / 58% no-repeat;
+		opacity: 0.55;
 	}
 
 	.indicator {

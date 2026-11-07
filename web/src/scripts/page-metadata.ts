@@ -79,10 +79,15 @@ function applyDocumentTitle(metadata: PageMetadata | null): void {
 	if (typeof document === "undefined") return;
 	if (metadata == null) return;
 	const instanceName = (instance as { name?: string }).name;
-	document.title =
-		instanceName != null && instanceName !== ""
-			? `${metadata.title} | ${instanceName}`
-			: metadata.title;
+	// Pages whose title already is the instance name (the welcome page, for
+	// one) would otherwise render as "Name | Name".
+	const suffix =
+		instanceName != null &&
+		instanceName !== "" &&
+		metadata.title !== instanceName
+			? ` | ${instanceName}`
+			: "";
+	document.title = metadata.title + suffix;
 }
 
 export function provideMetadataReceiver(

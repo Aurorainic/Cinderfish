@@ -67,7 +67,14 @@
 		<button v-if="editMode" class="_textButton footer" @click="exitEdit">
 			<i class="ph-bold ph-check"></i> {{ t("editWidgetsExit") }}
 		</button>
-		<button v-else class="_textButton footer" @click="enterEdit">
+		<!-- The empty-state panel already carries an edit button; the footer
+		     link renders only once there is something to edit, so a fresh
+		     widget column does not show the same action twice. -->
+		<button
+			v-else-if="list.length > 0"
+			class="_textButton footer"
+			@click="enterEdit"
+		>
 			<i class="ph-bold ph-pencil"></i> {{ t("editWidgets") }}
 		</button>
 	</aside>
