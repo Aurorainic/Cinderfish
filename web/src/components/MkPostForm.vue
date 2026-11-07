@@ -817,7 +817,7 @@ async function post(): Promise<void> {
 		replyId: props.reply?.id,
 		renoteId: props.renote?.id ?? quoteId.value ?? undefined,
 		poll: postPoll.value ?? undefined,
-		cw: useCw.value ? (cw.value || "") : undefined,
+		cw: useCw.value && cw.value.trim() !== "" ? cw.value : null,
 		localOnly: localOnly.value,
 		visibility: visibility.value,
 		visibleUserIds:

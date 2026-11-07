@@ -7093,3 +7093,30 @@ Array.from((preprocess(text.value) + imeText.value).trim()).length
   （hardTotal 0）、`pnpm build` 全绿。
 - `TestNotesCreateParamLimits`：`notes/edit` 的 101 字符 CW 返回 400、100 字符返回 200；
   与创建路径的边界一致。
+
+## 12FY. 第一百六十一波：发帖器的空 CW（2026-11-07）
+
+上一波按 Misskey 加了「CW 不能为空串」的校验，但 `MkPostForm` 在打开 CW 开关且内容为空时发送
+`cw: ""`，这种帖子会被 400 拒绝。编辑页早已发送 `null`，发帖器没有跟上。
+
+### 12FY.1 改动
+
+`web/src/components/MkPostForm.vue`：
+
+```ts
+cw: useCw.value && cw.value.trim() !== "" ? cw.value : null,
+```
+
+空 CW 现在按「没有内容警告」提交，与服务端把 `null` 当作清除的语义一致。
+
+### 12FY.2 有意的限制
+
+- 只影响内容警告；文本、投票等字段不变。
+- 草稿存储里的 `useCw` / `cw` 仍按原样保存（草稿不经过服务端校验）。
+
+### 12FY.3 验证证据
+
+- `vue-tsc --noEmit`、`check:port`（hardTotal 0）、`pnpm build` 全绿。
+- 真实二进制 + 无头浏览器：打开发帖框 → 点 CW 按钮（眼睛图标）→ 正文输入
+  「w161 cw test body」、CW 留空 → 提交成功，`users/notes` 返回的帖子 `cw: null`。
+  截图 `/tmp/w161-shots/cw-empty.png`（不入库）。
