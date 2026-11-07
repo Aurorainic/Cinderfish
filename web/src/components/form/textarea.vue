@@ -79,7 +79,7 @@ const emit = defineEmits<{
 }>();
 
 function onUpdate(value: string): void {
-	emit("update:modelValue", props.max == null ? value : value.slice(0, props.max));
+	emit("update:modelValue", props.max == null ? value : Array.from(value).slice(0, props.max).join(""));
 }
 
 function onChange(event: Event): void {

@@ -7064,3 +7064,32 @@ Array.from((preprocess(text.value) + imeText.value).trim()).length
 - 真实二进制 + 无头浏览器：在发帖框输入 1000 个汉字，计数器显示「2000」，提交成功，
   `users/notes` 中该帖文本长度为 1000 个码点；输入 3001 个汉字时计数器「-1」且提交按钮禁用。
   截图 `/tmp/w160-shots/text-count.png`（不入库）。
+
+## 12FX. 第一百六十波：编辑页的 CW 上限与表单层的码点截断（2026-11-07）
+
+补齐上一波留下的两处不一致：
+
+1. `notes/edit` 不检查 CW 长度，而编辑页的 `CW_MAX` 还是 250（创建上限是 100）。
+2. `FormInput` / `FormTextarea` 的 `max` 用 `String.slice`（UTF-16 单元）截断，可能切断代理对。
+
+### 12FX.1 改动
+
+| 层 | 文件 | 内容 |
+|----|------|------|
+| 领域 | `internal/note/edit.go` | CW 非空时按码点计，> 100 返回 `ErrInvalidCW`；空串仍表示清除 |
+| 端点 | `internal/httpapi/note_edit.go` | `ErrInvalidCW` → 400 `INVALID_PARAM` |
+| 页面 | `web/src/pages/NoteEdit.vue` | `CW_MAX` 250 → 100 |
+| 表单 | `web/src/components/form/{input,textarea}.vue` | `max` 改为 `Array.from(value).slice(0, max).join("")`，按码点截断 |
+
+### 12FX.2 发现并修掉的缺陷
+
+给 `note_edit.go` 增加错误分支时漏了 `return`，CW 超限会落到成功路径并以 `updated == nil` 打包，
+导致 `notePackContext` 空指针 panic（HTTP 连接 EOF）。新增的 101 字符 CW 用例当场暴露，
+补上 `return` 后通过。
+
+### 12FX.3 验证证据
+
+- `go vet ./...`、含数据库的全量 `go test ./...` 全绿；`vue-tsc --noEmit`、`check:port`
+  （hardTotal 0）、`pnpm build` 全绿。
+- `TestNotesCreateParamLimits`：`notes/edit` 的 101 字符 CW 返回 400、100 字符返回 200；
+  与创建路径的边界一致。

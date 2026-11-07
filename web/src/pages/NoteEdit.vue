@@ -72,7 +72,7 @@ import MkStickyContainer from "@/components/global/MkStickyContainer.vue";
 defineOptions({ name: "CfPageNoteEdit" });
 
 const TEXT_MAX = 3000;
-const CW_MAX = 250;
+const CW_MAX = 100;
 
 const route = useRoute();
 const router = useRouter();

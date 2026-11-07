@@ -64,6 +64,16 @@ func TestNotesCreateParamLimits(t *testing.T) {
 	}); resp.StatusCode != http.StatusBadRequest {
 		t.Errorf("edit 3001 CJK: status = %d, want 400", resp.StatusCode)
 	}
+	if resp, body := post(t, ts, "/api/notes/edit", map[string]any{
+		"i": token, "editId": noteID, "cw": strings.Repeat("x", 101),
+	}); resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("edit 101-char cw: status = %d, want 400 (%v)", resp.StatusCode, body)
+	}
+	if resp, body := post(t, ts, "/api/notes/edit", map[string]any{
+		"i": token, "editId": noteID, "cw": strings.Repeat("x", 100),
+	}); resp.StatusCode != http.StatusOK {
+		t.Errorf("edit 100-char cw: status = %d, want 200 (%v)", resp.StatusCode, body)
+	}
 
 	polls := []struct {
 		name    string

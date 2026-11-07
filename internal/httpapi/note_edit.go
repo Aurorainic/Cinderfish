@@ -70,6 +70,9 @@ func (s *Server) handleNotesEdit(w http.ResponseWriter, r *http.Request) {
 			ID: errIDYouNotAuthor, Kind: "client", Status: http.StatusForbidden,
 		})
 		return
+	case errors.Is(err, note.ErrInvalidCW):
+		writeAPIError(w, invalidParamError("invalid parameter"))
+		return
 	case errors.Is(err, note.ErrTextTooLong):
 		writeAPIError(w, invalidParamError("text is too long"))
 		return

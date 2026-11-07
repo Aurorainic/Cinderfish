@@ -102,7 +102,7 @@ const emit = defineEmits<{
 
 function clamp(value: string | number | null): string | number | null {
 	if (props.max == null || typeof value !== "string") return value;
-	return value.slice(0, props.max);
+	return Array.from(value).slice(0, props.max).join("");
 }
 
 function onUpdate(value: string | number | null): void {
