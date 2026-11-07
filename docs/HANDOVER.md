@@ -6949,3 +6949,30 @@ Firefish 的 `ui/_common_/common.vue` 在 `main` 频道上处理新通知：页�
   的 `li.voted` 为 true、gamma 为 false。
 - 带令牌的 `notes/show` 断言计票与 `isVoted` 如上；匿名调用只返回计票、`isVoted=false`（预期）。
 - 截图 `/tmp/w156-shots/multi-poll.png`（不入库）。
+
+## 12FT. 第一百五十六波：样式化 tooltip（2026-11-07）
+
+`directives/tooltip.ts` 此前把文字写进原生 `title`（注释标注为降级），与 Firefish 的深色浮层不同。
+这一轮补上真正的浮层。
+
+### 12FT.1 改动
+
+| 层 | 文件 | 内容 |
+|----|------|------|
+| 浮层 | `web/src/components/CfTooltip.vue`（新） | 固定定位、视口内水平夹紧、`top`/`bottom` 两种方向、`pointer-events: none`、淡入淡出 |
+| 指令 | `web/src/directives/tooltip.ts` | 鼠标/焦点进入 500ms 后显示（`.noDelay` 立即）、离开 100ms 后关闭、点击关闭；`aria-label` 同步（`.noLabel` 时不设置）；移除原生 `title`；`.mfm` 接受但忽略 |
+| 卸载 | 同上 | WeakMap 保存实例，`updated` 重新配置，`unmounted` 清理监听与浮层 |
+
+### 12FT.2 有意的限制
+
+- 气泡只渲染纯文本，不做 MFM 解析（`.mfm` 修饰无效）。
+- 没有滚动/窗口尺寸变化时的重新定位；打开期间滚动会使气泡停留在旧位置。
+- 触屏端没有长按显示（与原生 title 行为不同）。
+- 定位为「上方居中/下方居中」，不做四象限自动翻转。
+
+### 12FT.3 验证证据
+
+- `vue-tsc --noEmit`、`check:port`（hardTotal 0）、`pnpm build` 全绿；Go 侧未改动。
+- 真实二进制 + 无头浏览器：悬停笔记的回复按钮（`.noDelay.bottom`）后立即出现 `.cf-tooltip`，
+  文本「回复」，`top` 位于按钮底边之下；按钮的 `title` 为 null、`aria-label` 为「回复」；
+  移开鼠标后气泡消失。截图 `/tmp/w157-shots/tooltip.png`（不入库）。
