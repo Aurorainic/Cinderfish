@@ -6863,3 +6863,29 @@ Firefish 的 `ui/_common_/common.vue` 在 `main` 频道上处理新通知：页�
   约 500ms 后出现 `.cf-user-preview`，宽 300px，内容为
   「w153bob / @w153bob / 这个人很懒… / 1 帖子 · 0 关注中 · 1 关注者」；移开鼠标后卡片消失。
   截图 `/tmp/w153-shots/user-preview.png`（不入库）。
+
+## 12FQ. 第一百五十三波：图集灯箱（替代 PhotoSwipe）（2026-11-07）
+
+`MkMediaList` 注明 PhotoSwipe 未安装，图集只能逐张点开新标签页。这一轮用不依赖第三方库的
+`CfMediaLightbox` 补上页内查看。
+
+### 12FQ.1 改动
+
+| 层 | 文件 | 内容 |
+|----|------|------|
+| 灯箱 | `web/src/components/CfMediaLightbox.vue`（新） | 全屏遮罩、图片/视频、左右翻页（循环）、`1 / N` 计数、Esc/点击背景/关闭按钮退出；打开时锁定页面滚动 |
+| 图集 | `web/src/components/MkMediaList.vue` | 网格点击拦截图片链接：命中则 `popup(CfMediaLightbox, {medias, index})`，否则保留链接行为 |
+
+### 12FQ.2 有意的限制
+
+- 没有 PhotoSwipe 的缩放、拖拽、双指手势与缩略图条。
+- 只对可预览的图片/视频（`FILE_TYPE_BROWSERSAFE`）启用；SVG 仍走链接。
+- 灯箱按图集索引循环，不跨笔记。
+- 键盘左右键与 Esc 在窗口级监听；打开期间页面滚动被禁用。
+
+### 12FQ.3 验证证据
+
+- `vue-tsc --noEmit`、`check:port`（hardTotal 0）、`pnpm build` 全绿；Go 侧未改动。
+- 真实二进制 + 无头浏览器：带两张图的笔记在首页点击图片 → `.cf-lightbox` 打开，显示第 1 张与
+  `1 / 2`；按 `ArrowRight` 后 `src` 变为第二张、计数 `2 / 2`；按 `Escape` 后灯箱消失。
+  截图 `/tmp/w154-shots/lightbox.png`（不入库）。

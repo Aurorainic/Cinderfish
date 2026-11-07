@@ -12,7 +12,7 @@
 			:data-count="previewableCount < 5 ? previewableCount : null"
 			:class="{ dmWidth: inDm }"
 		>
-			<div ref="gallery" @click.stop>
+			<div ref="gallery" @click.stop="onGridClick">
 				<MkMedia
 					v-for="media in previewableMedias"
 					:key="media.id"
@@ -32,12 +32,15 @@ import type { DriveFile } from "@/api/types";
 import { FILE_TYPE_BROWSERSAFE } from "@/const";
 import MkMediaBanner from "@/components/MkMediaBanner.vue";
 import MkMedia from "@/components/MkMedia.vue";
+import CfMediaLightbox from "@/components/CfMediaLightbox.vue";
+import { resolveMediaUrl } from "@/api/client";
+import { popup } from "@/os";
 
 /**
- * Ported from Firefish. Degradation: PhotoSwipe is not installed
- * (contract §5), so the gallery is layout-only and each `MkMedia` image is
- * already a link that opens the file in a new tab. The grid sizes, breakpoint
- * classes and `data-count` branches are unchanged.
+ * Ported from Firefish. PhotoSwipe is not installed (contract §5), so gallery
+ * clicks open the in-house CfMediaLightbox instead; a plain image link still
+ * works if the click misses. The grid sizes, breakpoint classes and
+ * `data-count` branches are unchanged.
  */
 const props = defineProps<{
 	mediaList: DriveFile[];
@@ -57,6 +60,23 @@ const previewable = (file: DriveFile): boolean => {
 const previewableMedias = computed(() =>
 	props.mediaList.filter((media) => previewable(media)),
 );
+
+function onGridClick(ev: MouseEvent): void {
+	const anchor = (ev.target as HTMLElement | null)?.closest("a");
+	if (anchor == null) return;
+	const href = anchor.getAttribute("href");
+	const index = previewableMedias.value.findIndex(
+		(media) => resolveMediaUrl(media.url) === href,
+	);
+	if (index < 0) return;
+	ev.preventDefault();
+	void popup(
+		CfMediaLightbox,
+		{ medias: previewableMedias.value, index },
+		{},
+		"closed",
+	);
+}
 
 const previewableCount = computed(() => previewableMedias.value.length);
 </script>
