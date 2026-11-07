@@ -47,7 +47,7 @@ func MigrateDrive(ctx context.Context, pool *pgxpool.Pool, opts MigrationOptions
 	}
 
 	query := `
-SELECT id, storage_key, content_type, size FROM drive_files
+SELECT id, storage_key, content_type, size, thumbnail_key FROM drive_files
 WHERE storage_backend = $1 ORDER BY id`
 	args := []any{opts.Source.Backend()}
 	if opts.Limit > 0 {
@@ -62,11 +62,12 @@ WHERE storage_backend = $1 ORDER BY id`
 	type item struct {
 		id, key, contentType string
 		size                 int64
+		thumbKey             *string
 	}
 	var items []item
 	for rows.Next() {
 		var it item
-		if err := rows.Scan(&it.id, &it.key, &it.contentType, &it.size); err != nil {
+		if err := rows.Scan(&it.id, &it.key, &it.contentType, &it.size, &it.thumbKey); err != nil {
 			rows.Close()
 			return report, fmt.Errorf("media: migrate: scan file: %w", err)
 		}
@@ -80,27 +81,51 @@ WHERE storage_backend = $1 ORDER BY id`
 	report.Scanned = len(items)
 	keys := make(map[string]struct{}, len(items))
 
-	for _, it := range items {
-		if opts.DryRun {
-			opts.logf("would migrate %s (%s, %d bytes)", it.key, it.contentType, it.size)
-			report.Migrated++
-			keys[it.key] = struct{}{}
-			continue
-		}
-
-		rc, err := opts.Source.Get(ctx, it.key)
+	// migrateOne copies one object to the target backend. Thumbnails have
+	// no row of their own, so they travel with their file row: a key left
+	// behind on the source backend would keep URL(thumbKey) pointing at the
+	// old store once storage_backend flips.
+	migrateOne := func(key, contentType string, size int64) error {
+		rc, err := opts.Source.Get(ctx, key)
 		if err != nil {
-			report.fail(it.key, fmt.Errorf("read: %w", err))
-			continue
+			return fmt.Errorf("read: %w", err)
 		}
-		_, putErr := opts.Target.Put(ctx, it.key, rc, it.size, it.contentType)
+		_, putErr := opts.Target.Put(ctx, key, rc, size, contentType)
 		closeErr := rc.Close()
 		if putErr == nil {
 			putErr = closeErr
 		}
 		if putErr != nil {
-			report.fail(it.key, fmt.Errorf("write: %w", putErr))
+			return fmt.Errorf("write: %w", putErr)
+		}
+		return nil
+	}
+
+	for _, it := range items {
+		if opts.DryRun {
+			opts.logf("would migrate %s (%s, %d bytes)", it.key, it.contentType, it.size)
+			report.Migrated++
+			keys[it.key] = struct{}{}
+			if it.thumbKey != nil && *it.thumbKey != "" {
+				keys[*it.thumbKey] = struct{}{}
+			}
 			continue
+		}
+
+		if err := migrateOne(it.key, it.contentType, it.size); err != nil {
+			report.fail(it.key, err)
+			continue
+		}
+		if it.thumbKey != nil && *it.thumbKey != "" {
+			// A missing thumbnail is not a failure: rows without a generated
+			// preview have a null key. The size is unknown here (it lives
+			// nowhere in the schema), so the copy passes -1, which both the
+			// local writer (io.Copy) and minio-go (unknown-size multipart
+			// upload) treat as "read to EOF".
+			if err := migrateOne(*it.thumbKey, "image/png", -1); err != nil {
+				report.fail(*it.thumbKey, err)
+				continue
+			}
 		}
 
 		if _, err := pool.Exec(ctx,
@@ -113,6 +138,9 @@ WHERE storage_backend = $1 ORDER BY id`
 		opts.logf("migrated %s", it.key)
 		report.Migrated++
 		keys[it.key] = struct{}{}
+		if it.thumbKey != nil && *it.thumbKey != "" {
+			keys[*it.thumbKey] = struct{}{}
+		}
 	}
 
 	if opts.DeleteSource && !opts.DryRun && report.Failed == 0 {

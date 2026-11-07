@@ -84,7 +84,11 @@ func nullable(s string) any {
 //
 // It mirrors Misskey's AuthenticateService: a 16-character token is
 // treated as a native user token looked up in users.token, anything else
-// is looked up in access_tokens by exact token value.
+// is looked up in access_tokens by the token's SHA-256 hash. Issued
+// tokens are high-entropy random strings, so an unsalted fast hash is the
+// right lookup key (the same choice upstream makes by indexing the token
+// value directly); storing only the hash keeps a database leak from
+// yielding usable credentials.
 func (t *TokenService) Resolve(ctx context.Context, token string) (*User, *AccessToken, error) {
 	if token == "" {
 		return nil, nil, ErrInvalidToken
@@ -107,8 +111,8 @@ FROM users WHERE token = $1
 
 	row := t.pool.QueryRow(ctx, `
 SELECT id, token, user_id, session, name, scopes, created_at
-FROM access_tokens WHERE token = $1
-`, token)
+FROM access_tokens WHERE token_hash = $1
+`, auth.HashToken(token))
 	at, err := scanAccessToken(row)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil, ErrInvalidToken

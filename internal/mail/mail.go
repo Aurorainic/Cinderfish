@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"net/mail"
 	"net/smtp"
 	"strings"
 	"time"
@@ -77,6 +78,15 @@ type SMTPSender struct {
 // and tests.
 func (p *SMTPSender) Send(ctx context.Context, m Message) error {
 	s := p.settings
+	// RCPT TO and MAIL FROM go onto the wire as bare commands; an address
+	// carrying CR/LF would let extra SMTP commands be injected. The message
+	// body is sanitized separately in buildMessage.
+	if err := validateAddr(s.From, "from"); err != nil {
+		return err
+	}
+	if err := validateAddr(m.To, "to"); err != nil {
+		return err
+	}
 	addr := net.JoinHostPort(s.Host, fmt.Sprint(s.Port))
 	dialer := &net.Dialer{Timeout: 10 * time.Second}
 
@@ -154,4 +164,23 @@ func buildMessage(from string, m Message) []byte {
 
 func sanitizeHeader(v string) string {
 	return strings.NewReplacer("\r", " ", "\n", " ").Replace(v)
+}
+
+// validateAddr refuses an envelope address that is not a single RFC 5322
+// mailbox. CR/LF and other control characters would inject SMTP commands
+// through MAIL FROM / RCPT TO.
+func validateAddr(addr, field string) error {
+	if strings.TrimSpace(addr) == "" {
+		return fmt.Errorf("mail: %s address is empty", field)
+	}
+	parsed, err := mail.ParseAddress(addr)
+	if err != nil || parsed.Address == "" {
+		return fmt.Errorf("mail: %s address %q is not a valid mailbox", field, addr)
+	}
+	for _, r := range addr {
+		if r < 0x20 || r == 0x7f {
+			return fmt.Errorf("mail: %s address contains a control character", field)
+		}
+	}
+	return nil
 }

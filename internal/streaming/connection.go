@@ -72,6 +72,11 @@ func (c *Connection) setFollowing(f map[string]Follow) {
 	c.viewerMu.Unlock()
 }
 
+// maxFrameSize bounds one client frame. Misskey's frames are tiny JSON
+// envelopes; without a read limit a single oversized frame is parsed into
+// memory wholesale, so an anonymous client can exhaust the process.
+const maxFrameSize = 64 << 10
+
 // serve runs the connection until the peer closes it.
 func (c *Connection) serve() {
 	defer c.dispose()
@@ -91,6 +96,7 @@ func (c *Connection) serve() {
 	go c.ws.heartbeat(c.lastSeen)
 	go c.refreshLoop()
 
+	c.ws.ws.SetReadLimit(maxFrameSize)
 	for {
 		_, data, err := c.ws.ws.ReadMessage()
 		if err != nil {

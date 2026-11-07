@@ -7,7 +7,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -69,8 +71,14 @@ func scanWebhook(row pgx.Row) (*Webhook, error) {
 	return &w, nil
 }
 
+// ErrInvalidURL rejects a webhook target the instance must not call.
+var ErrInvalidURL = errors.New("webhook: URL is not a reachable public http(s) address")
+
 // Create stores a webhook for the user.
 func (s *Service) Create(ctx context.Context, userID, name, url, secret string, on []string) (*Webhook, error) {
+	if err := ValidateURL(ctx, url); err != nil {
+		return nil, err
+	}
 	row := s.pool.QueryRow(ctx, `
 INSERT INTO webhooks (id, user_id, name, url, secret, events)
 VALUES ($1, $2, $3, $4, $5, $6)
@@ -110,6 +118,9 @@ SELECT `+webhookColumns+` FROM webhooks WHERE id = $1 AND user_id = $2`, id, use
 
 // Update rewrites the editable fields of one webhook.
 func (s *Service) Update(ctx context.Context, userID, id, name, url, secret string, on []string, active bool) (*Webhook, error) {
+	if err := ValidateURL(ctx, url); err != nil {
+		return nil, err
+	}
 	row := s.pool.QueryRow(ctx, `
 UPDATE webhooks SET name = $3, url = $4, secret = $5, events = $6, active = $7
 WHERE id = $1 AND user_id = $2
@@ -167,6 +178,14 @@ func (s *Service) deliver(hook *Webhook, userID, eventType string, body any) {
 		return
 	}
 
+	// The URL was validated at registration, but the row may predate that
+	// check or the DNS may have changed; re-checking at delivery keeps the
+	// endpoint from probing internal addresses.
+	if err := ValidateURL(context.Background(), hook.URL); err != nil {
+		s.record(hook.ID, 0)
+		return
+	}
+
 	req, err := http.NewRequest(http.MethodPost, hook.URL, bytes.NewReader(payload))
 	if err != nil {
 		s.record(hook.ID, 0)
@@ -184,6 +203,46 @@ func (s *Service) deliver(hook *Webhook, userID, eventType string, body any) {
 	}
 	defer resp.Body.Close()
 	s.record(hook.ID, resp.StatusCode)
+}
+
+// ValidateURL rejects a webhook target that is not an http(s) URL on a
+// public host. Loopback, private, link-local and unresolved names are
+// refused: a registered webhook POSTs on every note, so a targeted URL
+// would turn latest_status into a port scanner against the instance's own
+// network. The check runs at registration and again at delivery.
+func ValidateURL(ctx context.Context, raw string) error {
+	parsed, err := url.Parse(raw)
+	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Host == "" {
+		return ErrInvalidURL
+	}
+	host := parsed.Hostname()
+	// A literal IP needs no lookup.
+	if ip := net.ParseIP(host); ip != nil {
+		if isPrivateIP(ip) {
+			return ErrInvalidURL
+		}
+		return nil
+	}
+	if host == "localhost" {
+		return ErrInvalidURL
+	}
+	lookupCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	ips, err := net.DefaultResolver.LookupIPAddr(lookupCtx, host)
+	if err != nil {
+		return ErrInvalidURL
+	}
+	for _, addr := range ips {
+		if isPrivateIP(addr.IP) {
+			return ErrInvalidURL
+		}
+	}
+	return nil
+}
+
+func isPrivateIP(ip net.IP) bool {
+	return ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() ||
+		ip.IsLinkLocalMulticast() || ip.IsUnspecified()
 }
 
 // record writes the delivery result back; a missing row is ignored.

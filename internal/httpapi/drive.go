@@ -6,6 +6,7 @@ import (
 	"mime"
 	"net/http"
 	"path"
+	"strings"
 
 	"github.com/Aurorainic/cinderfish/internal/media"
 )
@@ -331,9 +332,34 @@ func (s *Server) handleMediaServe(w http.ResponseWriter, r *http.Request) {
 			contentType = stored
 		}
 	}
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	if mediaContentTypeSandboxed(contentType) {
+		// SVG, HTML and similar formats execute script in the instance's
+		// origin when navigated to directly, and a stored upload is other
+		// users' input. Serving them as a download keeps the bytes
+		// available without handing them the origin; clients render their
+		// own preview through the API instead.
+		w.Header().Set("Content-Disposition", "attachment")
+		w.Header().Set("Content-Security-Policy", "sandbox")
+	}
 	w.Header().Set("Content-Type", contentType)
 	w.WriteHeader(http.StatusOK)
 	_, _ = io.Copy(w, rc)
+}
+
+// mediaContentTypeSandboxed reports whether a content type can carry
+// active content (script, XSLT, plugin navigation) and therefore must not
+// be served inline from the instance origin.
+func mediaContentTypeSandboxed(contentType string) bool {
+	main, _, _ := strings.Cut(contentType, ";")
+	main = strings.ToLower(strings.TrimSpace(main))
+	switch main {
+	case "image/svg+xml", "text/html", "application/xhtml+xml", "text/xml",
+		"application/xml", "text/xsl", "application/xslt+xml",
+		"application/pdf", "application/x-shockwave-flash":
+		return true
+	}
+	return false
 }
 
 // packDriveFile renders a file in Misskey's DriveFile schema.

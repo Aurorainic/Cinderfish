@@ -292,6 +292,11 @@ FROM drive_files WHERE user_id = $1`
 }
 
 // Delete removes a file and its stored object.
+//
+// The row is deleted first, but a trigger may cancel the delete (v25 keeps
+// remote media that notes still reference), so RowsAffected decides whether
+// the objects may go: deleting bytes for a row that survived would leave the
+// row pointing at nothing.
 func (s *DriveService) Delete(ctx context.Context, id, userID string) error {
 	f, err := s.Get(ctx, id)
 	if err != nil {
@@ -300,8 +305,13 @@ func (s *DriveService) Delete(ctx context.Context, id, userID string) error {
 	if f.UserID != userID {
 		return ErrNotFound
 	}
-	if _, err := s.pool.Exec(ctx, `DELETE FROM drive_files WHERE id = $1`, id); err != nil {
+	ct, err := s.pool.Exec(ctx, `DELETE FROM drive_files WHERE id = $1`, id)
+	if err != nil {
 		return fmt.Errorf("media: delete file row: %w", err)
+	}
+	if ct.RowsAffected() == 0 {
+		// The retain trigger cancelled the delete; the objects stay.
+		return nil
 	}
 	if f.ThumbnailKey != nil && *f.ThumbnailKey != "" {
 		// A leftover thumbnail is harmless but it keeps the bytes billed, so
@@ -311,6 +321,8 @@ func (s *DriveService) Delete(ctx context.Context, id, userID string) error {
 		}
 	}
 	if err := s.storage.Delete(ctx, f.StorageKey); err != nil {
+		// The row is gone, so the object is an orphan either way; report the
+		// failure so the caller can retry the storage cleanup.
 		return err
 	}
 	return nil

@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"errors"
 	"net/http"
 	"strings"
 	"time"
@@ -105,6 +106,10 @@ func (s *Server) handleWebhookCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	created, err := s.webhooks.Create(r.Context(), info.User.ID, name, url, secret, on)
 	if err != nil {
+		if errors.Is(err, webhook.ErrInvalidURL) {
+			writeAPIError(w, invalidParamError("url must be a public http(s) address"))
+			return
+		}
 		writeInternalServerError(w)
 		return
 	}
@@ -197,6 +202,10 @@ func (s *Server) handleWebhookUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 	updated, err := s.webhooks.Update(r.Context(), info.User.ID, body.WebhookID, name, url, secret, on, active)
 	if err != nil {
+		if errors.Is(err, webhook.ErrInvalidURL) {
+			writeAPIError(w, invalidParamError("url must be a public http(s) address"))
+			return
+		}
 		writeAPIError(w, &APIError{
 			Message: "No such webhook.", Code: "NO_SUCH_WEBHOOK",
 			ID: errIDInvalidParam, Kind: "client", Status: http.StatusNotFound,
