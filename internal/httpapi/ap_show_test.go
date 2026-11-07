@@ -281,3 +281,23 @@ func TestAPShowRejectsForeignNote(t *testing.T) {
 		t.Fatalf("foreign note = %d %v, want 400", resp.StatusCode, out)
 	}
 }
+
+// TestAPShowRefusesPrivateAddress proves the federation fetch path cannot
+// be pointed at the instance's own network: a literal loopback or private
+// IP is refused before any request is made.
+func TestAPShowRefusesPrivateAddress(t *testing.T) {
+	a := newInstance(t, "alpha")
+	_, viewerToken := a.signup(t, "alphaalice")
+
+	for _, uri := range []string{
+		"http://127.0.0.1:5432/",
+		"http://[::1]:5432/",
+		"http://10.0.0.1/secret",
+		"http://169.254.169.254/latest/meta-data/",
+	} {
+		resp, out := postWithToken(t, a.ts, "/api/ap/show", viewerToken, map[string]any{"uri": uri})
+		if resp.StatusCode == http.StatusOK {
+			t.Errorf("ap/show %q = 200 %v, want a refusal", uri, out)
+		}
+	}
+}

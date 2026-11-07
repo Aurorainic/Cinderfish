@@ -95,12 +95,23 @@ func (s *Server) serveTimeline(w http.ResponseWriter, r *http.Request, kind note
 		params.IncludeLocalRenotes = *body.IncludeLocalRenotes
 	}
 
-	// Date cursors are translated into id cursors.
+	// Date cursors are translated into id cursors. A conversion failure is
+	// a server error, not "no cursor".
 	if params.SinceID == "" && body.SinceDate != nil {
-		params.SinceID, _ = s.timeline.SinceIDForDate(r.Context(), unixMilli(*body.SinceDate))
+		id, err := s.timeline.SinceIDForDate(r.Context(), unixMilli(*body.SinceDate))
+		if err != nil {
+			writeInternalServerError(w)
+			return
+		}
+		params.SinceID = id
 	}
 	if params.UntilID == "" && body.UntilDate != nil {
-		params.UntilID, _ = s.timeline.SinceIDForDate(r.Context(), unixMilli(*body.UntilDate))
+		id, err := s.timeline.SinceIDForDate(r.Context(), unixMilli(*body.UntilDate))
+		if err != nil {
+			writeInternalServerError(w)
+			return
+		}
+		params.UntilID = id
 	}
 
 	notes, err := s.timeline.Timeline(r.Context(), params)

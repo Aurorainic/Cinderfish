@@ -110,7 +110,7 @@ func (s *EmojiService) ListAdmin(ctx context.Context, q EmojiQuery) ([]*Emoji, e
 	query := emojiSelect + ` WHERE TRUE`
 	args := []any{}
 	if q.Query != "" {
-		args = append(args, "%"+q.Query+"%")
+		args = append(args, "%"+escapeLike(q.Query)+"%")
 		query += fmt.Sprintf(" AND (name ILIKE $%d OR EXISTS (SELECT 1 FROM jsonb_array_elements_text(aliases) a WHERE a ILIKE $%d))", len(args), len(args))
 	}
 	if q.SinceID != "" {

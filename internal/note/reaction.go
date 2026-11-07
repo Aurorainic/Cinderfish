@@ -290,7 +290,9 @@ FROM notifications WHERE recipient_id = $1`
 	// Misskey's getNotifications filters with include-wins semantics
 	// (packages/backend/src/core/NotificationService.ts L302-306): a
 	// non-empty includeTypes takes precedence and excludeTypes is ignored.
-	if includeTypes != nil {
+	// An EMPTY includeTypes means no filter, not "match nothing" — hence
+	// the length check, not a nil check.
+	if len(includeTypes) > 0 {
 		args = append(args, includeTypes)
 		query += fmt.Sprintf(" AND type = ANY($%d)", len(args))
 	} else if len(excludeTypes) > 0 {

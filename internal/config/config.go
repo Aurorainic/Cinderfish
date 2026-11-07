@@ -189,8 +189,7 @@ func setBool(key string, dst *bool) {
 
 func setInt(key string, dst *int) {
 	if v, ok := os.LookupEnv(key); ok {
-		var n int
-		if _, err := fmt.Sscanf(strings.TrimSpace(v), "%d", &n); err == nil {
+		if n, err := strconv.Atoi(strings.TrimSpace(v)); err == nil {
 			*dst = n
 		}
 	}

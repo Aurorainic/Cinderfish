@@ -26,13 +26,22 @@ type AuthInfo struct {
 // authenticate resolves the credentials of a request.
 //
 // Misskey accepts the token in the `i` body parameter and in the
-// Authorization header (Bearer). The body parameter is checked first.
+// Authorization header (Bearer). The body parameter is checked first. For
+// a multipart upload the token may also arrive as a form field, which
+// only becomes readable after ParseMultipartForm; try it before giving up.
 func (s *Server) authenticate(ctx context.Context, r *http.Request, body map[string]any) (*AuthInfo, error) {
 	token := ""
 	if body != nil {
 		if v, ok := body["i"].(string); ok {
 			token = v
 		}
+	}
+	if token == "" && r.Method == http.MethodPost && strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/form-data") {
+		if r.MultipartForm == nil {
+			// ParseMultipartForm restores the body for the handler.
+			_ = r.ParseMultipartForm(1 << 20)
+		}
+		token = r.FormValue("i")
 	}
 	if token == "" {
 		if h := r.Header.Get("Authorization"); h != "" {

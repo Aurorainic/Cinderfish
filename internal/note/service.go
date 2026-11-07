@@ -161,7 +161,8 @@ var (
 )
 
 // validatePollParam enforces notes/create's poll schema: 2–10 distinct
-// choices, each 1–50 code points.
+// choices, each 1–50 code points, and an expiry in the future if one is
+// set (an already-expired poll is rejected at create, as upstream does).
 func validatePollParam(poll *PollParams) error {
 	if poll == nil {
 		return nil
@@ -176,6 +177,9 @@ func validatePollParam(poll *PollParams) error {
 			return ErrInvalidPoll
 		}
 		seen[choice] = true
+	}
+	if poll.ExpiresAt != nil && !poll.ExpiresAt.After(time.Now()) {
+		return ErrPollExpired
 	}
 	return nil
 }
@@ -603,16 +607,50 @@ func (s *Service) VisibleTo(ctx context.Context, n *Note, viewerID string) (bool
 	return visible, nil
 }
 
-// Delete soft deletes a note owned by the given user.
+// Delete soft deletes a note owned by the given user. The parents' reply
+// and renote counters are decremented in the same transaction — creation
+// incremented them, and leaving them high would let a renote-then-delete
+// loop inflate notes/featured scores forever.
 func (s *Service) Delete(ctx context.Context, id, userID string) error {
-	ct, err := s.pool.Exec(ctx, `
-UPDATE notes SET deleted_at = now() WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL
-`, id, userID)
+	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return fmt.Errorf("note: delete: %w", err)
 	}
-	if ct.RowsAffected() == 0 {
+	defer tx.Rollback(ctx)
+
+	var replyID, renoteID *string
+	err = tx.QueryRow(ctx, `
+UPDATE notes SET deleted_at = now()
+WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL
+RETURNING reply_id, renote_id
+`, id, userID).Scan(&replyID, &renoteID)
+	if errors.Is(err, pgx.ErrNoRows) {
 		return ErrNotFound
+	}
+	if err != nil {
+		return fmt.Errorf("note: delete: %w", err)
+	}
+
+	// A reply was counted on its parent; a renote was counted on its
+	// target. The parent may itself be deleted already; counters of
+	// deleted rows are irrelevant, so the update simply matches nothing.
+	if replyID != nil {
+		if _, err := tx.Exec(ctx, `
+UPDATE notes SET replies_count = replies_count - 1 WHERE id = $1 AND replies_count > 0
+`, *replyID); err != nil {
+			return fmt.Errorf("note: delete: decrement replies: %w", err)
+		}
+	}
+	if renoteID != nil {
+		if _, err := tx.Exec(ctx, `
+UPDATE notes SET renote_count = renote_count - 1 WHERE id = $1 AND renote_count > 0
+`, *renoteID); err != nil {
+			return fmt.Errorf("note: delete: decrement renotes: %w", err)
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("note: delete: commit: %w", err)
 	}
 	return nil
 }

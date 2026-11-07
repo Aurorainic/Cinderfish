@@ -47,7 +47,7 @@ ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`); err != nil {
 		t.Fatalf("seed mode: %v", err)
 	}
 
-	policy := federation.NewPolicy(pool, "fish.example")
+	policy := federation.NewPolicy(pool, "127.0.0.1")
 	renderer := federation.NewRenderer("https://fish.example")
 	priv, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {

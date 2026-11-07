@@ -96,12 +96,14 @@ func TestNotificationsIncludeTypes(t *testing.T) {
 		t.Errorf("includeTypes mention = %v, want %v", got, want)
 	}
 
-	// An explicitly empty includeTypes returns nothing.
-	none := fetchNotifications(t, ts, tokenA, map[string]any{
+	// An explicitly empty includeTypes means no filter, exactly like
+	// omitting it: Misskey filters only when the list is non-empty
+	// (NotificationService.ts L302).
+	all := fetchNotifications(t, ts, tokenA, map[string]any{
 		"markAsRead": false, "includeTypes": []string{},
 	})
-	if len(none) != 0 {
-		t.Errorf("empty includeTypes returned %v, want nothing", notificationTypesOf(none))
+	if len(all) != 2 {
+		t.Errorf("empty includeTypes returned %v, want both", notificationTypesOf(all))
 	}
 }
 

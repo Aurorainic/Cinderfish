@@ -123,9 +123,11 @@ func TestNotificationListIncludeTypes(t *testing.T) {
 		t.Errorf("includeTypes reaction+renote = %v, want %v", got, want)
 	}
 
-	// An explicitly empty includeTypes matches nothing; Misskey returns [].
-	if got := f.list(t, []string{}, nil); len(got) != 0 {
-		t.Errorf("empty includeTypes returned %v, want nothing", f.ids(got))
+	// An explicitly empty includeTypes means no filter, exactly like nil:
+	// Misskey checks length > 0 before filtering (NotificationService.ts
+	// L302), so [] returns everything.
+	if got := f.list(t, []string{}, nil); len(got) != 4 {
+		t.Errorf("empty includeTypes returned %v, want all four", f.ids(got))
 	}
 	// nil leaves the type unfiltered.
 	if got := f.list(t, nil, nil); len(got) != 4 {

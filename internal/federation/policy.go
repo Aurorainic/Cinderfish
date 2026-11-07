@@ -141,6 +141,56 @@ func (p *Policy) CheckURLAllowed(ctx context.Context, rawURL string) error {
 	return p.CheckAllowed(ctx, host)
 }
 
+// ErrPrivateAddress is returned when a federation target resolves to an
+// address no outbound call should ever reach: loopback, a private range
+// or link-local (cloud metadata). The self host is exempt so the
+// dual-instance setups and single-host deployments keep working.
+var ErrPrivateAddress = errors.New("federation: target resolves to a private address")
+
+// CheckURLRoutable applies CheckURLAllowed and additionally refuses hosts
+// whose addresses are loopback, private or link-local. Literal-IP hosts
+// are inspected directly; named hosts are resolved once here, and the
+// per-hop redirect check repeats it for every redirect target.
+func (p *Policy) CheckURLRoutable(ctx context.Context, rawURL string) error {
+	if err := p.CheckURLAllowed(ctx, rawURL); err != nil {
+		return err
+	}
+	host, err := HostOf(rawURL)
+	if err != nil {
+		return err
+	}
+	host = normalizeHost(host)
+	if host == p.selfHost || host == "localhost" {
+		return nil
+	}
+	if ip := net.ParseIP(host); ip != nil {
+		if isRoutable(ip) {
+			return nil
+		}
+		return fmt.Errorf("%w: %s", ErrPrivateAddress, host)
+	}
+	lookupCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	ips, err := net.DefaultResolver.LookupIPAddr(lookupCtx, host)
+	if err != nil {
+		// An unresolvable name cannot be inspected; let the request itself
+		// fail on connection. This also keeps environments where a rewrite
+		// transport maps the name elsewhere (dual-instance tests) working.
+		return nil
+	}
+	for _, addr := range ips {
+		if !isRoutable(addr.IP) {
+			return fmt.Errorf("%w: %s", ErrPrivateAddress, host)
+		}
+	}
+	return nil
+}
+
+func isRoutable(ip net.IP) bool {
+	return !ip.IsLoopback() && !ip.IsPrivate() && !ip.IsLinkLocalUnicast() &&
+		!ip.IsLinkLocalMulticast() && !ip.IsUnspecified()
+}
+
 // hostInAllowlist applies the suffix rule Misskey uses for its
 // allowlist: an entry of "example.com" matches example.com and
 // sub.example.com but not notexample.com.

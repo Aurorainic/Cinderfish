@@ -2,11 +2,13 @@ package note
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -155,6 +157,11 @@ func (s *TimelineService) Timeline(ctx context.Context, p TimelineParams) ([]*No
 		p.IncludeRenotedMyNotes = true
 		p.IncludeLocalRenotes = true
 	}
+	// Upstream timeline.ts appends an explicit exclude condition when
+	// withRenotes is false: a note without renote_id stays, a pure renote
+	// (no content of its own) goes. Quotes carry renote_id too, so the
+	// text/files/poll escape hatch is what keeps them visible.
+	excludePureRenotes := !p.WithRenotes
 
 	q := &queryBuilder{}
 
@@ -211,6 +218,9 @@ func (s *TimelineService) Timeline(ctx context.Context, p TimelineParams) ([]*No
 	}
 
 	// Renote inclusion filters.
+	if excludePureRenotes {
+		q.conds = append(q.conds, "(n.renote_id IS NULL OR n.text IS NOT NULL OR n.file_ids <> '{}' OR EXISTS (SELECT 1 FROM polls p WHERE p.id = n.id))")
+	}
 	if !p.IncludeMyRenotes {
 		me := q.viewerArg(p.ViewerID)
 		q.conds = append(q.conds, fmt.Sprintf("(n.user_id <> %s OR n.renote_id IS NULL OR n.text IS NOT NULL)", me))
@@ -246,14 +256,20 @@ func (s *TimelineService) Timeline(ctx context.Context, p TimelineParams) ([]*No
 }
 
 // SinceIDForDate returns the id of the oldest note newer than the given
-// time, so clients can use sinceDate and untilDate cursors.
+// time, so clients can use sinceDate and untilDate cursors. No match is
+// reported as an empty id and a nil error — the caller then behaves as if
+// no cursor was given, which is upstream's behaviour too — while a failed
+// query is reported so it is not mistaken for "no cursor".
 func (s *TimelineService) SinceIDForDate(ctx context.Context, t time.Time) (string, error) {
 	var id string
 	err := s.pool.QueryRow(ctx, `
 SELECT id FROM notes WHERE created_at >= $1 AND deleted_at IS NULL ORDER BY id ASC LIMIT 1
 `, t).Scan(&id)
-	if err != nil {
+	if errors.Is(err, pgx.ErrNoRows) {
 		return "", nil
+	}
+	if err != nil {
+		return "", fmt.Errorf("note: id for date: %w", err)
 	}
 	return id, nil
 }

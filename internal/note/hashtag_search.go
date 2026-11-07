@@ -21,7 +21,7 @@ func (s *HashtagService) SearchHashtags(ctx context.Context, query string, limit
 	if offset < 0 {
 		offset = 0
 	}
-	pattern := "%" + query + "%"
+	pattern := "%" + escapeLike(query) + "%"
 	rows, err := s.pool.Query(ctx, `
 SELECT lower(tag) AS tag, count(*) AS uses
 FROM notes n, jsonb_array_elements_text(n.tags) AS tag

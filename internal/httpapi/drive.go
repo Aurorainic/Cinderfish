@@ -22,6 +22,9 @@ func (s *Server) handleDriveFilesCreate(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	// A multipart body is not JSON, so bodyAsMap returns nothing; the
+	// authenticate call reads the i form field itself once the form is
+	// parsed.
 	info, err := s.authenticate(r.Context(), r, nil)
 	if err != nil || info == nil {
 		writeAuthenticationError(w)
@@ -30,6 +33,13 @@ func (s *Server) handleDriveFilesCreate(w http.ResponseWriter, r *http.Request) 
 
 	if !s.checkRateLimit(w, info.User.ID, limitDriveCreate) {
 		return
+	}
+
+	// The whole upload is bounded even before Save's per-file limit runs:
+	// ParseMultipartForm otherwise spools an unbounded body into OS temp
+	// files while the request is in flight.
+	if r.ContentLength > 0 {
+		r.Body = http.MaxBytesReader(w, r.Body, r.ContentLength)
 	}
 
 	if err := r.ParseMultipartForm(32 << 20); err != nil {
@@ -91,7 +101,7 @@ func (s *Server) checkOwnFolder(r *http.Request, userID, folderID string) *APIEr
 		if errors.Is(err, media.ErrNotFound) {
 			return &APIError{
 				Message: "No such folder.", Code: "NO_SUCH_FOLDER",
-				ID: errIDNoSuchFolder, Kind: "client", Status: http.StatusBadRequest,
+				ID: errIDNoSuchFolder, Kind: "client", Status: http.StatusNotFound,
 			}
 		}
 		return &APIError{
@@ -158,6 +168,12 @@ func (s *Server) handleDriveFilesList(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleDriveFilesShow implements POST /api/drive/files/show.
+//
+// The endpoint requires a credential (drive/files/show.ts sets
+// requireCredential) and answers with the caller's own files only; a file
+// owned by someone else is indistinguishable from a missing one, so its
+// metadata (name, comment, folder) does not leak through the fileIds other
+// users' public notes carry.
 func (s *Server) handleDriveFilesShow(w http.ResponseWriter, r *http.Request) {
 	if s.drive == nil {
 		writeAPIError(w, &APIError{
@@ -175,8 +191,14 @@ func (s *Server) handleDriveFilesShow(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	info, err := s.authenticate(r.Context(), r, bodyAsMap(r))
+	if err != nil || info == nil {
+		writeAuthenticationError(w)
+		return
+	}
+
 	f, err := s.drive.Get(r.Context(), body.FileID)
-	if err != nil {
+	if err != nil || f.UserID != info.User.ID {
 		writeAPIError(w, &APIError{
 			Message: "No such file.", Code: "NO_SUCH_FILE",
 			ID: "b6992544-63e7-67f0-fa7f-32444b1b5306", Kind: "client", Status: http.StatusNotFound,

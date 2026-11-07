@@ -81,3 +81,32 @@ func TestDriveFilesUpdate(t *testing.T) {
 		t.Errorf("empty name = %d, want 400", resp.StatusCode)
 	}
 }
+
+// TestDriveFilesShowRequiresOwnership proves files/show needs a credential
+// and answers only for the owner: another user's file is indistinguishable
+// from a missing one, so its metadata does not leak through the fileIds
+// other users' public notes carry.
+func TestDriveFilesShowRequiresOwnership(t *testing.T) {
+	ts := newTestServer(t, "open")
+	_, aliceToken := createUser(t, ts, uniqueName(t)+"a")
+	_, bobToken := createUser(t, ts, uniqueName(t)+"b")
+
+	respA, fileA := uploadFile(t, ts.URL, aliceToken, "owned.png", bytes.NewBufferString("png bytes"))
+	if respA.StatusCode != http.StatusOK {
+		t.Fatalf("upload: status %d, body %v", respA.StatusCode, fileA)
+	}
+	fileID, _ := fileA["id"].(string)
+
+	// Anonymous is 401.
+	if resp, _ := post(t, ts, "/api/drive/files/show", map[string]any{"fileId": fileID}); resp.StatusCode != http.StatusUnauthorized {
+		t.Errorf("anonymous show = %d, want 401", resp.StatusCode)
+	}
+	// The owner sees the file.
+	if resp, shown := postWithToken(t, ts, "/api/drive/files/show", aliceToken, map[string]any{"fileId": fileID}); resp.StatusCode != http.StatusOK || shown["id"] != fileID {
+		t.Errorf("owner show = %d %v, want 200", resp.StatusCode, shown["id"])
+	}
+	// Another user gets the same 404 as a missing file.
+	if resp, _ := postWithToken(t, ts, "/api/drive/files/show", bobToken, map[string]any{"fileId": fileID}); resp.StatusCode != http.StatusNotFound {
+		t.Errorf("foreign show = %d, want 404", resp.StatusCode)
+	}
+}

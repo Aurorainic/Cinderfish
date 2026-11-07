@@ -149,7 +149,15 @@ func (s *Server) handleDriveFoldersShow(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	folder, err := s.folders.GetFolder(r.Context(), body.FolderID)
-	if err != nil || folder.UserID != info.User.ID {
+	if err != nil {
+		if errors.Is(err, media.ErrNotFound) {
+			writeNoSuchFolder(w)
+			return
+		}
+		writeInternalServerError(w)
+		return
+	}
+	if folder.UserID != info.User.ID {
 		writeNoSuchFolder(w)
 		return
 	}

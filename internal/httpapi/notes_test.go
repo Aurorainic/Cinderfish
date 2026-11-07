@@ -898,7 +898,7 @@ func TestDriveFileLifecycle(t *testing.T) {
 		t.Errorf("name = %v, want note.txt", body["name"])
 	}
 
-	resp, body = post(t, ts, "/api/drive/files/show", map[string]any{"fileId": fileID})
+	resp, body = post(t, ts, "/api/drive/files/show", map[string]any{"i": token, "fileId": fileID})
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("drive/files/show: status %d, body %v", resp.StatusCode, body)
 	}
@@ -916,7 +916,7 @@ func TestDriveFileLifecycle(t *testing.T) {
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("drive/files/delete: status %d", resp.StatusCode)
 	}
-	resp, _ = post(t, ts, "/api/drive/files/show", map[string]any{"fileId": fileID})
+	resp, _ = post(t, ts, "/api/drive/files/show", map[string]any{"i": token, "fileId": fileID})
 	if resp.StatusCode != http.StatusNotFound {
 		t.Errorf("show after delete: status %d, want 404", resp.StatusCode)
 	}

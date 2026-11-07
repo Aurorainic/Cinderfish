@@ -54,15 +54,15 @@ func NewClient(policy *Policy, renderer *Renderer, keySource func(context.Contex
 		http: &http.Client{
 			Timeout: 15 * time.Second,
 			// ActivityPub identity is the URL, so following redirects is
-			// normal; the limit stops a redirect loop. Every hop is
-			// checked against the live policy, so a redirect from an
-			// allowed host cannot carry the request to a blocked host or
-			// an internal address.
+			// normal; the limit stops a redirect loop. Every hop is checked
+			// against the live policy and its routability, so a redirect
+			// from an allowed host cannot carry the request to a blocked
+			// host or an internal address.
 			CheckRedirect: func(req *http.Request, via []*http.Request) error {
 				if len(via) >= 5 {
 					return errors.New("too many redirects")
 				}
-				if err := policy.CheckURLAllowed(req.Context(), req.URL.String()); err != nil {
+				if err := policy.CheckURLRoutable(req.Context(), req.URL.String()); err != nil {
 					return err
 				}
 				return nil
@@ -145,7 +145,7 @@ func (c *Client) ResolveWebFinger(ctx context.Context, acct string) (*WebFinger,
 // id must match it, which is what stops a peer from serving someone
 // else's object at its own URL.
 func (c *Client) FetchObject(ctx context.Context, target, objectID string) (Object, error) {
-	if err := c.policy.CheckURLAllowed(ctx, target); err != nil {
+	if err := c.policy.CheckURLRoutable(ctx, target); err != nil {
 		return nil, err
 	}
 
@@ -198,7 +198,7 @@ func (c *Client) FetchMedia(ctx context.Context, target string, maxBytes int64) 
 	if maxBytes <= 0 {
 		return "", nil, "", fmt.Errorf("federation: invalid media size limit")
 	}
-	if err := c.policy.CheckURLAllowed(ctx, target); err != nil {
+	if err := c.policy.CheckURLRoutable(ctx, target); err != nil {
 		return "", nil, "", err
 	}
 	// The shared client's CheckRedirect re-checks every hop.
@@ -235,7 +235,7 @@ func (c *Client) FetchMedia(ctx context.Context, target string, maxBytes int64) 
 // PostActivity signs and POSTs an activity to inboxURL. asUserID names the
 // local account the activity speaks for; it picks the signing key.
 func (c *Client) PostActivity(ctx context.Context, inboxURL string, activity Object, asUserID string) error {
-	if err := c.policy.CheckURLAllowed(ctx, inboxURL); err != nil {
+	if err := c.policy.CheckURLRoutable(ctx, inboxURL); err != nil {
 		return err
 	}
 	body, err := json.Marshal(activity)

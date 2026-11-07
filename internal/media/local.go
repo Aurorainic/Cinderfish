@@ -41,14 +41,26 @@ func (s *LocalStorage) Put(ctx context.Context, key string, r io.Reader, size in
 		return "", fmt.Errorf("media: create directory: %w", err)
 	}
 
-	f, err := os.Create(path)
+	// The write goes to a sibling temp file and is renamed into place, so
+	// a crash never leaves a truncated object at the final content-hash
+	// key: the same key would then serve wrong bytes to every reader.
+	tmp := path + ".tmp"
+	f, err := os.Create(tmp)
 	if err != nil {
 		return "", fmt.Errorf("media: create file: %w", err)
 	}
-	defer f.Close()
-
 	if _, err := io.Copy(f, r); err != nil {
+		f.Close()
+		_ = os.Remove(tmp)
 		return "", fmt.Errorf("media: write file: %w", err)
+	}
+	if err := f.Close(); err != nil {
+		_ = os.Remove(tmp)
+		return "", fmt.Errorf("media: close file: %w", err)
+	}
+	if err := os.Rename(tmp, path); err != nil {
+		_ = os.Remove(tmp)
+		return "", fmt.Errorf("media: finalize file: %w", err)
 	}
 	return s.URL(key), nil
 }

@@ -62,6 +62,10 @@ func New(s Settings) Sender {
 type LogSender struct{}
 
 // Send logs the message in the same shape an operator needs to act on it.
+// The body carries the verification or reset link, which is how an
+// instance without SMTP completes its first signup: the operator copies
+// the link out of the log. That link is a one-time credential, so this
+// path exists only while no SMTP host is configured.
 func (LogSender) Send(_ context.Context, m Message) error {
 	log.Printf("mail: no SMTP host configured, printing instead")
 	log.Printf("mail: to=%s subject=%q\n%s", m.To, m.Subject, m.Body)
