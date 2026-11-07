@@ -381,6 +381,21 @@ prefix = "cinderfish"
 
 `prefix` 用于多实例共用一个 Redis 库时隔离频道；空值回退到 `cinderfish`。
 
+URL 支持标准 Redis URI 语法，包括密码：`redis://:password@127.0.0.1:6379/0`（ACL 用户则写成 `redis://user:password@host:port/db`）。密码错误时启动直接失败并打印 `WRONGPASS`，不会退化成静默重试。
+
+测试分两层：
+
+- `miniredis`（`internal/streaming/redis_test.go`、`internal/federation/redis_wake_test.go`）覆盖投递、自身回声丢弃、大报文不分块、唤醒不阻塞，默认执行。
+- 真实服务端集成测试（`internal/streaming/redis_integration_test.go`、`internal/federation/redis_integration_test.go`、`internal/httpapi/streaming_relay_redis_test.go`）在 `CINDERFISH_TEST_REDIS_URL` 设置后执行，覆盖真实 Pub/Sub 往返、`requirepass` 认证与生产接线方式（`NewRedisRelay` + `ListenRedis`）。
+
+本机安装与启动（Ubuntu/Debian 系）：
+
+```bash
+sudo apt-get install -y redis-server
+sudo systemctl enable --now redis-server
+redis-cli ping   # PONG
+```
+
 ### 11.5 实时更新
 
 `web/src/stores/streaming.ts` 维护唯一 `/streaming` 连接：token 走 query，`connect` 带 `pong:true`，按订阅 id 分发 `channel` 帧，断线指数退避（1s→30s，6 次封顶），登录/退出时重建连接。订阅按频道引用计数：同一频道只建立一条服务端订阅，最后一个订阅者释放时才 `disconnect`；外壳自己的 `main` 订阅也计入计数，并在 `onopen` 重新确认，所以通知页进出、断线重连都不会让未读徽标失去通道。时间线各自订阅自己的频道，`__reconnected`（空频道）触发整页重载。
@@ -7619,3 +7634,47 @@ Firefish 的 `init.ts` 在 `main` 频道上监听 `meUpdated` 并 `updateAccount
   - 用另一「设备」（直接调 API）把它改成 4（200）；不刷新页面，再打开同一分类：
     带修饰符的按钮 **32** 个（中等肤色）。
   截图 `/tmp/w175-shots/registry-updated.png`（不入库）。
+## 12GN. 第一百七十六波：v0.1.0 前的端到端浏览器回归（2026-11-07）
+
+发布前的整轮回归：独立库 `cinderfish_e2e`（`postgres` 超级用户建库后授予 `cinderfish`，因为该角色
+没有 CREATEDB 权限）、独立媒体目录 `/tmp/e2e-media`、真实二进制 `/tmp/cf-e2e`（schema v24），
+无头 Helium + CDP 驱动。用例脚本留在 `/tmp/e2e/`，不入库。
+
+### 12GN.1 覆盖范围
+
+| 阶段 | 内容 | 结果 |
+|------|------|------|
+| 全路由巡检 | 85 个页面：匿名 15、登录 45、管理员 25（含 6 个设置子页与管理台全部路由） | 85 / 85 干净：无控制台 error、无未捕获异常、无 ≥400 响应、无横向溢出 |
+| 交互流程 | 12 条：界面注册、发帖、回应、回复、转贴、关注/取消关注、设置持久化、网盘上传、流式新帖、登出 | 12 / 12 通过 |
+
+巡检判据：`document.body.innerText.length > 25` 且页面专属元素出现（例如详情页的 `.reply-bar`）；
+只等正文文本会把时间线上的同一段正文误判为详情页就绪，这是本轮多次「点击打空」的根因。
+
+### 12GN.2 修掉的缺陷
+
+| # | 位置 | 症状 | 修复 |
+|---|------|------|------|
+| 1 | `web/src/os/state.ts` | `popup(component, props, events, "closed")` 用 `{...events, [disposeEvent]: dispose}` 组装事件表，`dispose` 覆盖了调用方注册的同名处理器。于是 `os.post()` 的 `closed: () => resolve()` 被丢弃，**发帖对话框关闭后 Promise 永不 resolve**：详情页发完回复不刷新、所有依赖 `post().then()` 的后续动作都不执行 | 组装时先调用调用方处理器再 `dispose()` |
+| 2 | `web/src/pages/Note.vue` | 详情页发回复后子回复列表不刷新（`notes/children` 只在挂载时取一次，且没有流式通道） | 发帖完成后 `repliesRefresh += 1`，用 `:key` 重挂载 `MkNoteDetail` 重新拉取 |
+| 3 | `web/src/pages/Announcements.vue` | 未登录打开 `/announcements` 仍调 `i/read-announcement`，控制台 401 | `markRead` 先看 `signedIn`，访客只读 |
+| 4 | `web/src/pages/InstanceInfo.vue` | 未登录打开 `/instance-info/:host` 调需要鉴权的 `federation/show-instance`，控制台 401 | 未登录时直接给出「登录后可查询实例信息。」，不发请求 |
+| 5 | `internal/httpapi/registry.go` | `i/registry/get` 的 `NO_SUCH_KEY` 返回 404；Misskey 对该错误没有 `httpStatusCode`，按 `kind: client` 落 **400** | 改成 400，`registry_test.go` 的 4 处断言同步 |
+
+第 1 条是这一轮最有价值的发现：它不影响发帖本身（`notes/create` 一直是 200），只影响对话框关闭后的
+回调链，所以此前所有后端测试和手工走查都看不出来。
+
+### 12GN.3 固化的测试方法
+
+- 未登录状态必须单独跑一遍：匿名页面的 401 只在这一遍暴露。
+- 注入登录态时 `localStorage.account` 必须带 `token` 字段（`isMeDetailed` 要求非空 token），
+  否则会静默回落到欢迎页，后续所有断言都会「通过但测的是访客页」。
+- 交互用例的每个点击都要先等**页面专属元素**，再点击；点击后按「网络请求 + 页面元素」双判据确认。
+- 取消关注走 `os.confirm`，必须先点确认框里的「好」，否则按钮会一直停在「正在处理」。
+
+### 12GN.4 验证证据
+
+- `gofmt -l internal/ cmd/` 空、`go vet ./...` 干净；
+  `CINDERFISH_TEST_DATABASE_URL=… CINDERFISH_TEST_REDIS_URL=… go test ./... -count=1` 全绿
+  （httpapi 47.7s、federation 3.2s、media 7.3s）。
+- `vue-tsc --noEmit`、`check:port`（421 文件，hardTotal 0）、`pnpm build` 全绿。
+- 巡检与流程报告：`/tmp/e2e/sweep.json`、`/tmp/e2e/flows.json`，截图在 `/tmp/e2e-shots/`（均不入库）。
