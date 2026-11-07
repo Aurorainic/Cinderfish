@@ -7576,3 +7576,46 @@ Firefish 的 `init.ts` 在 `main` 频道上监听 `meUpdated` 并 `updateAccount
 | ≥400 响应 | 0 |
 
 没有发现缺陷，本波只记录结果。移动端底部导航、设置页表单与管理页表格在 390 宽下都不溢出。
+
+## 12GM. 第一百七十五波：registryUpdated 与跨设备设置同步（2026-11-07）
+
+`i/registry/set` 写入后没有任何广播，所以一台设备改了 account 作用域的偏好（默认肤色、表情回应
+开关等），另一台设备上的页面要刷新才看得到。这是 `PORTING-NOTES` 里最后一条流式缺口。
+
+### 12GM.1 落地清单
+
+| 层 | 文件 | 内容 |
+|----|------|------|
+| 发布 | `internal/httpapi/streaming_publish.go` | `publishRegistryUpdated(userID, scope, key, value)`：空 scope 按 Misskey 的默认值补成 `["client"]` |
+| 写入 | `internal/httpapi/registry.go` | `i/registry/set` 成功后发布 |
+| 事件表 | `web/src/api/stream.ts` | `ChannelEventMap.registryUpdated: {scope, key, value}` |
+| 存储 | `web/src/store/pizzax.ts` | 每个 `Storage` 在构造时注册进 `buckets`；新增 `applyRemote`（只接受 account 作用域字段，不写回）与 `applyRegistryUpdated(scope, key, value)` |
+| 订阅 | `web/src/main.ts` | 登录后与 `meUpdated` 同一条 `main` 连接上处理 `registryUpdated` |
+| 笔记 | `web/src/i18n/PORTING-NOTES.md` | 流式缺口清零 |
+
+### 12GM.2 过程中修掉的缺陷
+
+第一次实现把注册放在 `createPizzax` 工厂里，但 `base` store 是**直接** `new Storage("base", …)`
+构造的（`store/base.ts:274`），于是最常用的那个 bucket 根本没被注册，事件到达后找不到 store。
+注册改到构造函数里，工厂不再重复注册。
+
+### 12GM.3 有意的限制
+
+- 只应用 `scope.length === 2 && scope[0] === "client"` 的事件；`base` 之外的 bucket（widgets、
+  deck、sound、ui）同样适用，但其中的 device 作用域字段会被 `applyRemote` 忽略（它们不进注册表）。
+- 应用时不写回服务端，也不写 localStorage 的缓存副本；下一次登录会从服务端重新取一次。
+- 同一浏览器多标签页本来就有 `BroadcastChannel` 通道；这条流式路径补的是「另一台设备」。
+- 没有处理 `registryUpdated` 的删除语义（`i/registry/remove` 不广播，客户端仍保留旧值直到重登）。
+
+### 12GM.4 验证证据
+
+- `go vet ./...`、含数据库的全量 `go test ./...` 全绿；`vue-tsc --noEmit`、`check:port`
+  （hardTotal 0）、`pnpm build` 全绿。
+- `TestStreamingRegistryUpdated`：连接 `main` → `i/registry/set {scope:["client","base"], key:"noteTextSize", value:2}`
+  → 收到 `registryUpdated`，`scope`/`key`/`value` 与写入一致。
+- 真实二进制 + 无头浏览器（1400×900，单标签页，全程不刷新）：
+  - 先把服务端的 `reactionPickerSkinTone` 置 1，页面登录后打开回应选择器的「People & Body」：
+    带肤色修饰符的按钮 **0** 个；
+  - 用另一「设备」（直接调 API）把它改成 4（200）；不刷新页面，再打开同一分类：
+    带修饰符的按钮 **32** 个（中等肤色）。
+  截图 `/tmp/w175-shots/registry-updated.png`（不入库）。

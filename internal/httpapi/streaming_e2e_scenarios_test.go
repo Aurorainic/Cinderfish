@@ -341,6 +341,65 @@ func TestStreamingMainChannelNotification(t *testing.T) {
 	}
 }
 
+// TestStreamingRegistryUpdated checks that a client-scoped registry write
+// reaches the account's main channel, which is how a setting changed on another
+// device reaches this one.
+func TestStreamingRegistryUpdated(t *testing.T) {
+	ts := newStreamingServer(t, "open")
+	_, aliceToken := signup(t, ts, "alice")
+
+	conn := dial(t, ts, aliceToken)
+	sendFrame(t, conn, map[string]any{
+		"type": "connect",
+		"body": map[string]any{"channel": "main", "id": "main1", "pong": true},
+	})
+	connected := false
+	for deadline := time.Now().Add(wsWait); time.Now().Before(deadline); {
+		msg, ok := readWithTimeout(t, conn, time.Until(deadline))
+		if !ok {
+			break
+		}
+		if msg.Type == "connected" {
+			connected = true
+			break
+		}
+	}
+	if !connected {
+		t.Fatal("main channel did not connect")
+	}
+
+	resp, out := post(t, ts, "/api/i/registry/set", map[string]any{
+		"i": aliceToken, "scope": []string{"client", "base"},
+		"key": "noteTextSize", "value": 2,
+	})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("registry set = %d %v", resp.StatusCode, out)
+	}
+
+	deadline := time.Now().Add(wsWait)
+	for {
+		msg, ok := waitForChannelMessage(t, conn, "main1", time.Until(deadline))
+		if !ok {
+			t.Fatal("no registryUpdated frame")
+		}
+		if msg["type"] != "registryUpdated" {
+			continue
+		}
+		body, _ := msg["body"].(map[string]any)
+		scope, _ := body["scope"].([]any)
+		if len(scope) != 2 || scope[0] != "client" || scope[1] != "base" {
+			t.Errorf("scope = %v, want [client base]", body["scope"])
+		}
+		if body["key"] != "noteTextSize" {
+			t.Errorf("key = %v, want noteTextSize", body["key"])
+		}
+		if value, ok := body["value"].(float64); !ok || value != 2 {
+			t.Errorf("value = %v, want 2", body["value"])
+		}
+		return
+	}
+}
+
 // TestStreamingPollVoted checks that a vote reaches the note's subscribers,
 // which is how an open poll shows the new counts without a refresh.
 func TestStreamingPollVoted(t *testing.T) {

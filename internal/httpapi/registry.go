@@ -75,6 +75,7 @@ func (s *Server) handleRegistrySet(w http.ResponseWriter, r *http.Request) {
 		writeInternalServerError(w)
 		return
 	}
+	s.publishRegistryUpdated(userID, body.Scope, body.Key, body.Value)
 	writeJSON(w, http.StatusOK, struct{}{})
 }
 

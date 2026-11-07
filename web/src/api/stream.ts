@@ -29,6 +29,13 @@ export interface ChannelNoteEvent {
 
 export type FollowEvent = { id: string };
 
+/** A client-scoped setting written on another device (`i/registry/set`). */
+export interface RegistryUpdatedEvent {
+	scope: string[];
+	key: string;
+	value: unknown;
+}
+
 export interface ChannelEventMap {
 	note: NoteDetailed;
 	notification: Notification;
@@ -40,6 +47,7 @@ export interface ChannelEventMap {
 	unfollow: FollowEvent;
 	readAllNotifications: null;
 	meUpdated: MeDetailed;
+	registryUpdated: RegistryUpdatedEvent;
 	driveFileCreated: DriveFile;
 	connected: { id: string };
 	unavailable: { id: string };

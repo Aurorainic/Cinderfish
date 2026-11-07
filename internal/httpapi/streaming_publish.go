@@ -111,6 +111,24 @@ func (s *Server) publishNoteReaction(n *note.Note, typ, emoji, userID string) {
 		s.notes.VisibleUserIDs(context.Background(), n.ID), typ, body)
 }
 
+// publishRegistryUpdated emits the main channel "registryUpdated" event, which
+// Firefish's pizzax uses to pick up a setting written on another device. The
+// body is the same {scope, key, value} Misskey's RegistryApiService sends; an
+// empty scope is reported as the default ["client"], as Misskey stores it.
+func (s *Server) publishRegistryUpdated(userID string, scope []string, key string, value any) {
+	if s.streamBus == nil {
+		return
+	}
+	if len(scope) == 0 {
+		scope = []string{"client"}
+	}
+	s.streamBus.PublishTyped(streaming.MainSubject(userID), "registryUpdated", map[string]any{
+		"scope": scope,
+		"key":   key,
+		"value": value,
+	})
+}
+
 // publishNotePollVoted emits "pollVoted" on the note's stream, which is how
 // Misskey lets everyone looking at a poll see the new counts. The body carries
 // the choice index and the voter, matching GlobalEventService.

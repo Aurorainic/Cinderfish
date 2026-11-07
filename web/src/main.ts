@@ -19,6 +19,7 @@ import { install as installDirectives } from "./directives";
 import { updateInstance } from "./instance";
 import { router } from "./router";
 import { store } from "./store/base";
+import { applyRegistryUpdated } from "./store/pizzax";
 import { stream } from "./stream";
 import { ShellKey, SHELL_STORAGE_KEY, type ShellMode, type ShellRegistry } from "./ui/tokens";
 
@@ -101,8 +102,14 @@ void restoreSession()
   .catch(() => undefined)
   .then(() => {
     if (me.value == null) return;
-    stream.useChannel("main").on("meUpdated", (fresh) => {
+    const main = stream.useChannel("main");
+    main.on("meUpdated", (fresh) => {
       if (me.value != null) updateMe(fresh);
+    });
+    // A setting written on another device arrives as a registry value; the
+    // store applies it without writing it back.
+    main.on("registryUpdated", ({ scope, key, value }) => {
+      applyRegistryUpdated(scope, key, value);
     });
   });
 if (me.value != null) {

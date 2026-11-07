@@ -91,6 +91,10 @@ export class Storage<T extends StateDef> {
 		this.key = key;
 		this.keyForLocalStorage = `pizzax::${key}`;
 		this.def = def;
+		// Registered here rather than in the factory: the base store is
+		// constructed directly (`new Storage("base", …)`), so a factory-only
+		// registration would miss the bucket that carries most settings.
+		buckets.set(key, this as unknown as Storage<StateDef>);
 		this.options = options;
 
 		const uid = this.userId();
@@ -225,6 +229,21 @@ export class Storage<T extends StateDef> {
 		});
 	}
 
+	/**
+	 * Applies a value the server pushed for this bucket. Account-scoped fields
+	 * only: device fields never reach the registry, and a pushed device value
+	 * would disagree with the localStorage copy. Never writes back.
+	 */
+	applyRemote(key: string, value: unknown): boolean {
+		if (!(key in this.def)) return false;
+		const field = this.def[key as keyof T];
+		if (field.where !== "account") return false;
+		if (this.state[key as keyof T] === value) return false;
+		this.state[key as keyof T] = value as never;
+		this.reactiveState[key as keyof T].value = value as never;
+		return true;
+	}
+
 	set<K extends keyof T & string>(key: K, value: StoreDefaults<T>[K]): void {
 		const field = this.def[key] as StoreField<StoreDefaults<T>[K]>;
 		this.state[key] = value;
@@ -326,6 +345,25 @@ export function createPizzax<T extends StateDef>(
 	options: PizzaxOptions = {},
 ): Storage<T> {
 	return new Storage(bucket, def, options);
+}
+
+/** Every bucket, so a pushed registry value can find its store. */
+const buckets = new Map<string, Storage<StateDef>>();
+
+/**
+ * Applies a value the server pushed on `registryUpdated` (scope
+ * `["client", bucket]`, which is what `i/registry/set` writes). Returns whether
+ * anything changed; the value is not written back to the server.
+ */
+export function applyRegistryUpdated(
+	scope: readonly string[],
+	key: string,
+	value: unknown,
+): boolean {
+	if (scope.length !== 2 || scope[0] !== "client") return false;
+	const storage = buckets.get(scope[1]);
+	if (storage == null) return false;
+	return storage.applyRemote(key, value);
 }
 
 export type { ReactiveState, StoreDefaults };

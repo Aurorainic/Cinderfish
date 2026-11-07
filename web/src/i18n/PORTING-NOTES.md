@@ -254,11 +254,11 @@ chooses between the timeline and welcome layouts.
   (ASC) for followers/following. `users/notes` never flips.
 - **Streaming liveness**: server pongs do not refresh `lastSeen`; a data frame
   every <120s is mandatory. 30s heartbeat implemented.
-- **Streaming gaps**: no `registryUpdated`; only the five channels above. UI
-  must poll or refetch. `driveFileCreated` is published on `main` since wave 164
-  (drive upload and upload-from-url), `meUpdated` since wave 168 (profile,
-  pinned notes, follow, block and 2FA writes) and `pollVoted` on the note
-  stream since wave 172.
+- **Streaming gaps**: none of the events Firefish's `init.ts` subscribes to is
+  missing now. `driveFileCreated` is published on `main` since wave 164 (drive
+  upload and upload-from-url), `meUpdated` since wave 168 (profile, pinned
+  notes, follow, block and 2FA writes), `pollVoted` on the note stream since
+  wave 172 and `registryUpdated` since wave 175.
 
 ## 4. Verification performed
 
