@@ -7712,6 +7712,19 @@ Firefish 的 `init.ts` 在 `main` 频道上监听 `meUpdated` 并 `updateAccount
   真实二进制 curl 复核预检与响应头；浏览器里由 `http://127.0.0.1:3100` 页面跨域
   `POST /api/meta` 能解析出 `name`/`version`（能读到正文即证明预检通过——`Access-Control-*`
   响应头按 Fetch 规范不对脚本暴露，`headers.get()` 为 null 属正常）。
+- **第二层阻塞（对端白名单）**：`@palomiku@mi.rfs.im` 所在实例 `mi.rfs.im` 的 `meta.federation`
+  是 `specified`，即白名单模式。白名单只限制**活动收发**，不限制公开文档读取：该实例的
+  `/.well-known/webfinger` 与 actor 文档都以 200 正常返回。按 Miuno 的实现
+  （`backend/internal/core/activitypub/ap_inbox_processor.go:193`）入站活动会先问
+  `FederationAllowedURI(actor)`，不在白名单的 host 返回 `Blocked request: <host>` 并静默丢弃，
+  因此本站发出的 Follow 不会被对方处理——**这条只能在对方把 `fedi.lainns.xyz` 加进白名单后才会通**。
+  本站侧是 `federation: all`（`fedi.lainns.xyz` 的 meta），投递端没有问题。
+- **排查提醒**：`config.toml` 的 `federation_mode` 只在首次启动时写入 `instance_meta`，之后以数据库
+  为准。开发库 `cinderfish` 当时的 `federationMode` 是 `"none"`，导致本地
+  `users/show {username,host}` 返回 500 `Could not load the user.`（真实原因
+  `federation: federation with this host is not allowed`），一度看起来像解析缺陷。改成 `"public"`
+  后同一请求正常返回远端用户（头像、`description`、`host` 均来自 mi.rfs.im），据此确认
+  公开读取与白名单无关；探测后已把该值改回 `"none"`。
 - **待办**：线上 `fedi.lainns.xyz` 仍跑旧版本，重新发布后这条接续流程才会恢复；
   Misskey 的 `signin`/`signin-with-passkey` 另有「ACAO 设为 `config.url` + credentials」的
   特例（`SigninApiService.ts`），本站前端同源调用，暂无需求，未跟进。
