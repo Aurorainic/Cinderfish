@@ -70,9 +70,9 @@ const emit = defineEmits<{
 	click: [event: MouseEvent];
 }>();
 
-// Cinderfish accounts have no avatar upload yet (avatarUrl is always null), so
-// the <img> would render as a broken-image box. Fall back to a placeholder
-// asset, and swap the <img> for a letter badge via the `noAvatar` flag.
+// avatarUrl comes from user_profiles.avatar_url (i/update with avatarId); an
+// account without one would render a broken-image box, so it falls back to a
+// placeholder asset and the `noAvatar` flag hides the <img>.
 const url = computed<string>(() =>
 	resolveMediaUrl(props.user.avatarUrl) || "/favicon.svg",
 );
