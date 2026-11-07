@@ -6922,6 +6922,8 @@ Firefish 的 `ui/_common_/common.vue` 在 `main` 频道上处理新通知：页�
   通过、101 与空串 400 `INVALID_PARAM`；17 个 fileIds 400；投票 1 项/11 项/重复/空项/51 码点均
   400，2 项与 50 码点通过。
 - 编辑路径：`notes/edit`（`editId` 即笔记 id）把 3000 汉字改为 200、3001 汉字为 400。
+- 随后修正了发帖器的字数计数器（原按 UTF-8 字节）：1000 个汉字显示剩余 2000 并可提交，3001 个
+  显示 -1 且提交按钮禁用。
 - 真实二进制：同一组请求得到一致状态码（3000 CJK 200、3001 400 `NOTE_TOO_LONG`、CW 100 200、
   CW 101 400 `INVALID_PARAM`、poll 1 400 `INVALID_PARAM`、poll 2 200）。
 
@@ -7033,3 +7035,32 @@ Firefish 的 `ui/_common_/common.vue` 在 `main` 频道上处理新通知：页�
 - 真实二进制 + 无头浏览器：设置页把尺寸/列数/行数设为 3/5/4 后，在笔记上点回应按钮，
   `.omfetrab` 的类为 `omfetrab s3 w5 h4`，`--eachSize: 50px`，宽度 466px（50×9+16），
   高度受对话框 `max-height` 限制为 480px。截图 `/tmp/w159-shots/picker-prefs.png`（不入库）。
+
+## 12FW. 第一百五十九波：发帖计数器的单位（2026-11-07）
+
+第一百五十四波把服务端的文本上限从字节改成 Unicode 码点，但 `MkPostForm` 的字数计数器与提交前
+检查仍用 `TextEncoder` 数 UTF-8 字节。结果：1000 个汉字就显示剩余 0 并禁止提交，而服务端其实允许
+3000 个码点——前后端单位不一致。
+
+### 12FW.1 改动
+
+`web/src/components/MkPostForm.vue` 的 `textLength`：
+
+```ts
+Array.from((preprocess(text.value) + imeText.value).trim()).length
+```
+
+与 `notes/create` 的 JSON Schema maxLength（码点）一致；注释同步说明原因。
+
+### 12FW.2 有意的限制
+
+- 码点计数与 Misskey 客户端的 stringz（字素簇）仍有差别：一个「👨‍👩‍👧」在 UI 里算 5 个码点，
+  stringz 算 1 个。服务端同样按码点，所以不会出现「UI 允许但服务端拒绝」。
+- 输入法组合中的 `imeText` 仍计入（与原实现一致）。
+
+### 12FW.3 验证证据
+
+- `vue-tsc --noEmit`、`check:port`（hardTotal 0）、`pnpm build` 全绿。
+- 真实二进制 + 无头浏览器：在发帖框输入 1000 个汉字，计数器显示「2000」，提交成功，
+  `users/notes` 中该帖文本长度为 1000 个码点；输入 3001 个汉字时计数器「-1」且提交按钮禁用。
+  截图 `/tmp/w160-shots/text-count.png`（不入库）。

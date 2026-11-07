@@ -363,13 +363,11 @@ const visibilityIcon = computed<string>(() => {
 	}
 });
 
-// The `stringz` dependency is gone, and the server counts UTF-8 bytes rather
-// than code points (`len(text) > 3000` -> NOTE_TOO_LONG, notes-core.md), so this
-// counter measures the same thing the server enforces.
+// notes/create validates against the JSON Schema maxLength, which counts
+// Unicode code points; the counter must use the same unit or CJK text is
+// rejected long before the server limit.
 const textLength = computed<number>(() =>
-	new TextEncoder().encode(
-		(preprocess(text.value) + imeText.value).trim(),
-	).length,
+	Array.from((preprocess(text.value) + imeText.value).trim()).length,
 );
 
 const postPoll = computed<PollParam | null>(() => {
