@@ -7475,15 +7475,17 @@ Firefish 的 `init.ts` 在 `main` 频道上监听 `meUpdated` 并 `updateAccount
 ### 12GI.2 巡检尝试与结论
 
 用真实二进制 + 无头 Helium 逐页打开 36 个路由（1400×900，收集 console error / 未捕获异常 /
-≥400 响应）。结果不可用，原因是**全新 user-data-dir 的第一次导航在这个环境里经常
-`net::ERR_ABORTED`，或者页面到达 `readyState=complete` 但 `#app` 为空**；只有紧跟一次
-`Page.reload` 才会渲染。因此所有路由都被记成 TIMEOUT，得到的唯一「异常」是
-`/settings/theme` 的 `404 /api/i/registry/get`——查证后是 Misskey 的正常语义（键不存在返回
-`NO_SUCH_KEY` 404），客户端本来就有回退。
+≥400 响应）。第一次尝试全部记成 TIMEOUT，原因后来查明是**就绪检查写错了选择器**：脚本等的是
+`#app.innerText.length > 20`，而本应用的页面内容并不都在 `#app` 里（访客壳与弹层内容在 `body`
+下），所以页面明明渲染了、判定却一直是 false。改判 `document.body.innerText` 后同一批路由全部
+通过（见 §12GK）。
 
-以后要做类似巡检，应按每个路由「导航 → 轮询 → 失败则 reload 一次」重试，并把首次导航失败计为
-环境问题而不是页面问题。本轮没有发现产品缺陷；`meUpdated` 的真实走查仍沿用第 168 波的两标签页
-方法（那里是注入 storage 后 reload，因而绕开了这个坑）。
+这次还观测到：全新 user-data-dir 的第一次导航偶尔 `net::ERR_ABORTED`，紧跟一次 `Page.reload`
+就能渲染。这属于环境抖动，不是页面问题；巡检脚本应对每个路由做「导航 → 轮询 → 失败则 reload
+一次」的重试。
+
+第一次尝试里唯一的「异常」是 `/settings/theme` 的 `404 /api/i/registry/get`——查证后是 Misskey
+的正常语义（键不存在返回 `NO_SUCH_KEY` 404），客户端本来就有回退。
 
 ### 12GI.3 验证证据
 
@@ -7526,3 +7528,34 @@ Firefish 的 `init.ts` 在 `main` 频道上监听 `meUpdated` 并 `updateAccount
   - 第三个账号投票给 `yes`（API 200），无需刷新，页面变为
     `yes(1 票) no(1 票) 总票数 2`。
   截图 `/tmp/w172-shots/poll-voted.png`（不入库）。
+
+## 12GK. 第一百七十三波：30 个页面的控制台与请求巡检（2026-11-07）
+
+接着 §12GI 那次失败的巡检，修好就绪检查后重跑一遍，作为第一百六十二波以来前端改动的回归覆盖。
+
+### 12GK.1 方法
+
+- 真实二进制（`/tmp/cf-w63`，库 `cinderfish_test`）+ 无头 Helium（1400×900），管理员账号。
+- 引导：`Page.navigate` → 注入 token/account → `Page.reload`（必要时重试），直到 `body` 有内容。
+- 每个路由：`location.assign` → 轮询 `document.body.innerText.length > 20`（8 秒）→ 失败则
+  `Page.reload` 再等 12 秒；同时收集 `Runtime.consoleAPICalled`（error/assert）、
+  `Runtime.exceptionThrown`、`Network.responseReceived`（≥400）。
+- 32 个路由覆盖：首页/时间线、通知、收藏、搜索、发现、关于、网盘、关注请求、11 个设置页、
+  9 个管理页（含 `admin/database`、`admin/queue`）。
+
+### 12GK.2 结果
+
+| 项 | 结果 |
+|----|------|
+| 渲染成功 | 32 / 32 |
+| 控制台 error / 未捕获异常 | 0 |
+| ≥400 响应 | 0 |
+| 404 页面 | 2，均为脚本里写错的路径（`/my/following`、`/my/followers`；真实路由是 `/@<acct>/following`） |
+
+没有发现产品缺陷，因此本波只改文档（§12GI.2 的结论更正 + 本节）。
+
+### 12GK.3 走查配方更正
+
+**就绪检查用 `document.body.innerText`，不要用 `#app.innerText`。** 本应用的 `#app` 在访客壳与
+弹层场景下不承载全部文本，用 `#app` 判定会得到「页面永远不会渲染」的假象——这正是 §12GI 那次
+误判的根因。其余配方（注入 `cinderfish.token` / `account` / `accounts` 后 `Page.reload`）继续有效。
