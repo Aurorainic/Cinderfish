@@ -4,6 +4,10 @@
 // Paths are relative to `/api` unless noted. They are kept as a const object
 // (not string literals at call sites) so a route rename is a single edit and
 // so `EndpointName` can drive `api()`'s typing.
+//
+// None of these strings is a credential: every value is a public API route
+// path copied from the Misskey endpoint catalogue (the compatibility
+// contract), not a token, key or secret.
 
 import type {
 	AbuseReport,

@@ -11,6 +11,35 @@ export function acct(user: Pick<UserLite, "username" | "host">): string {
 	return user.host == null ? user.username : user.username + "@" + user.host;
 }
 
+/** Parsed acct: host is null for the local instance. */
+export interface ParsedAcct {
+	username: string;
+	host: string | null;
+}
+
+/**
+ * firefish-js `acct.parse`: "@user@host" / "user@host" / "user" -> parts.
+ * Trailing dots are the FQDN root convention firefish-js strips; the local
+ * host compares case-insensitively.
+ */
+export function parseAcct(value: string): ParsedAcct | null {
+	let rest = value.trim();
+	if (rest.startsWith("@")) rest = rest.slice(1);
+
+	const at = rest.indexOf("@", 1);
+	let username: string;
+	let host: string | null;
+	if (at === -1) {
+		username = rest;
+		host = null;
+	} else {
+		username = rest.slice(0, at);
+		host = rest.slice(at + 1).toLowerCase().replace(/\.$/, "");
+	}
+	if (!/^\w+$/.test(username) || (host !== null && host === "")) return null;
+	return { username, host };
+}
+
 export function userName(user: Pick<UserLite, "username" | "name">): string {
 	return user.name ?? user.username;
 }

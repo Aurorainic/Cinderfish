@@ -47,17 +47,17 @@
 //   media      users/notes { withFiles: true }
 //   activity   no charts/user/notes endpoint -> stated as unavailable
 //   reactions  no users/reactions endpoint     -> stated as unavailable
-// `users/show` only serves local accounts (contract §5), so a remote `acct` is
-// rejected by the route wrapper (UserProfile.vue) before this page mounts.
 import { computed, ref, watch } from "vue";
 import type { UserDetailed } from "@/api/types";
 import { api } from "@/api/client";
+import { me } from "@/account";
 import UserActivity from "@/components/user/UserActivity.vue";
 import UserHome from "@/components/user/UserHome.vue";
 import UserNotes from "@/components/user/UserNotes.vue";
 import UserPhotos from "@/components/user/UserPhotos.vue";
 import UserReactions from "@/components/user/UserReactions.vue";
-import { acct as formatAcct } from "@/filters/user";
+import { acct as formatAcct, parseAcct } from "@/filters/user";
+import { host as instanceHost } from "@/config";
 import { t } from "@/i18n";
 import { definePageMetadata } from "@/scripts/page-metadata";
 import { getUserMenu } from "@/scripts/get-user-menu";
@@ -104,13 +104,26 @@ const tab = ref<TabKey>(toTabKey(props.page));
 const user = ref<UserDetailed | null>(null);
 const error = ref<unknown>(null);
 
-const headerTabs = computed<TabDefinition[]>(() => [
-	{ key: "notes", title: t("notes"), icon: "ph-file-text ph-bold ph-lg" },
-	{ key: "replies", title: t("reply"), icon: "ph-chat-circle ph-bold ph-lg" },
-	{ key: "media", title: t("files"), icon: "ph-image-square ph-bold ph-lg" },
-	{ key: "activity", title: t("activity"), icon: "ph-chart-bar ph-bold ph-lg" },
-	{ key: "reactions", title: t("reaction"), icon: "ph-smiley ph-bold ph-lg" },
-]);
+// Firefish shows the reactions tab only for the account itself or when the
+// owner publishes reactions (`publicReactions`).
+const showReactions = computed<boolean>(
+	() =>
+		user.value != null &&
+		(me.value?.id === user.value.id || user.value.publicReactions),
+);
+
+const headerTabs = computed<TabDefinition[]>(() => {
+	const tabs: TabDefinition[] = [
+		{ key: "notes", title: t("notes"), icon: "ph-file-text ph-bold ph-lg" },
+		{ key: "replies", title: t("reply"), icon: "ph-chat-circle ph-bold ph-lg" },
+		{ key: "media", title: t("files"), icon: "ph-image-square ph-bold ph-lg" },
+		{ key: "activity", title: t("activity"), icon: "ph-chart-bar ph-bold ph-lg" },
+	];
+	if (showReactions.value) {
+		tabs.push({ key: "reactions", title: t("reaction"), icon: "ph-smiley ph-bold ph-lg" });
+	}
+	return tabs;
+});
 
 const headerActions = computed(() => [
 	{
@@ -138,10 +151,21 @@ async function fetchUser(): Promise<void> {
 	error.value = null;
 	user.value = null;
 	try {
-		const username = props.acct.includes("@")
-			? props.acct.slice(0, props.acct.indexOf("@"))
-			: props.acct;
-		user.value = await api("users/show", { username });
+		const parsed = parseAcct(props.acct);
+		if (parsed == null) {
+			error.value = new Error("invalid acct");
+			return;
+		}
+		// A bare name is local; the local host spelled out ("alice@this.host")
+		// is passed to users/show with that host, which the backend treats as
+		// a local lookup.
+		const host = parsed.host === instanceHost.toLowerCase().replace(/\.$/, "") ? undefined : parsed.host ?? undefined;
+		user.value = await api<UserDetailed>(
+			"users/show",
+			host === undefined
+				? { username: parsed.username }
+				: { username: parsed.username, host },
+		);
 	} catch (cause) {
 		error.value = cause;
 	}

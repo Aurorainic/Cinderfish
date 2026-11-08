@@ -320,18 +320,20 @@ func (s *Server) handleUsersShow(w http.ResponseWriter, r *http.Request) {
 	var err error
 	switch {
 	case body.Username != "" && body.Host != "":
-		if s.federationInbox == nil {
-			err = account.ErrUserNotFound
-			break
-		}
 		if s.cfg != nil && strings.EqualFold(body.Host, s.cfg.Domain) {
 			user, err = s.accounts.GetByUsername(r.Context(), body.Username)
-		} else {
-			var remote *federation.RemoteUser
-			remote, err = s.federationInbox.ResolveAcct(r.Context(), body.Username, body.Host)
-			if err == nil && remote != nil {
-				user, err = s.accounts.GetByID(r.Context(), remote.ID)
-			}
+			break
+		}
+		// resolveRemoteMention answers from the stored actor row when the
+		// account was seen before and only reaches for WebFinger otherwise;
+		// Misskey's users/show resolves remote handles through
+		// RemoteUserResolveService the same way (users/show.ts L143-149).
+		var remote *federation.RemoteUser
+		remote, err = s.resolveRemoteMention(r.Context(), body.Username+"@"+body.Host)
+		if err == nil && remote != nil {
+			user, err = s.accounts.GetByID(r.Context(), remote.ID)
+		} else if s.federationInbox == nil {
+			err = account.ErrUserNotFound
 		}
 	case body.UserID != "":
 		user, err = s.accounts.GetByID(r.Context(), body.UserID)

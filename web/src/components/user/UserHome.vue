@@ -114,7 +114,18 @@
 							</div>
 						</div>
 						<div v-if="user.host != null" class="remote">
-							<CfInfo warn>{{ t("remoteUserCaution") }}</CfInfo>
+							<!-- Ported from firefish@b425f61:packages/client/src/components/MkRemoteCaution.vue -->
+							<div class="caution">
+								<i class="ph-warning ph-bold"></i>
+								{{ t("remoteUserCaution") }}<a
+									v-if="remoteUrl !== ''"
+									class="link"
+									:href="remoteUrl"
+									rel="nofollow noopener"
+									target="_blank"
+									>{{ t("showOnRemote") }}</a
+								>
+							</div>
 						</div>
 						<div class="description">
 							<Mfm
@@ -208,8 +219,6 @@
 //   * no location / birthday rows and no "their local time": both fields are
 //     always null and `city-timezones` is not a dependency;
 //   * no `patrons` badge: the endpoint does not exist;
-//   * no remote-caution link target: `url` is an empty string, so the caution
-//     is a plain CfInfo;
 //   * the sidebar chart is dropped; it needs `charts/user/notes`.
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import type { EmojiSimple, UserDetailed } from "@/api/types";
@@ -260,6 +269,12 @@ const followsYou = computed<boolean>(
 const emojis = computed<EmojiSimple[]>(
 	() => (props.user.emojis ?? []) as unknown as EmojiSimple[],
 );
+
+// Firefish links the caution to the profile page on the origin server. The
+// backend fills `url` with the origin page for remote users and `uri` with
+// the actor id as fallback; a local user has both empty, but the caution
+// only renders for a remote host.
+const remoteUrl = computed<string>(() => props.user.url || props.user.uri);
 
 const fields = computed<ProfileField[]>(
 	() => (props.user.fields ?? []) as ProfileField[],
@@ -402,6 +417,22 @@ onBeforeUnmount(() => {
 
 			> .remote {
 				padding: 64px 16px 0 16px;
+
+				> .caution {
+					display: flex;
+					align-items: baseline;
+					gap: 0.4em;
+					padding: 12px 16px;
+					font-size: 90%;
+					background: var(--infoWarnBg);
+					color: var(--infoWarnFg);
+					border-radius: var(--radius);
+
+					> .link {
+						margin-inline-start: 4px;
+						color: var(--accent);
+					}
+				}
 			}
 
 			> .description {

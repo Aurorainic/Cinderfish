@@ -426,7 +426,7 @@ pnpm build    # 先 vue-tsc --noEmit，再输出 web/dist
 
 - **自定义 emoji 没有注册表**：`:shortcode:` 在 MFM 与通知里只按内置目录解析，解析不到就照原样显示；实例自定义 emoji 的注册、管理、picker 分组都在首版之外。后端打包的 `emojis` / `reactionEmojis` 目前恒为空数组。
 - **没有搜索、没有用户列表页、没有投票接口**（前端只展示投票结果）。
-- **远程资料不能浏览**：`users/show` 只接受本地用户名；远程用户点击 `@user@host` 会得到说明卡片。发帖器的 `specified` 仍允许手动输入远程 handle，后端并不会解析它。
+- **远程资料可以浏览（2026-11-08 关闭原缺口）**：`users/show` 的 `username+host` 先查本地存储的 actor 行、未命中才走 WebFinger（对齐 Misskey `RemoteUserResolveService`）；前端 `/@user@host` 直接渲染完整个人页（资料卡、关注按钮、`users/notes` 列表），远程提示卡带「打开原网页」链接。仍属缺口的是：发帖器的 `specified` 手动输入远程 handle 时后端不会预解析。
 - **关注/粉丝列表、回复树、会话串、转贴列表、反应名单没有消费端**：`users/following` / `users/followers` / `notes/replies` / `notes/children` / `notes/conversation` / `notes/renotes` / `notes/reactions` 后端都不存在（数据模型够，见 §11.15.3）。个人页的「关注中/关注者」计数保持纯数字并注明列表接口未提供，两个 tab 渲染真实的不可用态（见 11.14）；笔记页只渲染 `note.reply` 这一层上下文，没有回复树与「谁反应了」浮层，也没有「查看对话」入口。
 - **改密码、封禁/静音列表、注销账户在前端与后端都未实现**：账户设置页如实标注为未开放，没有假按钮。屏蔽/静音与锁定账号的**表已存在**（`blocks`、`mutes`、`follow_requests`、`users.is_locked`），缺的是端点与 UI（§11.15.3）。
 - **管理面板范围有限**：实例级文件列表与注册模式在线切换都没有端点（后者要可写 meta + 配置热加载，§11.15.4），用户列表也只在 `AdminUsers.vue:42` 取前 50 条——`admin/show-users` 其实支持 `limit`/`offset`，缺的是分页 UI。管理页需要管理员账号才能看到分区。
