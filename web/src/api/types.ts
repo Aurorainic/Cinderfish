@@ -645,6 +645,19 @@ export interface AdminInstanceMeta {
 	preservedUsernames: string[];
 	/** Runtime note-length cap in code points (default 3000). */
 	maxNoteTextLength: number;
+	/** Active captcha provider, "none" when disabled. */
+	captchaProvider: "none" | "hcaptcha" | "recaptcha" | "turnstile";
+	/** Site key of the active provider (public). */
+	captchaSiteKey: string;
+	/** Whether a captcha secret is stored; the value is never returned. */
+	captchaSecretSet: boolean;
+	/** Automatic IP ban after repeated signin failures (extension). */
+	signinAutoBan: {
+		enabled: boolean;
+		threshold: number;
+		windowMinutes: number;
+		banMinutes: number;
+	};
 	/** SMTP host, empty when mail delivery is not configured. */
 	emailServer: string;
 }

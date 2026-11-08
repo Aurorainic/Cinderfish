@@ -39,7 +39,7 @@ func testPool(t testing.TB) *pgxpool.Pool {
 	if _, err := pool.Exec(context.Background(), `
 TRUNCATE users, user_profiles, access_tokens, registration_tickets, signins, note_edits,
          oauth_grant_codes, announcements, announcement_reads, email_challenges, abuse_reports,
-         webhooks, instance_meta, federation_allowlist, emojis
+         webhooks, instance_meta, federation_allowlist, emojis, ip_bans, signin_failures
 RESTART IDENTITY CASCADE`); err != nil {
 		t.Fatalf("truncate: %v", err)
 	}

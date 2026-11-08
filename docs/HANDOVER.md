@@ -7981,3 +7981,48 @@ IP 封禁的 API 或数据表，所以这一项**不是移植**，是 Cinderfish
 - 没有「恢复为 config.toml」按钮：保存即钉住数据库值；要回到配置文件需删除该
   `instance_meta` 行。后续可加一键重置。
 
+## 12GX. 机器人防护、自动封禁与安全页分栏（2026-11-08）
+
+补齐安全页最后两项，并处理「登录审计全摊开」的可用性问题。
+
+- **Captcha**（对齐 Misskey 的 meta 字段与注册参数）：支持 hCaptcha / reCAPTCHA /
+  Cloudflare Turnstile，同一时间启用一个。校验端点固定为三个官方地址
+  （`hcaptcha.com`、`www.recaptcha.net`、`challenges.cloudflare.com`），
+  `internal/captcha` 不接受任何调用方传入的 URL，不触发本地/私网请求。注册
+  `POST /api/signup` 在注册前校验 token，失败回 400 `CAPTCHA_FAILED`；请求体接受
+  Misskey 的 kebab-case 字段（`hcaptcha-response`、`g-recaptcha-response`、
+  `turnstile-response`）。公开 meta 按上游返回 `enable*` 与 `*SiteKey`；
+  `admin/update-meta` 接受 `captcha: {provider, siteKey, secret}`，secret 只写不读，
+  切换服务商时必填新 secret，`provider: "none"` 清空。
+- **自动封禁**（自有扩展）：schema v29 `signin_failures` 记录每次失败（未知用户名
+  也能计数，signins 表需要账号行）；`signinAutoBan = {enabled, threshold,
+  windowMinutes, banMinutes}` 存在 `instance_meta`，默认关闭（10 次/60 分钟/封 60 分钟）。
+  登录失败达到阈值后自动写一条带到期时间的 `ip_bans` 记录（原因带「自动封禁」前缀）；
+  当次仍回密码错误，下一次直接被 IP 规则拦下。校验：阈值 3–100、窗口 1–1440、
+  时长 1–43200 分钟。
+- **安全页重构**：`/admin/security` 改为四个分栏（邀请码 / 登录审计 / IP 封禁 / 防护），
+  切栏时按需重拉数据；登录审计每页 30 条、底部「加载更多」，不再一次铺满整页；
+  「其余安全设置」占位块换成「相关设置」链接。
+- **注册页**：新增 `CfCaptcha` 组件（hCaptcha/reCAPTCHA/Turnstile 显式渲染，脚本仅从
+  官方 CDN 加载），按公开 meta 自动出现；token 单次使用，提交失败后自动重置。
+
+### 12GX.1 验证证据
+
+- `internal/captcha` 单测（固定端点、表单字段、成功/失败/缺 token/未知服务商/HTTP 500）；
+  `TestSignupCaptcha`（设置往返、公开 meta、无 token 400 `CAPTCHA_FAILED`、拒绝与放行、
+  切服务商缺 secret 400、关闭后清空）；`TestSigninAutoBan`（默认不触发、开启后第 4 次
+  失败生成规则、下一次 403 `IP_BANNED`、越界参数 400）。
+- 真实二进制 + 浏览器：防护分栏启用自动封禁（阈值 3）→ 3 次间隔失败后「IP 封禁」分栏
+  出现 `127.0.0.1 · 自动封禁：60 分钟内 3 次登录失败 · 至 …`，随后登录请求 403
+  `IP_BANNED`；删除规则并关闭自动封禁。用官方 hCaptcha 测试 key 配置后公开 meta 正确、
+  无 token 注册 400；访客身份打开注册对话框可见 hCaptcha iframe 且提交按钮在取得 token
+  前禁用；验证后关闭 captcha。
+- 全量 `go test` 13 包绿（含新 captcha 包），`vue-tsc` / `vite build` 通过。
+
+### 12GX.2 边界
+
+- captcha 只保护注册（上游还有密码重置等入口；本实现没有邮箱重置流程）。
+- 自动封禁只统计登录失败，不覆盖注册；阈值内成功登录不清零（按时间窗滚动）。
+- `signin_failures` 目前不清理，个人实例规模下可接受；量大时需要定期裁剪。
+- secret 仍以明文存于 `instance_meta`（与 §12GW 同一信任边界说明）。
+

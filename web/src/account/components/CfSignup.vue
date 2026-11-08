@@ -90,6 +90,16 @@
 			</p>
 		</div>
 
+		<div v-if="captchaProvider !== null" class="field captchaField">
+			<label class="label">人机验证</label>
+			<CfCaptcha
+				ref="captchaRef"
+				v-model="captchaToken"
+				:provider="captchaProvider"
+				:site-key="captchaSiteKey"
+			/>
+		</div>
+
 		<div v-if="errorText" class="info error" role="alert">{{ errorText }}</div>
 
 		<button class="_button primary submit" type="submit" :disabled="shouldDisableSubmitting">
@@ -121,6 +131,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
+import CfCaptcha from "../../components/CfCaptcha.vue";
 import { useLocale } from "../../i18n";
 import { fetchMeta } from "../meta";
 import { accountApi, AccountApiError } from "../transport";
@@ -146,6 +157,28 @@ const invitationCode = ref("");
 const submitting = ref(false);
 const errorText = ref<string | null>(null);
 
+// Captcha: the instance enables at most one provider (server-side order is
+// turnstile, recaptcha, hcaptcha; the public meta sets exactly one flag).
+type CaptchaProvider = "hcaptcha" | "recaptcha" | "turnstile";
+const captchaProvider = computed<CaptchaProvider | null>(() => {
+	const current = meta.value;
+	if (current == null) return null;
+	if (current.enableTurnstile) return "turnstile";
+	if (current.enableRecaptcha) return "recaptcha";
+	if (current.enableHcaptcha) return "hcaptcha";
+	return null;
+});
+const captchaSiteKey = computed<string>(() => {
+	const current = meta.value;
+	if (current == null) return "";
+	if (current.enableTurnstile) return current.turnstileSiteKey;
+	if (current.enableRecaptcha) return current.recaptchaSiteKey;
+	if (current.enableHcaptcha) return current.hcaptchaSiteKey;
+	return "";
+});
+const captchaToken = ref("");
+const captchaRef = ref<InstanceType<typeof CfCaptcha> | null>(null);
+
 type UsernameState =
 	| null
 	| "wait"
@@ -169,7 +202,8 @@ const shouldDisableSubmitting = computed(
 		usernameState.value === "unavailable" ||
 		usernameState.value === "invalid-format" ||
 		usernameState.value === "min-range" ||
-		usernameState.value === "max-range",
+		usernameState.value === "max-range" ||
+		(captchaProvider.value !== null && captchaToken.value === ""),
 );
 
 onMounted(() => {
@@ -279,17 +313,28 @@ async function onSubmit(): Promise<void> {
 	if (submitting.value || shouldDisableSubmitting.value) return;
 	submitting.value = true;
 	errorText.value = null;
+	const captcha =
+		captchaProvider.value === null
+			? undefined
+			: captchaProvider.value === "hcaptcha"
+				? { hcaptcha: captchaToken.value }
+				: captchaProvider.value === "recaptcha"
+					? { recaptcha: captchaToken.value }
+					: { turnstile: captchaToken.value };
 	try {
-		const account = await signUp(
-			username.value,
-			password.value,
-			invitationCode.value === "" ? undefined : invitationCode.value,
-		);
+		const account = await signUp(username.value, password.value, {
+			...(invitationCode.value !== "" ? { invitationCode: invitationCode.value } : {}),
+			...(captcha !== undefined ? { captcha } : {}),
+		});
 		emit("signup", account.account);
 	} catch (error) {
 		errorText.value = describeFailure(error);
 	} finally {
 		submitting.value = false;
+		// A captcha token is single use; ask for a fresh one on the next
+		// attempt whether this one succeeded or not.
+		captchaRef.value?.reset();
+		captchaToken.value = "";
 	}
 }
 </script>

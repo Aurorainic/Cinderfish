@@ -52,6 +52,11 @@ func (s *Server) handleSignup(w http.ResponseWriter, r *http.Request) {
 		Username       string `json:"username"`
 		Password       string `json:"password"`
 		InvitationCode string `json:"invitationCode"`
+		// Misskey's signup body uses kebab-case captcha fields; the token is
+		// absent when the instance has no captcha enabled.
+		HcaptchaResponse   string `json:"hcaptcha-response"`
+		GRecaptchaResponse string `json:"g-recaptcha-response"`
+		TurnstileResponse  string `json:"turnstile-response"`
 	}
 	if err := decodeOptionalJSON(r, &body); err != nil {
 		writeAPIError(w, err)
@@ -60,6 +65,12 @@ func (s *Server) handleSignup(w http.ResponseWriter, r *http.Request) {
 
 	// A banned source address cannot create accounts.
 	if s.rejectBannedIP(w, r) {
+		return
+	}
+
+	// Captcha comes before registration: a missing or forged token must not
+	// create anything.
+	if !s.verifySignupCaptcha(w, r, body.HcaptchaResponse, body.GRecaptchaResponse, body.TurnstileResponse) {
 		return
 	}
 
@@ -178,6 +189,7 @@ func (s *Server) handleSignin(w http.ResponseWriter, r *http.Request) {
 	user, err := s.accounts.Authenticate(r.Context(), body.Username, body.Password)
 	if err != nil {
 		if errors.Is(err, account.ErrUserNotFound) {
+			s.recordSigninFailure(r.Context(), ip)
 			writeIDError(w, http.StatusNotFound, errIDNoSuchUser)
 			return
 		}
@@ -187,6 +199,7 @@ func (s *Server) handleSignin(w http.ResponseWriter, r *http.Request) {
 			if existing, lookupErr := s.accounts.GetByUsername(r.Context(), body.Username); lookupErr == nil {
 				_ = s.accounts.RecordSignin(r.Context(), existing.ID, ip, false)
 			}
+			s.recordSigninFailure(r.Context(), ip)
 			writeIDError(w, http.StatusForbidden, errIDInvalidPassword)
 			return
 		}

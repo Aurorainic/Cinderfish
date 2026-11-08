@@ -32,7 +32,7 @@ func testPool(t *testing.T) *pgxpool.Pool {
 	}
 	// Start from a clean slate so reruns do not trip unique constraints.
 	if _, err := pool.Exec(context.Background(), `
-TRUNCATE users, user_profiles, access_tokens, registration_tickets, signins
+TRUNCATE users, user_profiles, access_tokens, registration_tickets, signins, ip_bans, signin_failures
 RESTART IDENTITY CASCADE`); err != nil {
 		t.Fatalf("truncate: %v", err)
 	}

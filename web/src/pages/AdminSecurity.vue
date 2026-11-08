@@ -12,7 +12,20 @@
 				</CfInfo>
 			</div>
 			<div v-else class="wrap">
-				<section class="invites">
+				<div class="tabBar">
+					<button
+						v-for="tab in tabs"
+						:key="tab.id"
+						class="tab"
+						:class="{ active: activeTab === tab.id }"
+						type="button"
+						@click="activeTab = tab.id"
+					>
+						{{ tab.label }}
+					</button>
+				</div>
+
+				<section v-if="activeTab === 'invites'" class="invites">
 					<h2 class="sectionTitle">邀请码</h2>
 					<p class="sectionNote">
 						注册模式为「仅限邀请」时，新用户必须凭这里的邀请码注册。切到
@@ -132,7 +145,7 @@
 					</CfInfo>
 				</section>
 
-				<section class="signinAudit">
+				<section v-if="activeTab === 'audit'" class="signinAudit">
 					<h2 class="sectionTitle">登录审计</h2>
 					<p class="sectionNote">
 						所有账号的登录记录，含失败尝试。成功登录也会出现在账号自己的设置页里。
@@ -161,9 +174,14 @@
 							</div>
 						</li>
 					</ul>
+					<div v-if="auditHasMore" class="loadMore">
+						<CfButton mini :disabled="auditLoading" @click="loadMoreAudit()">
+							{{ auditLoading ? "加载中…" : "加载更多" }}
+						</CfButton>
+					</div>
 				</section>
 
-				<section class="ipBans">
+				<section v-if="activeTab === 'bans'" class="ipBans">
 					<h2 class="sectionTitle">IP 封禁</h2>
 					<p class="sectionNote">
 						被封锁的地址无法登录或注册（浏览不受影响）。规则可以是单个 IP 或 CIDR
@@ -251,13 +269,101 @@
 					</CfInfo>
 				</section>
 
-				<AdminUnavailable
-					class="rest"
-					:title="rest.title"
-					:summary="rest.summary"
-					:available="rest.available"
-					:missing="rest.missing"
-				/>
+				<section v-if="activeTab === 'protection'" class="protection">
+					<h2 class="sectionTitle">机器人防护（Captcha）</h2>
+					<p class="sectionNote">
+						开启后，注册必须先通过所选服务的人机验证。Site Key 会公开给浏览器，Secret
+						只保存在服务端、接口不回传。
+					</p>
+					<form class="createCard" @submit.prevent="saveCaptcha">
+						<label class="countField">
+							<span class="label">服务商</span>
+							<select v-model="captchaFormProvider" class="nativeSelect" :disabled="captchaSaving">
+								<option value="none">不启用</option>
+								<option value="hcaptcha">hCaptcha</option>
+								<option value="recaptcha">reCAPTCHA</option>
+								<option value="turnstile">Cloudflare Turnstile</option>
+							</select>
+							<span class="caption">
+								当前状态：{{ captchaStatusText }}
+							</span>
+						</label>
+						<label v-if="captchaFormProvider !== 'none'" class="countField">
+							<span class="label">Site Key</span>
+							<input v-model="captchaFormSiteKey" class="nativeInput" type="text" :disabled="captchaSaving" />
+						</label>
+						<label v-if="captchaFormProvider !== 'none'" class="countField">
+							<span class="label">Secret</span>
+							<input
+								v-model="captchaFormSecret"
+								class="nativeInput"
+								type="password"
+								:disabled="captchaSaving"
+								:placeholder="captchaSecretSet ? '留空保留现有密钥' : ''"
+							/>
+						</label>
+						<CfInfo v-if="captchaFormError !== null" warn class="field">
+							{{ captchaFormError }}
+						</CfInfo>
+						<CfInfo v-else-if="captchaSaved" class="field">已保存并立即生效。</CfInfo>
+						<div class="actions">
+							<CfButton type="submit" primary :disabled="captchaSaving">
+								{{ captchaSaving ? "保存中…" : "保存" }}
+							</CfButton>
+						</div>
+					</form>
+
+					<h2 class="sectionTitle autoBanTitle">重复失败自动封禁</h2>
+					<p class="sectionNote">
+						同一地址在窗口期内登录失败达到阈值后，自动写入一条有时限的 IP
+						封禁；规则在「IP 封禁」分栏里可查看和删除。
+					</p>
+					<form class="createCard" @submit.prevent="saveAutoBan">
+						<label class="checkRow">
+							<input v-model="autoBanEnabled" type="checkbox" :disabled="autoBanSaving" />
+							<span>启用自动封禁</span>
+						</label>
+						<label class="countField">
+							<span class="label">失败阈值</span>
+							<input v-model.number="autoBanThreshold" class="nativeInput" type="number" min="3" max="100" :disabled="autoBanSaving" />
+						</label>
+						<label class="countField">
+							<span class="label">统计窗口（分钟）</span>
+							<input v-model.number="autoBanWindow" class="nativeInput" type="number" min="1" max="1440" :disabled="autoBanSaving" />
+						</label>
+						<label class="countField">
+							<span class="label">封禁时长（分钟）</span>
+							<input v-model.number="autoBanMinutes" class="nativeInput" type="number" min="1" max="43200" :disabled="autoBanSaving" />
+						</label>
+						<CfInfo v-if="autoBanError !== null" warn class="field">
+							{{ autoBanError }}
+						</CfInfo>
+						<CfInfo v-else-if="autoBanSaved" class="field">已保存并立即生效。</CfInfo>
+						<div class="actions">
+							<CfButton type="submit" primary :disabled="autoBanSaving">
+								{{ autoBanSaving ? "保存中…" : "保存" }}
+							</CfButton>
+						</div>
+					</form>
+				</section>
+
+				<section class="related">
+					<h2 class="sectionTitle">相关设置</h2>
+					<ul class="list">
+						<li class="item">
+							<div class="body"><span class="label">注册模式</span><span class="note">open / invite / admin 三档，运行期可切换</span></div>
+							<RouterLink class="link" to="/admin/settings">打开</RouterLink>
+						</li>
+						<li class="item">
+							<div class="body"><span class="label">封禁用户</span><span class="note">在用户列表里冻结/解冻账号</span></div>
+							<RouterLink class="link" to="/admin/users">打开</RouterLink>
+						</li>
+						<li class="item">
+							<div class="body"><span class="label">两步验证</span><span class="note">由每个账号在安全设置里自行开启</span></div>
+							<RouterLink class="link" to="/settings/security">打开</RouterLink>
+						</li>
+					</ul>
+				</section>
 			</div>
 		</MkSpacer>
 	</MkStickyContainer>
@@ -265,16 +371,15 @@
 
 <script lang="ts" setup>
 // Firefish's admin/security page manages bot protection, email validation
-// and IP logging, none of which this backend has. What it does have is
-// invite-code management (Misskey keeps that under admin/invite/*) plus two
-// Cinderfish extensions: IP bans and a cross-account signin audit. The
-// AdminUnavailable block at the bottom records what is still absent
-// (captcha support, automatic bans after repeated failures).
+// and IP logging. This port gathers what the backend actually offers into
+// tabs: invite codes (Misskey's admin/invite/*), the cross-account signin
+// audit, IP bans and the protection settings (captcha + the automatic-ban
+// rule). The audit list paginates, so a busy instance does not render every
+// signin at once.
 import { computed, onMounted, ref, watch } from "vue";
 import { ApiError, api } from "@/api/client";
-import type { AdminSigninEntry, IPBan } from "@/api/types";
+import type { AdminInstanceMeta, AdminSigninEntry, IPBan } from "@/api/types";
 import { isAdmin } from "@/account";
-import AdminUnavailable from "@/components/admin/AdminUnavailable.vue";
 import MkPageHeader from "@/components/global/MkPageHeader.vue";
 import MkSpacer from "@/components/global/MkSpacer.vue";
 import MkStickyContainer from "@/components/global/MkStickyContainer.vue";
@@ -289,6 +394,15 @@ import { copyToClipboard } from "@/scripts/copy-to-clipboard";
 import { definePageMetadata } from "@/scripts/page-metadata";
 
 defineOptions({ name: "CfPageAdminSecurity" });
+
+type TabId = "invites" | "audit" | "bans" | "protection";
+const tabs: Array<{ id: TabId; label: string }> = [
+	{ id: "invites", label: "邀请码" },
+	{ id: "audit", label: "登录审计" },
+	{ id: "bans", label: "IP 封禁" },
+	{ id: "protection", label: "防护" },
+];
+const activeTab = ref<TabId>("invites");
 
 interface InviteCodeRow {
 	id: string;
@@ -331,17 +445,40 @@ const banExpiresLocal = ref("");
 const banCreating = ref(false);
 const banFormError = ref<string | null>(null);
 
-const rest = {
-	title: "其余安全设置",
-	summary:
-		"上游的安全页还集中管理机器人防护与邮件验证。这些依赖外部服务，当前没有实现；登录限流按 IP 在后端内置，登录记录见上方审计区。",
-	available: [
-		{ label: "注册模式", note: "open / invite / admin 三档，运行期可切换", to: "/admin/settings" },
-		{ label: "封禁用户", note: "在用户列表里冻结/解冻账号", to: "/admin/users" },
-		{ label: "两步验证", note: "由每个账号在安全设置里自行开启", to: "/settings/security" },
-	],
-	missing: ["机器人防护（hCaptcha / reCAPTCHA）", "重复失败后的自动封禁"],
-};
+// Audit pagination: the list is served 30 rows at a time so a busy instance
+// does not need one huge response.
+const AUDIT_PAGE = 30;
+const auditOffset = ref(0);
+const auditHasMore = ref(false);
+
+// Protection tab: captcha provider plus the automatic-ban rule.
+const captchaFormProvider = ref<"none" | "hcaptcha" | "recaptcha" | "turnstile">("none");
+const captchaFormSiteKey = ref("");
+const captchaFormSecret = ref("");
+const captchaSecretSet = ref(false);
+const captchaSaving = ref(false);
+const captchaSaved = ref(false);
+const captchaFormError = ref<string | null>(null);
+const captchaStatusText = computed<string>(() => {
+	switch (captchaFormProvider.value) {
+		case "hcaptcha":
+			return "hCaptcha 已启用";
+		case "recaptcha":
+			return "reCAPTCHA 已启用";
+		case "turnstile":
+			return "Cloudflare Turnstile 已启用";
+		default:
+			return "未启用";
+	}
+});
+
+const autoBanEnabled = ref(false);
+const autoBanThreshold = ref(10);
+const autoBanWindow = ref(60);
+const autoBanMinutes = ref(60);
+const autoBanSaving = ref(false);
+const autoBanSaved = ref(false);
+const autoBanError = ref<string | null>(null);
 
 function errorText(cause: unknown): string {
 	if (cause instanceof ApiError) return cause.message;
@@ -448,19 +585,113 @@ async function remove(item: InviteCodeRow): Promise<void> {
 	}
 }
 
-async function loadAudit(): Promise<void> {
+async function loadAudit(reset = true): Promise<void> {
 	if (!admin.value) return;
 	auditLoading.value = true;
 	auditError.value = null;
 	try {
-		audit.value = await api<AdminSigninEntry[]>("admin/signin-history", {
-			limit: 100,
+		const rows = await api<AdminSigninEntry[]>("admin/signin-history", {
+			limit: AUDIT_PAGE,
+			offset: reset ? 0 : auditOffset.value,
 		});
+		audit.value = reset ? rows : [...audit.value, ...rows];
+		auditOffset.value = audit.value.length;
+		auditHasMore.value = rows.length === AUDIT_PAGE;
 	} catch (cause) {
 		auditError.value = errorText(cause);
-		audit.value = [];
+		if (reset) audit.value = [];
 	} finally {
 		auditLoading.value = false;
+	}
+}
+
+async function loadMoreAudit(): Promise<void> {
+	if (auditLoading.value) return;
+	await loadAudit(false);
+}
+
+// loadProtection reads the current captcha and auto-ban settings from
+// admin/meta (the same endpoint the settings pages use).
+async function loadProtection(): Promise<void> {
+	if (!admin.value) return;
+	try {
+		const meta = await api<AdminInstanceMeta>("admin/meta", {});
+		captchaFormProvider.value = meta.captchaProvider;
+		captchaFormSiteKey.value = meta.captchaSiteKey;
+		captchaSecretSet.value = meta.captchaSecretSet;
+		captchaFormSecret.value = "";
+		autoBanEnabled.value = meta.signinAutoBan.enabled;
+		autoBanThreshold.value = meta.signinAutoBan.threshold;
+		autoBanWindow.value = meta.signinAutoBan.windowMinutes;
+		autoBanMinutes.value = meta.signinAutoBan.banMinutes;
+	} catch {
+		// The protection tab keeps its defaults; saving reports the error.
+	}
+}
+
+async function saveCaptcha(): Promise<void> {
+	if (captchaSaving.value) return;
+	captchaFormError.value = null;
+	captchaSaved.value = false;
+	captchaSaving.value = true;
+	try {
+		const meta = await api<AdminInstanceMeta>("admin/update-meta", {
+			captcha: {
+				provider: captchaFormProvider.value,
+				siteKey: captchaFormSiteKey.value.trim(),
+				secret: captchaFormSecret.value.trim(),
+			},
+		});
+		captchaFormProvider.value = meta.captchaProvider;
+		captchaFormSiteKey.value = meta.captchaSiteKey;
+		captchaSecretSet.value = meta.captchaSecretSet;
+		captchaFormSecret.value = "";
+		captchaSaved.value = true;
+	} catch (cause) {
+		captchaFormError.value = errorText(cause);
+	} finally {
+		captchaSaving.value = false;
+	}
+}
+
+async function saveAutoBan(): Promise<void> {
+	if (autoBanSaving.value) return;
+	autoBanError.value = null;
+	autoBanSaved.value = false;
+	const threshold = Number(autoBanThreshold.value);
+	const windowMinutes = Number(autoBanWindow.value);
+	const banMinutes = Number(autoBanMinutes.value);
+	if (!Number.isInteger(threshold) || threshold < 3 || threshold > 100) {
+		autoBanError.value = "失败阈值必须是 3–100 之间的整数。";
+		return;
+	}
+	if (!Number.isInteger(windowMinutes) || windowMinutes < 1 || windowMinutes > 1440) {
+		autoBanError.value = "统计窗口必须是 1–1440 分钟。";
+		return;
+	}
+	if (!Number.isInteger(banMinutes) || banMinutes < 1 || banMinutes > 43200) {
+		autoBanError.value = "封禁时长必须是 1–43200 分钟。";
+		return;
+	}
+	autoBanSaving.value = true;
+	try {
+		const meta = await api<AdminInstanceMeta>("admin/update-meta", {
+			signinAutoBan: {
+				enabled: autoBanEnabled.value,
+				threshold,
+				windowMinutes,
+				banMinutes,
+			},
+		});
+		autoBanEnabled.value = meta.signinAutoBan.enabled;
+		autoBanThreshold.value = meta.signinAutoBan.threshold;
+		autoBanWindow.value = meta.signinAutoBan.windowMinutes;
+		autoBanMinutes.value = meta.signinAutoBan.banMinutes;
+		autoBanSaved.value = true;
+	} catch (cause) {
+		autoBanError.value = errorText(cause);
+	} finally {
+		autoBanSaving.value = false;
 	}
 }
 
@@ -547,6 +778,7 @@ onMounted(() => {
 	void load();
 	void loadAudit();
 	void loadBans();
+	void loadProtection();
 });
 
 // Changing the type filter re-queries immediately; the 刷新 button is for
@@ -555,12 +787,98 @@ watch(filterType, () => {
 	void load();
 });
 
+// Switching tabs refetches that tab's data: the lists can change while the
+// administrator is on another tab (an automatic ban, a signin, an invite).
+watch(activeTab, (tab) => {
+	switch (tab) {
+		case "audit":
+			void loadAudit();
+			break;
+		case "bans":
+			void loadBans();
+			break;
+		case "protection":
+			void loadProtection();
+			break;
+	}
+});
+
 definePageMetadata({ title: "安全设置", icon: "ph-shield-check ph-bold ph-lg" });
 </script>
 
 <style lang="scss" scoped>
 .wrap {
 	max-width: 760px;
+}
+
+.tabBar {
+	display: flex;
+	gap: 4px;
+	margin-bottom: 16px;
+	padding: 4px;
+	background: var(--panel);
+	border-radius: 999px;
+
+	.tab {
+		flex: 1;
+		padding: 7px 10px;
+		border: none;
+		border-radius: 999px;
+		background: transparent;
+		color: var(--fg);
+		font: inherit;
+		cursor: pointer;
+		opacity: 0.7;
+
+		&.active {
+			background: var(--accent);
+			color: var(--fgOnAccent, #fff);
+			opacity: 1;
+		}
+	}
+}
+
+.loadMore {
+	margin-top: 10px;
+	display: flex;
+	justify-content: center;
+}
+
+.related {
+	margin-top: 24px;
+
+	.item {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+	}
+
+	.label {
+		font-weight: 600;
+		margin-inline-end: 6px;
+	}
+
+	.note {
+		font-size: 0.82em;
+		opacity: 0.7;
+	}
+}
+
+.autoBanTitle {
+	margin-top: 24px;
+}
+
+.checkRow {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin-bottom: 12px;
+	font-size: 0.9em;
+
+	input {
+		width: 16px;
+		height: 16px;
+	}
 }
 
 .signinAudit,

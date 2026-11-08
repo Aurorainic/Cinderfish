@@ -170,6 +170,35 @@ SELECT ip FROM ip_bans WHERE expires_at IS NULL OR expires_at > now()
 	return false, nil
 }
 
+// RecordSigninFailure appends one failed signin attempt for the source
+// address. Unknown usernames cannot be stored in signins (the row needs an
+// account), so this table is the counter the automatic-ban rule reads.
+func (s *Service) RecordSigninFailure(ctx context.Context, ip string) error {
+	if strings.TrimSpace(ip) == "" {
+		return nil
+	}
+	_, err := s.pool.Exec(ctx, `
+INSERT INTO signin_failures (id, ip) VALUES ($1, $2)
+`, idgen.New(), ip)
+	if err != nil {
+		return fmt.Errorf("account: record signin failure: %w", err)
+	}
+	return nil
+}
+
+// CountRecentSigninFailures counts failed signin attempts from an address
+// since the given moment.
+func (s *Service) CountRecentSigninFailures(ctx context.Context, ip string, since time.Time) (int, error) {
+	var n int
+	err := s.pool.QueryRow(ctx, `
+SELECT count(*) FROM signin_failures WHERE ip = $1 AND created_at > $2
+`, ip, since).Scan(&n)
+	if err != nil {
+		return 0, fmt.Errorf("account: count signin failures: %w", err)
+	}
+	return n, nil
+}
+
 // AdminSigninRecord is one signin row with the account it belongs to.
 type AdminSigninRecord struct {
 	SigninRecord

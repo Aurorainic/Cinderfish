@@ -11,6 +11,15 @@ import (
 
 const repositoryURL = "https://github.com/Aurorainic/Cinderfish"
 
+// captchaSiteKeyFor returns the active provider's site key, or "" for the
+// providers that are not enabled.
+func captchaSiteKeyFor(settings instanceSettings, provider string) string {
+	if settings.CaptchaProvider == provider {
+		return settings.CaptchaSiteKey
+	}
+	return ""
+}
+
 // themeColorOrDefault keeps the historical default when no colour is set.
 func themeColorOrDefault(value string) string {
 	if value == "" {
@@ -54,15 +63,15 @@ func (s *Server) handleMeta(w http.ResponseWriter, r *http.Request) {
 		"inquiryUrl":                   settings.InquiryURL,
 		"disableRegistration":          settings.RegistrationMode != "open",
 		"emailRequiredForSignup":       false,
-		"enableHcaptcha":               false,
-		"hcaptchaSiteKey":              "",
+		"enableHcaptcha":               settings.CaptchaProvider == "hcaptcha",
+		"hcaptchaSiteKey":              captchaSiteKeyFor(settings, "hcaptcha"),
 		"enableMcaptcha":               false,
 		"mcaptchaSiteKey":              "",
 		"mcaptchaInstanceUrl":          "",
-		"enableRecaptcha":              false,
-		"recaptchaSiteKey":             "",
-		"enableTurnstile":              false,
-		"turnstileSiteKey":             "",
+		"enableRecaptcha":              settings.CaptchaProvider == "recaptcha",
+		"recaptchaSiteKey":             captchaSiteKeyFor(settings, "recaptcha"),
+		"enableTurnstile":              settings.CaptchaProvider == "turnstile",
+		"turnstileSiteKey":             captchaSiteKeyFor(settings, "turnstile"),
 		"enableTestcaptcha":            false,
 		"googleAnalyticsMeasurementId": "",
 		"swPublickey":                  "",

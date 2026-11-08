@@ -43,6 +43,30 @@ type instanceSettings struct {
 	// MaxNoteTextLength is the runtime note-length cap, defaulting to
 	// Misskey's 3000.
 	MaxNoteTextLength int
+	// Captcha provider and credentials (Misskey meta fields). One provider
+	// is active at a time; the secret never leaves the server.
+	CaptchaProvider string
+	CaptchaSiteKey  string
+	CaptchaSecret   string
+	// SigninAutoBan is a Cinderfish extension: after the configured number
+	// of failed signins from one address inside the window, an IP ban is
+	// created automatically.
+	SigninAutoBan AutoBanSettings
+}
+
+// AutoBanSettings configures the automatic IP ban after repeated signin
+// failures.
+type AutoBanSettings struct {
+	Enabled       bool
+	Threshold     int
+	WindowMinutes int
+	BanMinutes    int
+}
+
+// defaultAutoBan matches the documented defaults: off, 10 failures in an
+// hour lead to a one-hour ban once enabled.
+func defaultAutoBan() AutoBanSettings {
+	return AutoBanSettings{Enabled: false, Threshold: 10, WindowMinutes: 60, BanMinutes: 60}
 }
 
 // instanceMetaKey maps a settings field to its instance_meta key.
@@ -66,6 +90,8 @@ var instanceMetaKeys = map[string]string{
 	"customCss":          "customCss",
 	"preservedUsernames": "preservedUsernames",
 	"maxNoteTextLength":  "maxNoteTextLength",
+	"captchaSettings":    "captchaSettings",
+	"signinAutoBan":      "signinAutoBan",
 }
 
 // liveInstanceSettings reads the runtime overrides, falling back to the
@@ -78,6 +104,7 @@ func (s *Server) liveInstanceSettings(ctx context.Context) instanceSettings {
 		MaintainerEmail:   "",
 		RegistrationMode:  s.cfg.RegistrationMode,
 		MaxNoteTextLength: note.MaxTextLength,
+		SigninAutoBan:     defaultAutoBan(),
 	}
 	if out.RegistrationMode == "" {
 		out.RegistrationMode = "admin"
@@ -102,6 +129,8 @@ SELECT key, value FROM instance_meta WHERE key = ANY($1)
 		instanceMetaKeys["customCss"],
 		instanceMetaKeys["preservedUsernames"],
 		instanceMetaKeys["maxNoteTextLength"],
+		instanceMetaKeys["captchaSettings"],
+		instanceMetaKeys["signinAutoBan"],
 	})
 	if err != nil {
 		return out
@@ -129,6 +158,29 @@ SELECT key, value FROM instance_meta WHERE key = ANY($1)
 			var limit int
 			if err := json.Unmarshal(raw, &limit); err == nil && limit > 0 {
 				out.MaxNoteTextLength = limit
+			}
+			continue
+		}
+		if key == instanceMetaKeys["captchaSettings"] {
+			var cfg struct {
+				Provider string `json:"provider"`
+				SiteKey  string `json:"siteKey"`
+				Secret   string `json:"secret"`
+			}
+			if json.Unmarshal(raw, &cfg) == nil {
+				switch cfg.Provider {
+				case "hcaptcha", "recaptcha", "turnstile":
+					out.CaptchaProvider = cfg.Provider
+				}
+				out.CaptchaSiteKey = cfg.SiteKey
+				out.CaptchaSecret = cfg.Secret
+			}
+			continue
+		}
+		if key == instanceMetaKeys["signinAutoBan"] {
+			var cfg AutoBanSettings
+			if json.Unmarshal(raw, &cfg) == nil {
+				out.SigninAutoBan = cfg
 			}
 			continue
 		}
@@ -320,6 +372,19 @@ func (s *Server) handleAdminMeta(w http.ResponseWriter, r *http.Request) {
 		// (Misskey keeps both in meta: preservedUsernames, maxNoteTextLength).
 		"preservedUsernames": settings.PreservedUsernames,
 		"maxNoteTextLength":  s.liveMaxNoteTextLength(r.Context()),
+		// Captcha: one provider is active at a time; the secret is reported
+		// as a boolean only.
+		"captchaProvider":  captchaProviderOrDefault(settings.CaptchaProvider),
+		"captchaSiteKey":   settings.CaptchaSiteKey,
+		"captchaSecretSet": settings.CaptchaSecret != "",
+		// Automatic IP bans after repeated signin failures (Cinderfish
+		// extension).
+		"signinAutoBan": map[string]any{
+			"enabled":       settings.SigninAutoBan.Enabled,
+			"threshold":     settings.SigninAutoBan.Threshold,
+			"windowMinutes": settings.SigninAutoBan.WindowMinutes,
+			"banMinutes":    settings.SigninAutoBan.BanMinutes,
+		},
 		// The admin console only needs to know whether mail is configured and
 		// which host it goes through; credentials stay in the database (or
 		// config.toml) and are edited on the email-settings page.
@@ -366,6 +431,21 @@ func (s *Server) handleAdminUpdateMeta(w http.ResponseWriter, r *http.Request) {
 		// signup; maxNoteTextLength replaces the Misskey constant.
 		PreservedUsernames *[]string `json:"preservedUsernames"`
 		MaxNoteTextLength  *int      `json:"maxNoteTextLength"`
+		// Captcha is one active provider plus its keys. The secret is only
+		// accepted, never returned.
+		Captcha *struct {
+			Provider string `json:"provider"`
+			SiteKey  string `json:"siteKey"`
+			Secret   string `json:"secret"`
+		} `json:"captcha"`
+		// SigninAutoBan controls the automatic IP ban after repeated signin
+		// failures. Omitted fields keep their current values.
+		SigninAutoBan *struct {
+			Enabled       *bool `json:"enabled"`
+			Threshold     *int  `json:"threshold"`
+			WindowMinutes *int  `json:"windowMinutes"`
+			BanMinutes    *int  `json:"banMinutes"`
+		} `json:"signinAutoBan"`
 	}
 	if err := decodeOptionalJSON(r, &body); err != nil {
 		writeAPIError(w, err)
@@ -615,6 +695,89 @@ ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
 		}
 	}
 
+	if body.Captcha != nil {
+		current := s.liveInstanceSettings(r.Context())
+		provider := strings.TrimSpace(body.Captcha.Provider)
+		switch provider {
+		case "", "none":
+			provider = "none"
+		case "hcaptcha", "recaptcha", "turnstile":
+		default:
+			writeAPIError(w, invalidParamError("captcha provider must be none, hcaptcha, recaptcha or turnstile"))
+			return
+		}
+		siteKey := strings.TrimSpace(body.Captcha.SiteKey)
+		secret := strings.TrimSpace(body.Captcha.Secret)
+		if utf8.RuneCountInString(siteKey) > 256 || utf8.RuneCountInString(secret) > 256 {
+			writeAPIError(w, invalidParamError("captcha site key and secret are at most 256 characters"))
+			return
+		}
+		// An empty secret keeps the stored one, but only for the same
+		// provider; switching providers needs the new provider's secret.
+		if secret == "" {
+			if provider != "none" && provider != current.CaptchaProvider {
+				writeAPIError(w, invalidParamError("the captcha secret is required when changing providers"))
+				return
+			}
+			secret = current.CaptchaSecret
+		}
+		if provider == "none" {
+			siteKey = ""
+			secret = ""
+		}
+		payload, err := json.Marshal(map[string]string{
+			"provider": provider,
+			"siteKey":  siteKey,
+			"secret":   secret,
+		})
+		if err != nil {
+			writeInternalServerError(w)
+			return
+		}
+		if err := s.saveInstanceJSON(r.Context(), instanceMetaKeys["captchaSettings"], payload); err != nil {
+			writeInternalServerError(w)
+			return
+		}
+	}
+
+	if body.SigninAutoBan != nil {
+		current := s.liveInstanceSettings(r.Context()).SigninAutoBan
+		next := current
+		if body.SigninAutoBan.Enabled != nil {
+			next.Enabled = *body.SigninAutoBan.Enabled
+		}
+		if body.SigninAutoBan.Threshold != nil {
+			next.Threshold = *body.SigninAutoBan.Threshold
+		}
+		if body.SigninAutoBan.WindowMinutes != nil {
+			next.WindowMinutes = *body.SigninAutoBan.WindowMinutes
+		}
+		if body.SigninAutoBan.BanMinutes != nil {
+			next.BanMinutes = *body.SigninAutoBan.BanMinutes
+		}
+		if next.Threshold < 3 || next.Threshold > 100 {
+			writeAPIError(w, invalidParamError("signinAutoBan threshold must be between 3 and 100"))
+			return
+		}
+		if next.WindowMinutes < 1 || next.WindowMinutes > 1440 {
+			writeAPIError(w, invalidParamError("signinAutoBan windowMinutes must be between 1 and 1440"))
+			return
+		}
+		if next.BanMinutes < 1 || next.BanMinutes > 43200 {
+			writeAPIError(w, invalidParamError("signinAutoBan banMinutes must be between 1 and 43200"))
+			return
+		}
+		payload, err := json.Marshal(next)
+		if err != nil {
+			writeInternalServerError(w)
+			return
+		}
+		if err := s.saveInstanceJSON(r.Context(), instanceMetaKeys["signinAutoBan"], payload); err != nil {
+			writeInternalServerError(w)
+			return
+		}
+	}
+
 	for field, value := range updates {
 		if err := s.saveInstanceSetting(r.Context(), field, value); err != nil {
 			writeInternalServerError(w)
@@ -623,6 +786,24 @@ ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
 	}
 
 	s.handleAdminMeta(w, r)
+}
+
+// saveInstanceJSON stores a raw JSON payload under one instance_meta key.
+func (s *Server) saveInstanceJSON(ctx context.Context, key string, raw []byte) error {
+	_, err := s.pool.Exec(ctx, `
+INSERT INTO instance_meta (key, value) VALUES ($1, $2::jsonb)
+ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
+`, key, raw)
+	return err
+}
+
+// captchaProviderOrDefault reports "none" for an unset or unknown provider.
+func captchaProviderOrDefault(provider string) string {
+	switch provider {
+	case "hcaptcha", "recaptcha", "turnstile":
+		return provider
+	}
+	return "none"
 }
 
 // validThemeColor accepts a six-digit hex colour.

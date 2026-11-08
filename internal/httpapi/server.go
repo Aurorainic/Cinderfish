@@ -56,6 +56,10 @@ type Server struct {
 	// an instance without SMTP configured logs messages instead.
 	mail mail.Sender
 
+	// captchaHTTP performs the outbound verification calls. The endpoints
+	// are fixed (internal/captcha); tests inject a stub transport.
+	captchaHTTP *http.Client
+
 	// web serves the built Vue frontend. It is nil when no build is
 	// present, so API-only deployments and tests still work.
 	web *staticSite
@@ -93,6 +97,7 @@ func NewServer(cfg *config.Config) *Server {
 		streamBus:   streaming.NewBus(),
 		activity:    newActivityTracker(),
 		rateLimiter: newRateLimiter(),
+		captchaHTTP: &http.Client{Timeout: 10 * time.Second},
 	}
 	if cfg != nil {
 		s.mail = mail.NewSwitchableSender(mail.New(mail.Settings{
@@ -165,6 +170,15 @@ func (s *Server) SetStorage(storage media.Storage) {
 func (s *Server) AllowPrivateWebhookTargets() {
 	if s.webhooks != nil {
 		s.webhooks.AllowPrivateTargets = true
+	}
+}
+
+// SetCaptchaHTTPClient replaces the client used for captcha verification.
+// Tests inject a stub transport; the verification endpoints themselves stay
+// fixed in internal/captcha.
+func (s *Server) SetCaptchaHTTPClient(client *http.Client) {
+	if client != nil {
+		s.captchaHTTP = client
 	}
 }
 
@@ -490,8 +504,9 @@ const (
 	errIDNoSuchEndpoint  = "fc9c4a0b-f3a1-4b0e-9a8c-6f7f3d0f6a12"
 	errIDRegistrationOff = "4d371c9a-3a0f-4c8b-9b8e-2f9c0a1d3e45"
 	// Cinderfish extension ids, outside Misskey's table.
-	errIDIPBanned = "7a1e9c34-5b2d-4f6a-8c70-1d9b3e5f2a41"
-	errIDNotFound = "c1f6a9d2-3e4b-4c5d-9a78-2b3e4f5a6c7d"
+	errIDIPBanned      = "7a1e9c34-5b2d-4f6a-8c70-1d9b3e5f2a41"
+	errIDNotFound      = "c1f6a9d2-3e4b-4c5d-9a78-2b3e4f5a6c7d"
+	errIDCaptchaFailed = "2b4d6f80-1a3c-4e5f-9d72-8c6e4a2b0f13"
 )
 
 // writeAPIError emits the Misskey error envelope.

@@ -909,6 +909,18 @@ export interface EndpointMap {
 			customCss?: string;
 			preservedUsernames?: string[];
 			maxNoteTextLength?: number;
+			captcha?: {
+				provider: "none" | "hcaptcha" | "recaptcha" | "turnstile";
+				siteKey?: string;
+				/** Empty keeps the stored secret for the same provider. */
+				secret?: string;
+			};
+			signinAutoBan?: {
+				enabled?: boolean;
+				threshold?: number;
+				windowMinutes?: number;
+				banMinutes?: number;
+			};
 		};
 		res: AdminInstanceMeta;
 	};

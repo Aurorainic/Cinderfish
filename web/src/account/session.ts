@@ -137,6 +137,12 @@ export const signin = signIn;
 
 export interface SignUpOptions extends LoginOptions {
 	invitationCode?: string;
+	/** Captcha tokens, one of them depending on the instance's provider. */
+	captcha?: {
+		hcaptcha?: string;
+		recaptcha?: string;
+		turnstile?: string;
+	};
 }
 
 /**
@@ -162,6 +168,16 @@ export async function signUp(
 			password,
 			...(options.invitationCode != null && options.invitationCode !== ""
 				? { invitationCode: options.invitationCode }
+				: {}),
+			// Misskey's signup body uses kebab-case captcha fields.
+			...(options.captcha?.hcaptcha != null && options.captcha.hcaptcha !== ""
+				? { "hcaptcha-response": options.captcha.hcaptcha }
+				: {}),
+			...(options.captcha?.recaptcha != null && options.captcha.recaptcha !== ""
+				? { "g-recaptcha-response": options.captcha.recaptcha }
+				: {}),
+			...(options.captcha?.turnstile != null && options.captcha.turnstile !== ""
+				? { "turnstile-response": options.captcha.turnstile }
 				: {}),
 		},
 		null,

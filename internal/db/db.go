@@ -666,6 +666,17 @@ CREATE TABLE IF NOT EXISTS ip_bans (
 );
 CREATE INDEX IF NOT EXISTS idx_ip_bans_created ON ip_bans (created_at DESC);
 `,
+	29: `
+-- Automatic bans count failed signin attempts per source address. The rows
+-- are the counter and the audit trail; the admin console prunes nothing yet,
+-- and one row per failed attempt is cheap at personal-instance scale.
+CREATE TABLE IF NOT EXISTS signin_failures (
+    id         TEXT PRIMARY KEY,
+    ip         TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_signin_failures_ip ON signin_failures (ip, created_at DESC);
+`,
 }
 
 // Migrate applies pending migrations in order and returns the version
