@@ -308,6 +308,17 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("POST /api/notes/clips", s.handleNotesClips)
 	s.mux.HandleFunc("POST /api/users/clips", s.handleUsersClips)
 
+	// Antennas (schema v32), the antennas/* family upstream defines in
+	// packages/backend/src/server/api/endpoints/antennas/. The timeline
+	// endpoint is antennas/notes, not notes/antennas-timeline.
+	s.mux.HandleFunc("POST /api/antennas/create", s.handleAntennasCreate)
+	s.mux.HandleFunc("POST /api/antennas/update", s.handleAntennasUpdate)
+	s.mux.HandleFunc("POST /api/antennas/delete", s.handleAntennasDelete)
+	s.mux.HandleFunc("POST /api/antennas/list", s.handleAntennasList)
+	s.mux.HandleFunc("POST /api/antennas/show", s.handleAntennasShow)
+	s.mux.HandleFunc("POST /api/antennas/notes", s.handleAntennasNotes)
+	s.mux.HandleFunc("POST /api/antennas/remove-note", s.handleAntennasRemoveNote)
+
 	// Mutes and blocks. Both tables exist since schema v1; these endpoints
 	// are what the settings page and the timeline filter read.
 	s.mux.HandleFunc("POST /api/mute/create", s.handleMuteCreate)

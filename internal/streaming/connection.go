@@ -38,6 +38,8 @@ type Connection struct {
 	lists ListLoader
 	// clipLoader checks clip visibility for the clip channel.
 	clipLoader ClipLoader
+	// antennaLoader checks antenna ownership for the antenna channel.
+	antennaLoader AntennaLoader
 }
 
 // newConnection assembles a Connection for an upgraded WebSocket.

@@ -116,6 +116,9 @@ func (s *Server) handleNotesCreate(w http.ResponseWriter, r *http.Request) {
 	s.notifyNoteCreated(r, n, info.User.ID)
 	// Fan the note out to the streaming timelines and main channels.
 	s.publishNoteCreated(n, info.User.ID)
+	// Antennas collect the note when it matches their filter, which also
+	// publishes the antenna stream events.
+	s.ingestAntennas(r.Context(), n, info.User.ID)
 	// Followers whose follow asks for notifications get one per note.
 	s.notifyFollowersOfNote(r.Context(), n, info.User.ID)
 	// And to the author's outbound webhooks, if any subscribe to this event.

@@ -86,6 +86,18 @@ func (s *Server) LoadListMembers(ctx context.Context, listID, userID string) (ma
 	return out, true, nil
 }
 
+// AntennaOwned implements streaming.AntennaLoader for the Server.
+func (s *Server) AntennaOwned(ctx context.Context, antennaID, viewerID string) (bool, error) {
+	if s.accounts == nil {
+		return false, nil
+	}
+	_, err := s.accounts.GetAntenna(ctx, antennaID, viewerID)
+	if errors.Is(err, account.ErrAntennaNotFound) {
+		return false, nil
+	}
+	return err == nil, err
+}
+
 // ClipVisible implements streaming.ClipLoader for the Server: the owner
 // and readers of a public clip may watch its stream.
 func (s *Server) ClipVisible(ctx context.Context, clipID, viewerID string) (bool, error) {

@@ -449,3 +449,44 @@ func (s *TimelineService) ClipNotes(ctx context.Context, clipID, viewerID string
 	}
 	return out, rows.Err()
 }
+
+// AntennaNotes returns the notes one antenna collected, newest first
+// unless a sinceId is given without untilId. This is antennas/notes: the
+// same visibility filter the other note listings apply, in SQL. Upstream
+// filters after slicing its 200-entry cache and can return short pages;
+// this port filters in SQL and returns full pages, a divergence recorded
+// in docs/HANDOVER.md.
+func (s *TimelineService) AntennaNotes(ctx context.Context, antennaID, viewerID string, limit int, sinceID, untilID string) ([]*Note, error) {
+	if limit <= 0 {
+		limit = 10
+	}
+	if limit > 100 {
+		limit = 100
+	}
+
+	q := &queryBuilder{}
+	q.add("an.antenna_id = %s", antennaID)
+	q.conds = append(q.conds, "n.deleted_at IS NULL")
+	q.addNoteVisibility(viewerID)
+	q.addViewerRelationFilters(viewerID)
+	q.addPageCursors(sinceID, untilID)
+
+	query := noteSelect + " JOIN antenna_notes an ON an.note_id = n.id WHERE " + strings.Join(q.conds, " AND ") +
+		" ORDER BY n.id " + paginationOrder(sinceID, untilID) + " LIMIT " + strconv.Itoa(limit)
+
+	rows, err := s.pool.Query(ctx, query, q.args...)
+	if err != nil {
+		return nil, fmt.Errorf("note: antenna notes query: %w", err)
+	}
+	defer rows.Close()
+
+	out := []*Note{}
+	for rows.Next() {
+		n, err := scanNote(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, n)
+	}
+	return out, rows.Err()
+}

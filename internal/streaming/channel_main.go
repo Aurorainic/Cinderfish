@@ -13,9 +13,8 @@ type channelSpec struct {
 }
 
 // channelSpecs is the registry of supported channels. Channels Misskey
-// also defines but Cinderfish does not implement yet (clip, hashtag,
-// antenna, drive, serverStats, admin, chat*, reversi*, ...) are
-// deliberately absent: connecting to them is silently ignored, which
+// also defines but Cinderfish does not implement yet (hashtag, drive,
+// serverStats, admin, chat*, reversi*, ...) are deliberately absent: connecting to them is silently ignored, which
 // is what upstream clients observe when the constructor throws.
 var channelSpecs = map[string]channelSpec{
 	"main":           {Name: "main", RequireCredential: true, Shareable: true, New: newMainChannel},
@@ -29,6 +28,8 @@ var channelSpecs = map[string]channelSpec{
 	"userList":       {Name: "userList", RequireCredential: true, New: newUserListChannel},
 	// clip accepts anonymous watchers of a public clip, as upstream.
 	"clip":           {Name: "clip", New: newClipChannel},
+	// antenna is owner-only, as upstream's init existence check.
+	"antenna":        {Name: "antenna", RequireCredential: true, New: newAntennaChannel},
 }
 
 // newMainChannel builds the main channel.

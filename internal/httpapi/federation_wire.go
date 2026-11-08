@@ -70,6 +70,9 @@ func (s *Server) AttachFederation() {
 		if s.notes != nil {
 			if stored, err := s.notes.Get(ctx, noteID); err == nil {
 				s.notifyFollowersOfNote(ctx, stored, userID)
+				// Remote notes run past the antennas too, which is what
+				// makes acct-based antennas useful.
+				s.ingestAntennas(ctx, stored, userID)
 			}
 		}
 	}

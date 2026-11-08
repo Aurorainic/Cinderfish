@@ -66,6 +66,7 @@ type Options struct {
 	Followers ViewerLoader
 	Lists     ListLoader
 	Clips     ClipLoader
+	Antennas  AntennaLoader
 	Logger    func(string, ...any)
 	// MarkRead is called for the "readNotification" client frame: an empty
 	// id list means "mark everything read", which is what a frame without any
@@ -83,6 +84,7 @@ type Server struct {
 	followers   ViewerLoader
 	lists       ListLoader
 	clipsLoader ClipLoader
+	antennas    AntennaLoader
 	logf        func(string, ...any)
 	markRead    func(ctx context.Context, userID string, notificationIDs []string) error
 
@@ -97,6 +99,7 @@ func New(opts Options) *Server {
 		followers:   opts.Followers,
 		lists:       opts.Lists,
 		clipsLoader: opts.Clips,
+		antennas:    opts.Antennas,
 		logf:        logfOr(opts.Logger),
 		markRead:    opts.MarkRead,
 		// Misskey performs no origin check on the streaming endpoint.
@@ -178,6 +181,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	conn.lists = s.lists
 	conn.clipLoader = s.clipsLoader
+	conn.antennaLoader = s.antennas
 
 	conn.serve()
 }

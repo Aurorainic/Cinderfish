@@ -133,6 +133,8 @@ func TestChannelRegistry(t *testing.T) {
 		"userList": {true, false},
 		// clip accepts anonymous watchers of a public clip.
 		"clip": {false, false},
+		// antenna is owner-only, as upstream's init existence check.
+		"antenna": {true, false},
 	}
 	for name, w := range want {
 		spec, ok := channelSpecs[name]
@@ -766,5 +768,60 @@ func TestClipChannelRejects(t *testing.T) {
 	h3 := newTestConnection(t, Viewer{UserID: "alice"})
 	if channelSpecs["clip"].New(h3.conn, "c3").Init(map[string]json.RawMessage{"clipId": clipIDJSON}) {
 		t.Error("missing loader must reject")
+	}
+}
+
+// stubAntennaLoader is an AntennaLoader with a fixed ownership answer.
+type stubAntennaLoader struct {
+	owned bool
+}
+
+func (s stubAntennaLoader) AntennaOwned(_ context.Context, _, _ string) (bool, error) {
+	return s.owned, nil
+}
+
+func TestAntennaChannelForwardsNotes(t *testing.T) {
+	h := newTestConnection(t, Viewer{UserID: "alice"})
+	h.conn.antennaLoader = stubAntennaLoader{owned: true}
+
+	antennaIDJSON, _ := json.Marshal("ant1")
+	ch := newChannel(h, "antenna", "a1", map[string]json.RawMessage{"antennaId": antennaIDJSON})
+	if ch.Name() != "antenna" {
+		t.Fatalf("channel name = %q", ch.Name())
+	}
+
+	packed := noteFor("n1", "bob", "public")
+	noteMsg, _ := NewMessage("note", packed)
+	h.conn.bus.Publish(AntennaSubject("ant1"), noteMsg)
+	// Foreign subjects must not surface.
+	h.conn.bus.Publish(AntennaSubject("other"), noteMsg)
+
+	var col collector
+	col.drain(h.ws)
+	if len(col.events) != 1 || col.events[0].Type != "note" {
+		t.Fatalf("events = %+v, want one note", col.events)
+	}
+}
+
+func TestAntennaChannelRejects(t *testing.T) {
+	// A foreign antenna rejects the subscription.
+	h := newTestConnection(t, Viewer{UserID: "alice"})
+	h.conn.antennaLoader = stubAntennaLoader{owned: false}
+	antennaIDJSON, _ := json.Marshal("ant1")
+	if channelSpecs["antenna"].New(h.conn, "a1").Init(map[string]json.RawMessage{"antennaId": antennaIDJSON}) {
+		t.Error("foreign antenna must reject")
+	}
+
+	// A missing loader rejects rather than letting events flow.
+	h2 := newTestConnection(t, Viewer{UserID: "alice"})
+	if channelSpecs["antenna"].New(h2.conn, "a2").Init(map[string]json.RawMessage{"antennaId": antennaIDJSON}) {
+		t.Error("missing loader must reject")
+	}
+
+	// A missing antennaId param rejects.
+	h3 := newTestConnection(t, Viewer{UserID: "alice"})
+	h3.conn.antennaLoader = stubAntennaLoader{owned: true}
+	if channelSpecs["antenna"].New(h3.conn, "a3").Init(nil) {
+		t.Error("missing antennaId must reject")
 	}
 }

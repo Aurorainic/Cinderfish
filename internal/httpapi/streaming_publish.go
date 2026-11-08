@@ -90,6 +90,15 @@ func (s *Server) publishClipEvent(clipID, kind string) {
 	s.streamBus.PublishTyped(streaming.ClipSubject(clipID), kind, nil)
 }
 
+// publishAntennaEvent emits "note" on an antenna's stream subject with
+// the packed note, matching publishAntennaStream.
+func (s *Server) publishAntennaEvent(antennaID string, packed any) {
+	if s.streamBus == nil {
+		return
+	}
+	s.streamBus.PublishTyped(streaming.AntennaSubject(antennaID), "note", packed)
+}
+
 // publishListMemberEvent emits "userAdded"/"userRemoved" on a user list's
 // stream subject, carrying the member packed as UserLite the way
 // GlobalEventService.publishUserListStream does. The userList channel

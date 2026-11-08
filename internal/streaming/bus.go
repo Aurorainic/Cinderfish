@@ -50,6 +50,10 @@ func UserListSubject(listID string) string { return "userListStream:" + listID }
 // ("updated"/"deleted"), matching GlobalEventService.publishClipStream.
 func ClipSubject(clipID string) string { return "clipStream:" + clipID }
 
+// AntennaSubject returns the subject carrying one antenna's new notes,
+// matching GlobalEventService.publishAntennaStream.
+func AntennaSubject(antennaID string) string { return "antennaStream:" + antennaID }
+
 // Message is one event delivered on a subject.
 //
 // Type is the inner event type ("notification", "reacted", ...). A nil

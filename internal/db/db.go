@@ -751,6 +751,42 @@ CREATE TABLE IF NOT EXISTS clip_favorites (
 );
 CREATE INDEX IF NOT EXISTS idx_clip_favorites_clip ON clip_favorites (clip_id);
 `,
+	32: `
+-- Antennas (Misskey's antennas/* family): standing keyword/user filters
+-- that collect notes as they are created. Mirrors the Antenna model
+-- (packages/backend/src/models/Antenna.ts); the upstream Redis timeline
+-- list becomes a DB join table because Redis is optional here, and
+-- created_at is stored explicitly as in v30/v31.
+CREATE TABLE IF NOT EXISTS antennas (
+    id             TEXT PRIMARY KEY,
+    user_id        TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    name           VARCHAR(128) NOT NULL,
+    src            TEXT NOT NULL,
+    user_list_id   TEXT REFERENCES user_lists (id) ON DELETE CASCADE,
+    users          JSONB NOT NULL DEFAULT '[]',
+    keywords       JSONB NOT NULL DEFAULT '[]',
+    exclude_keywords JSONB NOT NULL DEFAULT '[]',
+    case_sensitive BOOLEAN NOT NULL DEFAULT false,
+    exclude_bots   BOOLEAN NOT NULL DEFAULT false,
+    with_replies   BOOLEAN NOT NULL DEFAULT false,
+    with_file      BOOLEAN NOT NULL DEFAULT false,
+    local_only     BOOLEAN NOT NULL DEFAULT false,
+    exclude_notes_in_sensitive_channel BOOLEAN NOT NULL DEFAULT false,
+    is_active      BOOLEAN NOT NULL DEFAULT true,
+    last_used_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+    created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_antennas_user ON antennas (user_id, id);
+
+-- One row per note an antenna collected. Upstream keeps a 200-entry Redis
+-- list with no backfill; the DB table grows unbounded here, which matches
+-- the rest of the schema and lets antennas/notes page with SQL cursors.
+CREATE TABLE IF NOT EXISTS antenna_notes (
+    antenna_id TEXT NOT NULL REFERENCES antennas (id) ON DELETE CASCADE,
+    note_id    TEXT NOT NULL REFERENCES notes (id) ON DELETE CASCADE,
+    PRIMARY KEY (antenna_id, note_id)
+);
+`,
 }
 
 // Migrate applies pending migrations in order and returns the version
