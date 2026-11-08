@@ -652,6 +652,20 @@ ALTER TABLE registration_tickets
 CREATE INDEX IF NOT EXISTS idx_registration_tickets_created_by
     ON registration_tickets (created_by_id);
 `,
+	28: `
+-- IP bans are a Cinderfish extension: neither Misskey nor Firefish has an
+-- IP-ban API, so the table and its endpoints are ours. Rules are single
+-- addresses or CIDR networks; expiry NULL means permanent.
+CREATE TABLE IF NOT EXISTS ip_bans (
+    id            TEXT PRIMARY KEY,
+    ip            TEXT NOT NULL,
+    reason        TEXT NOT NULL DEFAULT '',
+    created_by_id TEXT REFERENCES users (id) ON DELETE SET NULL,
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+    expires_at    TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS idx_ip_bans_created ON ip_bans (created_at DESC);
+`,
 }
 
 // Migrate applies pending migrations in order and returns the version

@@ -95,14 +95,14 @@ func NewServer(cfg *config.Config) *Server {
 		rateLimiter: newRateLimiter(),
 	}
 	if cfg != nil {
-		s.mail = mail.New(mail.Settings{
+		s.mail = mail.NewSwitchableSender(mail.New(mail.Settings{
 			Host:     cfg.Mail.Host,
 			Port:     cfg.Mail.Port,
 			Username: cfg.Mail.Username,
 			Password: cfg.Mail.Password,
 			From:     cfg.Mail.From,
 			TLS:      cfg.Mail.TLS,
-		})
+		}))
 	}
 	if site, err := newStaticSite(cfg.WebDir); err == nil {
 		s.web = site
@@ -139,18 +139,24 @@ func NewServerWithDB(cfg *config.Config, pool *pgxpool.Pool) *Server {
 	s.announcements = announcement.NewService(pool)
 	s.reports = report.NewService(pool)
 	s.webhooks = webhook.NewService(pool)
+	// A persisted SMTP override from the admin console wins over config.toml.
+	s.applyStoredMail()
 	return s
 }
 
-// SetStorage attaches the media backend and the drive service.
+// SetStorage attaches the media backend and the drive service. The backend
+// is wrapped in a switchable facade so the admin console can replace it at
+// runtime without rebuilding the drive service; a persisted override from
+// instance_meta (object storage page) wins over the passed-in backend.
 func (s *Server) SetStorage(storage media.Storage) {
-	s.storage = storage
+	s.storage = media.NewSwitchableStorage(storage)
 	if s.pool != nil {
-		s.drive = media.NewDriveService(s.pool, storage)
+		s.drive = media.NewDriveService(s.pool, s.storage)
 		if s.accounts != nil {
 			s.accounts.AttachDrive(s.drive)
 		}
 	}
+	s.applyStoredStorage()
 }
 
 // AllowPrivateWebhookTargets disables the public-address validation of
@@ -286,11 +292,20 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("POST /api/admin/get-table-stats", s.handleAdminTableStats)
 	s.mux.HandleFunc("POST /api/admin/meta", s.handleAdminMeta)
 	s.mux.HandleFunc("POST /api/admin/object-storage", s.handleAdminObjectStorage)
+	s.mux.HandleFunc("POST /api/admin/object-storage/update", s.handleAdminObjectStorageUpdate)
+	s.mux.HandleFunc("POST /api/admin/email-settings", s.handleAdminEmailSettings)
+	s.mux.HandleFunc("POST /api/admin/email-settings/update", s.handleAdminEmailSettingsUpdate)
 	s.mux.HandleFunc("POST /api/admin/deliver-queue", s.handleAdminDeliverQueue)
 	s.mux.HandleFunc("POST /api/admin/update-meta", s.handleAdminUpdateMeta)
 	s.mux.HandleFunc("POST /api/admin/get-index-stats", s.handleAdminIndexStats)
 	s.mux.HandleFunc("POST /api/admin/suspend-user", s.handleAdminSuspendUser)
 	s.mux.HandleFunc("POST /api/admin/unsuspend-user", s.handleAdminUnsuspendUser)
+	// IP bans and the cross-account signin audit (Cinderfish extension,
+	// HANDOVER §12GV).
+	s.mux.HandleFunc("POST /api/admin/ip-bans/list", s.handleAdminIPBans)
+	s.mux.HandleFunc("POST /api/admin/ip-bans/create", s.handleAdminIPBansCreate)
+	s.mux.HandleFunc("POST /api/admin/ip-bans/delete", s.handleAdminIPBansDelete)
+	s.mux.HandleFunc("POST /api/admin/signin-history", s.handleAdminSigninHistory)
 	// Invitation code management: the create/list paths are Misskey's admin
 	// namespace; delete is registered under both the upstream user path
 	// (invite/delete) and the admin path, since every issuer here is an
@@ -474,6 +489,9 @@ const (
 	errIDInternal        = "5d37dbcb-891e-41ca-a3d6-e690c97775ac"
 	errIDNoSuchEndpoint  = "fc9c4a0b-f3a1-4b0e-9a8c-6f7f3d0f6a12"
 	errIDRegistrationOff = "4d371c9a-3a0f-4c8b-9b8e-2f9c0a1d3e45"
+	// Cinderfish extension ids, outside Misskey's table.
+	errIDIPBanned = "7a1e9c34-5b2d-4f6a-8c70-1d9b3e5f2a41"
+	errIDNotFound = "c1f6a9d2-3e4b-4c5d-9a78-2b3e4f5a6c7d"
 )
 
 // writeAPIError emits the Misskey error envelope.

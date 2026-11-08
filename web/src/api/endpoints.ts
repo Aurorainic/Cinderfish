@@ -33,6 +33,9 @@ import type {
 	IndexStat,
 	InstanceStats,
 	InviteCode,
+	IPBan,
+	AdminSigninEntry,
+	MailSettingsInfo,
 	MeDetailed,
 	MetaDetailed,
 	MetaLite,
@@ -206,6 +209,9 @@ export const ENDPOINTS = {
 	adminMeta: "admin/meta",
 	adminUpdateMeta: "admin/update-meta",
 	adminObjectStorage: "admin/object-storage",
+	adminObjectStorageUpdate: "admin/object-storage/update",
+	adminEmailSettings: "admin/email-settings",
+	adminEmailSettingsUpdate: "admin/email-settings/update",
 	adminDeliverQueue: "admin/deliver-queue",
 	adminTableStats: "admin/get-table-stats",
 	adminIndexStats: "admin/get-index-stats",
@@ -219,6 +225,10 @@ export const ENDPOINTS = {
 	adminInviteCreate: "admin/invite/create",
 	adminInviteList: "admin/invite/list",
 	adminInviteDelete: "admin/invite/delete",
+	adminIPBansList: "admin/ip-bans/list",
+	adminIPBansCreate: "admin/ip-bans/create",
+	adminIPBansDelete: "admin/ip-bans/delete",
+	adminSigninHistory: "admin/signin-history",
 
 	notifications: "notifications",
 	notificationsMarkAllAsRead: "notifications/mark-all-as-read",
@@ -907,6 +917,40 @@ export interface EndpointMap {
 		req: Record<string, never>;
 		res: ObjectStorageInfo;
 	};
+	[ENDPOINTS.adminEmailSettings]: {
+		req: Record<string, never>;
+		res: MailSettingsInfo;
+	};
+	[ENDPOINTS.adminEmailSettingsUpdate]: {
+		req: {
+			host?: string;
+			port?: number;
+			username?: string;
+			/** Empty keeps the stored password. */
+			password?: string;
+			from?: string;
+			tls?: "starttls" | "tls" | "none";
+		};
+		res: MailSettingsInfo;
+	};
+	[ENDPOINTS.adminObjectStorageUpdate]: {
+		req: {
+			backend: "local" | "s3";
+			localPath?: string;
+			s3?: {
+				endpoint: string;
+				bucket: string;
+				region?: string;
+				accessKey?: string;
+				/** Empty keeps the stored secret. */
+				secretKey?: string;
+				useSSL?: boolean;
+				publicBaseUrl?: string;
+				caCert?: string;
+			};
+		};
+		res: ObjectStorageInfo;
+	};
 	[ENDPOINTS.adminDeliverQueue]: {
 		req: Record<string, never>;
 		res: DeliverQueueInfo;
@@ -1169,6 +1213,23 @@ export interface EndpointMap {
 	[ENDPOINTS.adminInviteDelete]: {
 		req: { inviteId: string };
 		res: Record<string, never>;
+	};
+
+	[ENDPOINTS.adminIPBansList]: {
+		req: { limit?: number; offset?: number };
+		res: IPBan[];
+	};
+	[ENDPOINTS.adminIPBansCreate]: {
+		req: { ip: string; reason?: string; expiresAt?: string | null };
+		res: IPBan;
+	};
+	[ENDPOINTS.adminIPBansDelete]: {
+		req: { id: string };
+		res: Record<string, never>;
+	};
+	[ENDPOINTS.adminSigninHistory]: {
+		req: { limit?: number; offset?: number; userId?: string };
+		res: AdminSigninEntry[];
 	};
 }
 

@@ -5,6 +5,7 @@ package media
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 )
 
@@ -24,6 +25,24 @@ type Storage interface {
 
 // ErrNotFound is returned when a key does not exist.
 var ErrNotFound = errors.New("media: object not found")
+
+// BuildStorage constructs the backend named by the configuration values.
+// It is shared by the binary's startup path and the admin console's runtime
+// object-storage update, so both interpret the settings the same way. With
+// no public base URL the bucket is assumed private and URLs are presigned.
+func BuildStorage(backend, localPath string, s3 S3Options) (Storage, error) {
+	switch backend {
+	case "s3":
+		if s3.PublicBaseURL == "" {
+			s3.Presign = true
+		}
+		return NewS3Storage(s3)
+	case "", "local":
+		return NewLocalStorage(localPath, "/media")
+	default:
+		return nil, fmt.Errorf("media: unknown backend %q", backend)
+	}
+}
 
 // Errors and limits for drive/files/update.
 var (

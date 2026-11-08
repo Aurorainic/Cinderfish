@@ -7909,3 +7909,75 @@ CINDERFISH_TEST_DATABASE_URL=... CINDERFISH_TEST_REDIS_URL=... go test ./... -co
 - 远程文件缓存开关与媒体代理地址仍是常量/config 值，占位页如实标注。
 - 字数上限作用于新建、编辑与导入；历史笔记不回溯校验。
 
+## 12GV. IP 封禁与跨账号登录审计（Cinderfish 自有扩展，2026-11-08）
+
+先核对过上游：Misskey `c05e844`、Firefish `02c31e0` 与 Iceshrimp 的源码里都没有
+IP 封禁的 API 或数据表，所以这一项**不是移植**，是 Cinderfish 的扩展，接口形状由本实现
+定义（`admin/ip-bans/*`、`admin/signin-history`），不与上游「兼容性」混谈。
+
+- **schema v28**：`ip_bans (id, ip, reason, created_by_id, created_at, expires_at)`。
+- **account 层**：规则规范化（单地址取标准形式，网段取掩码后的 CIDR），按 `net.ParseCIDR`
+  在 Go 侧匹配（表小且由运维维护，避免 `inet` 类型迁移）；过期规则不生效但仍列出。
+  `AdminSigninHistory` 联表返回账号名，`userId` 可过滤。
+- **httpapi**：`admin/ip-bans/list|create|delete`（403/404 用自有错误 id
+  `IP_BANNED`/`NO_SUCH_IP_BAN`）；拦截点只有 **登录与注册**——浏览、媒体、联邦不受影响，
+  封主机属于联邦 host 策略。非管理员一律 403。
+- **审计补漏**：`handleSignin` 的「密码错误」分支此前不写 `signins`，只有成功登录与
+  TOTP 失败会记录；现在失败密码也会落一行（成功响应不变）。
+- **前端**：`AdminSecurity.vue` 新增「登录审计」与「IP 封禁」两区（真实数据、增删确认框），
+  页尾缺口清单收窄为「机器人防护」「重复失败后的自动封禁」。
+
+### 12GV.1 验证证据
+
+- `TestIPBans`（规范化、精确/CIDR 匹配、过期、删除、非法规则）、
+  `TestAdminSigninHistory`（成功/失败排序与账号名）、`TestIPBansAndSigninAudit`
+  （非管理员 403、封禁后 signin/signup 403 `IP_BANNED`、封禁地址仍可调管理 API、
+  解封恢复、失败密码进审计、未知 id 404）。
+- 真实二进制 + 浏览器：`/admin/security` 渲染审计列表（历史登录记录）、页面创建
+  `203.0.113.55` 规则显示「生效中/原因/创建者」，删除后空态；全量 `go test` 12 包绿，
+  `vue-tsc`/`vite build` 通过。
+
+### 12GV.2 边界
+
+- 不做「重复失败自动封禁」：需要判定窗口与运维确认策略，先手动。
+- 不按国家/ASN 封禁，也不拦截已登录会话（只在登录/注册入口生效）。
+
+## 12GW. 实例配置运行期化：对象存储与 SMTP（2026-11-08）
+
+按「实例配置不要被 config.toml/env 钉死」的要求，把媒体存储与邮件服务器改为管理台
+可改、保存即生效。存储位置是 `instance_meta`（键 `objectStorage`、`mailServer`），
+优先级为 **数据库覆盖 > config.toml > 环境变量默认值**；首次启动仍由 config.toml 播种。
+
+- **对象存储**：`/admin/object-storage` 从只读改为表单（本地路径 / S3 的 endpoint、
+  bucket、region、AK/SK、HTTPS、公开基础 URL、CA 证书）。后端新增
+  `media.SwitchableStorage`（读写锁包一层，驱动服务只持有这个 facade），保存时
+  `admin/object-storage/update` 构建新后端并热切换，下次启动由 `SetStorage` 读取
+  覆盖行。密钥只写不读（响应仅 `accessKeySet`/`secretKeySet`），留空表示保留；
+  **不自动迁移已有文件**（页面注明用 `cinderfish-media-migrate`），旧后端对象切换后
+  不可读属预期。`media.BuildStorage` 统一了启动与运行期的构建逻辑。
+- **SMTP**：`/admin/email-settings` 改为表单（host/port/username/password/from/TLS），
+  `mail.SwitchableSender` 热切换；密码只写不读、留空保留；host 为空仍是日志模式。
+  `admin/meta` 的 `emailServer` 改为返回运行期主机。
+- 前端：两页都加了「来源：config.toml / 管理台设置」状态与保存回执；`/admin/other-settings`
+  的已有项更新（对象存储不再标注只读）。
+
+### 12GW.1 验证证据
+
+- `TestSwitchableStorage`（切换后新写入落新后端、旧后端读不到、Backend 跟随）、
+  `TestAdminObjectStorage`/`TestAdminObjectStorageRuntime`（默认只读字段兼容、保存覆盖、
+  重读仍在、本地目录被创建、S3 校验、空密钥保留、密钥不回传）、
+  `TestAdminMailSettings`（默认未配置、保存、重读、空密码保留、端口/TLS 校验、
+  `admin/meta emailServer` 跟随、非管理员 403）。
+- 真实二进制 + 浏览器：对象存储页显示 `./data/files` 并保存成功（来源变为管理台设置），
+  随后经 API 上传文件落在 `data/files/a9/...`；邮件页保存 `smtp.example.com` 后状态
+  变「已配置」，再清空恢复日志模式。全量 `go test` 12 包绿，`vue-tsc`/`vite build` 通过。
+
+### 12GW.2 边界与安全说明
+
+- AK/SK 与 SMTP 密码以明文存于 `instance_meta`：数据库在此是信任边界（与 config.toml
+  同级），接口永不回传；如需更强保护应做字段级加密，未在本次范围。
+- S3 endpoint 是运维自填的后端地址（与 config.toml 同级信任），此处不套用面向用户输入
+  的「拒绝环回/私网」规则；自建 MinIO 常在本机或私网。
+- 没有「恢复为 config.toml」按钮：保存即钉住数据库值；要回到配置文件需删除该
+  `instance_meta` 行。后续可加一键重置。
+

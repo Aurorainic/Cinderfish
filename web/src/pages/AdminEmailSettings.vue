@@ -4,102 +4,116 @@
 		<template #header>
 			<MkPageHeader :display-back-button="true" />
 		</template>
-		<MkSpacer :content-max="900" :margin-min="16" :margin-max="32">
+		<MkSpacer :content-max="700" :margin-min="16" :margin-max="32">
 			<div v-if="!admin" class="cf-admin-email-settings">
 				<CfInfo warn>
-					需要管理员权限，无法查看邮件设置。
+					需要管理员权限，无法查看邮件配置。
 					<CfA to="/" class="_link">返回首页</CfA>
 				</CfInfo>
 			</div>
-
 			<div v-else class="cf-admin-email-settings">
 				<CfLoading v-if="loading" />
-				<CfInfo v-else-if="loadError != null" warn>
-					{{ loadError }}
-					<CfButton inline @click="load">{{ t("retry") }}</CfButton>
-				</CfInfo>
-
-				<template v-else>
+				<MkError v-else-if="loadError !== null" @retry="load" />
+				<form v-else class="_formRoot" @submit.prevent="save">
 					<section class="_formBlock">
 						<h2 class="sectionTitle">{{ t("emailServer") }}</h2>
-						<CfKeyValue>
-							<template #key>状态</template>
-							<template #value>
-								<span v-if="configured" class="badge on">已配置</span>
-								<span v-else class="badge">未配置</span>
-							</template>
-						</CfKeyValue>
-						<CfKeyValue>
-							<template #key>SMTP 主机</template>
-							<template #value>
-								<code class="_monospace">{{ host || "（未设置）" }}</code>
-							</template>
-						</CfKeyValue>
-						<CfInfo class="note">
-							<template v-if="configured">
-								验证、密码重置与通知邮件都会经由这台服务器发出。端口、账号、密码、
-								发件人与 TLS 模式都在实例的
-								<code>config.toml</code> 的 <code>[mail]</code> 段里，不在本页面编辑——
-								这些是启动配置，改完需要重启服务。
-							</template>
-							<template v-else>
-								没有配置 SMTP 主机，验证、密码重置与通知邮件不会真的投递，
-								而是整封写进服务日志（<code>[mail] host</code> 为空时的日志模式）。
-								要让邮件真正发出，请在 <code>config.toml</code> 的
-								<code>[mail]</code> 段填写 <code>host</code>、<code>from</code> 等字段后重启。
-							</template>
-						</CfInfo>
-					</section>
+						<p class="sectionNote">
+							当前状态：
+							<span v-if="configured" class="badge on">已配置</span>
+							<span v-else class="badge">未配置（邮件写入服务日志）</span>
+							<span class="source">
+								· 来源：{{ stored ? "管理台设置" : "config.toml" }}
+							</span>
+						</p>
 
-					<section class="_formBlock">
-						<h2 class="sectionTitle">可用的邮件流程</h2>
-						<ul class="flows">
-							<li>
-								<strong>邮箱验证</strong>：<code>i/update-email</code> 改地址后发送验证链接，
-								<code>verify-email</code> 核销；<code>i/email-verification</code> 可重发。
-							</li>
-							<li>
-								<strong>密码重置</strong>：<code>request-reset-password</code> 恒回 204，
-								<code>reset-password</code> 用链接里的 token 设置新密码。
-							</li>
-							<li>
-								<strong>通知邮件</strong>：用户可在「邮箱设置」页勾选提及、回复、关注、
-								关注请求四类（<code>i/update</code> 的 <code>emailNotificationTypes</code>），
-								事件发生时按用户的选择投递。
-							</li>
-						</ul>
-					</section>
+						<CfInput v-model="host" class="_formBlock" :disabled="saving">
+							<template #label>SMTP 主机</template>
+							<template #caption>留空表示不投递，邮件只写日志。</template>
+						</CfInput>
+						<CfInput v-model="port" class="_formBlock" type="number" :disabled="saving">
+							<template #label>端口</template>
+							<template #caption>默认 587；隐式 TLS 常用 465。</template>
+						</CfInput>
+						<CfInput v-model="username" class="_formBlock" :disabled="saving">
+							<template #label>用户名（可选）</template>
+						</CfInput>
+						<CfInput
+							v-model="password"
+							class="_formBlock"
+							type="password"
+							:disabled="saving"
+						>
+							<template #label>密码</template>
+							<template #caption>
+								{{ passwordSet ? "已配置；留空保留现有密码。密码不会回传。" : "尚未配置。" }}
+							</template>
+						</CfInput>
+						<CfInput v-model="from" class="_formBlock" :disabled="saving">
+							<template #label>发件人（可选）</template>
+							<template #caption>留空使用 no-reply@&lt;主机名&gt;。</template>
+						</CfInput>
+						<CfSelect v-model="tls" class="_formBlock" :disabled="saving">
+							<template #label>TLS 模式</template>
+							<option value="starttls">STARTTLS（默认，提交端口）</option>
+							<option value="tls">隐式 TLS（465）</option>
+							<option value="none">不加密（仅测试）</option>
+						</CfSelect>
 
-					<section class="_formBlock">
-						<h2 class="sectionTitle">环境变量</h2>
-						<CfInfo class="note">
-							这些值也可以用 <code>CINDERFISH_MAIL_HOST</code>、
-							<code>CINDERFISH_MAIL_PORT</code>、<code>CINDERFISH_MAIL_USERNAME</code>、
-							<code>CINDERFISH_MAIL_PASSWORD</code>、<code>CINDERFISH_MAIL_FROM</code>、
-							<code>CINDERFISH_MAIL_TLS</code> 覆盖配置文件。
+						<CfInfo v-if="formError !== null" warn class="_formBlock">
+							{{ formError }}
 						</CfInfo>
+						<CfInfo v-else-if="saved" class="_formBlock">
+							已保存并立即生效，新邮件会走这套设置。
+						</CfInfo>
+
+						<CfButton type="submit" primary :disabled="saving">
+							{{ saving ? "保存中…" : "保存" }}
+						</CfButton>
 					</section>
-				</template>
+				</form>
+
+				<section class="_formBlock">
+					<h2 class="sectionTitle">可用的邮件流程</h2>
+					<ul class="flows">
+						<li>
+							<strong>邮箱验证</strong>：<code>i/update-email</code> 改地址后发送验证链接，
+							<code>verify-email</code> 核销；<code>i/email-verification</code> 可重发。
+						</li>
+						<li>
+							<strong>密码重置</strong>：<code>request-reset-password</code> 恒回 204，
+							<code>reset-password</code> 用链接里的 token 设置新密码。
+						</li>
+						<li>
+							<strong>通知邮件</strong>：用户可在「邮箱设置」页勾选提及、回复、关注、
+							关注请求四类（<code>i/update</code> 的 <code>emailNotificationTypes</code>），
+							事件发生时按用户的选择投递。
+						</li>
+					</ul>
+					<CfInfo class="note">
+						这里保存的设置覆盖 <code>config.toml</code> 的 <code>[mail]</code> 段与对应的环境变量，无需重启；密码保存在实例数据库中，接口只返回「已配置」状态。
+					</CfInfo>
+				</section>
 			</div>
 		</MkSpacer>
 	</MkStickyContainer>
 </template>
 
 <script lang="ts" setup>
-// Firefish's admin/email-settings edits SMTP credentials at runtime. Cinderfish
-// reads them from config.toml at startup only, so this page reports the state
-// and explains where the settings live instead of rendering fields that would
-// silently do nothing. `admin/meta` exposes the host (public knowledge, it shows
-// up in every message's Received header) and nothing else.
+// Runtime SMTP configuration. The server wraps the sender in a
+// mail.SwitchableSender, so saving this form changes delivery immediately;
+// the persisted override lives in instance_meta and wins over config.toml
+// (and the CINDERFISH_MAIL_* environment variables) from the next start too.
 import { computed, onMounted, ref } from "vue";
 import { isAdmin } from "@/account";
 import { ApiError, api } from "@/api/client";
-import type { AdminInstanceMeta } from "@/api/types";
+import type { MailSettingsInfo } from "@/api/types";
 import CfA from "@/components/ui/CfA.vue";
 import CfButton from "@/components/ui/CfButton.vue";
 import CfInfo from "@/components/ui/CfInfo.vue";
-import CfKeyValue from "@/components/ui/CfKeyValue.vue";
+import CfInput from "@/components/ui/CfInput.vue";
 import CfLoading from "@/components/ui/CfLoading.vue";
+import CfSelect from "@/components/ui/CfSelect.vue";
+import MkError from "@/components/global/MkError.vue";
 import MkPageHeader from "@/components/global/MkPageHeader.vue";
 import MkSpacer from "@/components/global/MkSpacer.vue";
 import MkStickyContainer from "@/components/global/MkStickyContainer.vue";
@@ -111,13 +125,35 @@ defineOptions({ name: "CfPageAdminEmailSettings" });
 const admin = computed<boolean>(() => isAdmin());
 const loading = ref(false);
 const loadError = ref<string | null>(null);
-const host = ref("");
+const saving = ref(false);
+const saved = ref(false);
+const formError = ref<string | null>(null);
 
-const configured = computed(() => host.value !== "");
+const configured = ref(false);
+const stored = ref(false);
+const passwordSet = ref(false);
+const host = ref<string | number | null>("");
+const port = ref<string | number | null>(587);
+const username = ref<string | number | null>("");
+const password = ref("");
+const from = ref<string | number | null>("");
+const tls = ref<"starttls" | "tls" | "none">("starttls");
 
 function errorMessage(cause: unknown): string {
 	if (cause instanceof ApiError) return cause.message;
 	return String(cause);
+}
+
+function apply(info: MailSettingsInfo): void {
+	configured.value = info.configured;
+	stored.value = info.stored;
+	passwordSet.value = info.passwordSet;
+	host.value = info.host;
+	port.value = info.port;
+	username.value = info.username;
+	password.value = "";
+	from.value = info.from ?? "";
+	tls.value = info.tls;
 }
 
 async function load(): Promise<void> {
@@ -125,12 +161,40 @@ async function load(): Promise<void> {
 	loading.value = true;
 	loadError.value = null;
 	try {
-		const meta: AdminInstanceMeta = await api("admin/meta", {});
-		host.value = meta.emailServer ?? "";
+		apply(await api("admin/email-settings", {}));
 	} catch (cause) {
 		loadError.value = errorMessage(cause);
 	} finally {
 		loading.value = false;
+	}
+}
+
+async function save(): Promise<void> {
+	if (saving.value) return;
+	formError.value = null;
+	saved.value = false;
+	const portNumber = Number(port.value);
+	if (!Number.isInteger(portNumber) || portNumber < 1 || portNumber > 65535) {
+		formError.value = "端口必须是 1–65535 之间的整数。";
+		return;
+	}
+	saving.value = true;
+	try {
+		apply(
+			await api("admin/email-settings/update", {
+				host: String(host.value ?? "").trim(),
+				port: portNumber,
+				username: String(username.value ?? "").trim(),
+				password: password.value.trim(),
+				from: String(from.value ?? "").trim(),
+				tls: tls.value,
+			}),
+		);
+		saved.value = true;
+	} catch (cause) {
+		formError.value = errorMessage(cause);
+	} finally {
+		saving.value = false;
 	}
 }
 
@@ -156,22 +220,33 @@ definePageMetadata({ title: t("emailServer"), icon: "ph-envelope-simple ph-bold 
 		opacity: 1;
 	}
 
-	.note {
-		margin-top: 12px;
+	.source {
+		margin-inline-start: 6px;
+		font-size: 0.85em;
+		opacity: 0.65;
 	}
 
-	code {
-		font-family: monospace;
-		background: var(--bg);
-		padding: 1px 4px;
-		border-radius: 4px;
+	.sectionTitle {
+		margin: 0 0 8px;
+		font-size: 1.05em;
+	}
+
+	.sectionNote {
+		margin: 0 0 12px;
+		font-size: 0.9em;
 	}
 
 	.flows {
 		margin: 0;
-		padding-inline-start: 20px;
+		padding-inline-start: 1.4em;
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
 		font-size: 0.9em;
-		line-height: 1.8;
+	}
+
+	.note {
+		margin-top: 12px;
 	}
 }
 </style>

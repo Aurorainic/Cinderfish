@@ -119,7 +119,7 @@ func main() {
 	}
 
 	// Media storage: local filesystem or an S3 compatible object store.
-	storage, err := openStorage(ctx, cfg)
+	storage, err := openStorage(cfg)
 	if err != nil {
 		log.Fatalf("cinderfish: storage: %v", err)
 	}
@@ -182,24 +182,15 @@ func openRedis(ctx context.Context, cfg *config.Config) (*redis.Client, error) {
 }
 
 // openStorage builds the media backend named by the configuration.
-func openStorage(ctx context.Context, cfg *config.Config) (media.Storage, error) {
-	switch cfg.Media.Backend {
-	case "s3":
-		return media.NewS3Storage(media.S3Options{
-			Endpoint:      cfg.Media.S3.Endpoint,
-			Bucket:        cfg.Media.S3.Bucket,
-			Region:        cfg.Media.S3.Region,
-			AccessKey:     cfg.Media.S3.AccessKey,
-			SecretKey:     cfg.Media.S3.SecretKey,
-			UseSSL:        cfg.Media.S3.UseSSL,
-			PublicBaseURL: cfg.Media.S3.PublicBaseURL,
-			CACertPath:    cfg.Media.S3.CACert,
-			// With no public base URL the bucket is assumed private, so
-			// URLs are presigned; the config comment has promised that
-			// since the S3 backend landed.
-			Presign: cfg.Media.S3.PublicBaseURL == "",
-		})
-	default:
-		return media.NewLocalStorage(cfg.Media.LocalPath, "/media")
-	}
+func openStorage(cfg *config.Config) (media.Storage, error) {
+	return media.BuildStorage(cfg.Media.Backend, cfg.Media.LocalPath, media.S3Options{
+		Endpoint:      cfg.Media.S3.Endpoint,
+		Bucket:        cfg.Media.S3.Bucket,
+		Region:        cfg.Media.S3.Region,
+		AccessKey:     cfg.Media.S3.AccessKey,
+		SecretKey:     cfg.Media.S3.SecretKey,
+		UseSSL:        cfg.Media.S3.UseSSL,
+		PublicBaseURL: cfg.Media.S3.PublicBaseURL,
+		CACertPath:    cfg.Media.S3.CACert,
+	})
 }

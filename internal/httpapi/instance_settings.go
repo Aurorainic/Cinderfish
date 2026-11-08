@@ -295,6 +295,8 @@ func (s *Server) handleAdminMeta(w http.ResponseWriter, r *http.Request) {
 	if blocked == nil {
 		blocked = []string{}
 	}
+	mailSettings, _ := s.liveMailSettings(r.Context())
+	mailHost := mailSettings.Host
 	writeJSON(w, http.StatusOK, map[string]any{
 		"name":             settings.Name,
 		"description":      settings.Description,
@@ -319,8 +321,9 @@ func (s *Server) handleAdminMeta(w http.ResponseWriter, r *http.Request) {
 		"preservedUsernames": settings.PreservedUsernames,
 		"maxNoteTextLength":  s.liveMaxNoteTextLength(r.Context()),
 		// The admin console only needs to know whether mail is configured and
-		// which host it goes through; credentials stay in config.toml.
-		"emailServer": s.cfg.Mail.Host,
+		// which host it goes through; credentials stay in the database (or
+		// config.toml) and are edited on the email-settings page.
+		"emailServer": mailHost,
 	})
 }
 

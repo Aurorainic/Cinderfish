@@ -592,6 +592,25 @@ export interface InviteCode {
 	used: boolean;
 }
 
+/** One IP ban rule (Cinderfish extension; single address or CIDR). */
+export interface IPBan {
+	id: string;
+	ip: string;
+	reason: string;
+	createdAt: string;
+	expiresAt: string | null;
+	createdBy: { id: string; username: string } | null;
+}
+
+/** One entry of the cross-account signin audit. */
+export interface AdminSigninEntry {
+	id: string;
+	createdAt: string;
+	ip: string;
+	success: boolean;
+	user: { id: string; username: string };
+}
+
 /** One row of `admin/get-index-stats`. */
 export interface IndexStat {
 	schemaname: string;
@@ -707,13 +726,31 @@ export interface ObjectStorageInfo {
 	backend: string;
 	localPath: string | null;
 	s3: {
-		endpointHost: string;
+		endpoint: string;
 		bucket: string;
 		region: string;
 		useSSL: boolean;
 		publicBaseUrl: string | null;
+		caCert: string | null;
+		accessKeySet: boolean;
+		secretKeySet: boolean;
 		hasCredentials: boolean;
 	} | null;
+	/** True once the admin console saved a runtime override. */
+	stored: boolean;
+}
+
+/** Effective SMTP settings from `admin/email-settings` (password masked). */
+export interface MailSettingsInfo {
+	host: string;
+	port: number;
+	username: string;
+	passwordSet: boolean;
+	from: string | null;
+	tls: "starttls" | "tls" | "none";
+	configured: boolean;
+	/** True once the admin console saved a runtime override. */
+	stored: boolean;
 }
 
 export interface DeliverQueueEntry {

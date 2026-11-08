@@ -58,6 +58,11 @@ func (s *Server) handleSignup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// A banned source address cannot create accounts.
+	if s.rejectBannedIP(w, r) {
+		return
+	}
+
 	mode := s.registrationMode(r.Context())
 	user, token, err := s.accounts.Register(r.Context(), mode, body.Username, body.Password, body.InvitationCode)
 	if err != nil {
@@ -134,6 +139,10 @@ func (s *Server) handleSignin(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, err)
 		return
 	}
+	// A banned source address cannot even try to sign in.
+	if s.rejectBannedIP(w, r) {
+		return
+	}
 	if body.Username == "" {
 		writeIDError(w, http.StatusBadRequest, errIDNoSuchUser)
 		return
@@ -173,6 +182,11 @@ func (s *Server) handleSignin(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if errors.Is(err, account.ErrInvalidCredentials) {
+			// Record the failed attempt for the admin audit view; the
+			// account exists, only the password was wrong.
+			if existing, lookupErr := s.accounts.GetByUsername(r.Context(), body.Username); lookupErr == nil {
+				_ = s.accounts.RecordSignin(r.Context(), existing.ID, ip, false)
+			}
 			writeIDError(w, http.StatusForbidden, errIDInvalidPassword)
 			return
 		}

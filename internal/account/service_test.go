@@ -449,3 +449,103 @@ func TestSetAdminAndSuspend(t *testing.T) {
 		t.Errorf("SetAdmin on a missing user = %v, want ErrUserNotFound", err)
 	}
 }
+
+func TestIPBans(t *testing.T) {
+	pool := testPool(t)
+	svc := account.NewService(pool)
+	ctx := context.Background()
+
+	admin, _, err := svc.Register(ctx, account.RegistrationOpen, uniqueUsername(t)+"a", "password123", "")
+	if err != nil {
+		t.Fatalf("register admin: %v", err)
+	}
+
+	// A bare address is normalised and matches exactly.
+	ban, err := svc.CreateIPBan(ctx, " 192.0.2.7 ", "spam", nil, admin.ID)
+	if err != nil {
+		t.Fatalf("CreateIPBan: %v", err)
+	}
+	if ban.IP != "192.0.2.7" {
+		t.Errorf("normalised ip = %q, want 192.0.2.7", ban.IP)
+	}
+	if banned, err := svc.IsIPBanned(ctx, "192.0.2.7"); err != nil || !banned {
+		t.Errorf("exact match = %v %v, want banned", banned, err)
+	}
+	if banned, _ := svc.IsIPBanned(ctx, "192.0.2.8"); banned {
+		t.Error("a neighbouring address must not be banned")
+	}
+
+	// A CIDR rule covers its network only.
+	if _, err := svc.CreateIPBan(ctx, "198.51.100.0/24", "", nil, admin.ID); err != nil {
+		t.Fatalf("CreateIPBan CIDR: %v", err)
+	}
+	if banned, _ := svc.IsIPBanned(ctx, "198.51.100.23"); !banned {
+		t.Error("an address inside the CIDR must be banned")
+	}
+	if banned, _ := svc.IsIPBanned(ctx, "198.51.101.1"); banned {
+		t.Error("an address outside the CIDR must not be banned")
+	}
+
+	// An expired rule no longer applies, but stays listed.
+	past := time.Now().Add(-time.Minute)
+	if _, err := svc.CreateIPBan(ctx, "203.0.113.9", "", &past, admin.ID); err != nil {
+		t.Fatalf("CreateIPBan expired: %v", err)
+	}
+	if banned, _ := svc.IsIPBanned(ctx, "203.0.113.9"); banned {
+		t.Error("an expired rule must not ban")
+	}
+	list, err := svc.ListIPBans(ctx, 10, 0)
+	if err != nil {
+		t.Fatalf("ListIPBans: %v", err)
+	}
+	if len(list) != 3 {
+		t.Fatalf("bans = %d, want 3", len(list))
+	}
+
+	// Deletion works and a second delete reports the row gone.
+	if err := svc.DeleteIPBan(ctx, ban.ID); err != nil {
+		t.Fatalf("DeleteIPBan: %v", err)
+	}
+	if err := svc.DeleteIPBan(ctx, ban.ID); err != account.ErrIPBanNotFound {
+		t.Errorf("second delete = %v, want ErrIPBanNotFound", err)
+	}
+
+	// Invalid rules are refused.
+	for _, rule := range []string{"", "not-an-ip", "300.1.1.1", "10.0.0.0/33"} {
+		if _, err := svc.CreateIPBan(ctx, rule, "", nil, admin.ID); err == nil {
+			t.Errorf("rule %q must be refused", rule)
+		}
+	}
+}
+
+func TestAdminSigninHistory(t *testing.T) {
+	pool := testPool(t)
+	svc := account.NewService(pool)
+	ctx := context.Background()
+
+	user, _, err := svc.Register(ctx, account.RegistrationOpen, uniqueUsername(t)+"s", "password123", "")
+	if err != nil {
+		t.Fatalf("register: %v", err)
+	}
+	if err := svc.RecordSignin(ctx, user.ID, "192.0.2.10", true); err != nil {
+		t.Fatalf("record ok: %v", err)
+	}
+	if err := svc.RecordSignin(ctx, user.ID, "192.0.2.10", false); err != nil {
+		t.Fatalf("record fail: %v", err)
+	}
+
+	records, err := svc.AdminSigninHistory(ctx, user.ID, 10, 0)
+	if err != nil {
+		t.Fatalf("AdminSigninHistory: %v", err)
+	}
+	if len(records) != 2 {
+		t.Fatalf("records = %d, want 2", len(records))
+	}
+	// Newest first; the failed attempt was recorded last.
+	if records[0].Success {
+		t.Error("newest record should be the failed attempt")
+	}
+	if records[0].Username != user.Username || records[0].IP != "192.0.2.10" {
+		t.Errorf("record = %+v, want user %s from 192.0.2.10", records[0], user.Username)
+	}
+}

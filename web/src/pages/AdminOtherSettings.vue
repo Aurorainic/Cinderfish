@@ -47,7 +47,8 @@ const state = {
 	available: [
 		{ label: "实例设置", note: "名称、描述、注册模式、保留用户名、笔记字数上限、合规链接、隐藏标签、主题色、实例图标与横幅", to: "/admin/settings" },
 		{ label: "实例 CSS", note: "全站样式，保存在 instance_meta", to: "/admin/custom-css" },
-		{ label: "对象存储", note: "当前后端与配置状态（只读）", to: "/admin/object-storage" },
+		{ label: "对象存储", note: "本地路径或 S3 配置，可运行期修改并立即生效", to: "/admin/object-storage" },
+		{ label: "安全设置", note: "邀请码、IP 封禁与登录审计", to: "/admin/security" },
 	],
 	missing: ["远程文件缓存开关（恒为 true）", "媒体代理地址"],
 };
