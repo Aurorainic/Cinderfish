@@ -79,40 +79,45 @@
 		</template>
 
 		<div class="pickerPrefs _formBlock">
-			<label class="pref">
-				<span>默认肤色</span>
-				<select
-					:value="reactionPickerSkinTone"
-					@change="setPicker('reactionPickerSkinTone', $event)"
-				>
-					<option v-for="(label, index) in skinToneLabels" :key="label" :value="index + 1">
-						{{ label }}
-					</option>
-				</select>
-			</label>
-			<label class="pref">
-				<span>表情尺寸</span>
-				<select :value="reactionPickerSize" @change="setPicker('reactionPickerSize', $event)">
-					<option :value="1">小</option>
-					<option :value="2">中</option>
-					<option :value="3">大</option>
-				</select>
-			</label>
-			<label class="pref">
-				<span>每行列数</span>
-				<select :value="reactionPickerWidth" @change="setPicker('reactionPickerWidth', $event)">
-					<option v-for="n in 5" :key="n" :value="n">{{ n + 4 }}</option>
-				</select>
-			</label>
-			<label class="pref">
-				<span>可见行数</span>
-				<select :value="reactionPickerHeight" @change="setPicker('reactionPickerHeight', $event)">
-					<option :value="1">4</option>
-					<option :value="2">6</option>
-					<option :value="3">8</option>
-					<option :value="4">10</option>
-				</select>
-			</label>
+			<CfSelect
+				:model-value="String(reactionPickerSkinTone)"
+				small
+				@update:model-value="(v) => setPickerNum('reactionPickerSkinTone', v)"
+			>
+				<template #label>默认肤色</template>
+				<option v-for="(label, index) in skinToneLabels" :key="label" :value="String(index + 1)">
+					{{ label }}
+				</option>
+			</CfSelect>
+			<CfSelect
+				:model-value="String(reactionPickerSize)"
+				small
+				@update:model-value="(v) => setPickerNum('reactionPickerSize', v)"
+			>
+				<template #label>表情尺寸</template>
+				<option value="1">小</option>
+				<option value="2">中</option>
+				<option value="3">大</option>
+			</CfSelect>
+			<CfSelect
+				:model-value="String(reactionPickerWidth)"
+				small
+				@update:model-value="(v) => setPickerNum('reactionPickerWidth', v)"
+			>
+				<template #label>每行列数</template>
+				<option v-for="n in 5" :key="n" :value="String(n)">{{ n + 4 }}</option>
+			</CfSelect>
+			<CfSelect
+				:model-value="String(reactionPickerHeight)"
+				small
+				@update:model-value="(v) => setPickerNum('reactionPickerHeight', v)"
+			>
+				<template #label>可见行数</template>
+				<option value="1">4</option>
+				<option value="2">6</option>
+				<option value="3">8</option>
+				<option value="4">10</option>
+			</CfSelect>
 		</div>
 
 		<CfInfo class="note">
@@ -137,6 +142,7 @@ import { computed } from "vue";
 import MkEmojiPickerDialog from "@/components/MkEmojiPickerDialog.vue";
 import CfButton from "@/components/ui/CfButton.vue";
 import CfInfo from "@/components/ui/CfInfo.vue";
+import CfSelect from "@/components/ui/CfSelect.vue";
 import CfSwitch from "@/components/ui/CfSwitch.vue";
 import { t } from "@/i18n";
 import { confirm, popup, popupMenu, type MenuItem } from "@/os";
@@ -147,6 +153,10 @@ const reactionPickerSkinTone = defaultStore.reactiveState.reactionPickerSkinTone
 const reactionPickerSize = defaultStore.reactiveState.reactionPickerSize;
 const reactionPickerWidth = defaultStore.reactiveState.reactionPickerWidth;
 const reactionPickerHeight = defaultStore.reactiveState.reactionPickerHeight;
+
+function setPickerNum(key: "reactionPickerSkinTone" | "reactionPickerSize" | "reactionPickerWidth" | "reactionPickerHeight", v: string | null): void {
+	if (v != null) defaultStore.set(key, Number(v));
+}
 
 defineOptions({ name: "CfPageSettingsReaction" });
 
@@ -303,17 +313,6 @@ const skinToneLabels = [
 	t("_skinTones.dark"),
 ];
 
-type PickerKey =
-	| "reactionPickerSkinTone"
-	| "reactionPickerSize"
-	| "reactionPickerWidth"
-	| "reactionPickerHeight";
-
-function setPicker(key: PickerKey, event: Event): void {
-	const value = Number((event.target as HTMLSelectElement).value);
-	defaultStore.set(key, value);
-}
-
 definePageMetadata({ title: t("reaction"), icon: "ph-smiley ph-bold ph-lg" });
 </script>
 
@@ -385,22 +384,6 @@ definePageMetadata({ title: t("reaction"), icon: "ph-smiley ph-bold ph-lg" });
 		flex-wrap: wrap;
 		gap: 12px;
 		margin-block-start: 12px;
-
-		> .pref {
-			display: flex;
-			flex-direction: column;
-			gap: 4px;
-			font-size: 0.85em;
-			opacity: 0.85;
-
-			> select {
-				padding: 4px 8px;
-				border-radius: 6px;
-				border: solid 0.5px var(--divider);
-				background: var(--panel);
-				color: var(--fg);
-			}
-		}
 	}
 
 	.note {

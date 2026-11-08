@@ -36,10 +36,11 @@
 			<ul class="sounds">
 				<li v-for="key in soundKeys" :key="key.key" class="sound">
 					<span class="soundName">{{ t(`_sfx.${key.sfx}`) }}</span>
-					<select
+					<CfSelect
 						class="soundType"
-						:value="key.value.type"
-						@change="onTypeChange(key, $event)"
+						:model-value="key.value.type"
+						small
+						@update:model-value="(v) => v && onTypeChange(key, v)"
 					>
 						<option value="none">{{ t("none") }}</option>
 						<option
@@ -47,7 +48,7 @@
 							:key="file"
 							:value="file"
 						>{{ file }}</option>
-					</select>
+					</CfSelect>
 					<CfButton inline :disabled="key.value.type === 'none'" @click="preview(key)">
 						<i class="ph-play ph-bold"></i>
 					</CfButton>
@@ -89,6 +90,7 @@
 import { computed, onMounted, reactive, ref, watch } from "vue";
 import CfButton from "@/components/ui/CfButton.vue";
 import CfInfo from "@/components/ui/CfInfo.vue";
+import CfSelect from "@/components/ui/CfSelect.vue";
 import { t } from "@/i18n";
 import { apiGet } from "@/api/client";
 import { definePageMetadata } from "@/scripts/page-metadata";
@@ -165,8 +167,7 @@ onMounted(() => {
 		});
 });
 
-function onTypeChange(row: SoundRow, event: Event): void {
-	const type = (event.target as HTMLSelectElement).value;
+function onTypeChange(row: SoundRow, type: string): void {
 	row.value.type = type;
 	saveSound(row.storeKey, row.value);
 	if (type !== "none") playFile(type, row.value.volume);

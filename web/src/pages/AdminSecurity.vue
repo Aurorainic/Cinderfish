@@ -78,12 +78,12 @@
 					</div>
 
 					<div class="filterRow">
-						<select v-model="filterType" class="nativeSelect" :disabled="loading">
+						<CfSelect v-model="filterType" small :disabled="loading">
 							<option value="all">全部</option>
 							<option value="unused">未使用</option>
 							<option value="used">已使用</option>
 							<option value="expired">已过期</option>
-						</select>
+						</CfSelect>
 						<CfButton mini :disabled="loading" @click="load()">刷新</CfButton>
 					</div>
 
@@ -278,12 +278,12 @@
 					<form class="createCard" @submit.prevent="saveCaptcha">
 						<label class="countField">
 							<span class="label">服务商</span>
-							<select v-model="captchaFormProvider" class="nativeSelect" :disabled="captchaSaving">
+							<CfSelect v-model="captchaFormProvider" :disabled="captchaSaving">
 								<option value="none">不启用</option>
 								<option value="hcaptcha">hCaptcha</option>
 								<option value="recaptcha">reCAPTCHA</option>
 								<option value="turnstile">Cloudflare Turnstile</option>
-							</select>
+							</CfSelect>
 							<span class="caption">
 								当前状态：{{ captchaStatusText }}
 							</span>
@@ -392,6 +392,7 @@ import CfA from "@/components/ui/CfA.vue";
 import CfButton from "@/components/ui/CfButton.vue";
 import CfInfo from "@/components/ui/CfInfo.vue";
 import CfLoading from "@/components/ui/CfLoading.vue";
+import CfSelect from "@/components/ui/CfSelect.vue";
 import CfSwitch from "@/components/ui/CfSwitch.vue";
 import { confirm } from "@/os";
 import { copyToClipboard } from "@/scripts/copy-to-clipboard";
@@ -996,15 +997,6 @@ definePageMetadata({ title: "安全设置", icon: "ph-shield-check ph-bold ph-lg
 	margin-bottom: 12px;
 }
 
-.nativeSelect {
-	padding: 7px 10px;
-	border: 1px solid var(--divider);
-	border-radius: 6px;
-	background: var(--bg);
-	color: var(--fg);
-	font: inherit;
-	max-width: 100%;
-}
 
 .list {
 	list-style: none;
