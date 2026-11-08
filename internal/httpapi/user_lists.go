@@ -15,31 +15,31 @@ import (
 // logical error often carries a different id per endpoint upstream, so the
 // ids travel with the handler through userListErrorIDs.
 const (
-	errIDTooManyListsCreate      = "0cf21a28-7715-4f39-a20d-777bfdb8d138"
-	errIDTooManyListsCopy        = "e9c105b2-c595-47de-97fb-7f7c2c33e92f"
-	errIDNoSuchListCopy          = "9292f798-6175-4f7d-93f4-b6742279667d"
-	errIDYouHaveBeenBlockedCopy  = "a2497f2a-2389-439c-8626-5298540530f4"
-	errIDTooManyUsersCopy        = "1845ea77-38d1-426e-8e4e-8b83b24f5bd7"
-	errIDNoSuchListDelete        = "78436795-db79-42f5-b1e2-55ea2cf19166"
-	errIDNoSuchUserListFavorite  = "7dbaf3cf-7b42-4b8f-b431-b3919e580dbe"
-	errIDAlreadyFavorited        = "6425bba0-985b-461e-af1b-518070e72081"
-	errIDNoSuchUserListUnfav     = "baedb33e-76b8-4b0c-86a8-9375c0a7b94b"
+	errIDTooManyListsCreate     = "0cf21a28-7715-4f39-a20d-777bfdb8d138"
+	errIDTooManyListsCopy       = "e9c105b2-c595-47de-97fb-7f7c2c33e92f"
+	errIDNoSuchListCopy         = "9292f798-6175-4f7d-93f4-b6742279667d"
+	errIDYouHaveBeenBlockedCopy = "a2497f2a-2389-439c-8626-5298540530f4"
+	errIDTooManyUsersCopy       = "1845ea77-38d1-426e-8e4e-8b83b24f5bd7"
+	errIDNoSuchListDelete       = "78436795-db79-42f5-b1e2-55ea2cf19166"
+	errIDNoSuchUserListFavorite = "7dbaf3cf-7b42-4b8f-b431-b3919e580dbe"
+	errIDAlreadyFavorited       = "6425bba0-985b-461e-af1b-518070e72081"
+	errIDNoSuchUserListUnfav    = "baedb33e-76b8-4b0c-86a8-9375c0a7b94b"
 	// Upstream unfavourite reuses the ALREADY_FAVORITED code for "you have
 	// not favourited it" — a typo clients may match on, so it is kept.
-	errIDAlreadyFavoritedUnfav   = "835c4b27-463d-4cfa-969b-a9058678d465"
-	errIDNoSuchListMemberships   = "7bc05c21-1d7a-41ae-88f1-66820f4dc686"
-	errIDNoSuchUserListsList     = "a8af4a82-0980-4cc4-a6af-8b0ffd54465e"
-	errIDRemoteUserNotAllowed    = "53858f1b-3315-4a01-81b7-db9b48d4b79a"
-	errIDNoSuchListPull          = "7f44670e-ab16-43b8-b4c1-ccd2ee89cc02"
-	errIDNoSuchUserPull          = "588e7f72-c744-4a61-b180-d354e912bda2"
-	errIDNoSuchListPush          = "2214501d-ac96-4049-b717-91e42272a711"
-	errIDNoSuchUserPush          = "a89abd3d-f0bc-4cce-beb1-2f446f4f1e6a"
-	errIDAlreadyAddedPush        = "1de7c884-1595-49e9-857e-61f12f4d4fc5"
-	errIDYouHaveBeenBlockedPush  = "990232c5-3f9d-4d83-9f3f-ef27b6332a4b"
-	errIDTooManyUsersPush        = "2dd9752e-a338-413d-8eec-41814430989b"
-	errIDNoSuchListUpdate        = "796666fe-3dff-4d39-becb-8a5932c1d5b7"
-	errIDYourAccountMoved        = "56f20ec9-fd06-4fa5-841b-edd6d7d4fa31"
-	errIDNoSuchListListTimeline  = "8fb1fbd5-e476-4c37-9fb0-43d55b63a2ff"
+	errIDAlreadyFavoritedUnfav  = "835c4b27-463d-4cfa-969b-a9058678d465"
+	errIDNoSuchListMemberships  = "7bc05c21-1d7a-41ae-88f1-66820f4dc686"
+	errIDNoSuchUserListsList    = "a8af4a82-0980-4cc4-a6af-8b0ffd54465e"
+	errIDRemoteUserNotAllowed   = "53858f1b-3315-4a01-81b7-db9b48d4b79a"
+	errIDNoSuchListPull         = "7f44670e-ab16-43b8-b4c1-ccd2ee89cc02"
+	errIDNoSuchUserPull         = "588e7f72-c744-4a61-b180-d354e912bda2"
+	errIDNoSuchListPush         = "2214501d-ac96-4049-b717-91e42272a711"
+	errIDNoSuchUserPush         = "a89abd3d-f0bc-4cce-beb1-2f446f4f1e6a"
+	errIDAlreadyAddedPush       = "1de7c884-1595-49e9-857e-61f12f4d4fc5"
+	errIDYouHaveBeenBlockedPush = "990232c5-3f9d-4d83-9f3f-ef27b6332a4b"
+	errIDTooManyUsersPush       = "2dd9752e-a338-413d-8eec-41814430989b"
+	errIDNoSuchListUpdate       = "796666fe-3dff-4d39-becb-8a5932c1d5b7"
+	errIDYourAccountMoved       = "56f20ec9-fd06-4fa5-841b-edd6d7d4fa31"
+	errIDNoSuchListListTimeline = "8fb1fbd5-e476-4c37-9fb0-43d55b63a2ff"
 )
 
 // limitListsPush is Misskey's push rate cap (30 per hour).
@@ -489,9 +489,9 @@ func (s *Server) handleUserListsShow(w http.ResponseWriter, r *http.Request) {
 // handleUserListsUpdate implements POST /api/users/lists/update.
 func (s *Server) handleUserListsUpdate(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		ListID    string `json:"listId"`
-		Name      *string `json:"name"`
-		IsPublic  *bool   `json:"isPublic"`
+		ListID   string  `json:"listId"`
+		Name     *string `json:"name"`
+		IsPublic *bool   `json:"isPublic"`
 	}
 	if err := decodeOptionalJSON(r, &body); err != nil {
 		writeAPIError(w, err)
@@ -694,14 +694,14 @@ func (s *Server) handleUserListTimeline(w http.ResponseWriter, r *http.Request) 
 	}
 
 	params := note.TimelineParams{
-		Kind:        note.TimelineList,
-		ListID:      body.ListID,
-		ViewerID:    info.User.ID,
-		Limit:       body.Limit,
-		SinceID:     body.SinceID,
-		UntilID:     body.UntilID,
-		WithFiles:   body.WithFiles,
-		WithRenotes: true,
+		Kind:                  note.TimelineList,
+		ListID:                body.ListID,
+		ViewerID:              info.User.ID,
+		Limit:                 body.Limit,
+		SinceID:               body.SinceID,
+		UntilID:               body.UntilID,
+		WithFiles:             body.WithFiles,
+		WithRenotes:           true,
 		IncludeMyRenotes:      true,
 		IncludeRenotedMyNotes: true,
 		IncludeLocalRenotes:   true,

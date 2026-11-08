@@ -143,7 +143,6 @@ func TestUserListCRUDAndTimeline(t *testing.T) {
 	}
 }
 
-
 // errCode digs the Misskey error code out of the envelope.
 func errCode(out map[string]any) any {
 	if e, ok := out["error"].(map[string]any); ok {
@@ -151,7 +150,6 @@ func errCode(out map[string]any) any {
 	}
 	return nil
 }
-
 
 // postNoContent posts a body with a bearer token and requires 204.
 func postNoContentToken(t *testing.T, ts *httptest.Server, path, token string, body any) int {

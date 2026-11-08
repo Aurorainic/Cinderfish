@@ -194,9 +194,9 @@ func (s *Service) queryClips(ctx context.Context, sql string, args ...any) ([]*C
 
 // ClipQuery pages a list request by clip id.
 type ClipQuery struct {
-	Limit   int
-	SinceID string
-	UntilID string
+	Limit     int
+	SinceID   string
+	UntilID   string
 	SinceDate *time.Time
 	UntilDate *time.Time
 }

@@ -16,24 +16,24 @@ import (
 // error often carries a different id per endpoint upstream, so ids travel
 // with the handler through clipErrorIDs.
 const (
-	errIDTooManyClips          = "920f7c2d-6208-4b76-8082-e632020f5883"
-	errIDNoSuchClipUpdate      = "b4d92d70-b216-46fa-9a3f-a8c811699257"
-	errIDNoSuchClipDelete      = "70ca08ba-6865-4630-b6fb-8494759aa754"
-	errIDNoSuchClipShow        = "c3c5fe33-d62c-44d2-9ea5-d997703f5c20"
-	errIDNoSuchClipFavorite    = "4c2aaeae-80d8-4250-9606-26cb1fdb77a5"
-	errIDClipAlreadyFavorited  = "92658936-c625-4273-8326-2d790129256e"
-	errIDNoSuchClipUnfavorite  = "2603966e-b865-426c-94a7-af4a01241dc1"
-	errIDClipNotFavorited      = "90c3a9e8-b321-4dae-bf57-2bf79bbcc187"
-	errIDNoSuchClipAddNote     = "d6e76cc0-a1b5-4c7c-a287-73fa9c716dcf"
-	errIDNoSuchClipNoteAdd     = "fc8c0b49-c7a3-4664-a0a6-b418d386bb8b"
+	errIDTooManyClips         = "920f7c2d-6208-4b76-8082-e632020f5883"
+	errIDNoSuchClipUpdate     = "b4d92d70-b216-46fa-9a3f-a8c811699257"
+	errIDNoSuchClipDelete     = "70ca08ba-6865-4630-b6fb-8494759aa754"
+	errIDNoSuchClipShow       = "c3c5fe33-d62c-44d2-9ea5-d997703f5c20"
+	errIDNoSuchClipFavorite   = "4c2aaeae-80d8-4250-9606-26cb1fdb77a5"
+	errIDClipAlreadyFavorited = "92658936-c625-4273-8326-2d790129256e"
+	errIDNoSuchClipUnfavorite = "2603966e-b865-426c-94a7-af4a01241dc1"
+	errIDClipNotFavorited     = "90c3a9e8-b321-4dae-bf57-2bf79bbcc187"
+	errIDNoSuchClipAddNote    = "d6e76cc0-a1b5-4c7c-a287-73fa9c716dcf"
+	errIDNoSuchClipNoteAdd    = "fc8c0b49-c7a3-4664-a0a6-b418d386bb8b"
 	// Load-bearing id: Firefish's note menu matches it verbatim to offer
 	// the "already clipped, unclip instead" confirmation.
-	errIDAlreadyClipped        = "734806c4-542c-463a-9311-15c512803965"
-	errIDTooManyClipNotes      = "f0dba960-ff73-4615-8df4-d6ac5d9dc118"
-	errIDNoSuchClipRemoveNote  = "b80525c6-97f7-49d7-a42d-ebccd49cfd52"
-	errIDNoSuchClipNoteRemove  = "aff017de-190e-434b-893e-33a9ff5049d8"
-	errIDNoSuchClipNotes       = "1d7645e6-2b6d-4635-b0fe-fe22b0e72e00"
-	errIDNoSuchNoteNotesClips  = "47db1a1c-b0af-458d-8fb4-986e4efafe1e"
+	errIDAlreadyClipped       = "734806c4-542c-463a-9311-15c512803965"
+	errIDTooManyClipNotes     = "f0dba960-ff73-4615-8df4-d6ac5d9dc118"
+	errIDNoSuchClipRemoveNote = "b80525c6-97f7-49d7-a42d-ebccd49cfd52"
+	errIDNoSuchClipNoteRemove = "aff017de-190e-434b-893e-33a9ff5049d8"
+	errIDNoSuchClipNotes      = "1d7645e6-2b6d-4635-b0fe-fe22b0e72e00"
+	errIDNoSuchNoteNotesClips = "47db1a1c-b0af-458d-8fb4-986e4efafe1e"
 )
 
 // limitClipsAddNote is Misskey's add-note rate cap (20 per hour).
@@ -531,12 +531,12 @@ func (s *Server) handleClipsNotes(w http.ResponseWriter, r *http.Request) {
 // clips of the target account, with no user-existence check, as upstream.
 func (s *Server) handleUsersClips(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		UserID    string  `json:"userId"`
-		Limit     int     `json:"limit"`
-		SinceID   string  `json:"sinceId"`
-		UntilID   string  `json:"untilId"`
-		SinceDate *int64  `json:"sinceDate"`
-		UntilDate *int64  `json:"untilDate"`
+		UserID    string `json:"userId"`
+		Limit     int    `json:"limit"`
+		SinceID   string `json:"sinceId"`
+		UntilID   string `json:"untilId"`
+		SinceDate *int64 `json:"sinceDate"`
+		UntilDate *int64 `json:"untilDate"`
 	}
 	if err := decodeOptionalJSON(r, &body); err != nil {
 		writeAPIError(w, err)
