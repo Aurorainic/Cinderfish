@@ -4,6 +4,7 @@
 		<div class="label"><slot name="label"></slot></div>
 		<div
 			ref="triggerEl"
+			v-adaptive-border
 			class="input"
 			:class="{ inline, disabled, focused: isOpen }"
 			role="combobox"
@@ -240,6 +241,9 @@ onBeforeUnmount(() => {
 		display: flex;
 		align-items: center;
 		border: solid 1px var(--inputBorder);
+		// `v-adaptive-border` picks a visible edge on flush surfaces and the
+		// field's own fill on contrasting ones; the token is the fallback.
+		border-color: var(--cf-adaptive-border-color, var(--inputBorder));
 		border-radius: 6px;
 		background: var(--bg);
 		cursor: pointer;

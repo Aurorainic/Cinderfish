@@ -2,7 +2,7 @@
 	<div class="matxzzsk">
 		<label>
 			<div class="label"><slot name="label"></slot></div>
-			<div class="input" :class="{ inline, disabled, focused }">
+			<div v-adaptive-border class="input" :class="{ inline, disabled, focused }">
 				<div ref="prefixEl" class="prefix"><slot name="prefix"></slot></div>
 				<input
 					ref="inputEl"
@@ -200,6 +200,9 @@ defineExpose({ focus, selectRange });
 		display: flex;
 		align-items: center;
 		border: solid 1px var(--inputBorder);
+		// `v-adaptive-border` picks a visible edge on flush surfaces and the
+		// field's own fill on contrasting ones; the token is the fallback.
+		border-color: var(--cf-adaptive-border-color, var(--inputBorder));
 		border-radius: 6px;
 		background: var(--bg);
 		transition: border-color 0.2s;

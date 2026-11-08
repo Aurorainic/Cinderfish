@@ -4,6 +4,7 @@
 // components use. Further directives can be added to this switch when the
 // component that needs them is ported.
 import type { App } from "vue";
+import adaptiveBorder from "./adaptive-border";
 import appear from "./appear";
 import hotkey from "./hotkey";
 import size from "./size";
@@ -11,6 +12,7 @@ import tooltip from "./tooltip";
 import userPreview from "./user-preview";
 
 export function install(app: App): void {
+	app.directive("adaptive-border", adaptiveBorder);
 	app.directive("appear", appear);
 	app.directive("size", size);
 	app.directive("tooltip", tooltip);
