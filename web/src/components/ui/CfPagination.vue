@@ -1,45 +1,54 @@
 <template>
 	<div class="cxiknjgy">
-		<CfLoading v-if="fetching && items.length === 0" />
+		<Transition
+			:enter-active-class="animation ? 'fade-enter-active' : ''"
+			:leave-active-class="animation ? 'fade-leave-active' : ''"
+			:enter-from-class="animation ? 'fade-enter-from' : ''"
+			:leave-to-class="animation ? 'fade-leave-to' : ''"
+			:mode="animation ? 'out-in' : undefined"
+		>
+			<CfLoading v-if="fetching && items.length === 0" />
 
-		<div v-else-if="error != null && items.length === 0" class="error _fullinfo">
-			<div>{{ t("somethingHappened") }}</div>
-			<CfButton primary class="retry" @click="reload">{{ t("retry") }}</CfButton>
-		</div>
+			<div v-else-if="error != null && items.length === 0" key="error" class="error _fullinfo">
+				<div>{{ errorMessage }}</div>
+				<CfButton primary class="retry" @click="reload">{{ t("retry") }}</CfButton>
+			</div>
 
-		<div v-else-if="empty" class="empty">
-			<slot name="empty">
-				<div class="_fullinfo">
-					<div>{{ t("nothing") }}</div>
+			<div v-else-if="empty" key="empty" class="empty">
+				<slot name="empty">
+					<div class="_fullinfo">
+						<div>{{ t("nothing") }}</div>
+					</div>
+				</slot>
+			</div>
+
+			<div v-else key="list" class="list">
+				<div v-if="reversed && hasMore" class="more">
+					<CfButton v-if="!moreFetching" primary @click="loadMore">
+						{{ t("loadMore") }}
+					</CfButton>
+					<CfLoading v-else mini />
 				</div>
-			</slot>
-		</div>
 
-		<div v-else class="list">
-			<div v-if="reversed && hasMore" class="more">
-				<CfButton v-if="!moreFetching" primary @click="loadMore">
-					{{ t("loadMore") }}
-				</CfButton>
-				<CfLoading v-else mini />
+				<slot :items="items"></slot>
+
+				<div v-if="!reversed && hasMore" ref="sentinelEl" class="more">
+					<CfButton v-if="!moreFetching" primary @click="loadMore">
+						{{ t("loadMore") }}
+					</CfButton>
+					<CfLoading v-else mini />
+				</div>
 			</div>
-
-			<slot :items="items"></slot>
-
-			<div v-if="!reversed && hasMore" ref="sentinelEl" class="more">
-				<CfButton v-if="!moreFetching" primary @click="loadMore">
-					{{ t("loadMore") }}
-				</CfButton>
-				<CfLoading v-else mini />
-			</div>
-		</div>
+		</Transition>
 	</div>
 </template>
 
 <script setup lang="ts" generic="T extends { id: string }">
-import { onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import CfButton from "./CfButton.vue";
 import CfLoading from "./CfLoading.vue";
 import { t } from "../../i18n";
+import { isApiError } from "../../api/errors";
 import { usePagination } from "../../composables/use-pagination";
 import { defaultStore } from "../../store/store";
 import type { Paging } from "./pagination";
@@ -81,6 +90,20 @@ const {
 	reversed: props.pagination.reversed,
 });
 
+
+// The loading/error/empty/list branches fade through `<Transition>`. The
+// user's animation preference (device-scoped) disables both the fade and its
+// out-in mode, matching how the rest of the client gates motion.
+const animation = computed(() => defaultStore.reactiveState.animation.value);
+
+// `usePagination` keeps the raw rejection around. `fetchPage` throws `ApiError`,
+// which carries the backend's `{ message }`; fall back to the generic string
+// when the cause is not a structured error (or has no message).
+const errorMessage = computed(() =>
+	isApiError(error.value) && error.value.message !== ""
+		? error.value.message
+		: t("somethingHappened"),
+);
 
 const sentinelEl = ref<HTMLElement | null>(null);
 let observer: IntersectionObserver | null = null;
@@ -143,5 +166,15 @@ defineExpose({
 		justify-content: center;
 		padding-block: var(--margin);
 	}
+}
+
+.fade-enter-active,
+.fade-leave-active {
+	transition: opacity 0.125s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+	opacity: 0;
 }
 </style>
