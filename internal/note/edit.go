@@ -51,7 +51,7 @@ func (s *Service) Edit(ctx context.Context, userID, noteID string, p EditParams)
 	text := n.Text
 	if p.Text != nil {
 		trimmed := strings.TrimSpace(*p.Text)
-		if utf8.RuneCountInString(trimmed) > MaxTextLength {
+		if utf8.RuneCountInString(trimmed) > s.textLimit() {
 			return nil, ErrTextTooLong
 		}
 		if trimmed == "" {

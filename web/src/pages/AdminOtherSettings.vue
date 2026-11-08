@@ -43,9 +43,13 @@ const admin = computed<boolean>(() => isAdmin());
 
 const state = {
 	title: "其它设置",
-	summary: "上游把无法归类的实例开关放在这里（保留用户名、远程文件缓存、字数上限、媒体代理等）。Cinderfish 的这些值要么是常量，要么在 config.toml 里，运行期不可改。",
-	available: [{"label": "实例设置", "note": "名称、描述、注册模式、合规链接、隐藏标签、主题色、实例图标与横幅", "to": "/admin/settings"}, {"label": "实例 CSS", "note": "全站样式，保存在 instance_meta", "to": "/admin/custom-css"}, {"label": "对象存储", "note": "当前后端与配置状态（只读）", "to": "/admin/object-storage"}],
-	missing: ["保留用户名 / 禁用用户名列表", "远程文件缓存开关（恒为 true）", "笔记字数上限调整（常量 3000）", "媒体代理地址"],
+	summary: "上游把无法归类的实例开关放在这里（保留用户名、远程文件缓存、字数上限、媒体代理等）。Cinderfish 的保留用户名与笔记字数上限已可在实例设置里运行期修改；其余几项仍是常量或 config.toml 值，运行期不可改。",
+	available: [
+		{ label: "实例设置", note: "名称、描述、注册模式、保留用户名、笔记字数上限、合规链接、隐藏标签、主题色、实例图标与横幅", to: "/admin/settings" },
+		{ label: "实例 CSS", note: "全站样式，保存在 instance_meta", to: "/admin/custom-css" },
+		{ label: "对象存储", note: "当前后端与配置状态（只读）", to: "/admin/object-storage" },
+	],
+	missing: ["远程文件缓存开关（恒为 true）", "媒体代理地址"],
 };
 
 definePageMetadata({ title: "其它设置", icon: "ph-info ph-bold ph-lg" });

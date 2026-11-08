@@ -116,11 +116,32 @@ type PollParams struct {
 // Service provides note operations.
 type Service struct {
 	pool *pgxpool.Pool
+
+	// maxTextLength returns the runtime note-length cap. The server wires it
+	// to the live instance settings (maxNoteTextLength); nil keeps the
+	// Misskey constant.
+	maxTextLength func() int
 }
 
 // NewService returns a Service backed by the given pool.
 func NewService(pool *pgxpool.Pool) *Service {
 	return &Service{pool: pool}
+}
+
+// SetMaxTextLength attaches the runtime cap provider. A provider returning
+// a value <= 0 falls back to MaxTextLength.
+func (s *Service) SetMaxTextLength(fn func() int) {
+	s.maxTextLength = fn
+}
+
+// textLimit is the effective note-length cap for the current request.
+func (s *Service) textLimit() int {
+	if s.maxTextLength != nil {
+		if limit := s.maxTextLength(); limit > 0 {
+			return limit
+		}
+	}
+	return MaxTextLength
 }
 
 // Errors returned by the service.
@@ -207,8 +228,9 @@ func (s *Service) Create(ctx context.Context, p CreateParams) (*Note, error) {
 	}
 	// Misskey validates against the JSON Schema maxLength, which counts
 	// Unicode code points; len() counts bytes and would cut CJK notes at a
-	// third of the upstream limit.
-	if p.Text != nil && utf8.RuneCountInString(*p.Text) > MaxTextLength {
+	// third of the upstream limit. The cap is runtime-configurable
+	// (maxNoteTextLength), defaulting to Misskey's 3000.
+	if p.Text != nil && utf8.RuneCountInString(*p.Text) > s.textLimit() {
 		return nil, ErrTextTooLong
 	}
 	if p.CW != nil {

@@ -4,6 +4,7 @@
 package httpapi
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -118,6 +119,15 @@ func NewServerWithDB(cfg *config.Config, pool *pgxpool.Pool) *Server {
 	s.accounts = account.NewService(pool)
 	s.tokens = account.NewTokenService(pool)
 	s.notes = note.NewService(pool)
+	// Runtime instance settings are read per request; the providers keep the
+	// account and note services in step with the stored values without
+	// importing the httpapi package into them.
+	s.accounts.SetReservedUsernames(func() []string {
+		return s.livePreservedUsernames(context.Background())
+	})
+	s.notes.SetMaxTextLength(func() int {
+		return s.liveMaxNoteTextLength(context.Background())
+	})
 	s.timeline = note.NewTimelineService(pool)
 	s.noteReactions = note.NewReactionService(pool)
 	s.notifications = note.NewNotificationService(pool)

@@ -10,6 +10,8 @@ import (
 	"unicode/utf8"
 
 	"github.com/Aurorainic/cinderfish/internal/account"
+	"github.com/Aurorainic/cinderfish/internal/auth"
+	"github.com/Aurorainic/cinderfish/internal/note"
 )
 
 // instanceSettings are the instance fields an administrator can change at
@@ -35,42 +37,52 @@ type instanceSettings struct {
 	ThemeColor       string
 	// CustomCSS is instance-wide stylesheet text injected into every page.
 	CustomCSS string
+	// PreservedUsernames cannot be claimed through signup; the list is
+	// Misskey's meta.preservedUsernames.
+	PreservedUsernames []string
+	// MaxNoteTextLength is the runtime note-length cap, defaulting to
+	// Misskey's 3000.
+	MaxNoteTextLength int
 }
 
 // instanceMetaKey maps a settings field to its instance_meta key.
 var instanceMetaKeys = map[string]string{
-	"name":             "instanceName",
-	"description":      "instanceDescription",
-	"maintainerName":   "maintainerName",
-	"maintainerEmail":  "maintainerEmail",
-	"registrationMode": "registrationMode",
-	"tosUrl":           "tosUrl",
-	"privacyPolicyUrl": "privacyPolicyUrl",
-	"repositoryUrl":    "repositoryUrl",
-	"feedbackUrl":      "feedbackUrl",
-	"inquiryUrl":       "inquiryUrl",
-	"impressumUrl":     "impressumUrl",
-	"serverRules":      "serverRules",
-	"hiddenTags":       "hiddenTags",
-	"iconUrl":          "iconUrl",
-	"bannerUrl":        "bannerUrl",
-	"themeColor":       "themeColor",
-	"customCss":        "customCss",
+	"name":               "instanceName",
+	"description":        "instanceDescription",
+	"maintainerName":     "maintainerName",
+	"maintainerEmail":    "maintainerEmail",
+	"registrationMode":   "registrationMode",
+	"tosUrl":             "tosUrl",
+	"privacyPolicyUrl":   "privacyPolicyUrl",
+	"repositoryUrl":      "repositoryUrl",
+	"feedbackUrl":        "feedbackUrl",
+	"inquiryUrl":         "inquiryUrl",
+	"impressumUrl":       "impressumUrl",
+	"serverRules":        "serverRules",
+	"hiddenTags":         "hiddenTags",
+	"iconUrl":            "iconUrl",
+	"bannerUrl":          "bannerUrl",
+	"themeColor":         "themeColor",
+	"customCss":          "customCss",
+	"preservedUsernames": "preservedUsernames",
+	"maxNoteTextLength":  "maxNoteTextLength",
 }
 
 // liveInstanceSettings reads the runtime overrides, falling back to the
 // configuration for every field without a row.
 func (s *Server) liveInstanceSettings(ctx context.Context) instanceSettings {
 	out := instanceSettings{
-		Name:             "Cinderfish",
-		Description:      "",
-		MaintainerName:   "",
-		MaintainerEmail:  "",
-		RegistrationMode: s.cfg.RegistrationMode,
+		Name:              "Cinderfish",
+		Description:       "",
+		MaintainerName:    "",
+		MaintainerEmail:   "",
+		RegistrationMode:  s.cfg.RegistrationMode,
+		MaxNoteTextLength: note.MaxTextLength,
 	}
 	if out.RegistrationMode == "" {
 		out.RegistrationMode = "admin"
 	}
+	out.PreservedUsernames = []string{}
 	if s.pool == nil {
 		return out
 	}
@@ -88,6 +100,8 @@ SELECT key, value FROM instance_meta WHERE key = ANY($1)
 		instanceMetaKeys["iconUrl"], instanceMetaKeys["bannerUrl"],
 		instanceMetaKeys["themeColor"],
 		instanceMetaKeys["customCss"],
+		instanceMetaKeys["preservedUsernames"],
+		instanceMetaKeys["maxNoteTextLength"],
 	})
 	if err != nil {
 		return out
@@ -105,6 +119,17 @@ SELECT key, value FROM instance_meta WHERE key = ANY($1)
 		}
 		if key == instanceMetaKeys["hiddenTags"] {
 			_ = json.Unmarshal(raw, &out.HiddenTags)
+			continue
+		}
+		if key == instanceMetaKeys["preservedUsernames"] {
+			_ = json.Unmarshal(raw, &out.PreservedUsernames)
+			continue
+		}
+		if key == instanceMetaKeys["maxNoteTextLength"] {
+			var limit int
+			if err := json.Unmarshal(raw, &limit); err == nil && limit > 0 {
+				out.MaxNoteTextLength = limit
+			}
 			continue
 		}
 		var value string
@@ -146,6 +171,10 @@ SELECT key, value FROM instance_meta WHERE key = ANY($1)
 			out.CustomCSS = value
 		}
 	}
+	if out.PreservedUsernames == nil {
+		// The wire shape is an array, not null (Misskey's schema).
+		out.PreservedUsernames = []string{}
+	}
 	return out
 }
 
@@ -159,6 +188,20 @@ func (s *Server) liveRegistrationMode(ctx context.Context) account.RegistrationM
 	default:
 		return account.RegistrationAdmin
 	}
+}
+
+// liveMaxNoteTextLength is the effective note-length cap. It falls back to
+// Misskey's constant when nothing (or something invalid) is stored.
+func (s *Server) liveMaxNoteTextLength(ctx context.Context) int {
+	if limit := s.liveInstanceSettings(ctx).MaxNoteTextLength; limit > 0 {
+		return limit
+	}
+	return note.MaxTextLength
+}
+
+// livePreservedUsernames is the runtime preserved-name list.
+func (s *Server) livePreservedUsernames(ctx context.Context) []string {
+	return s.liveInstanceSettings(ctx).PreservedUsernames
 }
 
 // saveInstanceSetting upserts one key.
@@ -271,6 +314,10 @@ func (s *Server) handleAdminMeta(w http.ResponseWriter, r *http.Request) {
 		"bannerUrl":        nilIfEmpty(settings.BannerURL),
 		"themeColor":       nilIfEmpty(settings.ThemeColor),
 		"customCss":        settings.CustomCSS,
+		// Preserved usernames and the note-length cap are runtime settings
+		// (Misskey keeps both in meta: preservedUsernames, maxNoteTextLength).
+		"preservedUsernames": settings.PreservedUsernames,
+		"maxNoteTextLength":  s.liveMaxNoteTextLength(r.Context()),
 		// The admin console only needs to know whether mail is configured and
 		// which host it goes through; credentials stay in config.toml.
 		"emailServer": s.cfg.Mail.Host,
@@ -312,6 +359,10 @@ func (s *Server) handleAdminUpdateMeta(w http.ResponseWriter, r *http.Request) {
 		BannerURL  nullableField `json:"bannerUrl"`
 		ThemeColor nullableField `json:"themeColor"`
 		CustomCSS  *string       `json:"customCss"`
+		// Runtime limits: preserved names are matched case-insensitively at
+		// signup; maxNoteTextLength replaces the Misskey constant.
+		PreservedUsernames *[]string `json:"preservedUsernames"`
+		MaxNoteTextLength  *int      `json:"maxNoteTextLength"`
 	}
 	if err := decodeOptionalJSON(r, &body); err != nil {
 		writeAPIError(w, err)
@@ -500,6 +551,63 @@ ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
 	if body.BlockedHosts != nil {
 		if err := s.saveBlockedHosts(r.Context(), *body.BlockedHosts); err != nil {
 			writeAPIError(w, invalidParamError(err.Error()))
+			return
+		}
+	}
+
+	if body.PreservedUsernames != nil {
+		names := make([]string, 0, len(*body.PreservedUsernames))
+		seen := map[string]struct{}{}
+		for _, name := range *body.PreservedUsernames {
+			trimmed := strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(name), "@"))
+			if trimmed == "" {
+				continue
+			}
+			if err := auth.ValidateUsername(trimmed); err != nil {
+				writeAPIError(w, invalidParamError("each preserved username must be 1-20 word characters"))
+				return
+			}
+			lower := strings.ToLower(trimmed)
+			if _, ok := seen[lower]; ok {
+				continue
+			}
+			seen[lower] = struct{}{}
+			names = append(names, trimmed)
+		}
+		if len(names) > 200 {
+			writeAPIError(w, invalidParamError("preservedUsernames has at most 200 entries"))
+			return
+		}
+		payload, err := json.Marshal(names)
+		if err != nil {
+			writeInternalServerError(w)
+			return
+		}
+		if _, err := s.pool.Exec(r.Context(), `
+INSERT INTO instance_meta (key, value) VALUES ('preservedUsernames', $1::jsonb)
+ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
+`, payload); err != nil {
+			writeInternalServerError(w)
+			return
+		}
+	}
+
+	if body.MaxNoteTextLength != nil {
+		limit := *body.MaxNoteTextLength
+		if limit < 100 || limit > 10000 {
+			writeAPIError(w, invalidParamError("maxNoteTextLength must be between 100 and 10000"))
+			return
+		}
+		payload, err := json.Marshal(limit)
+		if err != nil {
+			writeInternalServerError(w)
+			return
+		}
+		if _, err := s.pool.Exec(r.Context(), `
+INSERT INTO instance_meta (key, value) VALUES ('maxNoteTextLength', $1::jsonb)
+ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
+`, payload); err != nil {
+			writeInternalServerError(w)
 			return
 		}
 	}

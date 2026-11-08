@@ -271,6 +271,45 @@ func TestInviteManagement(t *testing.T) {
 
 func ptrTime(t time.Time) *time.Time { return &t }
 
+func TestReservedUsernames(t *testing.T) {
+	pool := testPool(t)
+	svc := account.NewService(pool)
+	ctx := context.Background()
+
+	svc.SetReservedUsernames(func() []string { return []string{"Admin", "root"} })
+
+	// Signup refuses a preserved name, case-insensitively (Misskey's
+	// SignupService compares lowercased entries).
+	_, _, err := svc.Register(ctx, account.RegistrationOpen, "aDmIn", "password123", "")
+	if err == nil {
+		t.Fatal("signup with a preserved username must fail")
+	}
+	var regErr *account.RegistrationError
+	if !asRegistrationError(err, &regErr) || regErr.Code != "USED_USERNAME" {
+		t.Fatalf("error = %v, want USED_USERNAME", err)
+	}
+
+	// username/available agrees.
+	available, err := svc.UsernameAvailable(ctx, "ROOT")
+	if err != nil {
+		t.Fatalf("UsernameAvailable: %v", err)
+	}
+	if available {
+		t.Error("a preserved username must report unavailable")
+	}
+
+	// A name not on the list still works.
+	if _, _, err := svc.Register(ctx, account.RegistrationOpen, uniqueUsername(t), "password123", ""); err != nil {
+		t.Errorf("registering an unreserved name: %v", err)
+	}
+
+	// The admin create path deliberately ignores the list: reserving a name
+	// and then issuing it is how an administrator uses it.
+	if _, err := svc.Create(ctx, "root", "password123"); err != nil {
+		t.Errorf("admin Create of a preserved name: %v", err)
+	}
+}
+
 func TestAuthenticate(t *testing.T) {
 	pool := testPool(t)
 	svc := account.NewService(pool)

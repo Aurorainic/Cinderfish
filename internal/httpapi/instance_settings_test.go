@@ -2,6 +2,7 @@ package httpapi_test
 
 import (
 	"net/http"
+	"strings"
 	"testing"
 )
 
@@ -145,5 +146,93 @@ func TestInstanceBlockedHosts(t *testing.T) {
 	})
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Errorf("scheme in blockedHosts status = %d, want 400", resp.StatusCode)
+	}
+}
+
+// TestInstanceRuntimeLimits covers the two runtime limits added with the
+// "其它设置" batch: preserved usernames (Misskey meta.preservedUsernames) and
+// the note-length cap (maxNoteTextLength). Both are stored in instance_meta
+// and take effect without a restart.
+func TestInstanceRuntimeLimits(t *testing.T) {
+	ts, _ := adminTestServer(t, "open")
+
+	// Normalisation: "@" prefixes and stray whitespace are stripped, entries
+	// are deduplicated case-insensitively, and the first spelling is kept.
+	resp, raw := postRawWithToken(t, ts, "/api/admin/update-meta", "admintoken000000", map[string]any{
+		"preservedUsernames": []string{" Admin ", "admin", "@root", ""},
+		"maxNoteTextLength":  100,
+	})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("update-meta limits: status %d, body %v", resp.StatusCode, raw)
+	}
+	updated, _ := raw.(map[string]any)
+	names, _ := updated["preservedUsernames"].([]any)
+	if len(names) != 2 || names[0] != "Admin" || names[1] != "root" {
+		t.Errorf("preservedUsernames = %v, want [Admin root]", updated["preservedUsernames"])
+	}
+	if updated["maxNoteTextLength"] != float64(100) {
+		t.Errorf("maxNoteTextLength = %v, want 100", updated["maxNoteTextLength"])
+	}
+
+	// The public meta carries both, so clients validate against the same list.
+	_, meta := post(t, ts, "/api/meta", map[string]any{})
+	if meta["maxNoteTextLength"] != float64(100) {
+		t.Errorf("public maxNoteTextLength = %v, want 100", meta["maxNoteTextLength"])
+	}
+	if publicNames, _ := meta["preservedUsernames"].([]any); len(publicNames) != 2 {
+		t.Errorf("public preservedUsernames = %v", meta["preservedUsernames"])
+	}
+
+	// Signup refuses a preserved name (case-insensitive), with Misskey's code.
+	signupResp, signupBody := post(t, ts, "/api/signup", map[string]any{
+		"username": "ROOT", "password": "password123",
+	})
+	if signupResp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("signup with a preserved name = %d, want 400", signupResp.StatusCode)
+	}
+	errBody, _ := signupBody["error"].(map[string]any)
+	if errBody["code"] != "USED_USERNAME" {
+		t.Errorf("signup error code = %v, want USED_USERNAME", errBody["code"])
+	}
+
+	// username/available agrees with the signup answer.
+	_, available := post(t, ts, "/api/username/available", map[string]any{"username": "Root"})
+	if available["available"] != false {
+		t.Errorf("username/available for a preserved name = %v, want false", available["available"])
+	}
+
+	// The note-length cap is live: 101 code points are refused, 100 pass.
+	_, signup := post(t, ts, "/api/signup", map[string]any{"username": "writer", "password": "password123"})
+	writerToken, _ := signup["token"].(string)
+	if writerToken == "" {
+		t.Fatalf("writer signup failed: %v", signup)
+	}
+	long := strings.Repeat("a", 101)
+	resp, raw = postRawWithToken(t, ts, "/api/notes/create", writerToken, map[string]any{"text": long})
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("101-char note = %d, want 400", resp.StatusCode)
+	}
+	if errBody, _ := raw.(map[string]any); errBody["error"] != nil {
+		errObj, _ := errBody["error"].(map[string]any)
+		if errObj["code"] != "NOTE_TOO_LONG" {
+			t.Errorf("note error code = %v, want NOTE_TOO_LONG", errObj["code"])
+		}
+	}
+	if resp, raw := postRawWithToken(t, ts, "/api/notes/create", writerToken, map[string]any{
+		"text": strings.Repeat("a", 100),
+	}); resp.StatusCode != http.StatusOK {
+		t.Errorf("100-char note = %d, want 200 (body %v)", resp.StatusCode, raw)
+	}
+
+	// Out-of-range values are refused.
+	if resp, _ := postRawWithToken(t, ts, "/api/admin/update-meta", "admintoken000000", map[string]any{
+		"maxNoteTextLength": 99,
+	}); resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("maxNoteTextLength 99 = %d, want 400", resp.StatusCode)
+	}
+	if resp, _ := postRawWithToken(t, ts, "/api/admin/update-meta", "admintoken000000", map[string]any{
+		"preservedUsernames": []string{"bad name"},
+	}); resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("preserved name with a space = %d, want 400", resp.StatusCode)
 	}
 }

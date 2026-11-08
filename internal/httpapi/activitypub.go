@@ -244,7 +244,7 @@ func (s *Server) serveNodeInfo(w http.ResponseWriter, r *http.Request, version s
 			"localComments": 0,
 		},
 		"metadata": map[string]any{
-			"maxNoteTextLength":   note.MaxTextLength,
+			"maxNoteTextLength":   s.liveMaxNoteTextLength(r.Context()),
 			"disableRegistration": s.liveInstanceSettings(r.Context()).RegistrationMode != "open",
 		},
 	}

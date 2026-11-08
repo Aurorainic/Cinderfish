@@ -7864,3 +7864,48 @@ CINDERFISH_TEST_DATABASE_URL=... CINDERFISH_TEST_REDIS_URL=... go test ./... -co
 - invite 注册模式端到端（表单填码 → 注册成功）：HTTP 测试覆盖了 signup+邀请码链路，
   浏览器里没有重跑（切注册模式会改动运行期实例设置）。
 
+## 12GU. 「其它设置」两项运行期化：保留用户名与笔记字数上限（2026-11-08）
+
+上一波之后「未实现的实例功能」剩五项。这一波处理「其它设置」占位页里最有实际价值的
+两条：保留用户名列表与笔记字数上限。两者都放进 `instance_meta`，经 `/admin/settings`
+的表单修改，立即生效、无需重启。契约对齐 Misskey `c05e844`：
+
+- **保留用户名**（上游 `meta.preservedUsernames`）：`account.Service` 新增
+  `SetReservedUsernames` provider，`Register` 对命中名字按 Misskey 的
+  `USED_USERNAME` 拒绝（`SignupService.ts` L91-95 大小写不敏感比较），
+  `username/available` 同步返回 `false`；管理台 `admin/accounts/create` 故意不检查
+  （上游同样如此），保留名仍可由管理员签发使用。`admin/update-meta` 接受
+  `preservedUsernames`，去空白、去掉 `@` 前缀、按小写去重、逐项用 `auth.ValidateUsername`
+  校验，上限 200 条。
+- **笔记字数上限**（上游 `meta.maxNoteTextLength`）：`note.Service` 新增
+  `SetMaxTextLength` provider，`Create`/`Edit` 的码点校验改用运行期值；
+  `admin/update-meta` 接受 100–10000 的整数。`meta`、NodeInfo 的
+  `maxNoteTextLength` 与 `i/import` 的校验都改读运行期值（导入同时把原来的
+  `len()` 字节计数修正为码点计数）。
+- **前端**：`AdminSettings.vue` 增加「保留用户名（每行一个）」多行框与
+  「笔记字数上限」数字输入（保存前本地校验 100–10000）；`AdminOtherSettings.vue`
+  的占位说明同步收窄，只剩远程文件缓存开关与媒体代理两项。
+
+### 12GU.1 验证证据
+
+- `gofmt`/`go vet ./...` 干净；含 PG 的全量 `go test ./...` 12 包全绿。
+- 新测试：`TestReservedUsernames`（大小写不敏感拒绝、available=false、管理员创建豁免）；
+  `TestInstanceRuntimeLimits`（update-meta 规范化与持久化、公开 meta 同步、
+  注册错误码 `USED_USERNAME`、101 字拒绝/100 字通过、越界与含空格的名字 400）。
+- `vue-tsc --noEmit`、`vite build` 通过。
+- 真实二进制 + 浏览器（`/admin/settings`）：新字段渲染默认值 3000；填
+  `Admin`/`root` 与 2000 保存后显示「已保存」；公开 `meta` 返回
+  `maxNoteTextLength=2000`、`preservedUsernames=['Admin','root']`；
+  `username/available` 对 `ADMIN` 为 false、对未保留名字为 true；
+  `notes/create` 2001 字返回 `NOTE_TOO_LONG`、2000 字成功。走查后把 dev 实例的
+  上限恢复为 3000（保留用户名保留）。
+- `/admin/other-settings` 复查：已有项含「保留用户名、笔记字数上限」，
+  「这里没有」只剩远程文件缓存与媒体代理。
+
+### 12GU.2 有意的边界
+
+- 没有做上游的 `prohibitedWordsForNameOfUser`（用户名词过滤）与 `used_usernames`
+  （已删除用户名不可复用）：前者需要敏感词表，后者需要新表，均不在本波范围。
+- 远程文件缓存开关与媒体代理地址仍是常量/config 值，占位页如实标注。
+- 字数上限作用于新建、编辑与导入；历史笔记不回溯校验。
+

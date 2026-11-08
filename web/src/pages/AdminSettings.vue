@@ -65,6 +65,29 @@
 						</template>
 					</CfSelect>
 
+					<CfTextarea
+						v-model="preservedUsernamesText"
+						class="_formBlock"
+						tall
+						:disabled="saving"
+					>
+						<template #label>保留用户名（每行一个）</template>
+						<template #caption
+							>注册和「用户名是否可用」检查会拒绝这些名字（不区分大小写，最多 200 个，每个 1–20 个字符）。管理员在管理台创建账号时不受限制。</template
+						>
+					</CfTextarea>
+					<CfInput
+						v-model="maxNoteTextLength"
+						class="_formBlock"
+						type="number"
+						:disabled="saving"
+					>
+						<template #label>笔记字数上限</template>
+						<template #caption
+							>100–10000 个字符（按 Unicode 码点计，中文与 emoji 各算一个）。默认 3000，与 Misskey 一致；公开 meta 会同步这个值。</template
+						>
+					</CfInput>
+
 					<CfInput v-model="tosUrl" class="_formBlock" type="url" :disabled="saving">
 						<template #label>服务条款 URL</template>
 						<template #caption>留空表示未提供；显示在关于页。</template>
@@ -109,7 +132,7 @@
 				</form>
 
 				<CfInfo class="notice">
-					这里覆盖名称、简介、维护者、注册模式、合规链接与实例规则；数据库、媒体、联邦策略等其余设置仍来自
+					这里覆盖名称、简介、维护者、注册模式、保留用户名、笔记字数上限、合规链接与实例规则；数据库、媒体、联邦策略等其余设置仍来自
 					<code>config.toml</code>，修改后需要重启。上游 <code>admin/update-meta</code> 还有大量字段，
 					本实例忽略未列出的字段。
 				</CfInfo>
@@ -153,6 +176,8 @@ const iconUrl = ref<string | number | null>("");
 const bannerUrl = ref<string | number | null>("");
 const themeColor = ref<string | number | null>("");
 const registrationMode = ref("open");
+const preservedUsernamesText = ref("");
+const maxNoteTextLength = ref<string | number | null>(3000);
 const tosUrl = ref<string | number | null>("");
 const privacyPolicyUrl = ref<string | number | null>("");
 const repositoryUrl = ref<string | number | null>("");
@@ -179,6 +204,8 @@ function apply(meta: AdminInstanceMeta): void {
 	bannerUrl.value = meta.bannerUrl ?? "";
 	themeColor.value = meta.themeColor ?? "";
 	registrationMode.value = meta.registrationMode;
+	preservedUsernamesText.value = (meta.preservedUsernames ?? []).join("\n");
+	maxNoteTextLength.value = meta.maxNoteTextLength ?? 3000;
 	tosUrl.value = meta.tosUrl ?? "";
 	privacyPolicyUrl.value = meta.privacyPolicyUrl ?? "";
 	repositoryUrl.value = meta.repositoryUrl ?? "";
@@ -203,6 +230,11 @@ async function load(): Promise<void> {
 
 async function save(): Promise<void> {
 	if (saving.value) return;
+	const limit = Number(maxNoteTextLength.value);
+	if (!Number.isInteger(limit) || limit < 100 || limit > 10000) {
+		error.value = "笔记字数上限必须是 100–10000 之间的整数。";
+		return;
+	}
 	saving.value = true;
 	error.value = null;
 	saved.value = false;
@@ -219,6 +251,11 @@ async function save(): Promise<void> {
 				| "open"
 				| "invite"
 				| "admin",
+			preservedUsernames: preservedUsernamesText.value
+				.split("\n")
+				.map((line) => line.trim())
+				.filter((line) => line !== ""),
+			maxNoteTextLength: limit,
 			tosUrl: String(tosUrl.value ?? "").trim(),
 			privacyPolicyUrl: String(privacyPolicyUrl.value ?? "").trim(),
 			repositoryUrl: String(repositoryUrl.value ?? "").trim(),

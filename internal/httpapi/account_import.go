@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"time"
+	"unicode/utf8"
 
 	"github.com/Aurorainic/cinderfish/internal/idgen"
 	"github.com/Aurorainic/cinderfish/internal/note"
@@ -126,7 +127,7 @@ func (s *Server) importAccount(ctx context.Context, userID string, doc *exportAc
 	}
 
 	for _, n := range doc.Notes {
-		if n.ID == "" || len(n.Text) > note.MaxTextLength || !validImportVisibility(n.Visibility) {
+		if n.ID == "" || utf8.RuneCountInString(n.Text) > s.liveMaxNoteTextLength(ctx) || !validImportVisibility(n.Visibility) {
 			summary.Skipped++
 			continue
 		}

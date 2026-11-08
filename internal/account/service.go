@@ -69,11 +69,36 @@ type Service struct {
 	// drive resolves avatar files for UpdateProfile; attached by the
 	// server wiring through AttachDrive.
 	drive *media.DriveService
+
+	// reservedUsernames returns the instance's preserved list (lowercase
+	// entries). The server wires it to the live instance settings. Nil
+	// means no names are reserved.
+	reservedUsernames func() []string
 }
 
 // NewService returns a Service backed by the given pool.
 func NewService(pool *pgxpool.Pool) *Service {
 	return &Service{pool: pool}
+}
+
+// SetReservedUsernames attaches the runtime preserved-usernames provider.
+// Misskey keeps the list in meta.preservedUsernames and refuses signup and
+// username/available for entries (SignupService.ts L91-95).
+func (s *Service) SetReservedUsernames(fn func() []string) {
+	s.reservedUsernames = fn
+}
+
+// isReserved reports whether a local username is on the preserved list.
+func (s *Service) isReserved(lower string) bool {
+	if s.reservedUsernames == nil {
+		return false
+	}
+	for _, name := range s.reservedUsernames() {
+		if strings.EqualFold(name, lower) {
+			return true
+		}
+	}
+	return false
 }
 
 // ErrUserNotFound is returned when a user does not exist.
@@ -100,6 +125,11 @@ func (s *Service) Register(ctx context.Context, mode RegistrationMode, username,
 	}
 	if password == "" {
 		return nil, "", &RegistrationError{Code: "INVALID_PASSWORD", Message: "Invalid password."}
+	}
+	// Misskey answers USED_USERNAME for preserved names on both signup paths
+	// (SignupService.ts L91-95, SignupApiService.ts L186-190).
+	if s.isReserved(auth.NormalizeUsername(username)) {
+		return nil, "", &RegistrationError{Code: "USED_USERNAME", Message: "This username is reserved."}
 	}
 
 	claimed := false
@@ -137,6 +167,10 @@ func (s *Service) Register(ctx context.Context, mode RegistrationMode, username,
 // Create makes a local account regardless of the registration mode. It is
 // what an administrator uses to add a user while self-service signup is
 // closed, which is the "admin" registration mode.
+//
+// Preserved usernames are not checked here: the list exists so users cannot
+// claim a name, and an administrator choosing one deliberately is the way to
+// use it (Misskey's admin/accounts/create does the same).
 func (s *Service) Create(ctx context.Context, username, password string) (*User, error) {
 	if err := auth.ValidateUsername(username); err != nil {
 		return nil, &RegistrationError{Code: "INVALID_USERNAME", Message: "Invalid username."}
@@ -400,9 +434,12 @@ func (s *Service) usernameExists(ctx context.Context, lower string) (bool, error
 }
 
 // UsernameAvailable reports whether a username can be registered, that
-// is, whether it is well formed and not already taken.
+// is, whether it is well formed, not reserved and not already taken.
 func (s *Service) UsernameAvailable(ctx context.Context, username string) (bool, error) {
 	if err := auth.ValidateUsername(username); err != nil {
+		return false, nil
+	}
+	if s.isReserved(auth.NormalizeUsername(username)) {
 		return false, nil
 	}
 	exists, err := s.usernameExists(ctx, auth.NormalizeUsername(username))

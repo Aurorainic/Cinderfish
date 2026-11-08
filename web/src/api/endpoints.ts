@@ -897,6 +897,8 @@ export interface EndpointMap {
 			bannerUrl?: string | null;
 			themeColor?: string | null;
 			customCss?: string;
+			preservedUsernames?: string[];
+			maxNoteTextLength?: number;
 		};
 		res: AdminInstanceMeta;
 	};

@@ -622,6 +622,10 @@ export interface AdminInstanceMeta {
 	themeColor: string | null;
 	/** Instance-wide stylesheet; empty when none is set. */
 	customCss: string;
+	/** Usernames signup refuses; Misskey's meta.preservedUsernames. */
+	preservedUsernames: string[];
+	/** Runtime note-length cap in code points (default 3000). */
+	maxNoteTextLength: number;
 	/** SMTP host, empty when mail delivery is not configured. */
 	emailServer: string;
 }

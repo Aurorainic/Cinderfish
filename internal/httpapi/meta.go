@@ -7,7 +7,6 @@ import (
 	"github.com/Aurorainic/cinderfish/internal/buildinfo"
 	"github.com/Aurorainic/cinderfish/internal/federation"
 	"github.com/Aurorainic/cinderfish/internal/media"
-	"github.com/Aurorainic/cinderfish/internal/note"
 )
 
 const repositoryURL = "https://github.com/Aurorainic/Cinderfish"
@@ -76,7 +75,8 @@ func (s *Server) handleMeta(w http.ResponseWriter, r *http.Request) {
 		"iconUrl":                      settings.IconURL,
 		"backgroundImageUrl":           "",
 		"logoImageUrl":                 "",
-		"maxNoteTextLength":            note.MaxTextLength,
+		"maxNoteTextLength":            s.liveMaxNoteTextLength(r.Context()),
+		"preservedUsernames":           s.livePreservedUsernames(r.Context()),
 		"defaultLightTheme":            nil,
 		"defaultDarkTheme":             nil,
 		"clientOptions":                map[string]any{},
