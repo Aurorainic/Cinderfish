@@ -67,10 +67,9 @@
 									: "尚未配置。" }}
 							</template>
 						</CfInput>
-						<label class="checkRow">
-							<input v-model="useSSL" type="checkbox" :disabled="saving" />
-							<span>使用 HTTPS 连接 Endpoint</span>
-						</label>
+						<CfSwitch v-model="useSSL" class="switchBlock" :disabled="saving">
+							<template #label>使用 HTTPS 连接 Endpoint</template>
+						</CfSwitch>
 						<CfInput v-model="publicBaseUrl" class="_formBlock" :disabled="saving">
 							<template #label>公开基础 URL（可选）</template>
 							<template #caption
@@ -123,6 +122,7 @@ import CfInfo from "@/components/ui/CfInfo.vue";
 import CfInput from "@/components/ui/CfInput.vue";
 import CfLoading from "@/components/ui/CfLoading.vue";
 import CfSelect from "@/components/ui/CfSelect.vue";
+import CfSwitch from "@/components/ui/CfSwitch.vue";
 import { definePageMetadata } from "@/scripts/page-metadata";
 
 defineOptions({ name: "CfPageAdminObjectStorage" });
@@ -236,17 +236,8 @@ definePageMetadata({
 </script>
 
 <style lang="scss" scoped>
-.checkRow {
-	display: flex;
-	align-items: center;
-	gap: 8px;
-	margin-bottom: 12px;
-	font-size: 0.9em;
-
-	input {
-		width: 16px;
-		height: 16px;
-	}
+.switchBlock {
+	margin-bottom: 14px;
 }
 
 .notice {

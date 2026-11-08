@@ -319,10 +319,13 @@
 						封禁；规则在「IP 封禁」分栏里可查看和删除。
 					</p>
 					<form class="createCard" @submit.prevent="saveAutoBan">
-						<label class="checkRow">
-							<input v-model="autoBanEnabled" type="checkbox" :disabled="autoBanSaving" />
-							<span>启用自动封禁</span>
-						</label>
+						<CfSwitch
+							v-model="autoBanEnabled"
+							class="switchBlock"
+							:disabled="autoBanSaving"
+						>
+							<template #label>启用自动封禁</template>
+						</CfSwitch>
 						<label class="countField">
 							<span class="label">失败阈值</span>
 							<input v-model.number="autoBanThreshold" class="nativeInput" type="number" min="3" max="100" :disabled="autoBanSaving" />
@@ -389,6 +392,7 @@ import CfA from "@/components/ui/CfA.vue";
 import CfButton from "@/components/ui/CfButton.vue";
 import CfInfo from "@/components/ui/CfInfo.vue";
 import CfLoading from "@/components/ui/CfLoading.vue";
+import CfSwitch from "@/components/ui/CfSwitch.vue";
 import { confirm } from "@/os";
 import { copyToClipboard } from "@/scripts/copy-to-clipboard";
 import { definePageMetadata } from "@/scripts/page-metadata";
@@ -828,11 +832,14 @@ definePageMetadata({ title: "安全设置", icon: "ph-shield-check ph-bold ph-lg
 		color: var(--fg);
 		font: inherit;
 		cursor: pointer;
-		opacity: 0.7;
+		opacity: 0.65;
 
 		&.active {
-			background: var(--accent);
-			color: var(--fgOnAccent, #fff);
+			// Tint of the accent rather than the accent itself: the theme's
+			// fgOnAccent is white, which reads poorly on the light accent.
+			background: color-mix(in srgb, var(--accent) 16%, transparent);
+			color: var(--accent);
+			font-weight: 600;
 			opacity: 1;
 		}
 	}
@@ -879,6 +886,10 @@ definePageMetadata({ title: "安全设置", icon: "ph-shield-check ph-bold ph-lg
 		width: 16px;
 		height: 16px;
 	}
+}
+
+.switchBlock {
+	margin-bottom: 14px;
 }
 
 .signinAudit,
@@ -983,15 +994,16 @@ definePageMetadata({ title: "安全设置", icon: "ph-shield-check ph-bold ph-lg
 	align-items: center;
 	gap: 8px;
 	margin-bottom: 12px;
+}
 
-	.nativeSelect {
-		padding: 6px 10px;
-		border: 1px solid var(--divider);
-		border-radius: 6px;
-		background: var(--panel);
-		color: var(--fg);
-		font: inherit;
-	}
+.nativeSelect {
+	padding: 7px 10px;
+	border: 1px solid var(--divider);
+	border-radius: 6px;
+	background: var(--bg);
+	color: var(--fg);
+	font: inherit;
+	max-width: 100%;
 }
 
 .list {
