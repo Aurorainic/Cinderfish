@@ -18,13 +18,16 @@
 
 		<fieldset class="events" :disabled="saving">
 			<legend>触发事件</legend>
-			<label v-for="event in supported" :key="event.value" class="event">
-				<input v-model="on" type="checkbox" :value="event.value" />
-				<span class="eventBody">
-					<span class="eventName">{{ event.label }}</span>
-					<span class="eventCaption">{{ event.caption }}</span>
-				</span>
-			</label>
+			<CfSwitch
+				v-for="event in supported"
+				:key="event.value"
+				:model-value="on.includes(event.value)"
+				:disabled="saving"
+				@update:model-value="(checked) => setEvent(event.value, checked)"
+			>
+				{{ event.label }}
+				<template #caption>{{ event.caption }}</template>
+			</CfSwitch>
 		</fieldset>
 		<p class="hint">
 			上游还有 follow / reaction / mention 等事件；本实例只产生上面三种，
@@ -101,6 +104,14 @@ const on = ref<string[]>(
 );
 const active = ref(props.initial?.active ?? true);
 
+function setEvent(value: string, checked: boolean): void {
+	if (checked) {
+		if (!on.value.includes(value)) on.value = [...on.value, value];
+	} else {
+		on.value = on.value.filter((event) => event !== value);
+	}
+}
+
 function submit(): void {
 	const events = on.value.filter((event) => supported.some((s) => s.value === event));
 	if (events.length === 0) return;
@@ -138,31 +149,6 @@ function submit(): void {
 		padding: 0 6px;
 		font-size: 0.85em;
 		opacity: 0.75;
-	}
-}
-
-.event {
-	display: flex;
-	align-items: flex-start;
-	gap: 8px;
-	cursor: pointer;
-
-	input {
-		margin-top: 3px;
-	}
-
-	.eventBody {
-		display: flex;
-		flex-direction: column;
-	}
-
-	.eventName {
-		font-size: 0.92em;
-	}
-
-	.eventCaption {
-		font-size: 0.78em;
-		opacity: 0.6;
 	}
 }
 

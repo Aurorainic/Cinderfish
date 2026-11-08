@@ -125,7 +125,7 @@ function onDrop(ev: DragEvent) {
 	}
 
 	&.draghover {
-		background: #eee;
+		background: var(--buttonHoverBg);
 	}
 
 	> i {

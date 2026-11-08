@@ -22,10 +22,9 @@
 </template>
 
 <script setup lang="ts">
-// Pass-through over `ui/CfSelect.vue`. Upstream renders the option list in an
-// os.popupMenu so the closed control can be styled freely; the wave-2 port keeps
-// a native <select> (degraded, see docs/research/2026-11-05-firefish-port-wave3
-// -contract.md §2), which is why the default slot carries <option> elements.
+// Pass-through over `ui/CfSelect.vue`. The default slot still carries <option>
+// elements: CfSelect reads them to build the themed popup list, while the
+// native <select> stays hidden for form semantics.
 import CfSelect from "@/components/ui/CfSelect.vue";
 
 defineProps<{

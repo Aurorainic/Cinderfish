@@ -278,8 +278,8 @@ function onContextmenu(ev: MouseEvent) {
 		right: 8px;
 		width: 16px;
 		height: 16px;
-		background: #fff;
-		border: solid 1px #000;
+		background: var(--panel);
+		border: solid 1px var(--divider);
 
 		&.checked {
 			background: var(--accent);
