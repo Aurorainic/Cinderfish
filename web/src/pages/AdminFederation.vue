@@ -131,26 +131,28 @@
 					<CfInfo v-else-if="instances.length === 0">
 						本实例还没有收录任何远端用户。
 					</CfInfo>
-					<table v-else class="instances">
-						<thead>
-							<tr>
-								<th>主机</th>
-								<th>用户</th>
-								<th>帖子</th>
-							</tr>
-						</thead>
-						<tbody>
-							<tr v-for="item in instances" :key="item.host">
-								<td>
-									<MkA :to="`/instance-info/${item.host}`" class="_monospace">
-										{{ item.host }}
-									</MkA>
-								</td>
-								<td>{{ item.usersCount }}</td>
-								<td>{{ item.notesCount }}</td>
-							</tr>
-						</tbody>
-					</table>
+					<div v-else class="instancesScroll">
+						<table class="instances">
+							<thead>
+								<tr>
+									<th>主机</th>
+									<th>用户</th>
+									<th>帖子</th>
+								</tr>
+							</thead>
+							<tbody>
+								<tr v-for="item in instances" :key="item.host">
+									<td>
+										<MkA :to="`/instance-info/${item.host}`" class="_monospace">
+											{{ item.host }}
+										</MkA>
+									</td>
+									<td>{{ item.usersCount }}</td>
+									<td>{{ item.notesCount }}</td>
+								</tr>
+							</tbody>
+						</table>
+					</div>
 				</section>
 			</div>
 		</MkSpacer>
@@ -591,8 +593,12 @@ definePageMetadata({
 	font-size: 32px;
 	opacity: 0.5;
 }
-.instances {
+.instancesScroll {
 	margin-block-start: 8px;
+	overflow-x: auto;
+}
+
+.instances {
 	inline-size: 100%;
 	border-collapse: collapse;
 	font-size: 0.9em;
@@ -602,6 +608,7 @@ definePageMetadata({
 		padding: 6px 8px;
 		border-block-end: 1px solid var(--divider);
 		text-align: start;
+		white-space: nowrap;
 	}
 
 	th {
