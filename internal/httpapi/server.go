@@ -364,6 +364,20 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("POST /api/i/gallery/likes", s.handleIGalleryLikes)
 	s.mux.HandleFunc("POST /api/users/gallery/posts", s.handleUsersGalleryPosts)
 
+	// Pages (schema v36), the pages/* family upstream defines in
+	// packages/backend/src/server/api/endpoints/pages/. The viewer renders
+	// only the four static block types, exactly as upstream's client does.
+	s.mux.HandleFunc("POST /api/pages/create", s.handlePagesCreate)
+	s.mux.HandleFunc("POST /api/pages/update", s.handlePagesUpdate)
+	s.mux.HandleFunc("POST /api/pages/delete", s.handlePagesDelete)
+	s.mux.HandleFunc("POST /api/pages/show", s.handlePagesShow)
+	s.mux.HandleFunc("POST /api/pages/featured", s.handlePagesFeatured)
+	s.mux.HandleFunc("POST /api/pages/like", s.handlePagesLike)
+	s.mux.HandleFunc("POST /api/pages/unlike", s.handlePagesUnlike)
+	s.mux.HandleFunc("POST /api/i/pages", s.handleIPages)
+	s.mux.HandleFunc("POST /api/i/page-likes", s.handleIPageLikes)
+	s.mux.HandleFunc("POST /api/users/pages", s.handleUsersPages)
+
 	// Mutes and blocks. Both tables exist since schema v1; these endpoints
 	// are what the settings page and the timeline filter read.
 	s.mux.HandleFunc("POST /api/mute/create", s.handleMuteCreate)

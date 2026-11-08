@@ -391,6 +391,7 @@ func (s *Server) handleUsersShow(w http.ResponseWriter, r *http.Request) {
 	}
 
 	packed := packUserDetailed(user, user.CreatedAt, false, loadProfile(r.Context(), s, user.ID))
+	s.applyPinnedPage(r.Context(), user.ID, packed)
 	if user.Host != nil && *user.Host != "" {
 		if remote, remoteErr := s.federationStore.UserByID(r.Context(), user.ID); remoteErr == nil {
 			packed["url"] = remote.URI

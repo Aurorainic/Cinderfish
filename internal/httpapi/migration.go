@@ -282,6 +282,7 @@ func (s *Server) writeMe(w http.ResponseWriter, r *http.Request, u *account.User
 // go through it so the two can never drift apart.
 func (s *Server) meDetailed(ctx context.Context, u *account.User, includeSecrets bool) map[string]any {
 	packed := packMeDetailed(u, u.CreatedAt, includeSecrets, loadProfile(ctx, s, u.ID))
+	s.applyPinnedPage(ctx, u.ID, packed)
 	s.packMovedTo(ctx, u, packed)
 	s.applyUserCounts(ctx, u.ID, packed)
 	s.applyUnreadNotifications(ctx, u.ID, packed)

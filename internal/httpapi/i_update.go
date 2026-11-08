@@ -102,6 +102,9 @@ func (s *Server) handleIUpdate(w http.ResponseWriter, r *http.Request) {
 		// instance announcements are mailed.
 		EmailNotificationTypes   json.RawMessage `json:"emailNotificationTypes"`
 		ReceiveAnnouncementEmail *bool           `json:"receiveAnnouncementEmail"`
+		// The profile pin of a Page. Ownership is checked against the
+		// caller; a foreign page answers NO_SUCH_PAGE with i/update's id.
+		PinnedPageID nullableField `json:"pinnedPageId"`
 	}
 	if err := decodeOptionalJSON(r, &body); err != nil {
 		writeAPIError(w, err)
@@ -237,15 +240,32 @@ func (s *Server) handleIUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// The profile pin of a Page, validated per owner before the response
+	// pack reads it back.
+	if body.PinnedPageID.provided() {
+		var pageID *string
+		if v := body.PinnedPageID.asUpdatePointer(); v != nil && *v != "" {
+			pageID = v
+		}
+		if err := s.accounts.SetPinnedPage(r.Context(), info.User.ID, pageID); err != nil {
+			if errors.Is(err, account.ErrPageOtherProfile) {
+				writeAPIError(w, &APIError{
+					Message: "No such page.", Code: "NO_SUCH_PAGE",
+					ID: errIDPageOtherProfile, Kind: "client", Status: http.StatusBadRequest,
+				})
+				return
+			}
+			writeInternalServerError(w)
+			return
+		}
+	}
+
 	// Remote instances cache the actor document, so the change has to be
 	// pushed to followers. Misskey's i/update calls AccountUpdateService
 	// unconditionally after a successful save.
 	s.DeliverPersonUpdate(r.Context(), info.User.ID)
 
-	packed := packMeDetailed(info.User, info.User.CreatedAt, info.Token == nil, loadProfile(r.Context(), s, info.User.ID))
-	s.applyUserCounts(r.Context(), info.User.ID, packed)
-	s.applyUnreadNotifications(r.Context(), info.User.ID, packed)
-	s.applyUnreadAnnouncements(r.Context(), info.User.ID, packed)
+	packed := s.meDetailed(r.Context(), info.User, info.Token == nil)
 	s.publishMeUpdated(r.Context(), info.User.ID)
 	writeJSON(w, http.StatusOK, packed)
 }

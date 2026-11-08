@@ -890,6 +890,45 @@ CREATE TABLE IF NOT EXISTS gallery_likes (
 );
 CREATE INDEX IF NOT EXISTS idx_gallery_likes_post ON gallery_likes (post_id);
 `,
+	36: `
+-- Pages (Misskey's pages/* family), stored with the full content model
+-- and rendered statically: Cinderfish's viewer, like upstream Misskey
+-- c05e844 itself, executes only the text/section/image/note block types
+-- and keeps script/variables as round-tripped data for other clients.
+CREATE TABLE IF NOT EXISTS pages (
+    id            TEXT PRIMARY KEY,
+    user_id       TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    updated_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+    title         VARCHAR(256) NOT NULL,
+    name          VARCHAR(256) NOT NULL,
+    summary       VARCHAR(256),
+    align_center  BOOLEAN NOT NULL DEFAULT false,
+    hide_title_when_pinned BOOLEAN NOT NULL DEFAULT false,
+    font          VARCHAR(32) NOT NULL DEFAULT 'sans-serif',
+    eye_catching_image_id TEXT REFERENCES drive_files (id) ON DELETE SET NULL,
+    content       JSONB NOT NULL DEFAULT '[]',
+    variables     JSONB NOT NULL DEFAULT '[]',
+    script        TEXT NOT NULL DEFAULT '',
+    visibility    TEXT NOT NULL DEFAULT 'public',
+    liked_count   INTEGER NOT NULL DEFAULT 0,
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (user_id, name)
+);
+CREATE INDEX IF NOT EXISTS idx_pages_user ON pages (user_id, id);
+
+CREATE TABLE IF NOT EXISTS page_likes (
+    id      TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    page_id TEXT NOT NULL REFERENCES pages (id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (user_id, page_id)
+);
+CREATE INDEX IF NOT EXISTS idx_page_likes_page ON page_likes (page_id);
+
+-- Profile page pinning, the i/update pinnedPageId field.
+ALTER TABLE user_profiles
+    ADD COLUMN IF NOT EXISTS pinned_page_id TEXT REFERENCES pages (id) ON DELETE SET NULL;
+`,
 }
 
 // Migrate applies pending migrations in order and returns the version
