@@ -29,20 +29,26 @@
 
 <script setup lang="ts">
 // Firefish's timeline page branches into swiper/tutorial/antenna/list menus and
-// a fixed PostForm. Cinderfish has none of those in this wave (contract §5):
+// a fixed PostForm. Cinderfish drops the swiper, tutorial and antennas (no
+// endpoints) and keeps the user-list menu as a header action:
 //   * no swiper — only the selected tab's MkTimeline is rendered;
-//   * no tutorial dialog, no list/antenna pickers (no endpoints);
-//   * no recommended timeline (no endpoint);
+//   * no antenna or recommended timeline (no endpoints);
 //   * the fixed PostForm is ported as-is (top of the column, gated by
 //     defaultStore.state.showFixedPostForm). Like Firefish, `posted` is not
 //     handled here: MkTimeline prepends the new note from Streaming.
-// `src` stays persisted in defaultStore.state.tl, exactly like Firefish.
+// `src` stays persisted in defaultStore.state.tl, exactly like Firefish; a
+// list timeline is reached through /timeline/list/:listId and never persisted.
 import { computed } from "vue";
 import MkTimeline from "@/components/MkTimeline.vue";
 import MkPostForm from "@/components/MkPostForm.vue";
+import { api } from "@/api/client";
+import { ENDPOINTS } from "@/api/endpoints";
 import { t } from "@/i18n";
 import { instance } from "@/instance";
 import { me } from "@/account";
+import * as os from "@/os";
+import type { MenuItem } from "@/os";
+import { router } from "@/router";
 import { defaultStore, type TimelineSource } from "@/store/base";
 import { definePageMetadata } from "@/scripts/page-metadata";
 
@@ -134,11 +140,61 @@ function saveSrc(newSrc: TimelineSource): void {
 	});
 }
 
-// Lists and antennas have no backend endpoints in this wave, so Firefish's two
-// header actions are not rendered. The array is kept for the page structure.
+// Firefish's list menu: the caller's lists navigate to /timeline/list/:listId,
+// with a trailing entry for the list manager. Loading is deferred until the
+// action is pressed so an unused menu costs no request.
+async function openListsMenu(ev: MouseEvent): Promise<void> {
+	const items: MenuItem[] = [];
+	try {
+		const lists = await api(ENDPOINTS.usersListsList, {});
+		if (lists.length === 0) {
+			items.push({ type: "label", text: t("noLists") });
+		} else {
+			for (const list of lists) {
+				items.push({
+					icon: "ph-list-bullets ph-bold ph-lg",
+					text: list.name,
+					action: () => {
+						void router.push(`/timeline/list/${list.id}`);
+					},
+				});
+			}
+		}
+	} catch {
+		items.push({ type: "label", text: t("somethingHappened") });
+	}
+	items.push(
+		{ separator: true },
+		{
+			icon: "ph-sliders-horizontal ph-bold ph-lg",
+			text: t("manageLists"),
+			action: () => {
+				void router.push("/my/lists");
+			},
+		},
+	);
+	void os.popupMenu(items, ev);
+}
+
 const headerActions = computed<
-	{ text: string; icon: string; handler: () => void }[]
->(() => []);
+	{
+		text: string;
+		icon: string;
+		handler: (ev: MouseEvent) => void;
+	}[]
+>(() =>
+	me.value == null
+		? []
+		: [
+				{
+					text: t("lists"),
+					icon: "ph-list-bullets ph-bold ph-lg",
+					handler: (ev: MouseEvent) => {
+						void openListsMenu(ev);
+					},
+				},
+			],
+);
 
 function iconForSource(source: TimelineSource): string {
 	switch (source) {

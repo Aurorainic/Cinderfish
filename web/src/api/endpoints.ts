@@ -69,6 +69,8 @@ import type {
 	RegistryValueType,
 	UserDetailed,
 	UserLite,
+	UserList,
+	UserListMembership,
 	Webhook,
 } from "./types";
 
@@ -197,11 +199,26 @@ export const ENDPOINTS = {
 	hashtagsList: "hashtags/list",
 	hashtagsUsers: "hashtags/users",
 
+	// user lists
+	usersListsCreate: "users/lists/create",
+	usersListsCreateFromPublic: "users/lists/create-from-public",
+	usersListsDelete: "users/lists/delete",
+	usersListsList: "users/lists/list",
+	usersListsShow: "users/lists/show",
+	usersListsUpdate: "users/lists/update",
+	usersListsPush: "users/lists/push",
+	usersListsPull: "users/lists/pull",
+	usersListsUpdateMembership: "users/lists/update-membership",
+	usersListsGetMemberships: "users/lists/get-memberships",
+	usersListsFavorite: "users/lists/favorite",
+	usersListsUnfavorite: "users/lists/unfavorite",
+
 	// timelines
 	notesTimeline: "notes/timeline",
 	notesLocalTimeline: "notes/local-timeline",
 	notesHybridTimeline: "notes/hybrid-timeline",
 	notesGlobalTimeline: "notes/global-timeline",
+	notesUserListTimeline: "notes/user-list-timeline",
 
 	// notifications
 	announcements: "announcements",
@@ -727,6 +744,62 @@ export interface EndpointMap {
 		res: UserLite;
 	};
 
+	// user lists
+	[ENDPOINTS.usersListsCreate]: {
+		req: { name: string };
+		res: UserList;
+	};
+	[ENDPOINTS.usersListsCreateFromPublic]: {
+		req: { name: string; listId: string };
+		res: UserList;
+	};
+	[ENDPOINTS.usersListsDelete]: {
+		req: { listId: string };
+		res: EmptyResponse;
+	};
+	[ENDPOINTS.usersListsList]: {
+		req: { userId?: string };
+		res: UserList[];
+	};
+	[ENDPOINTS.usersListsShow]: {
+		req: { listId: string; forPublic?: boolean };
+		res: UserList;
+	};
+	[ENDPOINTS.usersListsUpdate]: {
+		req: { listId: string; name?: string; isPublic?: boolean };
+		res: UserList;
+	};
+	[ENDPOINTS.usersListsPush]: {
+		req: { listId: string; userId: string };
+		res: EmptyResponse;
+	};
+	[ENDPOINTS.usersListsPull]: {
+		req: { listId: string; userId: string };
+		res: EmptyResponse;
+	};
+	[ENDPOINTS.usersListsUpdateMembership]: {
+		req: { listId: string; userId: string; withReplies: boolean };
+		res: EmptyResponse;
+	};
+	[ENDPOINTS.usersListsGetMemberships]: {
+		req: {
+			listId: string;
+			forPublic?: boolean;
+			limit?: number;
+			sinceId?: string;
+			untilId?: string;
+		};
+		res: UserListMembership[];
+	};
+	[ENDPOINTS.usersListsFavorite]: {
+		req: { listId: string };
+		res: EmptyResponse;
+	};
+	[ENDPOINTS.usersListsUnfavorite]: {
+		req: { listId: string };
+		res: EmptyResponse;
+	};
+
 	[ENDPOINTS.registrySet]: { req: RegistryParams; res: EmptyResponse };
 	[ENDPOINTS.registryGet]: { req: RegistryGetParams; res: unknown };
 	[ENDPOINTS.registryGetDetail]: {
@@ -852,6 +925,10 @@ export interface EndpointMap {
 	[ENDPOINTS.notesLocalTimeline]: { req: TimelineParams; res: NoteDetailed[] };
 	[ENDPOINTS.notesHybridTimeline]: { req: TimelineParams; res: NoteDetailed[] };
 	[ENDPOINTS.notesGlobalTimeline]: { req: TimelineParams; res: NoteDetailed[] };
+	[ENDPOINTS.notesUserListTimeline]: {
+		req: TimelineParams & { listId: string };
+		res: NoteDetailed[];
+	};
 
 	[ENDPOINTS.notifications]: {
 		req: NotificationsParams;
@@ -1254,6 +1331,7 @@ export type PagingEndpoint =
 	| typeof ENDPOINTS.notesLocalTimeline
 	| typeof ENDPOINTS.notesHybridTimeline
 	| typeof ENDPOINTS.notesGlobalTimeline
+	| typeof ENDPOINTS.notesUserListTimeline
 	| typeof ENDPOINTS.notifications
 	| typeof ENDPOINTS.iNotifications
 	| typeof ENDPOINTS.iFavorites

@@ -23,17 +23,21 @@
 	</div>
 	<MkNotes
 		ref="tlComponent"
+		:key="paginationKey"
 		:no-gap="!defaultStore.reactiveState.showGapBetweenNotesInTimeline.value"
 		:pagination="pagination"
 	/>
 </template>
 
 <script setup lang="ts">
-// Home / local / social / global timeline.
+// Home / local / social / global / list timeline.
 //
 // Firefish branches on `src` (antenna, list, channel, recommended, mentions,
-// directs). Cinderfish has no endpoints for those (contract §5), so only the
-// four real timelines are ported and `src` is limited to them.
+// directs). Cinderfish has no endpoints for most of those (contract §5); the
+// four real timelines and the user-list timeline are ported. `list` is a local
+// extension of the prop type, deliberately not part of the persisted
+// `TimelineSource` union in store/base.ts, so a list can never become someone's
+// saved `tl.src` preference.
 //
 // Streaming notes are prepended here: when the reader is scrolled down they are
 // queued (Firefish's MkPagination behaviour) and flushed when the timeline is
@@ -44,6 +48,7 @@ import MkNotes from "@/components/MkNotes.vue";
 import CfInfo from "@/components/ui/CfInfo.vue";
 import type { Paging } from "@/components/ui/pagination";
 import { stream } from "@/stream";
+import type { StreamChannelName } from "@/api/stream";
 import type { NoteDetailed } from "@/api/types";
 import * as sound from "@/scripts/sound";
 import { getScrollPosition } from "@/scripts/scroll";
@@ -60,27 +65,37 @@ interface NotesExposed {
 	pagingComponent?: NotesPaging | null;
 }
 
+/** A persisted timeline source, or the non-persisted user-list timeline. */
+export type TimelineSourceProp = TimelineSource | "list";
+
+type HintClosedKey =
+	| "tlHomeHintClosed"
+	| "tlLocalHintClosed"
+	| "tlSocialHintClosed"
+	| "tlGlobalHintClosed";
+
 interface TimelineDefinition {
 	endpoint: string;
-	channel: "homeTimeline" | "localTimeline" | "hybridTimeline" | "globalTimeline";
-	/** REST query; `withReplies` is a real backend parameter on all four. */
+	channel: StreamChannelName;
+	/** REST query; `withReplies` is a real backend parameter on the four timelines. */
 	restParams: Record<string, unknown>;
 	/** Channel subscription params (docs/research/api-contract/streaming.md). */
 	channelParams: Record<string, unknown>;
+	/** `null` means the timeline has no hint to render. */
 	hintKey: string | null;
-	hintClosedKey:
-		| "tlHomeHintClosed"
-		| "tlLocalHintClosed"
-		| "tlSocialHintClosed"
-		| "tlGlobalHintClosed";
+	/** `null` when `hintKey` is null; no store key is read or written then. */
+	hintClosedKey: HintClosedKey | null;
 }
 
 const props = withDefaults(
 	defineProps<{
-		src: TimelineSource;
+		src: TimelineSourceProp;
+		/** Required when `src` is `"list"`; ignored otherwise. */
+		listId?: string;
 		sound?: boolean;
 	}>(),
 	{
+		listId: undefined,
 		sound: false,
 	},
 );
@@ -96,8 +111,24 @@ const showTimelineReplies = defaultStore.reactiveState.showTimelineReplies.value
 // pure renotes by default, the other three drop them unless the client asks for
 // them explicitly (contract: streaming.md line ~602). Firefish's timelines show
 // renotes, so ask for them.
-function definitionFor(src: TimelineSource): TimelineDefinition {
+function definitionFor(
+	src: TimelineSourceProp,
+	listId?: string,
+): TimelineDefinition {
 	switch (src) {
+		case "list":
+			return {
+				endpoint: "notes/user-list-timeline",
+				channel: "userList",
+				restParams: {
+					listId,
+					withRenotes: true,
+					withFiles: false,
+				},
+				channelParams: { listId, withRenotes: true },
+				hintKey: null,
+				hintClosedKey: null,
+			};
 		case "local":
 			return {
 				endpoint: "notes/local-timeline",
@@ -147,13 +178,20 @@ function definitionFor(src: TimelineSource): TimelineDefinition {
 	}
 }
 
-const definition = definitionFor(props.src);
+// `listId` participates in the definition and in the pagination key so a
+// changed list reloads the timeline (and its streaming channel) instead of
+// showing the previous list's notes.
+const definition = computed(() => definitionFor(props.src, props.listId));
 
-const pagination: Paging = {
-	endpoint: definition.endpoint,
+const paginationKey = computed(
+	() => `${props.src}:${props.listId ?? ""}`,
+);
+
+const pagination = computed<Paging>(() => ({
+	endpoint: definition.value.endpoint,
 	limit: 10,
-	params: definition.restParams,
-};
+	params: definition.value.restParams,
+}));
 
 const tlComponent = ref<NotesExposed | null>(null);
 
@@ -239,8 +277,8 @@ function prepend(note: NoteDetailed): void {
 }
 
 const connection = stream.useChannel(
-	definition.channel,
-	definition.channelParams,
+	definition.value.channel,
+	definition.value.channelParams,
 );
 connection.on("note", prepend);
 
@@ -268,19 +306,28 @@ if (props.src === "home") {
 
 // ----- hint ---------------------------------------------------------------
 
+// A list timeline has no hint. `hintClosedKey` is null for it, so no store
+// entry is read or written and the template's `hint != null` guard keeps the
+// banner out of the page.
+const hintClosedKey = definition.value.hintClosedKey;
 const hintClosed = ref(
-	defaultStore.reactiveState[definition.hintClosedKey].value,
+	hintClosedKey == null
+		? true
+		: defaultStore.reactiveState[hintClosedKey].value,
 );
 // Firefish renders the hint through <i18n> with an inline icon; `{icon}` has no
 // component here, so the placeholder is dropped and the text is shown verbatim.
 const hint = computed<string | null>(() => {
-	if (definition.hintKey == null) return null;
-	return t(definition.hintKey).split("{icon}").join("").replace(/\s+/g, " ").trim();
+	const key = definition.value.hintKey;
+	if (key == null) return null;
+	return t(key).split("{icon}").join("").replace(/\s+/g, " ").trim();
 });
 
 function closeHint(): void {
+	const key = definition.value.hintClosedKey;
+	if (key == null) return;
 	hintClosed.value = true;
-	defaultStore.set(definition.hintClosedKey, true);
+	defaultStore.set(key, true);
 }
 
 onUnmounted(() => {

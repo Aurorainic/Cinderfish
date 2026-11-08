@@ -244,6 +244,28 @@ export interface FollowRequest {
 	followee: UserLite;
 }
 
+/** One user list (`users/lists/*`). */
+export interface UserList {
+	id: string;
+	createdAt: string;
+	name: string;
+	isPublic: boolean;
+	/** Members are returned only on the owner's view (`users/lists/list`). */
+	userIds?: string[];
+	/** Present on the `forPublic` branch of `users/lists/show` only. */
+	likedCount?: number;
+	isLiked?: boolean;
+}
+
+/** One member row of `users/lists/get-memberships`. */
+export interface UserListMembership {
+	id: string;
+	createdAt: string;
+	userId: string;
+	user: UserLite;
+	withReplies: boolean;
+}
+
 export interface NoteFavorite {
 	id: string;
 	createdAt: string;
