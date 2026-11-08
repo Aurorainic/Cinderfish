@@ -266,6 +266,23 @@ export interface UserListMembership {
 	withReplies: boolean;
 }
 
+/** One clip (`clips/*`). */
+export interface Clip {
+	id: string;
+	createdAt: string;
+	lastClippedAt: string | null;
+	userId: string;
+	user: UserLite;
+	name: string;
+	description: string | null;
+	isPublic: boolean;
+	favoritedCount: number;
+	/** Present only when the request carries a credential. */
+	isFavorited?: boolean;
+	/** Present only for the clip owner. */
+	notesCount?: number;
+}
+
 export interface NoteFavorite {
 	id: string;
 	createdAt: string;

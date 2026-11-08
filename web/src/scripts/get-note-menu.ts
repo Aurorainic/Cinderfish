@@ -4,10 +4,12 @@
 // Dropped from the Firefish menu (no endpoint, see the capability matrix):
 // notes/state (so the favourite entry cannot know the current state and always
 // creates one), watch / thread mute, translate, delete-and-edit, report
-// abuse, promote, clips, plugin actions and the user submenu. Edit and the
+// abuse, promote, plugin actions and the user submenu. Edit and the
 // history page are Cinderfish's own additions.
 import type { Ref } from "vue";
-import type { Note, NoteDetailed, NoteState } from "@/api/types";
+import { ApiError } from "@/api/errors";
+import { ENDPOINTS } from "@/api/endpoints";
+import type { Clip, Note, NoteDetailed, NoteState } from "@/api/types";
 import { me } from "@/account";
 import { url } from "@/config";
 import { t } from "@/i18n";
@@ -16,6 +18,9 @@ import type { MenuItem } from "@/os";
 import { router } from "@/router";
 import copyToClipboard from "@/scripts/copy-to-clipboard";
 import { makeCopyLinkMenuItem } from "@/scripts/copy-link";
+
+/** `clips/add-note` for a note already in the clip; Firefish matches it verbatim. */
+const ALREADY_CLIPPED_ERROR_ID = "734806c4-542c-463a-9311-15c512803965";
 
 /** Firefish types the menu against the full note shape; the timeline projection is a subset. */
 export type NoteMenuNote = Note &
@@ -44,6 +49,8 @@ export interface NoteMenuProps {
  */
 export async function buildNoteMenu(
 	props: NoteMenuProps,
+	/** Where the note menu was opened; the clip sub-popup reuses it. */
+	point?: MouseEvent | { x: number; y: number },
 ): Promise<NoteMenuItem[]> {
 	const note = props.note;
 	const isPureRenote =
@@ -60,10 +67,14 @@ export async function buildNoteMenu(
 			state = null;
 		}
 	}
-	return getNoteMenu({ ...props, state });
+	return getNoteMenu({ ...props, state }, point);
 }
 
-export function getNoteMenu(props: NoteMenuProps): NoteMenuItem[] {
+export function getNoteMenu(
+	props: NoteMenuProps,
+	/** Where the note menu was opened; the clip sub-popup reuses it. */
+	point?: MouseEvent | { x: number; y: number },
+): NoteMenuItem[] {
 	const note = props.note;
 	const isRenote =
 		note.renote != null &&
@@ -115,6 +126,81 @@ export function getNoteMenu(props: NoteMenuProps): NoteMenuItem[] {
 	function copyContent(): void {
 		copyToClipboard(appearNote.text ?? "");
 		os.success();
+	}
+
+	/**
+	 * Firefish opens `os.form` for a new clip. The port has no form helper, so
+	 * the popup asks for the name only; the clip is created private with no
+	 * description and the note is added to it.
+	 */
+	async function clip(): Promise<void> {
+		const clips = await os.api(ENDPOINTS.clipsList, {});
+		await os.popupMenu(
+			[
+				{
+					icon: "ph-plus ph-bold ph-lg",
+					text: t("createNewClip"),
+					action: async () => {
+						const { canceled, result } = await os.inputText({
+							title: t("createNewClip"),
+							placeholder: t("name"),
+						});
+						const name = String(result ?? "").trim();
+						if (canceled || name === "") return;
+						try {
+							const created = await os.apiWithDialog<Clip>(
+								ENDPOINTS.clipsCreate,
+								{ name },
+							);
+							await os.apiWithDialog(ENDPOINTS.clipsAddNote, {
+								clipId: created.id,
+								noteId: appearNote.id,
+							});
+						} catch {
+							// apiWithDialog already showed the server error.
+						}
+					},
+				},
+				{ separator: true },
+				...clips.map((entry) => ({
+					text: entry.name,
+					action: () => {
+						void os.promiseDialog(
+							os.api(ENDPOINTS.clipsAddNote, {
+								clipId: entry.id,
+								noteId: appearNote.id,
+							}),
+							null,
+							async (error: unknown) => {
+								if (
+									error instanceof ApiError &&
+									error.errorId === ALREADY_CLIPPED_ERROR_ID
+								) {
+									const { canceled } = await os.confirm({
+										type: "warning",
+										text: t("confirmToUnclipAlreadyClippedNote", {
+											name: entry.name,
+										}),
+									});
+									if (canceled) return;
+									await os.apiWithDialog(ENDPOINTS.clipsRemoveNote, {
+										clipId: entry.id,
+										noteId: appearNote.id,
+									});
+									return;
+								}
+								const text =
+									error instanceof ApiError
+										? `${error.message}\n${error.errorId ?? error.code ?? ""}`.trim()
+										: String(error);
+								void os.alert({ type: "error", text });
+							},
+						);
+					},
+				})),
+			],
+			point ?? { x: 0, y: 0 },
+		);
 	}
 
 	function copyOriginal(): void {
@@ -185,6 +271,11 @@ export function getNoteMenu(props: NoteMenuProps): NoteMenuItem[] {
 			icon: "ph-bookmark-simple ph-bold ph-lg",
 			text: props.state?.isFavorited ? t("unfavorite") : t("favorite"),
 			action: toggleFavorite,
+		},
+		{
+			icon: "ph-paperclip ph-bold ph-lg",
+			text: t("clip"),
+			action: () => void clip(),
 		},
 		hasRemote
 			? {

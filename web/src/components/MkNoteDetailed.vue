@@ -98,6 +98,30 @@
 			</MkA>
 		</template>
 		<MkLoading v-else-if="tab === 'reactions' && reactedUsers == null" />
+
+		<template v-if="tab === 'clips' && clips && clips.length > 0">
+			<div class="clips">
+				<MkA
+					v-for="item in clips"
+					:key="item.id"
+					:to="`/clips/${item.id}`"
+					class="item _panel"
+				>
+					<b>{{ item.name }}</b>
+					<div v-if="item.description" class="description">
+						{{ item.description }}
+					</div>
+					<div class="user">
+						<MkAvatar
+							:user="item.user"
+							class="avatar"
+							:show-indicator="true"
+						/>
+						<MkUserName :user="item.user" :nowrap="false" />
+					</div>
+				</MkA>
+			</div>
+		</template>
 	</div>
 	<div v-else class="_panel muted" @click="muted.muted = false">
 		<small>{{ softMuteText }}</small>
@@ -106,7 +130,6 @@
 
 <script lang="ts" setup>
 // Degradations vs Firefish:
-//   * clips tab dropped (`notes/clips` has no endpoint);
 //   * `MkUserCardMini` / `MkReactedUsers` are not part of this wave, so both
 //     lists are rendered inline with the same class names (the surrounding SCSS
 //     hooks are kept);
@@ -115,7 +138,8 @@
 //   * translation is dropped (no endpoint).
 import { computed, onMounted, onUnmounted, onUpdated, ref, type Ref } from "vue";
 import { api } from "@/api/client";
-import type { Note, NoteDetailed, NoteReaction } from "@/api/types";
+import { ENDPOINTS } from "@/api/endpoints";
+import type { Clip, Note, NoteDetailed, NoteReaction } from "@/api/types";
 import CfInfo from "@/components/ui/CfInfo.vue";
 import CfTab from "@/components/ui/CfTab.vue";
 import MkNote from "@/components/MkNote.vue";
@@ -189,6 +213,7 @@ const directReplies = ref<DetailNote[] | null>(null);
 const directQuotes = ref<DetailNote[] | null>(null);
 const renotes = ref<DetailNote[] | null>(null);
 const reactedUsers = ref<NoteReaction[] | null>(null);
+const clips = ref<Clip[] | null>(null);
 let isScrolling = false;
 
 const reactionsCount = Object.values(props.note.reactions).reduce(
@@ -225,6 +250,15 @@ const tabOptions = computed(() => {
 			count: directQuotes.value.length,
 		});
 	}
+	// `notes/clips` returns only the public clips containing this note, even
+	// for the owner, so the tab appears only when there is something to show.
+	if (clips.value != null && clips.value.length > 0) {
+		tabs.push({
+			value: "clips",
+			label: t("clips"),
+			count: clips.value.length,
+		});
+	}
 	return tabs;
 });
 
@@ -241,6 +275,8 @@ const tabEmpty = computed<boolean>(() => {
 			return renotes.value != null && renotes.value.length === 0;
 		case "reactions":
 			return reactedUsers.value != null && reactedUsers.value.length === 0;
+		case "clips":
+			return clips.value != null && clips.value.length === 0;
 		default:
 			return false;
 	}
@@ -300,7 +336,7 @@ function onContextmenu(ev: MouseEvent): void {
 		ev.preventDefault();
 		react();
 	} else {
-		void buildNoteMenu({ note: note.value, isDeleted })
+		void buildNoteMenu({ note: note.value, isDeleted }, ev)
 			.then((items) => os.contextMenu(items, ev))
 			.then(focus);
 	}
@@ -352,6 +388,16 @@ async function loadChildren(): Promise<void> {
 }
 
 void loadChildren();
+
+// Firefish loads the clip list eagerly because the tab's visibility depends on
+// its length. A failure just hides the tab; it must not take over the page.
+void api(ENDPOINTS.notesClips, { noteId: note.value.id })
+	.then((res) => {
+		clips.value = res;
+	})
+	.catch(() => {
+		clips.value = [];
+	});
 
 conversation.value = null;
 if (note.value.replyId != null) {

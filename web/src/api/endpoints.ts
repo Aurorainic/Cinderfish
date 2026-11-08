@@ -19,6 +19,7 @@ import type {
 	AuthorizedApp,
 	BlockingRecord,
 	AllowlistResponse,
+	Clip,
 	DriveFile,
 	DriveUsage,
 	DriveFolder,
@@ -212,6 +213,21 @@ export const ENDPOINTS = {
 	usersListsGetMemberships: "users/lists/get-memberships",
 	usersListsFavorite: "users/lists/favorite",
 	usersListsUnfavorite: "users/lists/unfavorite",
+
+	// clips
+	clipsCreate: "clips/create",
+	clipsUpdate: "clips/update",
+	clipsDelete: "clips/delete",
+	clipsList: "clips/list",
+	clipsShow: "clips/show",
+	clipsMyFavorites: "clips/my-favorites",
+	clipsFavorite: "clips/favorite",
+	clipsUnfavorite: "clips/unfavorite",
+	clipsAddNote: "clips/add-note",
+	clipsRemoveNote: "clips/remove-note",
+	clipsNotes: "clips/notes",
+	notesClips: "notes/clips",
+	usersClips: "users/clips",
 
 	// timelines
 	notesTimeline: "notes/timeline",
@@ -800,6 +816,66 @@ export interface EndpointMap {
 		res: EmptyResponse;
 	};
 
+	// clips
+	[ENDPOINTS.clipsCreate]: {
+		req: { name: string; isPublic?: boolean; description?: string | null };
+		res: Clip;
+	};
+	[ENDPOINTS.clipsUpdate]: {
+		req: {
+			clipId: string;
+			name?: string;
+			isPublic?: boolean;
+			/** Omitted keeps the stored description; null or "" clears it. */
+			description?: string | null;
+		};
+		res: Clip;
+	};
+	[ENDPOINTS.clipsDelete]: {
+		req: { clipId: string };
+		res: EmptyResponse;
+	};
+	[ENDPOINTS.clipsList]: {
+		req: PaginationParams;
+		res: Clip[];
+	};
+	[ENDPOINTS.clipsShow]: {
+		req: { clipId: string };
+		res: Clip;
+	};
+	[ENDPOINTS.clipsMyFavorites]: {
+		req: Record<string, never>;
+		res: Clip[];
+	};
+	[ENDPOINTS.clipsFavorite]: {
+		req: { clipId: string };
+		res: EmptyResponse;
+	};
+	[ENDPOINTS.clipsUnfavorite]: {
+		req: { clipId: string };
+		res: EmptyResponse;
+	};
+	[ENDPOINTS.clipsAddNote]: {
+		req: { clipId: string; noteId: string };
+		res: EmptyResponse;
+	};
+	[ENDPOINTS.clipsRemoveNote]: {
+		req: { clipId: string; noteId: string };
+		res: EmptyResponse;
+	};
+	[ENDPOINTS.clipsNotes]: {
+		req: PaginationParams & { clipId: string; search?: string };
+		res: Note[];
+	};
+	[ENDPOINTS.notesClips]: {
+		req: { noteId: string };
+		res: Clip[];
+	};
+	[ENDPOINTS.usersClips]: {
+		req: PaginationParams & { userId: string };
+		res: Clip[];
+	};
+
 	[ENDPOINTS.registrySet]: { req: RegistryParams; res: EmptyResponse };
 	[ENDPOINTS.registryGet]: { req: RegistryGetParams; res: unknown };
 	[ENDPOINTS.registryGetDetail]: {
@@ -1344,4 +1420,7 @@ export type PagingEndpoint =
 	| typeof ENDPOINTS.notesReactions
 	| typeof ENDPOINTS.driveFiles
 	| typeof ENDPOINTS.driveFolders
+	| typeof ENDPOINTS.clipsList
+	| typeof ENDPOINTS.clipsNotes
+	| typeof ENDPOINTS.usersClips
 	| typeof ENDPOINTS.adminEmojiList;

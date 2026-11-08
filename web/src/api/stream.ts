@@ -12,8 +12,8 @@ import type { DriveFile, MeDetailed, NoteDetailed, Notification } from "./types"
  *   - idle connections are killed after ~120-180s because server pongs do not
  *     refresh liveness, so an application-level heartbeat is sent every 30s;
  *   - channel names are limited to `main`, `homeTimeline`, `localTimeline`,
- *     `hybridTimeline`, `globalTimeline` and `userList` by the backend. Unknown
- *     channels are ignored silently, so subscriptions time out locally.
+ *     `hybridTimeline`, `globalTimeline`, `userList` and `clip` by the backend.
+ *     Unknown channels are ignored silently, so subscriptions time out locally.
  */
 
 export type StreamChannelName =
@@ -22,7 +22,8 @@ export type StreamChannelName =
 	| "localTimeline"
 	| "hybridTimeline"
 	| "globalTimeline"
-	| "userList";
+	| "userList"
+	| "clip";
 
 export interface ChannelNoteEvent {
 	note: NoteDetailed;
@@ -52,6 +53,10 @@ export interface ChannelEventMap {
 	driveFileCreated: DriveFile;
 	connected: { id: string };
 	unavailable: { id: string };
+	/** Clip channel: the clip was edited (refetch `clips/show`). */
+	updated: null;
+	/** Clip channel: the clip was deleted (navigate away). */
+	deleted: null;
 }
 
 export interface NoteUpdatedEvent {

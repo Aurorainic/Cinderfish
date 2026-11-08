@@ -411,13 +411,9 @@ function onContextmenu(ev: MouseEvent): void {
 
 function menu(_viaKeyboard = false): void {
 	const rect = menuButton.value?.getBoundingClientRect();
-	void buildNoteMenu({ note: note.value, isDeleted })
-		.then((items) =>
-			os.popupMenu(items, {
-				x: rect?.left ?? 0,
-				y: (rect?.bottom ?? 0) + 4,
-			}),
-		)
+	const point = { x: rect?.left ?? 0, y: (rect?.bottom ?? 0) + 4 };
+	void buildNoteMenu({ note: note.value, isDeleted }, point)
+		.then((items) => os.popupMenu(items, point))
 		.then(focus);
 }
 
