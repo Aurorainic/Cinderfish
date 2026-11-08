@@ -10,9 +10,8 @@
 					:style="{ backgroundImage: `url(${me.bannerUrl})` }"
 				></div>
 				<button
+					v-tooltip="accountLabel"
 					class="item _button account"
-					:title="accountLabel"
-					:aria-label="accountLabel"
 					@click="openAccountMenu"
 				>
 					<CfAvatar
@@ -28,9 +27,9 @@
 			<nav class="middle">
 				<CfA
 					to="/"
+					v-tooltip="t('timeline')"
 					class="item index"
 					active-class="active"
-					:title="labelled ? t('timeline') : undefined"
 				>
 					<i class="icon ph-house ph-bold ph-lg ph-fw"></i>
 					<span class="text">{{ t("timeline") }}</span>
@@ -40,9 +39,9 @@
 					v-for="nav in menu"
 					:key="nav.id"
 					:to="nav.to"
+					v-tooltip="t(nav.title)"
 					class="item"
 					active-class="active"
-					:title="labelled ? t(nav.title) : undefined"
 				>
 					<i class="icon ph-lg ph-fw" :class="nav.icon"></i>
 					<span class="text">{{ t(nav.title) }}</span>
@@ -56,17 +55,17 @@
 				<CfA
 					v-if="moderator"
 					to="/admin"
+					v-tooltip="t('controlPanel')"
 					class="item"
 					active-class="active"
-					:title="labelled ? t('controlPanel') : undefined"
 				>
 					<i class="icon ph-door ph-bold ph-lg ph-fw"></i>
 					<span class="text">{{ t("controlPanel") }}</span>
 				</CfA>
 
 				<button
+					v-tooltip="t('more')"
 					class="item _button"
-					:title="labelled ? t('more') : undefined"
 					@click="openMoreMenu"
 				>
 					<i class="icon ph-dots-three-outline ph-bold ph-lg ph-fw"></i>
@@ -78,9 +77,9 @@
 
 				<CfA
 					to="/settings"
+					v-tooltip="t('settings')"
 					class="item"
 					active-class="active"
-					:title="labelled ? t('settings') : undefined"
 				>
 					<i class="icon ph-gear-six ph-bold ph-lg ph-fw"></i>
 					<span class="text">{{ t("settings") }}</span>
@@ -89,8 +88,8 @@
 
 			<div class="bottom">
 				<button
+					v-tooltip="t('note')"
 					class="item _button post"
-					:title="labelled ? t('note') : undefined"
 					data-cy-open-post-form
 					@click="openPost"
 				>
@@ -98,9 +97,8 @@
 					<span class="text">{{ t("note") }}</span>
 				</button>
 				<button
+					v-tooltip="t('help')"
 					class="item _button help"
-					:title="t('help')"
-					:aria-label="t('help')"
 					@click="openHelpMenu"
 				>
 					<i class="icon ph-info ph-bold ph-xl ph-fw"></i>
@@ -131,7 +129,7 @@ import { userPage } from "@/components/ui/icon";
 import CfA from "@/components/ui/CfA.vue";
 import CfAvatar from "@/components/ui/CfAvatar.vue";
 
-const props = withDefaults(
+withDefaults(
 	defineProps<{
 		/** Collapse to the 80px icon rail (Firefish's `iconOnly`). */
 		iconOnly?: boolean;
@@ -243,9 +241,6 @@ const UNAVAILABLE_MENU: ReadonlySet<MenuOption> = new Set<MenuOption>([
 
 const router = useRouter();
 const { t } = useLocale();
-
-/** The icon rail hides the labels, so it moves them into `title`. */
-const labelled = computed(() => props.iconOnly && !props.drawer);
 
 const moderator = computed(
 	() => me.value != null && (me.value.isAdmin || me.value.isModerator),

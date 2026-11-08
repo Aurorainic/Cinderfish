@@ -14,7 +14,7 @@
 					<button
 						v-for="(button, index) in buttonsLeft"
 						:key="index"
-						:title="button.title"
+						v-tooltip="button.title"
 						class="button _button"
 						:class="{ highlighted: button.highlighted }"
 						@click="button.onClick"
@@ -33,7 +33,7 @@
 					<button
 						v-for="(button, index) in buttonsRight"
 						:key="index"
-						:title="button.title"
+						v-tooltip="button.title"
 						class="button _button"
 						:class="{ highlighted: button.highlighted }"
 						@click="button.onClick"

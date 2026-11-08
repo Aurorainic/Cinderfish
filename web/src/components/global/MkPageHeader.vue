@@ -12,7 +12,7 @@
 			<div class="buttons">
 				<button
 					v-if="displayBackButton"
-					:title="t('goBack')"
+					v-tooltip="t('goBack')"
 					class="_buttonIcon button icon backButton"
 					@click.stop="goBack()"
 					@touchstart="preventDrag"
@@ -78,7 +78,7 @@
 				v-for="tab in tabs"
 				:key="tab.key ?? tab.title"
 				:ref="(tabEl) => setTabRef(tab, tabEl)"
-				:title="tab.title"
+				v-tooltip="tab.title"
 				class="tab _button"
 				:class="{ active: tab.key != null && tab.key === props.tab }"
 				@mousedown="(ev) => onTabMousedown(tab, ev)"
@@ -99,7 +99,7 @@
 			<button
 				v-for="(action, i) in actions"
 				:key="i"
-				:title="action.text"
+				v-tooltip="action.text"
 				class="_buttonIcon button"
 				:class="{ highlighted: action.highlighted }"
 				@click.stop="action.handler"
