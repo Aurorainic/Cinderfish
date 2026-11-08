@@ -227,15 +227,15 @@ const OVERFLOW_ENTRIES: NavEntry[] = [
 ];
 
 /**
- * First-release scope keeps chat / channels / clips / gallery / pages /
- * antennas / lists as placeholder routes (Misskey API coverage register §5).
- * Search is listed again now that `notes/search` and `users/search` exist; it
- * opens /search, which carries its own query box.
+ * First-release scope keeps channels / clips / gallery / pages / antennas /
+ * lists as placeholder routes (Misskey API coverage register §5). Messaging is
+ * wired now (1:1 only), so its entry is no longer filtered out. Search is
+ * listed again now that `notes/search` and `users/search` exist; it opens
+ * /search, which carries its own query box.
  * The menu table still knows them so the store shape stays Firefish-compatible,
  * but they are filtered out instead of leading to a dead end.
  */
 const UNAVAILABLE_MENU: ReadonlySet<MenuOption> = new Set<MenuOption>([
-	"messaging",
 	"channels",
 ]);
 
@@ -264,7 +264,7 @@ function isIndicated(id: string): boolean {
 		case "followRequests":
 			return account.hasPendingReceivedFollowRequest;
 		case "messaging":
-			return account.hasUnreadChatMessages;
+			return account.hasUnreadMessagingMessage;
 		case "announcements":
 			return account.hasUnreadAnnouncement;
 		default:

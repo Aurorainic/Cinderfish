@@ -52,7 +52,13 @@
 				<CfButton disabled>
 					{{ t("markAsReadAllUnreadNotes") }}
 				</CfButton>
-				<CfButton disabled>
+				<CfButton
+					primary
+					:wait="markingMessaging"
+					:disabled="markingMessaging || me == null"
+					@click="markAllMessagingAsRead()"
+				>
+					<i class="ph-check ph-bold ph-lg"></i>
 					{{ t("markAsReadAllTalkMessages") }}
 				</CfButton>
 			</div>
@@ -60,9 +66,9 @@
 				{{ actionErrorText }}
 			</CfInfo>
 			<CfInfo v-else class="_note">
-				「{{ t("markAsReadAllUnreadNotes") }}」与「{{ t("markAsReadAllTalkMessages") }}」
-				所需的 <code>i/read-all-unread-notes</code> / <code>i/read-all-messaging-messages</code>
-				端点<strong>未提供</strong>，因此保持禁用。
+				「{{ t("markAsReadAllUnreadNotes") }}」所需的
+				<code>i/read-all-unread-notes</code> 端点<strong>未提供</strong>，因此保持禁用；
+				私聊消息通过 <code>i/read-all-messaging-messages</code> 一并标记已读。
 			</CfInfo>
 		</section>
 
@@ -89,10 +95,12 @@
 <script lang="ts" setup>
 // Firefish's notification settings page writes `i/update { mutingNotificationTypes }`
 // after the notification-type window closes, and offers three "mark all read"
-// buttons. Only one of those has a Cinderfish endpoint:
+// buttons. Two of those have a Cinderfish endpoint:
 //   * `notifications/mark-all-as-read` exists and is called for real;
-//   * `i/read-all-unread-notes` / `i/read-all-messaging-messages` do not exist,
-//     so those buttons stay disabled with an explicit note;
+//   * `i/read-all-messaging-messages` exists (1:1 messaging), so the talk button
+//     is live and clears `hasUnreadMessagingMessage`;
+//   * `i/read-all-unread-notes` is still missing, so that button stays disabled
+//     with an explicit note;
 //   * `i/update` stores `mutingNotificationTypes`; the list below toggles it
 //     and the notification endpoint filters on the stored value.
 // The push-notification block is dropped entirely: `sw/*` is not implemented.
@@ -100,6 +108,7 @@ import { computed, onMounted, ref } from "vue";
 import { me, updateMe, updateProfile } from "@/account";
 import type { MeDetailed, NotificationType } from "@/api/types";
 import { api } from "@/api/client";
+import { ENDPOINTS } from "@/api/endpoints";
 import CfButton from "@/components/ui/CfButton.vue";
 import CfInfo from "@/components/ui/CfInfo.vue";
 import CfLoading from "@/components/ui/CfLoading.vue";
@@ -124,6 +133,7 @@ const loading = ref(true);
 const loadErrorText = ref<string | null>(null);
 const actionErrorText = ref<string | null>(null);
 const marking = ref(false);
+const markingMessaging = ref(false);
 const savingType = ref(false);
 const typeError = ref<string | null>(null);
 
@@ -184,7 +194,7 @@ async function markAllAsRead(): Promise<void> {
 	marking.value = true;
 	actionErrorText.value = null;
 	try {
-		await api("notifications/mark-all-as-read");
+		await api(ENDPOINTS.notificationsMarkAllAsRead);
 		updateMe({ hasUnreadNotification: false, unreadNotificationsCount: 0 });
 		success();
 	} catch (error) {
@@ -194,6 +204,24 @@ async function markAllAsRead(): Promise<void> {
 				: t("somethingHappened");
 	} finally {
 		marking.value = false;
+	}
+}
+
+async function markAllMessagingAsRead(): Promise<void> {
+	if (markingMessaging.value) return;
+	markingMessaging.value = true;
+	actionErrorText.value = null;
+	try {
+		await api(ENDPOINTS.iReadAllMessagingMessages, {});
+		updateMe({ hasUnreadMessagingMessage: false });
+		success();
+	} catch (error) {
+		actionErrorText.value =
+			error instanceof Error && error.message !== ""
+				? error.message
+				: t("somethingHappened");
+	} finally {
+		markingMessaging.value = false;
 	}
 }
 

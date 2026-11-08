@@ -111,6 +111,14 @@ void restoreSession()
     main.on("registryUpdated", ({ scope, key, value }) => {
       applyRegistryUpdated(scope, key, value);
     });
+    // Messaging unread state: the backend fires the unread event two seconds
+    // after delivery, and clears the marker when nothing incoming remains.
+    main.on("unreadMessagingMessage", () => {
+      updateMe({ hasUnreadMessagingMessage: true });
+    });
+    main.on("readAllMessagingMessages", () => {
+      updateMe({ hasUnreadMessagingMessage: false });
+    });
   });
 if (me.value != null) {
   void refreshAccount().catch(() => undefined);

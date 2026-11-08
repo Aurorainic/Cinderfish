@@ -42,6 +42,7 @@ import type {
 	AdminSigninEntry,
 	MailSettingsInfo,
 	MeDetailed,
+	MessagingMessage,
 	MetaDetailed,
 	MetaLite,
 	MiAuthTokenResponse,
@@ -217,6 +218,14 @@ export const ENDPOINTS = {
 	usersListsGetMemberships: "users/lists/get-memberships",
 	usersListsFavorite: "users/lists/favorite",
 	usersListsUnfavorite: "users/lists/unfavorite",
+
+	// messaging (fork-preserved 1:1 contract; groups are deferred)
+	messagingHistory: "messaging/history",
+	messagingMessages: "messaging/messages",
+	messagingMessagesCreate: "messaging/messages/create",
+	messagingMessagesDelete: "messaging/messages/delete",
+	messagingMessagesRead: "messaging/messages/read",
+	iReadAllMessagingMessages: "i/read-all-messaging-messages",
 
 	// clips
 	clipsCreate: "clips/create",
@@ -952,6 +961,39 @@ export interface EndpointMap {
 	[ENDPOINTS.usersClips]: {
 		req: PaginationParams & { userId: string };
 		res: Clip[];
+	};
+
+	// messaging
+	[ENDPOINTS.messagingHistory]: {
+		req: { limit?: number; group?: boolean };
+		res: MessagingMessage[];
+	};
+	[ENDPOINTS.messagingMessages]: {
+		req: {
+			userId: string;
+			limit?: number;
+			sinceId?: string;
+			untilId?: string;
+			/** Defaults to true on the backend; the room passes false and reads explicitly. */
+			markAsRead?: boolean;
+		};
+		res: MessagingMessage[];
+	};
+	[ENDPOINTS.messagingMessagesCreate]: {
+		req: { userId: string; text?: string; fileId?: string };
+		res: MessagingMessage;
+	};
+	[ENDPOINTS.messagingMessagesDelete]: {
+		req: { messageId: string };
+		res: EmptyResponse;
+	};
+	[ENDPOINTS.messagingMessagesRead]: {
+		req: { messageId: string };
+		res: EmptyResponse;
+	};
+	[ENDPOINTS.iReadAllMessagingMessages]: {
+		req: Record<string, never>;
+		res: EmptyResponse;
 	};
 
 	// antennas

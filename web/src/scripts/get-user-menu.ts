@@ -6,9 +6,9 @@
 // `userActions` plugin entries are all dropped. Lists have since been ported
 // and are offered through an "add to list" entry that opens a second popup.
 // Mute/block and abuse reporting have also been ported and are offered again.
-// "Send message" is dropped too: Firefish opens the post form with
-// `{ specified: user }`, and the Cinderfish `os.post` contract has no
-// `specified` / `visibleUserIds` field yet.
+// "Send message" is re-enabled: Cinderfish now has the 1:1 messaging endpoints,
+// so the entry navigates to `/my/messaging/<acct>` instead of opening the post
+// form (the port's `os.post` contract still has no `specified` field).
 //
 // Cinderfish's CfPopupMenu does not render `MenuItem.children`, so the list
 // submenu is a second popup anchored at the point that opened the user menu.
@@ -22,6 +22,7 @@ import { ENDPOINTS } from "@/api/endpoints";
 import type { UserDetailed, UserList } from "@/api/types";
 import { me } from "@/account";
 import { host as instanceHost } from "@/config";
+import { acct } from "@/filters/user";
 import { t } from "@/i18n";
 import * as os from "@/os";
 import type { MenuItem } from "@/os";
@@ -210,6 +211,13 @@ export function getUserMenu(
 	} else if (current != null) {
 		items.push(
 			{ separator: true },
+			{
+				icon: "ph-chats-teardrop ph-bold ph-lg",
+				text: t("startMessaging"),
+				action: () => {
+					void router.push(`/my/messaging/${acct(user)}`);
+				},
+			},
 			{
 				icon: "ph-list-plus ph-bold ph-lg",
 				text: t("addToList"),

@@ -107,6 +107,9 @@ export interface MeDetailed extends UserDetailed {
 	hideOnlineStatus: boolean;
 	hasUnreadSpecifiedNotes: boolean;
 	hasUnreadMentions: boolean;
+	/** Computed by the backend from `messaging_messages`; the navbar indicator. */
+	hasUnreadMessagingMessage: boolean;
+	/** Legacy group-chat flag, always false: groups are a recorded deferral. */
 	hasUnreadChatMessages: boolean;
 	hasUnreadAnnouncement: boolean;
 	unreadAnnouncements: unknown[];
@@ -268,6 +271,34 @@ export interface UserListMembership {
 	userId: string;
 	user: UserLite;
 	withReplies: boolean;
+}
+
+/**
+ * One 1:1 message (`messaging/*`, the fork-preserved legacy contract).
+ *
+ * `messaging/history` and `messaging/messages/create` embed `recipient`;
+ * the `messaging/messages` thread listing leaves it out. Group fields stay
+ * null/empty because group messaging is a recorded deferral.
+ */
+export interface MessagingMessage {
+	id: string;
+	createdAt: string;
+	/** Sender. */
+	userId: string;
+	user: UserLite;
+	text: string | null;
+	fileId: string | null;
+	file: DriveFile | null;
+	/** The other participant. */
+	recipientId: string;
+	/** Present only on the shapes that populate the recipient. */
+	recipient?: UserLite;
+	/** Always null; the backend has no group branch. */
+	groupId: null;
+	/** Recipient-side read flag. */
+	isRead: boolean;
+	/** Always empty for a 1:1 message. */
+	reads: string[];
 }
 
 /** One clip (`clips/*`). */

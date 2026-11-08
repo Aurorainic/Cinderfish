@@ -1,5 +1,12 @@
 import { getAuthToken } from "./client";
-import type { DriveFile, MeDetailed, NoteDetailed, Notification } from "./types";
+import type {
+	DriveFile,
+	MeDetailed,
+	MessagingMessage,
+	NoteDetailed,
+	Notification,
+	UserLite,
+} from "./types";
 
 /**
  * Cinderfish Streaming API client.
@@ -12,8 +19,8 @@ import type { DriveFile, MeDetailed, NoteDetailed, Notification } from "./types"
  *   - idle connections are killed after ~120-180s because server pongs do not
  *     refresh liveness, so an application-level heartbeat is sent every 30s;
  *   - channel names are limited to `main`, `homeTimeline`, `localTimeline`,
- *     `hybridTimeline`, `globalTimeline`, `userList`, `clip`, `channel` and
- *     `antenna` by the backend.
+ *     `hybridTimeline`, `globalTimeline`, `userList`, `clip`, `channel`,
+ *     `antenna`, `messaging` and `messagingIndex` by the backend.
  *     Unknown channels are ignored silently, so subscriptions time out locally.
  */
 
@@ -26,7 +33,9 @@ export type StreamChannelName =
 	| "userList"
 	| "clip"
 	| "channel"
-	| "antenna";
+	| "antenna"
+	| "messaging"
+	| "messagingIndex";
 
 export interface ChannelNoteEvent {
 	note: NoteDetailed;
@@ -39,6 +48,14 @@ export interface RegistryUpdatedEvent {
 	scope: string[];
 	key: string;
 	value: unknown;
+}
+
+/** Main-channel payload for `messagingMessage` / `unreadMessagingMessage`. */
+export type MessagingMessageEvent = MessagingMessage;
+
+/** Body of the `read` event on both messaging channels. */
+export interface MessagingReadEvent {
+	readerId: string;
 }
 
 export interface ChannelEventMap {
@@ -58,8 +75,23 @@ export interface ChannelEventMap {
 	unavailable: { id: string };
 	/** Clip channel: the clip was edited (refetch `clips/show`). */
 	updated: null;
-	/** Clip channel: the clip was deleted (navigate away). */
-	deleted: null;
+	/**
+	 * Clip channel: the clip was deleted (payload null, navigate away).
+	 * Messaging channels: `{ id }` of the removed message.
+	 */
+	deleted: { id: string } | null;
+	/** Messaging channels: one message was created. */
+	message: MessagingMessage;
+	/** Messaging channels: a participant read the conversation. */
+	read: MessagingReadEvent;
+	/** Messaging channel: users typing within the last five seconds. */
+	typers: UserLite[];
+	/** Main channel: a message was created in one of my conversations. */
+	messagingMessage: MessagingMessageEvent;
+	/** Main channel: a message stayed unread two seconds after delivery. */
+	unreadMessagingMessage: MessagingMessageEvent;
+	/** Main channel: nothing incoming remains unread. */
+	readAllMessagingMessages: null;
 }
 
 export interface NoteUpdatedEvent {
@@ -547,6 +579,15 @@ export class StreamClient {
 	/** Ask the server to mark all notifications as read (no REST round-trip). */
 	readNotification(): void {
 		this.send("readNotification", {});
+	}
+
+	/**
+	 * Announce that the viewer is typing in a 1:1 conversation. Firefish sends
+	 * this as a top-level frame; the server turns it into the `typers` event of
+	 * the conversation channel (`docs/research/api-contract/streaming.md`).
+	 */
+	typingOnMessaging(partner: string): void {
+		this.send("typingOnMessaging", { partner });
 	}
 }
 
