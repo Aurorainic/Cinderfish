@@ -131,6 +131,8 @@ func TestChannelRegistry(t *testing.T) {
 		// userList requires the credential outright; upstream's init
 		// dereferences the viewer so anonymous subscribers crash.
 		"userList": {true, false},
+		// clip accepts anonymous watchers of a public clip.
+		"clip": {false, false},
 	}
 	for name, w := range want {
 		spec, ok := channelSpecs[name]
@@ -702,6 +704,67 @@ func TestUserListChannelRejectsBadParams(t *testing.T) {
 	// pass every note.
 	listIDJSON, _ := json.Marshal("list1")
 	if channelSpecs["userList"].New(h2.conn, "u2").Init(map[string]json.RawMessage{"listId": listIDJSON}) {
+		t.Error("missing loader must reject")
+	}
+}
+
+// stubClipLoader is a ClipLoader with a fixed visibility answer.
+type stubClipLoader struct {
+	visible bool
+}
+
+func (s stubClipLoader) ClipVisible(_ context.Context, _, _ string) (bool, error) {
+	return s.visible, nil
+}
+
+func TestClipChannelForwardsEvents(t *testing.T) {
+	h := newTestConnection(t, Viewer{UserID: "alice"})
+	h.conn.clipLoader = stubClipLoader{visible: true}
+
+	clipIDJSON, _ := json.Marshal("clip1")
+	ch := newChannel(h, "clip", "c1", map[string]json.RawMessage{"clipId": clipIDJSON})
+	if ch.Name() != "clip" {
+		t.Fatalf("channel name = %q", ch.Name())
+	}
+
+	forwarded, _ := NewMessage("updated", nil)
+	h.conn.bus.Publish(ClipSubject("clip1"), forwarded)
+	deleted, _ := NewMessage("deleted", nil)
+	h.conn.bus.Publish(ClipSubject("clip1"), deleted)
+	// Other subjects and types must not surface.
+	h.conn.bus.Publish(ClipSubject("other"), forwarded)
+	notePing, _ := NewMessage("unrelated", nil)
+	h.conn.bus.Publish(ClipSubject("clip1"), notePing)
+
+	var col collector
+	col.drain(h.ws)
+	if len(col.events) != 2 {
+		t.Fatalf("events = %+v, want updated and deleted", col.events)
+	}
+	if col.events[0].Type != "updated" || col.events[1].Type != "deleted" {
+		t.Errorf("event types = %q, %q", col.events[0].Type, col.events[1].Type)
+	}
+}
+
+func TestClipChannelRejects(t *testing.T) {
+	// An invisible clip rejects the subscription.
+	h := newTestConnection(t, Viewer{UserID: "alice"})
+	h.conn.clipLoader = stubClipLoader{visible: false}
+	clipIDJSON, _ := json.Marshal("clip1")
+	if channelSpecs["clip"].New(h.conn, "c1").Init(map[string]json.RawMessage{"clipId": clipIDJSON}) {
+		t.Error("invisible clip must reject")
+	}
+
+	// A missing clipId param rejects.
+	h2 := newTestConnection(t, Viewer{UserID: "alice"})
+	h2.conn.clipLoader = stubClipLoader{visible: true}
+	if channelSpecs["clip"].New(h2.conn, "c2").Init(nil) {
+		t.Error("missing clipId must reject")
+	}
+
+	// A missing loader rejects rather than letting events flow.
+	h3 := newTestConnection(t, Viewer{UserID: "alice"})
+	if channelSpecs["clip"].New(h3.conn, "c3").Init(map[string]json.RawMessage{"clipId": clipIDJSON}) {
 		t.Error("missing loader must reject")
 	}
 }

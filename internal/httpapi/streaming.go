@@ -15,10 +15,12 @@ import (
 func (s *Server) AttachStreaming(logf func(string, ...any)) *streaming.Bus {
 	var followers streaming.ViewerLoader
 	var lists streaming.ListLoader
+	var clips streaming.ClipLoader
 	if s.pool != nil {
 		followers = s
 		if s.accounts != nil {
 			lists = s
+			clips = s
 		}
 	}
 
@@ -42,6 +44,7 @@ func (s *Server) AttachStreaming(logf func(string, ...any)) *streaming.Bus {
 		Auth:      auth,
 		Followers: followers,
 		Lists:     lists,
+		Clips:     clips,
 		Logger:    logf,
 		MarkRead:  markRead,
 	})

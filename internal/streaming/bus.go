@@ -46,6 +46,10 @@ func NoteSubject(noteID string) string { return "noteStream:" + noteID }
 // GlobalEventService.publishUserListStream.
 func UserListSubject(listID string) string { return "userListStream:" + listID }
 
+// ClipSubject returns the subject carrying one clip's update events
+// ("updated"/"deleted"), matching GlobalEventService.publishClipStream.
+func ClipSubject(clipID string) string { return "clipStream:" + clipID }
+
 // Message is one event delivered on a subject.
 //
 // Type is the inner event type ("notification", "reacted", ...). A nil

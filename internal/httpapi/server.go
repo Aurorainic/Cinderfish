@@ -292,6 +292,22 @@ func (s *Server) registerRoutes() {
 	// The timeline that joins a list's members.
 	s.mux.HandleFunc("POST /api/notes/user-list-timeline", s.handleUserListTimeline)
 
+	// Clips (schema v31), the clips/* family upstream defines in
+	// packages/backend/src/server/api/endpoints/clips/.
+	s.mux.HandleFunc("POST /api/clips/create", s.handleClipsCreate)
+	s.mux.HandleFunc("POST /api/clips/update", s.handleClipsUpdate)
+	s.mux.HandleFunc("POST /api/clips/delete", s.handleClipsDelete)
+	s.mux.HandleFunc("POST /api/clips/list", s.handleClipsList)
+	s.mux.HandleFunc("POST /api/clips/show", s.handleClipsShow)
+	s.mux.HandleFunc("POST /api/clips/my-favorites", s.handleClipsMyFavorites)
+	s.mux.HandleFunc("POST /api/clips/favorite", s.handleClipsFavorite)
+	s.mux.HandleFunc("POST /api/clips/unfavorite", s.handleClipsUnfavorite)
+	s.mux.HandleFunc("POST /api/clips/add-note", s.handleClipsAddNote)
+	s.mux.HandleFunc("POST /api/clips/remove-note", s.handleClipsRemoveNote)
+	s.mux.HandleFunc("POST /api/clips/notes", s.handleClipsNotes)
+	s.mux.HandleFunc("POST /api/notes/clips", s.handleNotesClips)
+	s.mux.HandleFunc("POST /api/users/clips", s.handleUsersClips)
+
 	// Mutes and blocks. Both tables exist since schema v1; these endpoints
 	// are what the settings page and the timeline filter read.
 	s.mux.HandleFunc("POST /api/mute/create", s.handleMuteCreate)

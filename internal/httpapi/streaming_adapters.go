@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"errors"
 
 	"github.com/Aurorainic/cinderfish/internal/account"
 	"github.com/Aurorainic/cinderfish/internal/streaming"
@@ -83,4 +84,17 @@ func (s *Server) LoadListMembers(ctx context.Context, listID, userID string) (ma
 		out[m.UserID] = streaming.ListMembership{WithReplies: m.WithReplies}
 	}
 	return out, true, nil
+}
+
+// ClipVisible implements streaming.ClipLoader for the Server: the owner
+// and readers of a public clip may watch its stream.
+func (s *Server) ClipVisible(ctx context.Context, clipID, viewerID string) (bool, error) {
+	if s.accounts == nil {
+		return false, nil
+	}
+	_, err := s.accounts.GetClip(ctx, clipID, viewerID)
+	if errors.Is(err, account.ErrClipNotFound) {
+		return false, nil
+	}
+	return err == nil, err
 }

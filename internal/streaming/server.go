@@ -65,6 +65,7 @@ type Options struct {
 	Auth      Authenticator
 	Followers ViewerLoader
 	Lists     ListLoader
+	Clips     ClipLoader
 	Logger    func(string, ...any)
 	// MarkRead is called for the "readNotification" client frame: an empty
 	// id list means "mark everything read", which is what a frame without any
@@ -77,12 +78,13 @@ type Options struct {
 
 // Server serves the /streaming WebSocket endpoint.
 type Server struct {
-	bus       *Bus
-	auth      Authenticator
-	followers ViewerLoader
-	lists     ListLoader
-	logf      func(string, ...any)
-	markRead  func(ctx context.Context, userID string, notificationIDs []string) error
+	bus         *Bus
+	auth        Authenticator
+	followers   ViewerLoader
+	lists       ListLoader
+	clipsLoader ClipLoader
+	logf        func(string, ...any)
+	markRead    func(ctx context.Context, userID string, notificationIDs []string) error
 
 	upgrader websocket.Upgrader
 }
@@ -90,12 +92,13 @@ type Server struct {
 // New returns a streaming Server.
 func New(opts Options) *Server {
 	return &Server{
-		bus:       opts.Bus,
-		auth:      opts.Auth,
-		followers: opts.Followers,
-		lists:     opts.Lists,
-		logf:      logfOr(opts.Logger),
-		markRead:  opts.MarkRead,
+		bus:         opts.Bus,
+		auth:        opts.Auth,
+		followers:   opts.Followers,
+		lists:       opts.Lists,
+		clipsLoader: opts.Clips,
+		logf:        logfOr(opts.Logger),
+		markRead:    opts.MarkRead,
 		// Misskey performs no origin check on the streaming endpoint.
 		upgrader: websocket.Upgrader{
 			ReadBufferSize:  1 << 10,
@@ -174,6 +177,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	conn.lists = s.lists
+	conn.clipLoader = s.clipsLoader
 
 	conn.serve()
 }

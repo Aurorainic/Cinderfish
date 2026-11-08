@@ -402,3 +402,50 @@ func (s *TimelineService) notesLinkedTo(ctx context.Context, column, label, note
 	}
 	return out, rows.Err()
 }
+
+// ClipNotes returns the notes collected in one clip, newest first unless
+// a sinceId is given without untilId. This is clips/notes: the same
+// generateVisibilityQuery filter the timelines use, plus an optional
+// full-text search over text and cw — trimmed, split on spaces, every
+// word an ILIKE match, wildcards escaped as upstream does.
+func (s *TimelineService) ClipNotes(ctx context.Context, clipID, viewerID string, limit int, sinceID, untilID string, words []string) ([]*Note, error) {
+	if limit <= 0 {
+		limit = 10
+	}
+	if limit > 100 {
+		limit = 100
+	}
+
+	q := &queryBuilder{}
+	q.add("cn.clip_id = %s", clipID)
+	q.conds = append(q.conds, "n.deleted_at IS NULL")
+	q.addNoteVisibility(viewerID)
+	q.addViewerRelationFilters(viewerID)
+	q.addPageCursors(sinceID, untilID)
+	for _, word := range words {
+		escaped := escapeLike(word)
+		arg := "%" + escaped + "%"
+		q.args = append(q.args, arg)
+		ph := fmt.Sprintf("$%d", len(q.args))
+		q.conds = append(q.conds, "(n.text ILIKE "+ph+" OR n.cw ILIKE "+ph+")")
+	}
+
+	query := noteSelect + " JOIN clip_notes cn ON cn.note_id = n.id WHERE " + strings.Join(q.conds, " AND ") +
+		" ORDER BY n.id " + paginationOrder(sinceID, untilID) + " LIMIT " + strconv.Itoa(limit)
+
+	rows, err := s.pool.Query(ctx, query, q.args...)
+	if err != nil {
+		return nil, fmt.Errorf("note: clip notes query: %w", err)
+	}
+	defer rows.Close()
+
+	out := []*Note{}
+	for rows.Next() {
+		n, err := scanNote(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, n)
+	}
+	return out, rows.Err()
+}

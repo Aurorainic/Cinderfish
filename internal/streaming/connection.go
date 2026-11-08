@@ -36,6 +36,8 @@ type Connection struct {
 	refreshViewer      func(*Connection)
 	// lists loads user-list membership for the userList channel.
 	lists ListLoader
+	// clipLoader checks clip visibility for the clip channel.
+	clipLoader ClipLoader
 }
 
 // newConnection assembles a Connection for an upgraded WebSocket.

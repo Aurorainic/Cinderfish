@@ -716,6 +716,41 @@ CREATE TABLE IF NOT EXISTS user_list_favorites (
 );
 CREATE INDEX IF NOT EXISTS idx_user_list_favorites_list ON user_list_favorites (user_list_id);
 `,
+	31: `
+-- Clips (Misskey's clips/* family): named, ownable collections of notes
+-- with an optional public view and favouriting. Mirrors
+-- Clip/ClipFavorite/ClipNote (packages/backend/src/models); Cinderfish
+-- stores created_at explicitly instead of decoding it from the id.
+CREATE TABLE IF NOT EXISTS clips (
+    id             TEXT PRIMARY KEY,
+    user_id        TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    name           VARCHAR(128) NOT NULL,
+    is_public      BOOLEAN NOT NULL DEFAULT false,
+    description    VARCHAR(2048),
+    last_clipped_at TIMESTAMPTZ,
+    created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_clips_user ON clips (user_id, id);
+CREATE INDEX IF NOT EXISTS idx_clips_public ON clips (is_public);
+
+CREATE TABLE IF NOT EXISTS clip_notes (
+    id       TEXT PRIMARY KEY,
+    clip_id  TEXT NOT NULL REFERENCES clips (id) ON DELETE CASCADE,
+    note_id  TEXT NOT NULL REFERENCES notes (id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (clip_id, note_id)
+);
+CREATE INDEX IF NOT EXISTS idx_clip_notes_note ON clip_notes (note_id);
+
+CREATE TABLE IF NOT EXISTS clip_favorites (
+    id      TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    clip_id TEXT NOT NULL REFERENCES clips (id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (user_id, clip_id)
+);
+CREATE INDEX IF NOT EXISTS idx_clip_favorites_clip ON clip_favorites (clip_id);
+`,
 }
 
 // Migrate applies pending migrations in order and returns the version

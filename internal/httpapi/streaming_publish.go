@@ -79,6 +79,17 @@ func (s *Server) publishDriveFileCreated(userID string, file map[string]any) {
 	s.streamBus.PublishTyped(streaming.MainSubject(userID), "driveFileCreated", file)
 }
 
+// publishClipEvent emits "updated"/"deleted" on a clip's stream subject.
+// The body is null for both, matching publishClipStream. Upstream throttles
+// "updated" bursts; this port publishes immediately, a divergence noted in
+// docs/HANDOVER.md.
+func (s *Server) publishClipEvent(clipID, kind string) {
+	if s.streamBus == nil {
+		return
+	}
+	s.streamBus.PublishTyped(streaming.ClipSubject(clipID), kind, nil)
+}
+
 // publishListMemberEvent emits "userAdded"/"userRemoved" on a user list's
 // stream subject, carrying the member packed as UserLite the way
 // GlobalEventService.publishUserListStream does. The userList channel
