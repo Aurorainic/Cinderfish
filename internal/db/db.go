@@ -677,6 +677,45 @@ CREATE TABLE IF NOT EXISTS signin_failures (
 );
 CREATE INDEX IF NOT EXISTS idx_signin_failures_ip ON signin_failures (ip, created_at DESC);
 `,
+	30: `
+-- User lists (Misskey's users/lists/* family): named, ownable groups of
+-- users with an optional public list timeline and favouriting. Mirrors
+-- UserList/UserListMembership/UserListFavorite (packages/backend/src/models)
+-- with snake_case columns and an explicit created_at instead of decoding it
+-- back out of the id.
+CREATE TABLE IF NOT EXISTS user_lists (
+    id         TEXT PRIMARY KEY,
+    user_id    TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    name       VARCHAR(128) NOT NULL,
+    is_public  BOOLEAN NOT NULL DEFAULT false,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_user_lists_user ON user_lists (user_id, id);
+CREATE INDEX IF NOT EXISTS idx_user_lists_public ON user_lists (is_public);
+
+CREATE TABLE IF NOT EXISTS user_list_memberships (
+    id             TEXT PRIMARY KEY,
+    user_list_id   TEXT NOT NULL REFERENCES user_lists (id) ON DELETE CASCADE,
+    user_id        TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    -- Denormalised list owner, so the note fanout join never has to reach
+    -- back into user_lists to find who the membership belongs to.
+    user_list_user_id TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    with_replies   BOOLEAN NOT NULL DEFAULT false,
+    created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (user_list_id, user_id)
+);
+CREATE INDEX IF NOT EXISTS idx_user_list_memberships_list ON user_list_memberships (user_list_id, id);
+CREATE INDEX IF NOT EXISTS idx_user_list_memberships_member ON user_list_memberships (user_id);
+
+CREATE TABLE IF NOT EXISTS user_list_favorites (
+    id           TEXT PRIMARY KEY,
+    user_id      TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    user_list_id TEXT NOT NULL REFERENCES user_lists (id) ON DELETE CASCADE,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (user_id, user_list_id)
+);
+CREATE INDEX IF NOT EXISTS idx_user_list_favorites_list ON user_list_favorites (user_list_id);
+`,
 }
 
 // Migrate applies pending migrations in order and returns the version

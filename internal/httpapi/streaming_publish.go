@@ -79,6 +79,22 @@ func (s *Server) publishDriveFileCreated(userID string, file map[string]any) {
 	s.streamBus.PublishTyped(streaming.MainSubject(userID), "driveFileCreated", file)
 }
 
+// publishListMemberEvent emits "userAdded"/"userRemoved" on a user list's
+// stream subject, carrying the member packed as UserLite the way
+// GlobalEventService.publishUserListStream does. The userList channel
+// listens for these to refresh its member filter.
+func (s *Server) publishListMemberEvent(ctx context.Context, listID, memberID, kind string) {
+	if s.streamBus == nil || s.accounts == nil {
+		return
+	}
+	u, err := s.accounts.GetByID(ctx, memberID)
+	if err != nil || u == nil {
+		return
+	}
+	s.streamBus.PublishTyped(streaming.UserListSubject(listID), kind,
+		packUserLite(u, "", loadProfile(ctx, s, memberID)))
+}
+
 // publishMeUpdated emits the main channel "meUpdated" event, which Firefish's
 // init.ts uses to keep `$i` in step when another tab changes the account.
 // A missing account (deleted between the write and the push) is ignored.

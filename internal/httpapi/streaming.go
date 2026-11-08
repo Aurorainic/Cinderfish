@@ -14,8 +14,12 @@ import (
 // moment the Server is constructed.
 func (s *Server) AttachStreaming(logf func(string, ...any)) *streaming.Bus {
 	var followers streaming.ViewerLoader
+	var lists streaming.ListLoader
 	if s.pool != nil {
 		followers = s
+		if s.accounts != nil {
+			lists = s
+		}
 	}
 
 	var markRead func(ctx context.Context, userID string, notificationIDs []string) error
@@ -37,6 +41,7 @@ func (s *Server) AttachStreaming(logf func(string, ...any)) *streaming.Bus {
 		Bus:       s.streamBus,
 		Auth:      auth,
 		Followers: followers,
+		Lists:     lists,
 		Logger:    logf,
 		MarkRead:  markRead,
 	})

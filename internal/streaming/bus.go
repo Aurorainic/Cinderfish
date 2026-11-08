@@ -41,6 +41,11 @@ func MainSubject(userID string) string { return "mainStream:" + userID }
 // NoteSubject returns the subject carrying updates to a single note.
 func NoteSubject(noteID string) string { return "noteStream:" + noteID }
 
+// UserListSubject returns the subject carrying one user list's member
+// changes ("userAdded"/"userRemoved"), matching Misskey's
+// GlobalEventService.publishUserListStream.
+func UserListSubject(listID string) string { return "userListStream:" + listID }
+
 // Message is one event delivered on a subject.
 //
 // Type is the inner event type ("notification", "reacted", ...). A nil

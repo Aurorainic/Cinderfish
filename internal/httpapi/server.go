@@ -275,6 +275,23 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("POST /api/following/update-all", s.handleFollowingUpdateAll)
 	s.mux.HandleFunc("POST /api/following/invalidate", s.handleFollowingInvalidate)
 
+	// User lists (schema v30), the users/lists/* family upstream defines
+	// in packages/backend/src/server/api/endpoints/users/lists/.
+	s.mux.HandleFunc("POST /api/users/lists/create", s.handleUserListsCreate)
+	s.mux.HandleFunc("POST /api/users/lists/create-from-public", s.handleUserListsCreateFromPublic)
+	s.mux.HandleFunc("POST /api/users/lists/delete", s.handleUserListsDelete)
+	s.mux.HandleFunc("POST /api/users/lists/list", s.handleUserListsList)
+	s.mux.HandleFunc("POST /api/users/lists/show", s.handleUserListsShow)
+	s.mux.HandleFunc("POST /api/users/lists/update", s.handleUserListsUpdate)
+	s.mux.HandleFunc("POST /api/users/lists/push", s.handleUserListsPush)
+	s.mux.HandleFunc("POST /api/users/lists/pull", s.handleUserListsPull)
+	s.mux.HandleFunc("POST /api/users/lists/update-membership", s.handleUserListsUpdateMembership)
+	s.mux.HandleFunc("POST /api/users/lists/get-memberships", s.handleUserListsGetMemberships)
+	s.mux.HandleFunc("POST /api/users/lists/favorite", s.handleUserListsFavorite)
+	s.mux.HandleFunc("POST /api/users/lists/unfavorite", s.handleUserListsUnfavorite)
+	// The timeline that joins a list's members.
+	s.mux.HandleFunc("POST /api/notes/user-list-timeline", s.handleUserListTimeline)
+
 	// Mutes and blocks. Both tables exist since schema v1; these endpoints
 	// are what the settings page and the timeline filter read.
 	s.mux.HandleFunc("POST /api/mute/create", s.handleMuteCreate)

@@ -24,6 +24,8 @@ const (
 	TimelineSocial TimelineKind = "social"
 	// TimelineGlobal holds the public notes of every known account.
 	TimelineGlobal TimelineKind = "global"
+	// TimelineList holds the notes of the members of one user list.
+	TimelineList TimelineKind = "list"
 )
 
 // TimelineParams carries the query parameters of a timeline request.
@@ -36,6 +38,9 @@ type TimelineParams struct {
 	WithFiles   bool
 	WithRenotes bool
 	WithReplies bool
+	// ListID names the user list of TimelineList. The handler has already
+	// checked that the list exists and belongs to ViewerID.
+	ListID string
 	// IncludeMyRenotes, IncludeRenotedMyNotes and IncludeLocalRenotes
 	// default to true, matching Misskey's defaults.
 	IncludeMyRenotes      bool
@@ -182,6 +187,23 @@ func (s *TimelineService) Timeline(ctx context.Context, p TimelineParams) ([]*No
 		me := q.viewerArg(p.ViewerID)
 		q.conds = append(q.conds, fmt.Sprintf(
 			"(n.user_id = %s OR n.user_id IN (SELECT followee_id FROM followings WHERE follower_id = %s) OR (n.visibility = 'public' AND n.user_host IS NULL))", me, me))
+
+	case TimelineList:
+		// notes/user-list-timeline: members of one list. The reply rule
+		// comes from the membership row (with_replies), not a request
+		// parameter — upstream UserListTimelineService uses only that.
+		// A reply is shown when it is not a reply, answers the member's
+		// own note, answers the viewer's note, or the member opted in.
+		listID := q.viewerArg(p.ListID)
+		replyOK := "(n.reply_id IS NULL OR n.reply_user_id = n.user_id"
+		if p.ViewerID != "" {
+			replyOK += fmt.Sprintf(" OR n.reply_user_id = %s", q.viewerArg(p.ViewerID))
+		}
+		replyOK += ")"
+		q.conds = append(q.conds, fmt.Sprintf(
+			"EXISTS (SELECT 1 FROM user_list_memberships ulm WHERE ulm.user_list_id = %s AND ulm.user_id = n.user_id AND (ulm.with_replies OR %s))",
+			listID, replyOK))
+
 	default:
 		return nil, fmt.Errorf("note: unknown timeline %q", p.Kind)
 	}
@@ -193,8 +215,10 @@ func (s *TimelineService) Timeline(ctx context.Context, p TimelineParams) ([]*No
 
 	// Replies are excluded unless asked for. A reply to a note the viewer
 	// wrote is kept, matching Misskey's rule that a reply to one's own
-	// note stays in the timeline.
-	if !p.WithReplies {
+	// note stays in the timeline. The list timeline is exempt: its reply
+	// rule is the per-member with_replies switch, handled in the kind
+	// switch above.
+	if !p.WithReplies && p.Kind != TimelineList {
 		if p.ViewerID != "" {
 			me := q.viewerArg(p.ViewerID)
 			q.conds = append(q.conds, fmt.Sprintf(

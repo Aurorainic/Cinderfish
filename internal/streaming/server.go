@@ -43,11 +43,28 @@ type ViewerLoader interface {
 	LoadFollows(ctx context.Context, userID string) (map[string]Follow, error)
 }
 
+// ListMembership records one member's list settings.
+type ListMembership struct {
+	// WithReplies is the member's "show replies in the list timeline"
+	// setting.
+	WithReplies bool
+}
+
+// ListLoader loads the membership map of one user list, the state the
+// userList channel filters notes with.
+type ListLoader interface {
+	// LoadListMembers returns the members of listID. ok is false when the
+	// list does not exist or is not owned by userID, which rejects the
+	// subscription the way upstream's init throw does.
+	LoadListMembers(ctx context.Context, listID, userID string) (map[string]ListMembership, bool, error)
+}
+
 // Options configures a Server.
 type Options struct {
 	Bus       *Bus
 	Auth      Authenticator
 	Followers ViewerLoader
+	Lists     ListLoader
 	Logger    func(string, ...any)
 	// MarkRead is called for the "readNotification" client frame: an empty
 	// id list means "mark everything read", which is what a frame without any
@@ -63,6 +80,7 @@ type Server struct {
 	bus       *Bus
 	auth      Authenticator
 	followers ViewerLoader
+	lists     ListLoader
 	logf      func(string, ...any)
 	markRead  func(ctx context.Context, userID string, notificationIDs []string) error
 
@@ -75,6 +93,7 @@ func New(opts Options) *Server {
 		bus:       opts.Bus,
 		auth:      opts.Auth,
 		followers: opts.Followers,
+		lists:     opts.Lists,
 		logf:      logfOr(opts.Logger),
 		markRead:  opts.MarkRead,
 		// Misskey performs no origin check on the streaming endpoint.
@@ -154,6 +173,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			c.setFollowing(f)
 		}
 	}
+	conn.lists = s.lists
 
 	conn.serve()
 }

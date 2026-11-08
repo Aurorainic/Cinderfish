@@ -61,3 +61,26 @@ func (s *Server) LoadFollows(ctx context.Context, userID string) (map[string]str
 	}
 	return out, rows.Err()
 }
+
+// LoadListMembers implements streaming.ListLoader for the Server. A list
+// that does not exist or is not owned by userID reports ok = false,
+// which rejects the channel subscription the way upstream's init throw
+// does; an ownership mismatch reports not-found rather than forbidden so
+// other people's private list ids are not enumerable.
+func (s *Server) LoadListMembers(ctx context.Context, listID, userID string) (map[string]streaming.ListMembership, bool, error) {
+	if s.accounts == nil {
+		return nil, false, nil
+	}
+	if _, err := s.accounts.OwnList(ctx, listID, userID); err != nil {
+		return nil, false, nil
+	}
+	memberships, err := s.accounts.ListMemberships(ctx, listID, account.UserListMembershipQuery{Limit: 100})
+	if err != nil {
+		return nil, false, err
+	}
+	out := make(map[string]streaming.ListMembership, len(memberships))
+	for _, m := range memberships {
+		out[m.UserID] = streaming.ListMembership{WithReplies: m.WithReplies}
+	}
+	return out, true, nil
+}

@@ -1,6 +1,7 @@
 package streaming
 
 import (
+	"context"
 	"encoding/json"
 	"reflect"
 	"testing"
@@ -127,6 +128,9 @@ func TestChannelRegistry(t *testing.T) {
 		"localTimeline":  {false, false},
 		"hybridTimeline": {true, false},
 		"globalTimeline": {false, false},
+		// userList requires the credential outright; upstream's init
+		// dereferences the viewer so anonymous subscribers crash.
+		"userList": {true, false},
 	}
 	for name, w := range want {
 		spec, ok := channelSpecs[name]
@@ -637,5 +641,67 @@ func TestBoolParam(t *testing.T) {
 	}
 	if got := boolParam(nil, "p", true); got != true {
 		t.Errorf("missing param should use the default")
+	}
+}
+
+// stubListLoader is a ListLoader with a fixed membership map.
+type stubListLoader struct {
+	members map[string]ListMembership
+}
+
+func (s stubListLoader) LoadListMembers(_ context.Context, _ string, _ string) (map[string]ListMembership, bool, error) {
+	return s.members, true, nil
+}
+
+func TestUserListChannelFilter(t *testing.T) {
+	h := newTestConnection(t, Viewer{UserID: "alice", Following: map[string]Follow{}})
+	h.conn.lists = stubListLoader{members: map[string]ListMembership{
+		"bob": {},
+	}}
+
+	listIDJSON, _ := json.Marshal("list1")
+	ch := newChannel(h, "userList", "u1", map[string]json.RawMessage{"listId": listIDJSON})
+	if ch.Name() != "userList" {
+		t.Fatalf("channel name = %q", ch.Name())
+	}
+
+	// A member's note passes; a stranger's does not.
+	ch.HandleNote(noteFor("n1", "bob", "public"))
+	ch.HandleNote(noteFor("n2", "carol", "public"))
+
+	// The list owner is not a member unless added, so their note stays out.
+	ch.HandleNote(noteFor("n3", "alice", "public"))
+
+	var col collector
+	col.drain(h.ws)
+	if len(col.events) != 1 || col.events[0].Type != "note" {
+		t.Fatalf("events = %+v, want one note", col.events)
+	}
+}
+
+// An anonymous connection's userList subscription is refused, matching
+// the credential requirement every other personal channel has.
+func TestChannelRejectsAnonymousUserList(t *testing.T) {
+	h := newTestConnection(t, Viewer{})
+	listIDJSON, _ := json.Marshal("list1")
+	ch := channelSpecs["userList"].New(h.conn, "u2")
+	if ch.Init(map[string]json.RawMessage{"listId": listIDJSON}) {
+		t.Error("anonymous subscription must be rejected")
+	}
+}
+
+// A missing listId param and an unknown loader both reject the
+// subscription.
+func TestUserListChannelRejectsBadParams(t *testing.T) {
+	h := newTestConnection(t, Viewer{UserID: "alice"})
+	if channelSpecs["userList"].New(h.conn, "u1").Init(nil) {
+		t.Error("missing listId must reject")
+	}
+	h2 := newTestConnection(t, Viewer{UserID: "alice"})
+	// No loader installed: Init must refuse rather than let the filter
+	// pass every note.
+	listIDJSON, _ := json.Marshal("list1")
+	if channelSpecs["userList"].New(h2.conn, "u2").Init(map[string]json.RawMessage{"listId": listIDJSON}) {
+		t.Error("missing loader must reject")
 	}
 }

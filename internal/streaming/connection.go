@@ -34,6 +34,8 @@ type Connection struct {
 	// client asked to mark read; an empty slice means "all notifications".
 	onReadNotification func(userID string, notificationIDs []string)
 	refreshViewer      func(*Connection)
+	// lists loads user-list membership for the userList channel.
+	lists ListLoader
 }
 
 // newConnection assembles a Connection for an upgraded WebSocket.
