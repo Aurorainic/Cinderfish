@@ -137,6 +137,10 @@ func TestChannelRegistry(t *testing.T) {
 		"antenna": {true, false},
 		// channel boards accept anonymous watchers, no existence check.
 		"channel": {false, false},
+		// messaging is per-conversation and non-shareable; the index feed
+		// is shareable. Both require the credential.
+		"messaging":      {true, false},
+		"messagingIndex": {true, true},
 	}
 	for name, w := range want {
 		spec, ok := channelSpecs[name]
@@ -866,5 +870,52 @@ func TestChannelBoardStreamRejects(t *testing.T) {
 	bad, _ := json.Marshal(42)
 	if channelSpecs["channel"].New(h2.conn, "b2").Init(map[string]json.RawMessage{"channelId": bad}) {
 		t.Error("non-string channelId must reject")
+	}
+}
+
+func TestMessagingChannels(t *testing.T) {
+	h := newTestConnection(t, Viewer{UserID: "alice"})
+
+	// The messaging channel needs a partner that is not the viewer.
+	self, _ := json.Marshal("alice")
+	if channelSpecs["messaging"].New(h.conn, "m0").Init(map[string]json.RawMessage{"otherparty": self}) {
+		t.Error("self partner must reject")
+	}
+	// A group param is the recorded deferral and must reject.
+	group, _ := json.Marshal("g1")
+	if channelSpecs["messaging"].New(h.conn, "m1").Init(map[string]json.RawMessage{"group": group}) {
+		t.Error("group param must reject")
+	}
+
+	partner, _ := json.Marshal("bob")
+	newChannel(h, "messaging", "m2", map[string]json.RawMessage{"otherparty": partner})
+	newChannel(h, "messagingIndex", "m3", nil)
+
+	// A message on the pair subject reaches the conversation channel and
+	// the index feed; both forward it unchanged.
+	packedMsg, _ := NewMessage("message", map[string]any{"id": "msg1", "text": "hi"})
+	h.conn.bus.Publish(MessagingStreamSubject("alice", "bob"), packedMsg)
+	h.conn.bus.Publish(MessagingIndexSubject("alice"), packedMsg)
+
+	var col collector
+	col.drain(h.ws)
+	kinds := map[string]int{}
+	for _, ev := range col.events {
+		kinds[ev.Type]++
+	}
+	if kinds["message"] != 2 {
+		t.Fatalf("events = %+v, want the message on both channels", col.events)
+	}
+}
+
+func TestMessagingChannelRejectsAnonymous(t *testing.T) {
+	h := newTestConnection(t, Viewer{})
+	partner, _ := json.Marshal("bob")
+	if channelSpecs["messaging"].New(h.conn, "m1").Init(map[string]json.RawMessage{"otherparty": partner}) {
+		t.Error("anonymous subscription must reject")
+	}
+	h2 := newTestConnection(t, Viewer{})
+	if channelSpecs["messagingIndex"].New(h2.conn, "m2").Init(nil) {
+		t.Error("anonymous index subscription must reject")
 	}
 }

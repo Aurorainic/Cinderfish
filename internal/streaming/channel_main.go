@@ -33,6 +33,10 @@ var channelSpecs = map[string]channelSpec{
 	// channel boards accept anonymous watchers and no existence check,
 	// exactly as upstream's channel.ts.
 	"channel": {Name: "channel", New: newChannelStreamChannel},
+	// messaging is per-conversation and non-shareable; messagingIndex is
+	// the shareable conversation-list feed.
+	"messaging":      {Name: "messaging", RequireCredential: true, New: newMessagingChannel},
+	"messagingIndex": {Name: "messagingIndex", RequireCredential: true, Shareable: true, New: newMessagingIndexChannel},
 }
 
 // newMainChannel builds the main channel.

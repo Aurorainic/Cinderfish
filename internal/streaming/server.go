@@ -76,6 +76,9 @@ type Options struct {
 	// TokenHasReadAccount reports whether an app token carries the
 	// read:account permission. Misskey rejects the connection without it.
 	TokenHasReadAccount func(ctx context.Context, token string) (bool, error)
+	// Typing handles the typingOnMessaging frame; the server publishes the
+	// packed typer on the conversation subject.
+	Typing func(userID, partner string)
 }
 
 // Server serves the /streaming WebSocket endpoint.
@@ -89,6 +92,7 @@ type Server struct {
 	channels    ChannelFollowLoader
 	logf        func(string, ...any)
 	markRead    func(ctx context.Context, userID string, notificationIDs []string) error
+	typing      func(userID, partner string)
 
 	upgrader websocket.Upgrader
 }
@@ -105,6 +109,7 @@ func New(opts Options) *Server {
 		channels:    opts.Channels,
 		logf:        logfOr(opts.Logger),
 		markRead:    opts.MarkRead,
+		typing:      opts.Typing,
 		// Misskey performs no origin check on the streaming endpoint.
 		upgrader: websocket.Upgrader{
 			ReadBufferSize:  1 << 10,
@@ -191,6 +196,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			}
 			c.setFollowing(f)
 		}
+	}
+	if user != nil && s.typing != nil {
+		conn.onTypingOnMessaging = s.typing
 	}
 	conn.lists = s.lists
 	conn.clipLoader = s.clipsLoader

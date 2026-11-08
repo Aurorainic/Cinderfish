@@ -844,6 +844,24 @@ ALTER TABLE notes ADD COLUMN IF NOT EXISTS channel_id TEXT REFERENCES channels (
 ALTER TABLE notes ADD COLUMN IF NOT EXISTS renote_channel_id TEXT;
 CREATE INDEX IF NOT EXISTS idx_notes_channel ON notes (channel_id, id DESC);
 `,
+	34: `
+-- Messaging (Misskey's legacy messaging/* family, fork-preserved: removed
+-- upstream at c05e844 in favour of chat/*, contract carried verbatim in
+-- the Iceshrimp Vue fork and the Firefish backend mirror). First pass is
+-- user-to-user only; groups and federation are explicit deferrals.
+CREATE TABLE IF NOT EXISTS messaging_messages (
+    id           TEXT PRIMARY KEY,
+    user_id      TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    recipient_id TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    text         VARCHAR(4096),
+    is_read      BOOLEAN NOT NULL DEFAULT false,
+    file_id      TEXT REFERENCES drive_files (id) ON DELETE CASCADE,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_messaging_user ON messaging_messages (user_id, id DESC);
+CREATE INDEX IF NOT EXISTS idx_messaging_recipient ON messaging_messages (recipient_id, is_read);
+CREATE INDEX IF NOT EXISTS idx_messaging_recipient_id ON messaging_messages (recipient_id, id DESC);
+`,
 }
 
 // Migrate applies pending migrations in order and returns the version

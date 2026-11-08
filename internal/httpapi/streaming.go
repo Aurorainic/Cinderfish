@@ -53,6 +53,7 @@ func (s *Server) AttachStreaming(logf func(string, ...any)) *streaming.Bus {
 		Channels:  channels,
 		Logger:    logf,
 		MarkRead:  markRead,
+		Typing:    s.publishMessagingTyping,
 	})
 	return s.streamBus
 }

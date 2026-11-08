@@ -34,6 +34,9 @@ type Connection struct {
 	// client asked to mark read; an empty slice means "all notifications".
 	onReadNotification func(userID string, notificationIDs []string)
 	refreshViewer      func(*Connection)
+	// onTypingOnMessaging receives the top-level typing frame: the ids of
+	// the typer and the conversation partner.
+	onTypingOnMessaging func(userID, partner string)
 	// lists loads user-list membership for the userList channel.
 	lists ListLoader
 	// clipLoader checks clip visibility for the clip channel.

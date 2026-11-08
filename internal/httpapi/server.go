@@ -339,6 +339,16 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("POST /api/channels/mute/delete", s.handleChannelsMuteDelete)
 	s.mux.HandleFunc("POST /api/channels/mute/list", s.handleChannelsMuted)
 
+	// Messaging (schema v34), the fork-preserved legacy messaging/*
+	// family: user-to-user only, groups and federation deferred. See
+	// docs/HANDOVER.md for the provenance note.
+	s.mux.HandleFunc("POST /api/messaging/history", s.handleMessagingHistory)
+	s.mux.HandleFunc("POST /api/messaging/messages", s.handleMessagingMessages)
+	s.mux.HandleFunc("POST /api/messaging/messages/create", s.handleMessagingMessagesCreate)
+	s.mux.HandleFunc("POST /api/messaging/messages/delete", s.handleMessagingMessagesDelete)
+	s.mux.HandleFunc("POST /api/messaging/messages/read", s.handleMessagingMessagesRead)
+	s.mux.HandleFunc("POST /api/i/read-all-messaging-messages", s.handleIReadAllMessagingMessages)
+
 	// Mutes and blocks. Both tables exist since schema v1; these endpoints
 	// are what the settings page and the timeline filter read.
 	s.mux.HandleFunc("POST /api/mute/create", s.handleMuteCreate)

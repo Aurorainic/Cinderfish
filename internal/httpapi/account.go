@@ -282,13 +282,7 @@ func (s *Server) handleI(w http.ResponseWriter, r *http.Request) {
 
 	// Misskey only includes secrets for native-token requests.
 	includeSecrets := info.Token == nil
-	packed := packMeDetailed(info.User, info.User.CreatedAt, includeSecrets, loadProfile(r.Context(), s, info.User.ID))
-	s.packMovedTo(r.Context(), info.User, packed)
-	s.applyUserCounts(r.Context(), info.User.ID, packed)
-	s.applyUnreadNotifications(r.Context(), info.User.ID, packed)
-	s.applyUnreadAnnouncements(r.Context(), info.User.ID, packed)
-	s.applyPinnedNotes(r.Context(), info.User.ID, info.User.ID, packed)
-	writeJSON(w, http.StatusOK, packed)
+	writeJSON(w, http.StatusOK, s.meDetailed(r.Context(), info.User, includeSecrets))
 }
 
 // handleUsersShow implements POST /api/users/show.

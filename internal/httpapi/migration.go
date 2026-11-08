@@ -287,6 +287,15 @@ func (s *Server) meDetailed(ctx context.Context, u *account.User, includeSecrets
 	s.applyUnreadNotifications(ctx, u.ID, packed)
 	s.applyUnreadAnnouncements(ctx, u.ID, packed)
 	s.applyPinnedNotes(ctx, u.ID, u.ID, packed)
+	// The Firefish client reads the legacy field name; hasUnreadChatMessages
+	// stays false for clients keyed to the newer Misskey field.
+	if s.accounts != nil {
+		if hasUnread, err := s.accounts.HasUnreadMessages(ctx, u.ID); err == nil {
+			packed["hasUnreadMessagingMessage"] = hasUnread
+		}
+	} else {
+		packed["hasUnreadMessagingMessage"] = false
+	}
 	return packed
 }
 
