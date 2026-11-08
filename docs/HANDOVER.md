@@ -1,6 +1,12 @@
 # Cinderfish 交接说明
 
-- **发布状态：v0.1.3（2026-11-08）**。`v0.1.2` 已发布；本版包含两轮审计的收尾与工程化：
+- **发布状态：v0.1.4（2026-11-08）**。`v0.1.3` 已发布；本版是管理台「未实现的实例功能」的收尾：
+  邀请码管理（§12GT，v27）、保留用户名与笔记字数上限运行期化（§12GU）、IP 封禁与跨账号登录审计
+  （§12GV，v28）、对象存储与 SMTP 从 config.toml/env 解耦为可在线修改（§12GW），以及 captcha、
+  自动封禁与安全页分栏（§12GX，v29）。IP 封禁/登录审计/自动封禁是 Cinderfish 自有扩展
+  （上游三个参考实现均无此 API），不以 Misskey 兼容名义发布；captcha 的 meta 字段与注册参数
+  与 Misskey 对齐。
+  `v0.1.3` 包含两轮审计的收尾与工程化：
   全面代码审计与前端视觉审计（§12GQ/§12GR）、数据层 sqlc 决策与迁移不可变门禁、CI 工作流、
   schema v26（file_ids GIN 索引）、`database_max_conns` 配置化、`users/show` 批量上限、
   前端 dist 瘦身 7.7M→4.1M（Phosphor woff2-only），以及 62 份 wave 契约等低价值文档的清理（§12GS）。
@@ -9,14 +15,15 @@
   `os.post()` 的 Promise 永不 resolve 是此前所有后端测试与手工走查都看不出来的一条；记录见 §12GN。
   `frontend-ui-redesign` 的全部提交已包含在 `main` 内（可删），`naming/project-name` 的文档内容
   已由 `main` 上更新的版本取代（保留分支仅作历史）。
-- 最后更新：2026-11-08（v0.1.3 发版准备、目标模式第一百六十二至一百七十六波：通知合并与多 id 已读、状态栏 RSS、
+- 最后更新：2026-11-08（v0.1.4 发版准备：邀请码、运行期设置、IP 封禁与登录审计、对象存储/SMTP
+  热切换、captcha 与自动封禁，§12GT–§12GX；目标模式第一百六十二至一百七十六波：通知合并与多 id 已读、状态栏 RSS、
   `driveFileCreated`、举报转发与 `Flag`、客户端图片压缩、从 URL 上传、`meUpdated`、举报备注、
   默认肤色、`pollVoted`、32 页与 390px 巡检、`registryUpdated` 跨设备同步、v0.1.0 端到端回归、
   `/api/*` 的 CORS 预检修复（§12GP）。
   更早的第五十一至六十四波（账号迁移、OAuth 同意页、`ap/show`、`app/*` 授权、关注关系设置、
   schema v20/v21 等）见 §12BP–§12CB）
 - 项目名 **Cinderfish**（2026-10-28 定名，Go module `github.com/Aurorainic/cinderfish`）
-- 仓库：`https://github.com/Aurorainic/Cinderfish.git`，工作表分支 `main`；当前 schema **v26**
+- 仓库：`https://github.com/Aurorainic/Cinderfish.git`，工作表分支 `main`；当前 schema **v29**
 - **历史施工文档已清理（2026-11-08）**：正文各批次引用的
   `docs/research/2026-11-05/06-firefish-port-waveN-contract.md`（62 份）与
   `docs/superpowers/plans/2026-10-29-frontend-redesign/` 的逐任务材料已删除。
@@ -150,7 +157,7 @@ pnpm build          # 产出 web/dist，由 Go 二进制静态托管
 以及**模板里用到但未 import/未全局注册的组件**（第二波踩过：`pages/Note.vue` 漏 import `MkNoteDetailed`，`vue-tsc` 不报错、页面静默空白），
 外加 `t()` 引用了 zh-CN 词典里不存在的键。
 
-数据库迁移在启动时自动执行（不可变的版本化脚本）。当前 schema 版本为 **9**（`internal/db/db.go` 的 `migrations` 1–9）。
+数据库迁移在启动时自动执行（不可变的版本化脚本）。当前 schema 版本为 **29**（`internal/db/db.go` 的 `migrations` 1–29）。
 
 数据库测试包（`internal/account`、`internal/httpapi`）都会 TRUNCATE 同一批表，因此每个包用 `internal/testdb` 在 `TestMain` 里持有 PostgreSQL advisory lock，直到该包的测试二进制退出——这样 `go test ./...` 并行跑包时不会互相清表（不加锁时会随机出现"找不到用户"之类的假失败）。
 
