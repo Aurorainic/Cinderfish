@@ -8091,3 +8091,56 @@ IP 封禁的 API 或数据表，所以这一项**不是移植**，是 Cinderfish
 - `cd web && pnpm run check:port`：通过，`hardTotal: 0`。
 - `cd web && pnpm build`：通过（Vite build 完成）。
 - 本地未登录浏览器实测：认证守卫将 `/settings` 重定向到公开首页，无法执行登录后的设置导航与发帖器端到端流程；未对公网生产实例进行验证或操作。窄屏样式已通过 TypeScript/构建门禁，但 320/360/390/412px 登录态人工走查仍待可用本地登录环境补验。
+
+## 12HA. 批次：缺失子系统连续实现——lists/clips/antennas/channels/messaging（2026-11-08/09）
+
+**背景**：能力矩阵（2026-11-01）登记的"需新增后端"条目经核实全部已补齐（矩阵本身过时，未改），
+真正缺失的是 §5 隐藏清单里仍为占位页的子系统。本批次按用户指示（"依次全搞完"）依次实现了
+用户列表、剪藏、天线、频道、私信五个家族；relay 按 AGENTS.md 明确不做。
+
+**提交**：`3525420`+`3b968ae`（lists，v30）、`a1278d5`+`a0ee645`（clips，v31）、
+`4f8f9e1`+`c1d1301`（antennas，v32）、`c8d9983`+`461874e`+`c79d62b`（channels，v33），
+`9984dd4`（messaging 后端，v34）。全部 `go vet`/`go test ./...` 绿；
+前端各批次 `vue-tsc --noEmit` 干净。
+
+**契约来源**：lists/clips/antennas/channels 逐端点对照 Misskey `c05e844` 的
+paramDef/res/错误码（id 逐字复制）。messaging 的契约**不在 c05e844**——上游已整体移除
+messaging/*（由 chat/* 取代），契约保存在两个本地授权参考树
+（Iceshrimp Vue fork 快照与 jclaudan Firefish 镜像，二者 `endpoints/messaging/` 逐字节一致），
+采用其为 Firefish 客户端目标契约。
+
+**已记录的实现取舍**（有意偏离上游处）：
+
+- users/lists/update-membership：非成员上游 500，本实现回答 404 NO_SUCH_USER（pull 的 id）。
+- clips 的 updateFavorites：CLIP 收藏去重沿用唯一索引；unfavorite 的上游错拼
+  `ALREADY_FAVORITED`（表"未收藏"）逐字保留。
+- clips 流事件的 `updated`：上游节流（首事件即时、burst 3 秒合并），本实现即时发布。
+- clips/notes：上游在 200 条缓存切片后过滤（可能短页），本实现 SQL 内过滤（满页）。
+- antennas：上游 200 条 Redis 列表改为 DB 连接表 `antenna_notes`，无回填（与上游
+  "天线只收集创建之后的笔记"行为一致）；`antennas/notes` 同样改为 SQL 过滤。
+- antennas：`src: 'home'` 保持与 `'all'` 行为一致（上游为 TODO），不做"修复"。
+- channels：`bannerId: null` 清除横幅（上游 `banner ? {...} : {}` 静默不清除，视为 bug 已修，
+  测试钉住）。channels/favorite 重复收藏上游 500，本实现回答 ALREADY_FAVORITED
+  风格的 400。muted 频道只影响 renoted 引用，订 podcast 自身始终投递。
+- channels 笔记强制 `visibility = public`、`localOnly = true`，永不联邦，入站
+  INSERT 不动——与上游一致；home 时间线移植上游的四段式
+  follows-and-channels 括号，hybrid 放行已关注频道，local/global/list 排除全部频道笔记。
+- antennas 的 excludeNotesInSensitiveChannel 现在读取真实的频道 is_sensitive 标志
+  （此前恒 false）。
+- messaging：仅 1:1 私信；`users/groups/*` 与消息联邦为显式延后项
+  （索引页群组 tab 以空列表呈现，群组参数被拒）。`readAllMessagingMessagesOfARoom`
+  仅存在于 Web Push（上游同样未在主流实现），未实现。messaging 的
+  `unreadMessagingMessage` 2 秒延迟语义保留；未读为 DB 计算，不用 Redis。
+- `MeDetailed` 增加 `hasUnreadMessagingMessage`（Firefish 客户端读取的旧字段名），
+  `hasUnreadChatMessages` 保留为 false；`/api/i` 收编到共享 `meDetailed` 路径
+  以免两处漂移。导航私信徽标应读旧字段。
+
+**流频道注册表当前**：main、homeTimeline、localTimeline、hybridTimeline、globalTimeline、
+userList、clip、antenna、channel、messaging、messagingIndex。Schemas v30–v34。
+
+**前端**：占位页全部替换——MyLists{Index,List}、UserListTimeline、MyClips、Clip、
+MyAntennas{Index,Create,Edit}、AntennaTimeline、Channels、Channel、ChannelEditor、
+Messaging 系（messaging 前端接线进行中，完成后补充本节）；时间线组件新增非持久化的
+"list"/"antenna"/"channel" src（不会成为 `tl.src` 偏好）；发帖组件支持频道目标
+（强制本地公开）。不在 Misskey 契约内的 Firefish 字段（antenna 的 instances/group、
+post 的 typingOnChannel）未实现，UI 已按契约收窄。
