@@ -4,4 +4,4 @@
 package buildinfo
 
 // Version is the Cinderfish release version.
-const Version = "0.1.2"
+const Version = "0.1.3"
