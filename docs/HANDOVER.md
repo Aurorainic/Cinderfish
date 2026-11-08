@@ -429,7 +429,7 @@ pnpm build    # 先 vue-tsc --noEmit，再输出 web/dist
 - **远程资料可以浏览（2026-11-08 关闭原缺口）**：`users/show` 的 `username+host` 先查本地存储的 actor 行、未命中才走 WebFinger（对齐 Misskey `RemoteUserResolveService`）；前端 `/@user@host` 直接渲染完整个人页（资料卡、关注按钮、`users/notes` 列表），远程提示卡带「打开原网页」链接。仍属缺口的是：发帖器的 `specified` 手动输入远程 handle 时后端不会预解析。
 - **关注/粉丝列表、回复树、会话串、转贴列表、反应名单没有消费端**：`users/following` / `users/followers` / `notes/replies` / `notes/children` / `notes/conversation` / `notes/renotes` / `notes/reactions` 后端都不存在（数据模型够，见 §11.15.3）。个人页的「关注中/关注者」计数保持纯数字并注明列表接口未提供，两个 tab 渲染真实的不可用态（见 11.14）；笔记页只渲染 `note.reply` 这一层上下文，没有回复树与「谁反应了」浮层，也没有「查看对话」入口。
 - **改密码、封禁/静音列表、注销账户在前端与后端都未实现**：账户设置页如实标注为未开放，没有假按钮。屏蔽/静音与锁定账号的**表已存在**（`blocks`、`mutes`、`follow_requests`、`users.is_locked`），缺的是端点与 UI（§11.15.3）。
-- **管理面板范围有限**：实例级文件列表与注册模式在线切换都没有端点（后者要可写 meta + 配置热加载，§11.15.4），用户列表也只在 `AdminUsers.vue:42` 取前 50 条——`admin/show-users` 其实支持 `limit`/`offset`，缺的是分页 UI。管理页需要管理员账号才能看到分区。
+- **管理面板范围有限**：实例级文件列表与注册模式在线切换都没有端点（后者要可写 meta + 配置热加载，§11.15.4），用户列表也只在 `AdminUsers.vue:42` 取前 50 条——`admin/show-users` 其实支持 `limit`/`offset`，缺的是分页 UI。管理页需要管理员账号才能看到分区。**邀请码管理已在 2026-11-08 补齐**（§12GT）：`admin/invite/*` 三个端点 + 安全设置页的生成/筛选/删除，invite 注册模式自此可用。
 - **i18n 未做**：文案硬编码中文；主题只保留 `data-theme` 双主题 + CSS 变量，没有 Firefish 的 JSON5 主题 DSL。
 - **置顶不同步联邦**：actor 文档声明了 `featured` 集合，但没有对应路由与投递，置顶只在本实例生效。
 - **草稿只有一份**：`cinderfish.draft` 是单条草稿，时间线固定发帖器与全局对话框共用同一个键。
@@ -7814,3 +7814,53 @@ CINDERFISH_TEST_DATABASE_URL=... CINDERFISH_TEST_REDIS_URL=... go test ./... -co
   capability matrix、runtime contract、license register、`api-contract/`、
   `2026-10-30/31` 两份被 rebaseline-decision 承诺「保留历史」的计划。
   `.gitignore` 增加 `.superpowers/ .mimosa/ .workbuddy/ .zcode/ .archify/`。
+
+## 12GT. 邀请码管理：安全设置页从占位说明变为真实功能（2026-11-08）
+
+管理台「未实现的实例功能」分组里的安全设置页有一个此前被低估的缺口：invite 注册模式
+（`registration_tickets` 表、领取/回滚逻辑、注册表单的邀请码输入框）全部已存在，唯独
+管理员没有任何生成邀请码的入口——切到 invite 模式后新用户实际上无法注册。本波补上
+端点与管理页，契约照 Misskey `c05e844` 的
+`endpoints/{admin/,}invite/{create,list,delete}.ts` 与 `InviteCodeEntityService`：
+
+- **schema v27**：`registration_tickets` 补 `created_by_id`（Misskey 的
+  `RegistrationTicket.createdById`），带索引；迁移链 1→27 实测干净跑完。
+- **account 层**：`Invite` 类型与 `ListInvites`（type all/unused/used/expired、
+  sort 沿用上游 id 序语义、limit/offset）、`DeleteInvite`；`CreateInvite` 改为返回
+  落库后的整行（含 id/createdAt）并记录创建者。签到侧补上 `bindInvite`：注册成功后把
+  `used_by_id` 绑到新账号（Misskey `SignupApiService` 同款），管理台才能显示「使用者」。
+- **httpapi**：`POST /api/admin/invite/create|list|delete`（create 的 count 1–100、
+  expiresAt RFC3339，错误 id 沿用上游 `INVALID_DATE_TIME`/`NO_SUCH_INVITE_CODE`）；
+  `admin/invite/delete` 同时注册在 `/api/invite/delete`（上游的用户路径）。打包形状
+  与 `Packed<'InviteCode'>` 一致（`web/src/api/types.ts` 的 `InviteCode`）。
+- **前端**：`AdminSecurity.vue` 重写——页首是邀请码管理（生成表单、新码复制区、
+  类型筛选、列表带「已使用/已过期」徽标与使用者链接、确认删除），下方保留
+  `AdminUnavailable` 块如实登记上游仍有而这里没有的项（机器人防护、IP 封禁、
+  登录失败审计）。`endpoints.ts`/`types.ts` 注册三个端点。
+
+### 12GT.1 验证证据
+
+- `gofmt`/`go vet ./...` 干净；含 PG 的全量 `go test ./...` 11 包全绿。
+- 新测试：`TestInviteManagement`（account 层：创建者记录、type/sort 筛选、used 绑定、
+  过期筛选、删除与二次删除报缺）；`TestAdminInviteLifecycle`（HTTP 层：非管理员拒绝、
+  打包形状、count/expiresAt 校验、已用码删除、404 错误 id）。
+- `vue-tsc --noEmit`、`vite build` 通过。
+- 真实二进制 + 浏览器走查（`/admin/security`，管理员登录）：生成 2 个码出「已生成」
+  复制区；「已使用」筛选即时重查并显示使用者链接；删除出确认框、确认后行消失、
+  「已使用」显示空态文案。走查中发现并修复一个真 bug：切筛选不重新拉列表
+  （现在 `watch(filterType)` 触发 `load()`）。
+
+### 12GT.2 有意的边界
+
+- 删除只对管理员开放：上游允许创建者本人删自己的码，但这里的码只能从管理台签发，
+  签发者必是管理员。
+- `invite/limit`、`invite/create`（用户侧带角色上限的邀请）未做：本实现的邀请码只从
+  管理台签发，没有 per-user 配额概念（Misskey 的角色系统不在首版范围）。
+- 邀请码通过复制粘贴分发，没有邮件发送（实例 SMTP 当前只用于公告订阅与邮箱验证）。
+
+### 12GT.3 仍未验证
+
+- 手机断点下管理页的排版（不在本波范围）。
+- invite 注册模式端到端（表单填码 → 注册成功）：HTTP 测试覆盖了 signup+邀请码链路，
+  浏览器里没有重跑（切注册模式会改动运行期实例设置）。
+

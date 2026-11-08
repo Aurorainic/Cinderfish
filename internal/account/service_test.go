@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -112,7 +113,11 @@ func TestRegisterInviteMode(t *testing.T) {
 		t.Error("invite mode must refuse signup without a code")
 	}
 
-	code, err := svc.CreateInvite(ctx, nil)
+	invited, err := svc.CreateInvite(ctx, "", nil)
+	if err != nil {
+		t.Fatalf("CreateInvite: %v", err)
+	}
+	code := invited.Code
 	if err != nil {
 		t.Fatalf("CreateInvite: %v", err)
 	}
@@ -128,7 +133,11 @@ func TestRegisterInviteMode(t *testing.T) {
 
 	// A failed signup releases the code: claim happens before the account is
 	// created, so a taken username must not burn the invitation.
-	retryCode, err := svc.CreateInvite(ctx, nil)
+	retryInvited, err := svc.CreateInvite(ctx, "", nil)
+	if err != nil {
+		t.Fatalf("CreateInvite: %v", err)
+	}
+	retryCode := retryInvited.Code
 	if err != nil {
 		t.Fatalf("CreateInvite: %v", err)
 	}
@@ -147,6 +156,120 @@ func TestRegisterInviteMode(t *testing.T) {
 		t.Errorf("reusing the released code: %v", err)
 	}
 }
+
+func TestInviteManagement(t *testing.T) {
+	pool := testPool(t)
+	svc := account.NewService(pool)
+	ctx := context.Background()
+
+	admin, _, err := svc.Register(ctx, account.RegistrationOpen, uniqueUsername(t), "password123", "")
+	if err != nil {
+		t.Fatalf("Register admin: %v", err)
+	}
+	if _, err := pool.Exec(ctx, `UPDATE users SET is_admin = true WHERE id = $1`, admin.ID); err != nil {
+		t.Fatalf("promote: %v", err)
+	}
+
+	expires := time.Now().Add(time.Hour).UTC().Truncate(time.Microsecond)
+	invited, err := svc.CreateInvite(ctx, admin.ID, &expires)
+	if err != nil {
+		t.Fatalf("CreateInvite: %v", err)
+	}
+	code := invited.Code
+	if err != nil {
+		t.Fatalf("CreateInvite: %v", err)
+	}
+	if len(code) != 16 {
+		t.Errorf("invite code length = %d, want 16", len(code))
+	}
+
+	// The creator is recorded on the ticket.
+	invites, err := svc.ListInvites(ctx, account.InviteFilter{Type: "all", Sort: "+createdAt"})
+	if err != nil {
+		t.Fatalf("ListInvites: %v", err)
+	}
+	if len(invites) != 1 {
+		t.Fatalf("invite count = %d, want 1", len(invites))
+	}
+	inv := invites[0]
+	if inv.Code != code {
+		t.Errorf("code = %q, want %q", inv.Code, code)
+	}
+	if inv.Used {
+		t.Error("a fresh invite must not be used")
+	}
+	if inv.ExpiresAt == nil || !inv.ExpiresAt.Equal(expires) {
+		t.Errorf("expiresAt = %v, want %v", inv.ExpiresAt, expires)
+	}
+	if inv.CreatedBy == nil || inv.CreatedBy.ID != admin.ID {
+		t.Fatalf("createdBy = %+v, want admin %s", inv.CreatedBy, admin.ID)
+	}
+	if inv.CreatedBy.Username != admin.Username {
+		t.Errorf("createdBy username = %q, want %q", inv.CreatedBy.Username, admin.Username)
+	}
+
+	// Filter by type sees the same ticket as unused, none as used.
+	used, err := svc.ListInvites(ctx, account.InviteFilter{Type: "used"})
+	if err != nil {
+		t.Fatalf("ListInvites used: %v", err)
+	}
+	if len(used) != 0 {
+		t.Errorf("used filter returned %d invites, want 0", len(used))
+	}
+
+	// A signup claims the ticket and the used-by side of the pack follows.
+	claimant, _, err := svc.Register(ctx, account.RegistrationInvite, uniqueUsername(t)+"x", "password123", code)
+	if err != nil {
+		t.Fatalf("Register with invite: %v", err)
+	}
+	invites, err = svc.ListInvites(ctx, account.InviteFilter{Type: "used"})
+	if err != nil {
+		t.Fatalf("ListInvites used: %v", err)
+	}
+	if len(invites) != 1 || !invites[0].Used {
+		t.Fatalf("used filter = %+v, want one used invite", invites)
+	}
+	if invites[0].UsedBy == nil || invites[0].UsedBy.ID != claimant.ID {
+		t.Errorf("usedBy = %+v, want claimant %s", invites[0].UsedBy, claimant.ID)
+	}
+	if invites[0].UsedAt == nil {
+		t.Error("usedAt must be set once claimed")
+	}
+
+	// An expired filter only matches tickets whose deadline has passed.
+	expiredInv, err := svc.CreateInvite(ctx, admin.ID, ptrTime(time.Now().Add(-time.Hour)))
+	if err != nil {
+		t.Fatalf("CreateInvite expired: %v", err)
+	}
+	expiredCode := expiredInv.Code
+	if err != nil {
+		t.Fatalf("CreateInvite expired: %v", err)
+	}
+	expired, err := svc.ListInvites(ctx, account.InviteFilter{Type: "expired"})
+	if err != nil {
+		t.Fatalf("ListInvites expired: %v", err)
+	}
+	if len(expired) != 1 || expired[0].Code != expiredCode {
+		t.Fatalf("expired filter = %+v, want the expired invite", expired)
+	}
+
+	// Deleting works, and a second delete reports the ticket gone.
+	if err := svc.DeleteInvite(ctx, invites[0].ID); err != nil {
+		t.Fatalf("DeleteInvite: %v", err)
+	}
+	if err := svc.DeleteInvite(ctx, invites[0].ID); err == nil {
+		t.Error("deleting a missing invite must fail")
+	}
+	all, err := svc.ListInvites(ctx, account.InviteFilter{Type: "all"})
+	if err != nil {
+		t.Fatalf("ListInvites after delete: %v", err)
+	}
+	if len(all) != 1 || all[0].Code != expiredCode {
+		t.Errorf("remaining invites = %+v, want only the expired one", all)
+	}
+}
+
+func ptrTime(t time.Time) *time.Time { return &t }
 
 func TestAuthenticate(t *testing.T) {
 	pool := testPool(t)

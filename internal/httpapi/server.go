@@ -281,6 +281,14 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("POST /api/admin/get-index-stats", s.handleAdminIndexStats)
 	s.mux.HandleFunc("POST /api/admin/suspend-user", s.handleAdminSuspendUser)
 	s.mux.HandleFunc("POST /api/admin/unsuspend-user", s.handleAdminUnsuspendUser)
+	// Invitation code management: the create/list paths are Misskey's admin
+	// namespace; delete is registered under both the upstream user path
+	// (invite/delete) and the admin path, since every issuer here is an
+	// administrator.
+	s.mux.HandleFunc("POST /api/admin/invite/create", s.handleAdminInviteCreate)
+	s.mux.HandleFunc("POST /api/admin/invite/list", s.handleAdminInviteList)
+	s.mux.HandleFunc("POST /api/admin/invite/delete", s.handleAdminInviteDelete)
+	s.mux.HandleFunc("POST /api/invite/delete", s.handleAdminInviteDelete)
 	s.mux.HandleFunc("GET /api/admin/federation/mode", s.handleAdminFederationMode)
 	s.mux.HandleFunc("POST /api/federation/show-instance", s.handleFederationShowInstance)
 	s.mux.HandleFunc("POST /api/federation/instances", s.handleFederationInstances)

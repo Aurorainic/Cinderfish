@@ -32,6 +32,7 @@ import type {
 	ImportSummary,
 	IndexStat,
 	InstanceStats,
+	InviteCode,
 	MeDetailed,
 	MetaDetailed,
 	MetaLite,
@@ -215,6 +216,9 @@ export const ENDPOINTS = {
 	adminAnnouncementsList: "admin/announcements/list",
 	adminAnnouncementsUpdate: "admin/announcements/update",
 	adminAnnouncementsDelete: "admin/announcements/delete",
+	adminInviteCreate: "admin/invite/create",
+	adminInviteList: "admin/invite/list",
+	adminInviteDelete: "admin/invite/delete",
 
 	notifications: "notifications",
 	notificationsMarkAllAsRead: "notifications/mark-all-as-read",
@@ -1138,6 +1142,31 @@ export interface EndpointMap {
 	[ENDPOINTS.adminFederationAllowlist]: {
 		req: { host?: string; remove?: boolean };
 		res: AllowlistResponse;
+	};
+
+	[ENDPOINTS.adminInviteCreate]: {
+		req: {
+			count?: number;
+			expiresAt?: string | null;
+		};
+		res: InviteCode[];
+	};
+	[ENDPOINTS.adminInviteList]: {
+		req: {
+			limit?: number;
+			offset?: number;
+			type?: "all" | "unused" | "used" | "expired";
+			sort?:
+				| "+createdAt"
+				| "-createdAt"
+				| "+usedAt"
+				| "-usedAt";
+		};
+		res: InviteCode[];
+	};
+	[ENDPOINTS.adminInviteDelete]: {
+		req: { inviteId: string };
+		res: Record<string, never>;
 	};
 }
 

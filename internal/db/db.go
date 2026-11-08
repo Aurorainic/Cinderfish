@@ -643,6 +643,15 @@ CREATE TRIGGER drive_files_retain_remote_media
 -- drive_files delete; without an index that is a full table scan.
 CREATE INDEX IF NOT EXISTS idx_notes_file_ids_gin ON notes USING GIN (file_ids);
 `,
+	27: `
+-- Invite code management: Misskey's registration tickets record which
+-- moderator created them (RegistrationTicket.createdById), so the admin
+-- console can show the creator and sort by creation time.
+ALTER TABLE registration_tickets
+    ADD COLUMN IF NOT EXISTS created_by_id TEXT REFERENCES users (id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS idx_registration_tickets_created_by
+    ON registration_tickets (created_by_id);
+`,
 }
 
 // Migrate applies pending migrations in order and returns the version

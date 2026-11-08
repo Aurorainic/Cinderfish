@@ -87,6 +87,14 @@ const menuDef = computed<MkSuperMenuGroup[]>(() => [
 				active: isActive("/admin/settings"),
 			},
 			{
+				icon: "ph-shield-check ph-bold ph-lg",
+				// Real since the invite-code console landed (§12GT): generation,
+				// filtering and deletion of registration tickets.
+				text: "安全设置",
+				to: "/admin/security",
+				active: isActive("/admin/security"),
+			},
+			{
 				icon: "ph-gauge ph-bold ph-lg",
 				text: t("overview"),
 				to: "/admin/overview",
@@ -173,7 +181,9 @@ const menuDef = computed<MkSuperMenuGroup[]>(() => [
 	},
 	{
 		// Upstream features this backend does not have. The pages explain the
-		// gap instead of rendering controls that would do nothing.
+		// gap instead of rendering controls that would do nothing. Security
+		// used to sit here too; the invite-code console made it a real page
+		// and it moved to the 管理 group.
 		title: "未实现的实例功能",
 		items: [
 			{
@@ -199,12 +209,6 @@ const menuDef = computed<MkSuperMenuGroup[]>(() => [
 				text: "广告与推广",
 				to: "/admin/ads",
 				active: isActive("/admin/ads"),
-			},
-			{
-				icon: "ph-shield-check ph-bold ph-lg",
-				text: "安全设置",
-				to: "/admin/security",
-				active: isActive("/admin/security"),
 			},
 			{
 				icon: "ph-sliders ph-bold ph-lg",

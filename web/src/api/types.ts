@@ -580,6 +580,18 @@ export interface TableStat {
 	size: number;
 }
 
+/** One registration ticket as the admin console sees it (Packed<'InviteCode'>). */
+export interface InviteCode {
+	id: string;
+	code: string;
+	createdAt: string;
+	expiresAt: string | null;
+	createdBy: UserLite | null;
+	usedBy: UserLite | null;
+	usedAt: string | null;
+	used: boolean;
+}
+
 /** One row of `admin/get-index-stats`. */
 export interface IndexStat {
 	schemaname: string;

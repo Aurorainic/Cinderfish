@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -125,6 +126,11 @@ func (s *Service) Register(ctx context.Context, mode RegistrationMode, username,
 		}
 		return nil, "", err
 	}
+	if claimed {
+		// Misskey stamps the ticket with usedBy once the account exists
+		// (SignupApiService); the admin console shows who redeemed a code.
+		s.bindInvite(ctx, invitationCode, user.ID)
+	}
 	return user, user.Token, nil
 }
 
@@ -220,15 +226,167 @@ UPDATE registration_tickets SET used_at = NULL WHERE code = $1 AND used_by_id IS
 `, code)
 }
 
-// CreateInvite generates an invitation code.
-func (s *Service) CreateInvite(ctx context.Context, expiresAt *time.Time) (string, error) {
-	code := auth.SecureRndstrLower(16)
-	if _, err := s.pool.Exec(ctx, `
-INSERT INTO registration_tickets (id, code, expires_at) VALUES ($1, $2, $3)
-`, idgen.New(), code, expiresAt); err != nil {
-		return "", fmt.Errorf("account: create invite: %w", err)
+// bindInvite records which account redeemed a code after its signup
+// succeeded. Best effort: the signup is already committed, and the only loss
+// if this fails is an unattributed row in the admin console.
+func (s *Service) bindInvite(ctx context.Context, code, userID string) {
+	if code == "" || userID == "" {
+		return
 	}
-	return code, nil
+	_, _ = s.pool.Exec(ctx, `
+UPDATE registration_tickets SET used_by_id = $2 WHERE code = $1 AND used_by_id IS NULL
+`, code, userID)
+}
+
+// Invite is one registration ticket as the admin console sees it.
+// Misskey packs the same shape (Packed<'InviteCode'>).
+type Invite struct {
+	ID        string
+	Code      string
+	CreatedAt time.Time
+	ExpiresAt *time.Time
+	CreatedBy *User
+	UsedBy    *User
+	UsedAt    *time.Time
+	Used      bool
+}
+
+// InviteFilter selects which tickets ListInvites returns. Type and sort
+// follow Misskey's admin/invite/list parameter values.
+type InviteFilter struct {
+	Limit  int
+	Offset int
+	Type   string // all | unused | used | expired
+	Sort   string // +createdAt | -createdAt | +usedAt | -usedAt
+}
+
+// ErrInviteNotFound is returned when a ticket id does not exist.
+var ErrInviteNotFound = errors.New("account: invite not found")
+
+// ListInvites returns registration tickets for the admin console.
+func (s *Service) ListInvites(ctx context.Context, filter InviteFilter) ([]Invite, error) {
+	limit := filter.Limit
+	if limit <= 0 || limit > 100 {
+		limit = 30
+	}
+	if filter.Offset < 0 {
+		filter.Offset = 0
+	}
+
+	conditions := []string{}
+	args := []any{}
+	switch filter.Type {
+	case "unused":
+		conditions = append(conditions, `t.used_by_id IS NULL`)
+	case "used":
+		conditions = append(conditions, `t.used_by_id IS NOT NULL`)
+	case "expired":
+		args = append(args, time.Now())
+		conditions = append(conditions, `t.expires_at < $1`)
+	case "", "all":
+	default:
+		return nil, fmt.Errorf("account: invalid invite type %q", filter.Type)
+	}
+	where := ""
+	if len(conditions) > 0 {
+		where = "WHERE " + strings.Join(conditions, " AND ")
+	}
+
+	// Misskey sorts on the ticket id, whose leading base36 timestamp makes
+	// +createdAt / -createdAt id-order sorts; usedAt sorts keep NULLs last
+	// for the descending branch, matching the upstream query builder.
+	orderBy := "t.id DESC"
+	switch filter.Sort {
+	case "-createdAt":
+		orderBy = "t.id ASC"
+	case "+usedAt":
+		orderBy = "t.used_at DESC NULLS LAST"
+	case "-usedAt":
+		orderBy = "t.used_at ASC NULLS FIRST"
+	}
+
+	args = append(args, limit, filter.Offset)
+	// The limit/offset placeholders follow whatever the filter added.
+	// Building the whole statement here keeps the positional list in one
+	// place; PostgreSQL counts placeholders from $1 regardless of where the
+	// LIMIT clause sits.
+	sql := `
+SELECT t.id, t.code, t.created_at, t.expires_at, t.used_at, t.used_by_id IS NOT NULL,
+       cu.id, COALESCE(cu.username, ''), COALESCE(cu.username_lower, ''), cu.host,
+       COALESCE(cu.is_admin, false), COALESCE(cu.is_suspended, false), COALESCE(cu.created_at, t.created_at),
+       uu.id, COALESCE(uu.username, ''), COALESCE(uu.username_lower, ''), uu.host,
+       COALESCE(uu.is_admin, false), COALESCE(uu.is_suspended, false), COALESCE(uu.created_at, t.created_at)
+FROM registration_tickets t
+LEFT JOIN users cu ON cu.id = t.created_by_id
+LEFT JOIN users uu ON uu.id = t.used_by_id
+` + where + `
+ORDER BY ` + orderBy + `
+LIMIT $` + fmt.Sprint(len(args)-1) + ` OFFSET $` + fmt.Sprint(len(args))
+	rows, err := s.pool.Query(ctx, sql, args...)
+	if err != nil {
+		return nil, fmt.Errorf("account: list invites: %w", err)
+	}
+	defer rows.Close()
+
+	out := make([]Invite, 0, limit)
+	for rows.Next() {
+		var inv Invite
+		var createdBy, usedBy User
+		var createdByID, usedByID *string
+		if err := rows.Scan(
+			&inv.ID, &inv.Code, &inv.CreatedAt, &inv.ExpiresAt, &inv.UsedAt, &inv.Used,
+			&createdByID, &createdBy.Username, &createdBy.UsernameLower, &createdBy.Host,
+			&createdBy.IsAdmin, &createdBy.IsSuspended, &createdBy.CreatedAt,
+			&usedByID, &usedBy.Username, &usedBy.UsernameLower, &usedBy.Host,
+			&usedBy.IsAdmin, &usedBy.IsSuspended, &usedBy.CreatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("account: scan invite: %w", err)
+		}
+		if createdByID != nil {
+			createdBy.ID = *createdByID
+			inv.CreatedBy = &createdBy
+		}
+		if usedByID != nil {
+			usedBy.ID = *usedByID
+			inv.UsedBy = &usedBy
+		}
+		out = append(out, inv)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("account: list invites: %w", err)
+	}
+	return out, nil
+}
+
+// DeleteInvite removes one registration ticket.
+func (s *Service) DeleteInvite(ctx context.Context, id string) error {
+	ct, err := s.pool.Exec(ctx, `DELETE FROM registration_tickets WHERE id = $1`, id)
+	if err != nil {
+		return fmt.Errorf("account: delete invite: %w", err)
+	}
+	if ct.RowsAffected() == 0 {
+		return ErrInviteNotFound
+	}
+	return nil
+}
+
+// CreateInvite generates an invitation code and returns the stored ticket.
+// createdByID records the administrator who issued it (Misskey's
+// RegistrationTicket.createdById); an empty id stores NULL for callers that
+// predate the column.
+func (s *Service) CreateInvite(ctx context.Context, createdByID string, expiresAt *time.Time) (Invite, error) {
+	code := auth.SecureRndstrLower(16)
+	now := time.Now()
+	inv := Invite{Code: code, CreatedAt: now, ExpiresAt: expiresAt}
+	row := s.pool.QueryRow(ctx, `
+INSERT INTO registration_tickets (id, code, created_by_id, expires_at, created_at)
+VALUES ($1, $2, NULLIF($3, ''), $4, $5)
+RETURNING id, created_at
+`, idgen.New(), code, createdByID, expiresAt, now)
+	if err := row.Scan(&inv.ID, &inv.CreatedAt); err != nil {
+		return Invite{}, fmt.Errorf("account: create invite: %w", err)
+	}
+	return inv, nil
 }
 
 func (s *Service) usernameExists(ctx context.Context, lower string) (bool, error) {
