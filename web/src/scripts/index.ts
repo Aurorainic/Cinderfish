@@ -5,6 +5,7 @@
 // shared helpers to this list once their module exists.
 export * from "./array";
 export * from "./clone";
+export * from "./copy-link";
 export * from "./copy-to-clipboard";
 export * from "./extract-mentions";
 export * from "./focus";

@@ -162,7 +162,7 @@ import MkStarButton from "@/components/MkStarButton.vue";
 import MkStarButtonNoEmoji from "@/components/MkStarButtonNoEmoji.vue";
 import MkRenoteButton from "@/components/MkRenoteButton.vue";
 import MkQuoteButton from "@/components/MkQuoteButton.vue";
-import copyToClipboard from "@/scripts/copy-to-clipboard";
+import { makeCopyLinkMenuItem } from "@/scripts/copy-link";
 import { url } from "@/config";
 import { pleaseLogin } from "@/scripts/please-login";
 import { buildNoteMenu } from "@/scripts/get-note-menu";
@@ -326,13 +326,7 @@ function onContextmenu(ev: MouseEvent): void {
 						window.open(notePage(appearNote.value), "_blank");
 					},
 				},
-				{
-					icon: "ph-link-simple ph-bold ph-lg",
-					text: t("copyLink"),
-					action: () => {
-						copyToClipboard(`${url}${notePage(appearNote.value)}`);
-					},
-				},
+				makeCopyLinkMenuItem(`${url}${notePage(appearNote.value)}`),
 				note.value.user.host != null
 					? {
 							icon: "ph-arrow-square-up-right ph-bold ph-lg",

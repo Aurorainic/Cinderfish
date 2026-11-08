@@ -19,9 +19,10 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { contextMenu, success } from "../../os";
+import { contextMenu, success, type MenuItem } from "../../os";
 import { t } from "../../i18n";
 import { url as local } from "../../config";
+import { makeCopyLinkMenuItem } from "../../scripts/copy-link";
 
 // Firefish's MkA is the router-aware link used everywhere in note bodies and
 // page chrome. Cinderfish merges the "internal route" and "external URL" cases
@@ -72,28 +73,12 @@ const active = computed<boolean>(() => {
 	return resolved.name === route.name;
 });
 
-function copyLink(): void {
-	const text = isExternal.value ? (props.url ?? "") : local + (props.to ?? "");
-	void navigator.clipboard.writeText(text).then(
-		() => success(),
-		() => {
-			// Clipboard permission denied; keep the URL reachable in the console.
-			console.info(text);
-		},
-	);
-}
-
 function openWindow(): void {
 	window.open(href.value, "_blank", "noopener");
 }
 
 function onContextmenu(ev: MouseEvent): void {
-	const items: {
-		type?: "label";
-		icon?: string;
-		text?: string;
-		action?: () => void;
-	}[] = [];
+	const items: MenuItem[] = [];
 	if (!isExternal.value) {
 		items.push({
 			icon: "ph-bold ph-browser",
@@ -113,11 +98,12 @@ function onContextmenu(ev: MouseEvent): void {
 		text: t("openInNewTab"),
 		action: openWindow,
 	});
-	items.push({
-		icon: "ph-bold ph-link-simple",
-		text: t("copyLink"),
-		action: copyLink,
-	});
+	items.push(
+		makeCopyLinkMenuItem(
+			isExternal.value ? (props.url ?? "") : local + (props.to ?? ""),
+			{ icon: "ph-bold ph-link-simple", onCopied: success },
+		),
+	);
 	void contextMenu(items, ev);
 }
 

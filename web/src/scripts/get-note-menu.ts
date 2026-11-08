@@ -15,6 +15,7 @@ import * as os from "@/os";
 import type { MenuItem } from "@/os";
 import { router } from "@/router";
 import copyToClipboard from "@/scripts/copy-to-clipboard";
+import { makeCopyLinkMenuItem } from "@/scripts/copy-link";
 
 /** Firefish types the menu against the full note shape; the timeline projection is a subset. */
 export type NoteMenuNote = Note &
@@ -116,11 +117,6 @@ export function getNoteMenu(props: NoteMenuProps): NoteMenuItem[] {
 		os.success();
 	}
 
-	function copyLink(): void {
-		copyToClipboard(`${url}/notes/${appearNote.id}`);
-		os.success();
-	}
-
 	function copyOriginal(): void {
 		const original = appearNote.url ?? appearNote.uri;
 		if (original == null) return;
@@ -154,11 +150,9 @@ export function getNoteMenu(props: NoteMenuProps): NoteMenuItem[] {
 				text: t("copyContent"),
 				action: copyContent,
 			},
-			{
-				icon: "ph-link-simple ph-bold ph-lg",
-				text: t("copyLink"),
-				action: copyLink,
-			},
+			makeCopyLinkMenuItem(`${url}/notes/${appearNote.id}`, {
+				onCopied: () => os.success(),
+			}),
 			hasRemote
 				? {
 						icon: "ph-link-simple ph-bold ph-lg",
@@ -217,11 +211,9 @@ export function getNoteMenu(props: NoteMenuProps): NoteMenuItem[] {
 			text: t("copyContent"),
 			action: copyContent,
 		},
-		{
-			icon: "ph-link-simple ph-bold ph-lg",
-			text: t("copyLink"),
-			action: copyLink,
-		},
+		makeCopyLinkMenuItem(`${url}/notes/${appearNote.id}`, {
+			onCopied: () => os.success(),
+		}),
 		hasRemote
 			? {
 					icon: "ph-link-simple ph-bold ph-lg",

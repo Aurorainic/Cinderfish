@@ -14,6 +14,7 @@ import { computed } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { contextMenu, success } from "../../os";
 import { t } from "../../i18n";
+import { makeCopyLinkMenuItem } from "../../scripts/copy-link";
 
 const props = withDefaults(
 	defineProps<{
@@ -54,17 +55,6 @@ function nav(event: MouseEvent): void {
 	void router.push(props.to);
 }
 
-async function copyLink(): Promise<void> {
-	const url = `${location.origin}${props.to}`;
-	try {
-		await navigator.clipboard.writeText(url);
-		success();
-	} catch {
-		// Clipboard permission denied; leave the URL in the console.
-		console.info(url);
-	}
-}
-
 function onContextmenu(event: MouseEvent): void {
 	void contextMenu(
 		[
@@ -79,11 +69,10 @@ function onContextmenu(event: MouseEvent): void {
 				text: t("openInNewTab"),
 				action: openWindow,
 			},
-			{
+			makeCopyLinkMenuItem(`${location.origin}${props.to}`, {
 				icon: "ph-bold ph-link-simple",
-				text: t("copyLink"),
-				action: () => void copyLink(),
-			},
+				onCopied: success,
+			}),
 		],
 		event,
 	);
