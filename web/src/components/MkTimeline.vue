@@ -30,14 +30,15 @@
 </template>
 
 <script setup lang="ts">
-// Home / local / social / global / list / antenna timeline.
+// Home / local / social / global / list / antenna / channel timeline.
 //
 // Firefish branches on `src` (antenna, list, channel, recommended, mentions,
 // directs). Cinderfish has no endpoints for most of those (contract §5); the
-// four real timelines, the user-list timeline and the antenna timeline are
-// ported. `list` and `antenna` are local extensions of the prop type,
-// deliberately not part of the persisted `TimelineSource` union in
-// store/base.ts, so neither can become someone's saved `tl.src` preference.
+// four real timelines, the user-list timeline, the antenna timeline and the
+// channel timeline are ported. `list`, `antenna` and `channel` are local
+// extensions of the prop type, deliberately not part of the persisted
+// `TimelineSource` union in store/base.ts, so none of them can become
+// someone's saved `tl.src` preference.
 //
 // Streaming notes are prepended here: when the reader is scrolled down they are
 // queued (Firefish's MkPagination behaviour) and flushed when the timeline is
@@ -65,8 +66,12 @@ interface NotesExposed {
 	pagingComponent?: NotesPaging | null;
 }
 
-/** A persisted timeline source, or the non-persisted list/antenna timelines. */
-export type TimelineSourceProp = TimelineSource | "list" | "antenna";
+/** A persisted timeline source, or the non-persisted list/antenna/channel ones. */
+export type TimelineSourceProp =
+	| TimelineSource
+	| "list"
+	| "antenna"
+	| "channel";
 
 type HintClosedKey =
 	| "tlHomeHintClosed"
@@ -94,11 +99,14 @@ const props = withDefaults(
 		listId?: string;
 		/** Required when `src` is `"antenna"`; ignored otherwise. */
 		antennaId?: string;
+		/** Required when `src` is `"channel"`; ignored otherwise. */
+		channelId?: string;
 		sound?: boolean;
 	}>(),
 	{
 		listId: undefined,
 		antennaId: undefined,
+		channelId: undefined,
 		sound: false,
 	},
 );
@@ -118,6 +126,7 @@ function definitionFor(
 	src: TimelineSourceProp,
 	listId?: string,
 	antennaId?: string,
+	channelId?: string,
 ): TimelineDefinition {
 	switch (src) {
 		case "list":
@@ -139,6 +148,15 @@ function definitionFor(
 				channel: "antenna",
 				restParams: { antennaId },
 				channelParams: { antennaId },
+				hintKey: null,
+				hintClosedKey: null,
+			};
+		case "channel":
+			return {
+				endpoint: "channels/timeline",
+				channel: "channel",
+				restParams: { channelId },
+				channelParams: { channelId },
 				hintKey: null,
 				hintClosedKey: null,
 			};
@@ -191,16 +209,17 @@ function definitionFor(
 	}
 }
 
-// `listId` / `antennaId` participate in the definition and in the pagination
-// key so a changed list or antenna reloads the timeline (and its streaming
-// channel) instead of showing the previous source's notes.
+// `listId` / `antennaId` / `channelId` participate in the definition and in
+// the pagination key so a changed list, antenna or channel reloads the
+// timeline (and its streaming channel) instead of showing the previous
+// source's notes.
 const definition = computed(() =>
-	definitionFor(props.src, props.listId, props.antennaId),
+	definitionFor(props.src, props.listId, props.antennaId, props.channelId),
 );
 
 const paginationKey = computed(
 	() =>
-		`${props.src}:${props.listId ?? ""}:${props.antennaId ?? ""}`,
+		`${props.src}:${props.listId ?? ""}:${props.antennaId ?? ""}:${props.channelId ?? ""}`,
 );
 
 const pagination = computed<Paging>(() => ({

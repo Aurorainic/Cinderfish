@@ -180,6 +180,16 @@
 					>
 						<i class="ph-dots-three-outline ph-bold ph-lg"></i>
 					</button>
+					<MkA
+						v-if="appearNote.channel"
+						v-tooltip.bottom="appearNote.channel.name"
+						class="channel"
+						:to="`/channels/${appearNote.channel.id}`"
+						@click.stop
+					>
+						<i class="ph-television ph-bold ph-lg"></i>
+						<span>{{ appearNote.channel.name }}</span>
+					</MkA>
 				</footer>
 			</div>
 		</article>
@@ -827,6 +837,31 @@ defineExpose({
 
 					&.reacted {
 						color: var(--accent);
+					}
+				}
+
+				// A channel note's board link; kept compact and pushed to the
+				// trailing edge so it never competes with the reaction buttons.
+				> .channel {
+					display: inline-flex;
+					align-items: center;
+					gap: 4px;
+					margin-inline-start: auto;
+					padding: 8px;
+					max-inline-size: 45%;
+					font-size: 0.9em;
+					color: var(--fgTransparentWeak);
+					overflow: hidden;
+					white-space: nowrap;
+					text-decoration: none;
+
+					&:hover {
+						color: var(--accent);
+					}
+
+					> span {
+						overflow: hidden;
+						text-overflow: ellipsis;
 					}
 				}
 			}

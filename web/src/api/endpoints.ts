@@ -21,6 +21,8 @@ import type {
 	AllowlistResponse,
 	Antenna,
 	AntennaSrc,
+	Channel,
+	ChannelShow,
 	Clip,
 	DriveFile,
 	DriveUsage,
@@ -240,6 +242,24 @@ export const ENDPOINTS = {
 	antennasNotes: "antennas/notes",
 	antennasRemoveNote: "antennas/remove-note",
 
+	// channels (schema v33; there is no channels/delete — archiving is deletion)
+	channelsCreate: "channels/create",
+	channelsUpdate: "channels/update",
+	channelsShow: "channels/show",
+	channelsTimeline: "channels/timeline",
+	channelsFavorite: "channels/favorite",
+	channelsUnfavorite: "channels/unfavorite",
+	channelsFollow: "channels/follow",
+	channelsUnfollow: "channels/unfollow",
+	channelsFollowed: "channels/followed",
+	channelsOwned: "channels/owned",
+	channelsMyFavorites: "channels/my-favorites",
+	channelsFeatured: "channels/featured",
+	channelsSearch: "channels/search",
+	channelsMuteCreate: "channels/mute/create",
+	channelsMuteDelete: "channels/mute/delete",
+	channelsMuteList: "channels/mute/list",
+
 	// timelines
 	notesTimeline: "notes/timeline",
 	notesLocalTimeline: "notes/local-timeline",
@@ -348,6 +368,31 @@ export interface AntennaInput {
 	excludeBots?: boolean;
 	excludeNotesInSensitiveChannel?: boolean;
 }
+
+/**
+ * Writable channel fields. `channels/create` requires `name`; the rest is
+ * optional. `channels/update` accepts any subset, and an omitted field keeps
+ * its stored value. `bannerId: ""` (or `null`) clears the banner — Cinderfish
+ * fixes upstream's silent no-clear.
+ */
+export interface ChannelInput {
+	name: string;
+	description?: string | null;
+	bannerId?: string | null;
+	color?: string;
+	isSensitive?: boolean;
+	allowRenoteToExternal?: boolean;
+}
+
+/** `channels/update` also carries the archive switch and the pin list. */
+export interface ChannelPatch extends Partial<ChannelInput> {
+	channelId: string;
+	isArchived?: boolean;
+	pinnedNoteIds?: string[];
+}
+
+/** `channels/search` type selector. */
+export type ChannelSearchType = "nameAndDescription" | "nameOnly";
 
 export interface NotesSearchParams {
 	query: string;
@@ -491,6 +536,8 @@ export interface NotesCreateParams {
 	mediaIds?: string[];
 	replyId?: string | null;
 	renoteId?: string | null;
+	/** Posts into a channel; the backend forces public + localOnly. */
+	channelId?: string | null;
 	poll?: PollParam;
 }
 
@@ -929,6 +976,72 @@ export interface EndpointMap {
 	[ENDPOINTS.antennasRemoveNote]: {
 		req: { antennaId: string; noteId: string };
 		res: EmptyResponse;
+	};
+
+	// channels
+	[ENDPOINTS.channelsCreate]: { req: ChannelInput; res: Channel };
+	[ENDPOINTS.channelsUpdate]: { req: ChannelPatch; res: Channel };
+	[ENDPOINTS.channelsShow]: {
+		req: { channelId: string };
+		res: ChannelShow;
+	};
+	[ENDPOINTS.channelsTimeline]: {
+		req: PaginationParams & { channelId: string };
+		res: NoteDetailed[];
+	};
+	[ENDPOINTS.channelsFavorite]: {
+		req: { channelId: string };
+		res: EmptyResponse;
+	};
+	[ENDPOINTS.channelsUnfavorite]: {
+		req: { channelId: string };
+		res: EmptyResponse;
+	};
+	[ENDPOINTS.channelsFollow]: {
+		req: { channelId: string };
+		res: EmptyResponse;
+	};
+	[ENDPOINTS.channelsUnfollow]: {
+		req: { channelId: string };
+		res: EmptyResponse;
+	};
+	[ENDPOINTS.channelsFollowed]: {
+		req: PaginationParams;
+		res: Channel[];
+	};
+	[ENDPOINTS.channelsOwned]: {
+		req: PaginationParams;
+		res: Channel[];
+	};
+	[ENDPOINTS.channelsMyFavorites]: {
+		req: Record<string, never>;
+		res: Channel[];
+	};
+	[ENDPOINTS.channelsFeatured]: {
+		req: Record<string, never>;
+		res: Channel[];
+	};
+	[ENDPOINTS.channelsSearch]: {
+		req: {
+			query: string;
+			type?: ChannelSearchType;
+			limit?: number;
+			sinceId?: string;
+			untilId?: string;
+		};
+		res: Channel[];
+	};
+	[ENDPOINTS.channelsMuteCreate]: {
+		req: { channelId: string; expiresAt?: number };
+		res: EmptyResponse;
+	};
+	[ENDPOINTS.channelsMuteDelete]: {
+		req: { channelId: string };
+		res: EmptyResponse;
+	};
+	[ENDPOINTS.channelsMuteList]: {
+		req: Record<string, never>;
+		res: Channel[];
 	};
 
 	[ENDPOINTS.registrySet]: { req: RegistryParams; res: EmptyResponse };
@@ -1479,4 +1592,8 @@ export type PagingEndpoint =
 	| typeof ENDPOINTS.clipsNotes
 	| typeof ENDPOINTS.usersClips
 	| typeof ENDPOINTS.antennasNotes
+	| typeof ENDPOINTS.channelsTimeline
+	| typeof ENDPOINTS.channelsFollowed
+	| typeof ENDPOINTS.channelsOwned
+	| typeof ENDPOINTS.channelsSearch
 	| typeof ENDPOINTS.adminEmojiList;

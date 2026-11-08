@@ -26,10 +26,11 @@
 				<span class="text-count" :class="{ over: textLength > maxTextLength }">{{
 					maxTextLength - textLength
 				}}</span>
-				<span v-if="localOnly" class="local-only">
+				<span v-if="effectiveLocalOnly" class="local-only">
 					<i class="ph-hand-fist ph-bold ph-lg"></i>
 				</span>
 				<button
+					v-if="!inChannel"
 					ref="visibilityButton"
 					v-tooltip="t('visibility')"
 					class="_button visibility"
@@ -98,6 +99,10 @@
 					{{ t("add") }}
 				</button>
 			</CfInfo>
+			<div v-if="channel" class="channel-target">
+				<i class="ph-television ph-bold ph-lg"></i>
+				<span>{{ channel.name }}</span>
+			</div>
 			<input
 				v-show="useCw"
 				ref="cwInputEl"
@@ -207,6 +212,7 @@
 import * as mfm from "mfm-js";
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import type {
+	ChannelRef,
 	DriveFile,
 	NoteDetailed,
 	NoteVisibility,
@@ -251,6 +257,8 @@ const props = withDefaults(
 		initialVisibility?: NoteVisibility;
 		initialFiles?: DriveFile[];
 		initialLocalOnly?: boolean;
+		/** Post into this channel; visibility and federation are forced. */
+		channel?: ChannelRef | null;
 		initialNote?: NoteDetailed | null;
 		fixed?: boolean;
 		autofocus?: boolean;
@@ -262,6 +270,7 @@ const props = withDefaults(
 		initialVisibility: undefined,
 		initialFiles: () => [],
 		initialLocalOnly: undefined,
+		channel: null,
 		initialNote: null,
 		fixed: false,
 		autofocus: true,
@@ -308,6 +317,13 @@ const visibility = ref<NoteVisibility>(
 );
 const localOnly = ref<boolean>(props.initialLocalOnly ?? defaultLocalOnly);
 
+// A channel note is always public and local-only; the backend enforces this,
+// and the composer mirrors it so the visibility picker is not misleading.
+const inChannel = computed<boolean>(() => props.channel != null);
+const effectiveLocalOnly = computed<boolean>(
+	() => inChannel.value || localOnly.value,
+);
+
 const withHashtags = ref(defaultStore.state.postFormWithHashtags);
 const hashtags = ref(defaultStore.state.postFormHashtags);
 
@@ -319,12 +335,14 @@ watch(hashtags, (value) => {
 });
 
 const draftKey = computed<string>(() => {
+	if (props.channel != null) return `channel:${props.channel.id}`;
 	if (props.renote != null) return `renote:${props.renote.id}`;
 	if (props.reply != null) return `reply:${props.reply.id}`;
 	return "note";
 });
 
 const placeholder = computed<string>(() => {
+	if (props.channel != null) return t("_postForm.channelPlaceholder");
 	if (props.renote != null) return t("_postForm.quotePlaceholder");
 	if (props.reply != null) return t("_postForm.replyPlaceholder");
 	const xs = [
@@ -395,8 +413,13 @@ const canPost = computed<boolean>(() => {
 	if (textLength.value > maxTextLength.value) return false;
 	if (poll.value != null && postPoll.value == null) return false;
 	// `visibleUserIds` must be non-empty for specified visibility, otherwise the
-	// server answers INVALID_VISIBILITY (notes-core.md).
-	if (visibility.value === "specified" && visibleUsers.value.length === 0)
+	// server answers INVALID_VISIBILITY (notes-core.md). A channel post is
+	// forced public, so the stored preference does not apply there.
+	if (
+		!inChannel.value &&
+		visibility.value === "specified" &&
+		visibleUsers.value.length === 0
+	)
 		return false;
 	return true;
 });
@@ -818,12 +841,13 @@ async function post(): Promise<void> {
 		renoteId: props.renote?.id ?? quoteId.value ?? undefined,
 		poll: postPoll.value ?? undefined,
 		cw: useCw.value && cw.value.trim() !== "" ? cw.value : null,
-		localOnly: localOnly.value,
-		visibility: visibility.value,
+		localOnly: effectiveLocalOnly.value,
+		visibility: inChannel.value ? "public" : visibility.value,
 		visibleUserIds:
 			visibility.value === "specified"
 				? visibleUsers.value.map((user) => user.id)
 				: undefined,
+		channelId: props.channel?.id,
 	};
 
 	params = await applyInterruptors(params);
@@ -1120,6 +1144,27 @@ watch(text, () => {
 
 		> .hasNotSpecifiedMentions {
 			margin: 0 20px 16px;
+		}
+
+		> .channel-target {
+			display: flex;
+			align-items: center;
+			gap: 6px;
+			margin: 0 24px 8px;
+			padding: 4px 10px;
+			inline-size: fit-content;
+			max-inline-size: calc(100% - 48px);
+			font-size: 0.85em;
+			font-weight: bold;
+			color: var(--accent);
+			background: var(--accentedBg);
+			border-radius: 999px;
+
+			> span {
+				overflow: hidden;
+				white-space: nowrap;
+				text-overflow: ellipsis;
+			}
 		}
 
 		> .cw,

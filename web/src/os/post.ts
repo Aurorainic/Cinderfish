@@ -3,7 +3,7 @@
 // Firefish keeps `os.post` in the big os.ts barrel; Cinderfish splits it out so
 // the composer components never have to import the barrel (which would create a
 // cycle: os/index -> post -> MkPostFormDialog -> MkPostForm -> os/*).
-import type { DriveFile, NoteDetailed, NoteVisibility } from "@/api/types";
+import type { ChannelRef, DriveFile, NoteDetailed, NoteVisibility } from "@/api/types";
 import { popup } from "./state";
 import MkPostFormDialog from "./MkPostFormDialog.vue";
 
@@ -14,6 +14,8 @@ export interface PostFormProps {
 	initialVisibility?: NoteVisibility;
 	initialFiles?: DriveFile[];
 	initialLocalOnly?: boolean;
+	/** Post into this channel; the backend forces public + localOnly. */
+	channel?: ChannelRef | null;
 	/** Accepted for Firefish compatibility; editing has no endpoint here. */
 	initialNote?: NoteDetailed | null;
 	fixed?: boolean;

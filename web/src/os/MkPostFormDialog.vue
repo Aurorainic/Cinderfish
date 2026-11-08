@@ -35,6 +35,7 @@ const props = withDefaults(defineProps<PostFormProps>(), {
 	initialVisibility: undefined,
 	initialFiles: () => [],
 	initialLocalOnly: undefined,
+	channel: null,
 	initialNote: null,
 	fixed: false,
 	autofocus: true,
@@ -52,6 +53,7 @@ const formProps = computed(() => ({
 	initialVisibility: props.initialVisibility,
 	initialFiles: props.initialFiles,
 	initialLocalOnly: props.initialLocalOnly,
+	channel: props.channel,
 	initialNote: props.initialNote,
 	autofocus: props.autofocus,
 }));

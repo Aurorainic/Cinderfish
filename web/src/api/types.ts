@@ -196,6 +196,10 @@ export interface Note {
 	url: string | null;
 	visibleUserIds?: string[];
 	reactionAcceptance?: string;
+	/** Set on a note posted into a channel; the note then never federates. */
+	channelId?: string | null;
+	/** Embedded reference to {@link ChannelRef}; present when `channelId` is. */
+	channel?: ChannelRef | null;
 }
 
 export interface NoteDetailed extends Note {
@@ -281,6 +285,49 @@ export interface Clip {
 	isFavorited?: boolean;
 	/** Present only for the clip owner. */
 	notesCount?: number;
+}
+
+/**
+ * The channel reference embedded in a packed note (`note.channel`). It carries
+ * only what the timeline needs to link the note back to its channel; the
+ * counters and viewer flags live on the full {@link Channel} shape.
+ */
+export interface ChannelRef {
+	id: string;
+	name: string;
+	color: string;
+	isSensitive: boolean;
+	allowRenoteToExternal: boolean;
+	/** `null` for the instance-owned channels the backend can create. */
+	userId: string | null;
+}
+
+/** One channel (`channels/show`, `channels/featured`, …). */
+export interface Channel {
+	id: string;
+	createdAt: string;
+	lastNotedAt: string | null;
+	name: string;
+	description: string | null;
+	userId: string | null;
+	bannerUrl: string | null;
+	bannerId: string | null;
+	pinnedNoteIds: string[];
+	color: string;
+	isArchived: boolean;
+	usersCount: number;
+	notesCount: number;
+	isSensitive: boolean;
+	allowRenoteToExternal: boolean;
+	/** Viewer flags; present only when the request carried a credential. */
+	isFollowing?: boolean;
+	isFavorited?: boolean;
+	isMuting?: boolean;
+}
+
+/** `channels/show` additionally packs the pinned notes in pin order. */
+export interface ChannelShow extends Channel {
+	pinnedNotes: NoteDetailed[];
 }
 
 /**
