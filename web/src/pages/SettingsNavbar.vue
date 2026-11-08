@@ -92,7 +92,7 @@
 // Firefish edits `defaultStore.state.menu` as a newline-separated textarea with a
 // picker that appends entries, and reloads the client after every change. The
 // textarea is replaced by an explicit ordered list: the menu is a closed union of
-// seven entries in Cinderfish (`MenuOption` in store/base.ts), so a text field
+// eight entries in Cinderfish (`MenuOption` in store/base.ts), so a text field
 // would accept values the navbar cannot render. Each change is persisted at once
 // and applied on the next render; the reload is a button instead of a modal per
 // keystroke.
@@ -124,6 +124,7 @@ const ENTRY_DEFS: EntryDef[] = [
 	{ key: "explore", labelKey: "explore", icon: "ph-compass ph-bold" },
 	{ key: "favorites", labelKey: "favorites", icon: "ph-bookmark-simple ph-bold" },
 	{ key: "channels", labelKey: "channel", icon: "ph-television ph-bold" },
+	{ key: "gallery", labelKey: "gallery", icon: "ph-image-square ph-bold" },
 	{ key: "search", labelKey: "search", icon: "ph-magnifying-glass ph-bold" },
 ];
 

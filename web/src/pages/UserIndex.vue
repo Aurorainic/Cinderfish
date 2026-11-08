@@ -33,6 +33,9 @@
 					<MkSpacer v-else-if="tab === 'clips'" :content-max="800">
 						<UserClips :user="user" />
 					</MkSpacer>
+					<MkSpacer v-else-if="tab === 'gallery'" :content-max="800">
+						<UserGallery :user="user" />
+					</MkSpacer>
 				</div>
 				<MkError v-else-if="error != null" @retry="fetchUser" />
 				<MkLoading v-else />
@@ -43,20 +46,22 @@
 
 <script lang="ts" setup>
 // Firefish's tab set is home / reactions / clips / pages / gallery, gated on
-// `publicReactions` and on the user being local. Cinderfish has no pages or
-// gallery endpoints, so the tabs here are the ones the API can feed:
+// `publicReactions` and on the user being local. Cinderfish has no pages
+// endpoint, so the tabs here are the ones the API can feed:
 //   notes      users/notes { withReplies: false }  + pinned notes block
 //   replies    users/notes { withReplies: true }   (backend has no reply-only filter)
 //   media      users/notes { withFiles: true }
 //   activity   no charts/user/notes endpoint -> stated as unavailable
 //   reactions  no users/reactions endpoint     -> stated as unavailable
 //   clips      users/clips (public clips only)  -- local users only, as upstream
+//   gallery    users/gallery/posts              -- local users only, as upstream
 import { computed, ref, watch } from "vue";
 import type { UserDetailed } from "@/api/types";
 import { api } from "@/api/client";
 import { me } from "@/account";
 import UserActivity from "@/components/user/UserActivity.vue";
 import UserClips from "@/components/user/UserClips.vue";
+import UserGallery from "@/components/user/UserGallery.vue";
 import UserHome from "@/components/user/UserHome.vue";
 import UserNotes from "@/components/user/UserNotes.vue";
 import UserPhotos from "@/components/user/UserPhotos.vue";
@@ -68,7 +73,14 @@ import { definePageMetadata } from "@/scripts/page-metadata";
 import { getUserMenu } from "@/scripts/get-user-menu";
 import { useRouter } from "vue-router";
 
-type TabKey = "notes" | "replies" | "media" | "activity" | "reactions" | "clips";
+type TabKey =
+	| "notes"
+	| "replies"
+	| "media"
+	| "activity"
+	| "reactions"
+	| "clips"
+	| "gallery";
 
 interface TabDefinition {
 	key: TabKey;
@@ -83,6 +95,7 @@ const TAB_KEYS: readonly TabKey[] = [
 	"activity",
 	"reactions",
 	"clips",
+	"gallery",
 ];
 
 const props = withDefaults(
@@ -128,10 +141,15 @@ const headerTabs = computed<TabDefinition[]>(() => {
 	if (showReactions.value) {
 		tabs.push({ key: "reactions", title: t("reaction"), icon: "ph-smiley ph-bold ph-lg" });
 	}
-	// Firefish offers clips only on local accounts: federated users are resolved
-	// through users/show, where `host` is set.
+	// Firefish offers clips and gallery only on local accounts: federated users
+	// are resolved through users/show, where `host` is set.
 	if (user.value != null && user.value.host == null) {
 		tabs.push({ key: "clips", title: t("clips"), icon: "ph-paperclip ph-bold ph-lg" });
+		tabs.push({
+			key: "gallery",
+			title: t("gallery"),
+			icon: "ph-image-square ph-bold ph-lg",
+		});
 	}
 	return tabs;
 });

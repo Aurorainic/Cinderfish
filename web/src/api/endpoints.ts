@@ -32,6 +32,8 @@ import type {
 	FederationModeResponse,
 	FollowRequest,
 	Following,
+	GalleryLike,
+	GalleryPost,
 	Hashtag,
 	HashtagTrend,
 	ImportSummary,
@@ -268,6 +270,20 @@ export const ENDPOINTS = {
 	channelsMuteCreate: "channels/mute/create",
 	channelsMuteDelete: "channels/mute/delete",
 	channelsMuteList: "channels/mute/list",
+
+	// gallery (schema v35)
+	galleryPosts: "gallery/posts",
+	galleryFeatured: "gallery/featured",
+	galleryPopular: "gallery/popular",
+	galleryPostsCreate: "gallery/posts/create",
+	galleryPostsUpdate: "gallery/posts/update",
+	galleryPostsDelete: "gallery/posts/delete",
+	galleryPostsShow: "gallery/posts/show",
+	galleryPostsLike: "gallery/posts/like",
+	galleryPostsUnlike: "gallery/posts/unlike",
+	iGalleryPosts: "i/gallery/posts",
+	iGalleryLikes: "i/gallery/likes",
+	usersGalleryPosts: "users/gallery/posts",
 
 	// timelines
 	notesTimeline: "notes/timeline",
@@ -1086,6 +1102,69 @@ export interface EndpointMap {
 		res: Channel[];
 	};
 
+	// gallery
+	[ENDPOINTS.galleryPosts]: {
+		req: PaginationParams;
+		res: GalleryPost[];
+	};
+	[ENDPOINTS.galleryFeatured]: {
+		req: { limit?: number; untilId?: string; untilDate?: number };
+		res: GalleryPost[];
+	};
+	[ENDPOINTS.galleryPopular]: {
+		req: Record<string, never>;
+		res: GalleryPost[];
+	};
+	[ENDPOINTS.galleryPostsCreate]: {
+		req: {
+			title: string;
+			description?: string | null;
+			/** 1–32 ids of the caller's own drive files, in display order. */
+			fileIds: string[];
+			isSensitive?: boolean;
+		};
+		res: GalleryPost;
+	};
+	[ENDPOINTS.galleryPostsUpdate]: {
+		req: {
+			postId: string;
+			title?: string;
+			/** Omitted keeps the stored description; null clears it. */
+			description?: string | null;
+			fileIds?: string[];
+			isSensitive?: boolean;
+		};
+		res: GalleryPost;
+	};
+	[ENDPOINTS.galleryPostsDelete]: {
+		req: { postId: string };
+		res: EmptyResponse;
+	};
+	[ENDPOINTS.galleryPostsShow]: {
+		req: { postId: string };
+		res: GalleryPost;
+	};
+	[ENDPOINTS.galleryPostsLike]: {
+		req: { postId: string };
+		res: EmptyResponse;
+	};
+	[ENDPOINTS.galleryPostsUnlike]: {
+		req: { postId: string };
+		res: EmptyResponse;
+	};
+	[ENDPOINTS.iGalleryPosts]: {
+		req: PaginationParams;
+		res: GalleryPost[];
+	};
+	[ENDPOINTS.iGalleryLikes]: {
+		req: PaginationParams;
+		res: GalleryLike[];
+	};
+	[ENDPOINTS.usersGalleryPosts]: {
+		req: PaginationParams & { userId: string };
+		res: GalleryPost[];
+	};
+
 	[ENDPOINTS.registrySet]: { req: RegistryParams; res: EmptyResponse };
 	[ENDPOINTS.registryGet]: { req: RegistryGetParams; res: unknown };
 	[ENDPOINTS.registryGetDetail]: {
@@ -1638,4 +1717,9 @@ export type PagingEndpoint =
 	| typeof ENDPOINTS.channelsFollowed
 	| typeof ENDPOINTS.channelsOwned
 	| typeof ENDPOINTS.channelsSearch
+	| typeof ENDPOINTS.galleryPosts
+	| typeof ENDPOINTS.galleryFeatured
+	| typeof ENDPOINTS.iGalleryPosts
+	| typeof ENDPOINTS.iGalleryLikes
+	| typeof ENDPOINTS.usersGalleryPosts
 	| typeof ENDPOINTS.adminEmojiList;

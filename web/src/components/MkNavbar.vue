@@ -194,6 +194,12 @@ const NAV_ENTRIES: Record<MenuOption, NavEntry> = {
 		icon: "ph-television ph-bold",
 		to: "/channels",
 	},
+	gallery: {
+		id: "gallery",
+		title: "gallery",
+		icon: "ph-image-square ph-bold",
+		to: "/gallery",
+	},
 	search: {
 		id: "search",
 		title: "search",
@@ -218,6 +224,12 @@ const OVERFLOW_ENTRIES: NavEntry[] = [
 		to: "/announcements",
 	},
 	{
+		id: "gallery",
+		title: "gallery",
+		icon: "ph-image-square ph-bold",
+		to: "/gallery",
+	},
+	{
 		id: "registry",
 		title: "registry",
 		icon: "ph-database ph-bold",
@@ -227,13 +239,14 @@ const OVERFLOW_ENTRIES: NavEntry[] = [
 ];
 
 /**
- * First-release scope keeps channels / clips / gallery / pages / antennas /
- * lists as placeholder routes (Misskey API coverage register §5). Messaging is
- * wired now (1:1 only), so its entry is no longer filtered out. Search is
- * listed again now that `notes/search` and `users/search` exist; it opens
- * /search, which carries its own query box.
- * The menu table still knows them so the store shape stays Firefish-compatible,
- * but they are filtered out instead of leading to a dead end.
+ * First-release scope keeps channels / clips / pages / antennas / lists as
+ * placeholder routes (Misskey API coverage register §5). Messaging, channels
+ * and gallery are wired now, so their entries are no longer filtered out.
+ * Search is listed again now that `notes/search` and `users/search` exist; it
+ * opens /search, which carries its own query box.
+ * Gallery is wired now and listed as a default menu entry. It also stays in
+ * OVERFLOW_ENTRIES so accounts whose stored `menu` predates it can still reach
+ * it from the "more" menu; `overflow` drops it when the menu already has it.
  */
 const UNAVAILABLE_MENU: ReadonlySet<MenuOption> = new Set<MenuOption>([
 	"channels",

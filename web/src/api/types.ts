@@ -318,6 +318,32 @@ export interface Clip {
 	notesCount?: number;
 }
 
+/** One gallery post (`gallery/posts/*`). */
+export interface GalleryPost {
+	id: string;
+	createdAt: string;
+	/** Set only after `gallery/posts/update`. */
+	updatedAt: string | null;
+	userId: string;
+	user: UserLite;
+	title: string;
+	description: string | null;
+	/** Drive file ids in display order. */
+	fileIds: string[];
+	/** The packed files, resolved in `fileIds` order. */
+	files: DriveFile[];
+	isSensitive: boolean;
+	likedCount: number;
+	/** Present only when the request carries a credential. */
+	isLiked?: boolean;
+}
+
+/** One entry of `i/gallery/likes`: the like record and its post. */
+export interface GalleryLike {
+	id: string;
+	post: GalleryPost;
+}
+
 /**
  * The channel reference embedded in a packed note (`note.channel`). It carries
  * only what the timeline needs to link the note back to its channel; the
