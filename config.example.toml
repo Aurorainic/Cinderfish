@@ -11,6 +11,9 @@ domain = "example.com"
 # PostgreSQL is the only mandatory dependency.
 database_url = "postgres://cinderfish:cinderfish@localhost:5432/cinderfish"
 
+# pgxpool size cap. 0 keeps the default of 10.
+# database_max_conns = 10
+
 # open | invite | admin
 registration_mode = "admin"
 

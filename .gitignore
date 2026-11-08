@@ -7,3 +7,10 @@ coverage.txt
 tmp/
 web/node_modules/
 web/dist/
+
+# Local agent tooling state, not project content.
+.superpowers/
+.mimosa/
+.workbuddy/
+.zcode/
+.archify/

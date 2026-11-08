@@ -29,6 +29,9 @@ type Config struct {
 	// cap Misskey's signin limiter uses. Zero means the default of 10;
 	// a negative value disables the cap (tests, sealed networks).
 	SigninRateLimit int `toml:"signin_rate_limit"`
+	// DatabaseMaxConns caps the pgxpool size. Zero means the default of 10;
+	// raise it only when the PostgreSQL server can take the connections.
+	DatabaseMaxConns int `toml:"database_max_conns"`
 }
 
 // Mail configures outbound email. An empty Host means the server logs the
@@ -171,6 +174,7 @@ func applyEnv(c *Config) {
 	setStr("CINDERFISH_MAIL_TLS", &c.Mail.TLS)
 	setInt("CINDERFISH_MAIL_PORT", &c.Mail.Port)
 	setInt("CINDERFISH_PORT", &c.Port)
+	setInt("CINDERFISH_DATABASE_MAX_CONNS", &c.DatabaseMaxConns)
 }
 
 func setStr(key string, dst *string) {

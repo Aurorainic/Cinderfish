@@ -104,3 +104,20 @@ func TestIDeleteAccount(t *testing.T) {
 		t.Errorf("users/show after delete = %d, want 404", resp.StatusCode)
 	}
 }
+
+func TestUsersShowBatchRejectsOver100(t *testing.T) {
+	f := newFederationServer(t, "public")
+	f.registerUser(t, "alice")
+
+	ids := make([]string, 101)
+	for i := range ids {
+		ids[i] = "9w7d5ej1g2h3" + string(rune('a'+i%26)) + "0" + strings.Repeat("x", 8)
+	}
+	resp, out := post(t, f.ts, "/api/users/show", map[string]any{"userIds": ids})
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("users/show with 101 userIds = %d %v, want 400", resp.StatusCode, out)
+	}
+	if code, _ := out["error"].(map[string]any)["code"].(string); code != "TOO_MANY_USERS" {
+		t.Errorf("error code = %v, want TOO_MANY_USERS", out)
+	}
+}

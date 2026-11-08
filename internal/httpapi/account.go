@@ -20,6 +20,7 @@ const (
 	errIDUserSuspended   = "e03a5f46-d309-4865-9b69-56282d94e1eb"
 	errIDInvalidPassword = "932c904e-9460-45b7-9ce6-7ed33be7eb2c"
 	errIDSignupFailed    = "4d371c9a-3a0f-4c8b-9b8e-2f9c0a1d3e45"
+	errIDTooManyUsers    = "76d5ec72-88a6-4edd-b64f-11b756a0bb8b"
 )
 
 // writeIDError emits Misskey's id-only error envelope, used by signin.
@@ -287,7 +288,16 @@ func (s *Server) handleUsersShow(w http.ResponseWriter, r *http.Request) {
 	// userIds answers a batch, which is how Firefish's migration page
 	// resolves the aliases it stores. Misskey accepts ids there; Cinderfish
 	// also accepts actor URIs, because alsoKnownAs holds URIs and the client
-	// passes the list straight back in.
+	// passes the list straight back in. The batch is capped like Misskey's
+	// users/show (100) so one request cannot fan out into unbounded work.
+	if len(body.UserIDs) > 100 {
+		writeAPIError(w, &APIError{
+			Message: "Your request includes too many users. Please lower the number.",
+			Code:    "TOO_MANY_USERS",
+			ID:      errIDTooManyUsers, Kind: "client", Status: http.StatusBadRequest,
+		})
+		return
+	}
 	if len(body.UserIDs) > 0 {
 		out := make([]any, 0, len(body.UserIDs))
 		for _, id := range body.UserIDs {

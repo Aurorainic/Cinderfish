@@ -153,7 +153,10 @@ func openDB(ctx context.Context, cfg *config.Config) (*pgxpool.Pool, error) {
 	if err != nil {
 		return nil, err
 	}
-	poolCfg.MaxConns = 10
+	poolCfg.MaxConns = int32(cfg.DatabaseMaxConns)
+	if poolCfg.MaxConns <= 0 {
+		poolCfg.MaxConns = 10
+	}
 	return pgxpool.NewWithConfig(ctx, poolCfg)
 }
 

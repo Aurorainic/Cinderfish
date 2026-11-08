@@ -1,0 +1,90 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  go:
+    name: Go checks
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: cinderfish
+          POSTGRES_PASSWORD: cinderfish
+          POSTGRES_DB: cinderfish_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U cinderfish"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "1.26"
+
+      - name: gofmt
+        run: test -z "$(gofmt -l internal/ cmd/)"
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: migration immutability gate
+        run: ./scripts/check-migrations.sh
+
+      - name: go test
+        env:
+          CINDERFISH_TEST_DATABASE_URL: postgres://cinderfish:cinderfish@localhost:5432/cinderfish_test
+          CINDERFISH_TEST_REDIS_URL: redis://127.0.0.1:6379/0
+        run: go test ./...
+
+  web:
+    name: Frontend checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+
+      - name: Install dependencies
+        working-directory: web
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        working-directory: web
+        run: pnpm typecheck
+
+      - name: Build
+        working-directory: web
+        run: pnpm build

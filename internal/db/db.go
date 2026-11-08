@@ -638,6 +638,11 @@ DROP TRIGGER IF EXISTS drive_files_retain_remote_media ON drive_files;
 CREATE TRIGGER drive_files_retain_remote_media
     BEFORE DELETE ON drive_files FOR EACH ROW EXECUTE FUNCTION retain_remote_media();
 `,
+	26: `
+-- The retain_remote_media trigger (v25) scans notes.file_ids on every
+-- drive_files delete; without an index that is a full table scan.
+CREATE INDEX IF NOT EXISTS idx_notes_file_ids_gin ON notes USING GIN (file_ids);
+`,
 }
 
 // Migrate applies pending migrations in order and returns the version

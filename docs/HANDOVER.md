@@ -12,7 +12,12 @@
   更早的第五十一至六十四波（账号迁移、OAuth 同意页、`ap/show`、`app/*` 授权、关注关系设置、
   schema v20/v21 等）见 §12BP–§12CB）
 - 项目名 **Cinderfish**（2026-10-28 定名，Go module `github.com/Aurorainic/cinderfish`）
-- 仓库：`https://github.com/Aurorainic/Cinderfish.git`，工作表分支 `main`；当前 schema **v24**
+- 仓库：`https://github.com/Aurorainic/Cinderfish.git`，工作表分支 `main`；当前 schema **v26**
+- **历史施工文档已清理（2026-11-08）**：正文各批次引用的
+  `docs/research/2026-11-05/06-firefish-port-waveN-contract.md`（62 份）与
+  `docs/superpowers/plans/2026-10-29-frontend-redesign/` 的逐任务材料已删除。
+  它们是当批次的施工契约与验收口径，内容已由代码、提交信息与本文各节吸收；
+  需要追溯时按批次日期查 git 历史（`git log --diff-filter=D --name-only` 可列出原路径）。
 
 ## 1. 一句话说明
 
@@ -7779,3 +7784,29 @@ CINDERFISH_TEST_DATABASE_URL=... CINDERFISH_TEST_REDIS_URL=... go test ./... -co
 
 复验:`pnpm typecheck` 干净、构建成功,四象限截图逐项确认无回归。
 详见 `docs/research/2026-11-07-frontend-visual-audit.md`。
+
+## 12GS. 仓库优化与精简(2026-11-08)
+
+- **数据层决策:不迁移 sqlc**。实测 324 个 SQL 调用点中动态拼接仅 4 处(且已收拢在
+  `queryBuilder`),迁移内嵌 Go 是「单二进制部署」的设计意图;结论与替代手段记录在
+  `docs/research/2026-11-08-data-layer-sqlc-decision.md`。
+- **迁移不可变门禁**:`scripts/check-migrations.sh` 以 HEAD 比对 `internal/db/db.go`
+  的版本条目——已发布版本被改/删/降号即失败;三条失败路径与一条合法路径均实测验证。
+  CI(`.github/workflows/ci.yml`,新增,gofmt/vet/门禁/go test 带 PG18+Redis service/
+  前端 typecheck+build)接入。
+- **schema v26**:`notes.file_ids` 加 GIN 索引(服务 v25 触发器的 `ANY(file_ids)` 全表扫),
+  测试库实测迁移链 1→26 干净跑完。`AGENTS.md` 的版本失配(22)修正为 26 并指向门禁脚本。
+- **性能补漏**:`database_max_conns` 配置化(默认 10);`users/show` 批量 userIds 上限 100
+  (Misskey 同款,超限 400 TOO_MANY_USERS,带回归测试)。
+- **前端构建瘦身:dist 7.7M → 4.1M**。@phosphor-icons/web 的 @font-face 声明 woff2+woff+ttf+svg
+  四格式,Vite 会全数拷入 dist 但浏览器只下载 woff2。新增 `web/scripts/gen-phosphor.mjs`
+  生成 woff2-only 镜像 `web/src/styles/generated/_phosphor.scss`(类规则与包 CSS 一致,
+  2496 条 content 规则实测对齐),woff2 本体复制到 `web/src/assets/fonts/`。
+  浏览器实测:两个字体 family 均 loaded,时间线截图图标无回归。
+- **仓库精简(-2.4M 跟踪文件)**:删除 62 份 wave 施工契约
+  (`docs/research/2026-11-05/06-firefish-port-waveN-contract.md`)、
+  `2026-10-29-frontend-redesign` 的逐任务材料(留占位 README)、
+  `.archify` 的 16 个 review-* 评审产物。保留:AGENTS.md 点名的 4 份 port 定义文档、
+  capability matrix、runtime contract、license register、`api-contract/`、
+  `2026-10-30/31` 两份被 rebaseline-decision 承诺「保留历史」的计划。
+  `.gitignore` 增加 `.superpowers/ .mimosa/ .workbuddy/ .zcode/ .archify/`。
