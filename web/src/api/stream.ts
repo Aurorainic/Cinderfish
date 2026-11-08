@@ -23,7 +23,8 @@ export type StreamChannelName =
 	| "hybridTimeline"
 	| "globalTimeline"
 	| "userList"
-	| "clip";
+	| "clip"
+	| "antenna";
 
 export interface ChannelNoteEvent {
 	note: NoteDetailed;

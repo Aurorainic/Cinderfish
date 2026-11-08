@@ -30,14 +30,14 @@
 </template>
 
 <script setup lang="ts">
-// Home / local / social / global / list timeline.
+// Home / local / social / global / list / antenna timeline.
 //
 // Firefish branches on `src` (antenna, list, channel, recommended, mentions,
 // directs). Cinderfish has no endpoints for most of those (contract §5); the
-// four real timelines and the user-list timeline are ported. `list` is a local
-// extension of the prop type, deliberately not part of the persisted
-// `TimelineSource` union in store/base.ts, so a list can never become someone's
-// saved `tl.src` preference.
+// four real timelines, the user-list timeline and the antenna timeline are
+// ported. `list` and `antenna` are local extensions of the prop type,
+// deliberately not part of the persisted `TimelineSource` union in
+// store/base.ts, so neither can become someone's saved `tl.src` preference.
 //
 // Streaming notes are prepended here: when the reader is scrolled down they are
 // queued (Firefish's MkPagination behaviour) and flushed when the timeline is
@@ -65,8 +65,8 @@ interface NotesExposed {
 	pagingComponent?: NotesPaging | null;
 }
 
-/** A persisted timeline source, or the non-persisted user-list timeline. */
-export type TimelineSourceProp = TimelineSource | "list";
+/** A persisted timeline source, or the non-persisted list/antenna timelines. */
+export type TimelineSourceProp = TimelineSource | "list" | "antenna";
 
 type HintClosedKey =
 	| "tlHomeHintClosed"
@@ -92,10 +92,13 @@ const props = withDefaults(
 		src: TimelineSourceProp;
 		/** Required when `src` is `"list"`; ignored otherwise. */
 		listId?: string;
+		/** Required when `src` is `"antenna"`; ignored otherwise. */
+		antennaId?: string;
 		sound?: boolean;
 	}>(),
 	{
 		listId: undefined,
+		antennaId: undefined,
 		sound: false,
 	},
 );
@@ -114,6 +117,7 @@ const showTimelineReplies = defaultStore.reactiveState.showTimelineReplies.value
 function definitionFor(
 	src: TimelineSourceProp,
 	listId?: string,
+	antennaId?: string,
 ): TimelineDefinition {
 	switch (src) {
 		case "list":
@@ -126,6 +130,15 @@ function definitionFor(
 					withFiles: false,
 				},
 				channelParams: { listId, withRenotes: true },
+				hintKey: null,
+				hintClosedKey: null,
+			};
+		case "antenna":
+			return {
+				endpoint: "antennas/notes",
+				channel: "antenna",
+				restParams: { antennaId },
+				channelParams: { antennaId },
 				hintKey: null,
 				hintClosedKey: null,
 			};
@@ -178,13 +191,16 @@ function definitionFor(
 	}
 }
 
-// `listId` participates in the definition and in the pagination key so a
-// changed list reloads the timeline (and its streaming channel) instead of
-// showing the previous list's notes.
-const definition = computed(() => definitionFor(props.src, props.listId));
+// `listId` / `antennaId` participate in the definition and in the pagination
+// key so a changed list or antenna reloads the timeline (and its streaming
+// channel) instead of showing the previous source's notes.
+const definition = computed(() =>
+	definitionFor(props.src, props.listId, props.antennaId),
+);
 
 const paginationKey = computed(
-	() => `${props.src}:${props.listId ?? ""}`,
+	() =>
+		`${props.src}:${props.listId ?? ""}:${props.antennaId ?? ""}`,
 );
 
 const pagination = computed<Paging>(() => ({
@@ -306,9 +322,9 @@ if (props.src === "home") {
 
 // ----- hint ---------------------------------------------------------------
 
-// A list timeline has no hint. `hintClosedKey` is null for it, so no store
-// entry is read or written and the template's `hint != null` guard keeps the
-// banner out of the page.
+// A list or antenna timeline has no hint. `hintClosedKey` is null for both, so
+// no store entry is read or written and the template's `hint != null` guard
+// keeps the banner out of the page.
 const hintClosedKey = definition.value.hintClosedKey;
 const hintClosed = ref(
 	hintClosedKey == null

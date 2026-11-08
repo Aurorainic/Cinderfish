@@ -1,7 +1,7 @@
 <!-- Ported from firefish@b425f61:packages/client/src/widgets/timeline.vue (AGPL-3.0-only) -->
 <template>
 	<WidgetCard
-		:title="t('_timelines.' + src)"
+		:title="title"
 		:icon="iconFor(src)"
 		:show-header="widgetProps.showHeader === true"
 		:height="height"
@@ -12,17 +12,24 @@
 				<i class="ph-bold ph-caret-down"></i>
 			</button>
 		</template>
-		<MkTimeline :key="src" :src="src" />
+		<MkTimeline
+			:key="timelineKey"
+			:src="src"
+			:antenna-id="antennaId ?? undefined"
+		/>
 	</WidgetCard>
 </template>
 
 <script setup lang="ts">
-// Firefish also offers antenna and list sources and loads them with
-// `antennas/list` / `users/lists/list`. Neither endpoint exists (contract §2),
-// so the menu is limited to the four real timelines.
+// Firefish also offers list sources and loads them with `users/lists/list`;
+// that menu entry is not ported. Antennas are: `antennas/list` exists and the
+// widget stores the chosen antenna id/name alongside the source, so the title
+// can show the antenna name without a second request.
 import { computed } from "vue";
 import WidgetCard from "./WidgetCard.vue";
 import MkTimeline from "@/components/MkTimeline.vue";
+import { api } from "@/api/client";
+import { ENDPOINTS } from "@/api/endpoints";
 import { popupMenu, type MenuItem } from "@/os";
 import { t } from "@/i18n";
 import type { TimelineSource } from "@/store/base";
@@ -33,6 +40,9 @@ const name = "timeline";
 
 const props = defineProps<{ widget?: Widget }>();
 const emit = defineEmits<{ updateProps: [data: Record<string, unknown>] }>();
+
+/** Persisted sources plus the non-persisted antenna source. */
+type WidgetSource = TimelineSource | "antenna";
 
 const sources: TimelineSource[] = ["home", "local", "social", "global"];
 
@@ -58,17 +68,40 @@ const { widgetProps, configure, save } = useWidgetPropsManager(
 	(data) => emit("updateProps", data),
 );
 
-const src = computed<TimelineSource>(() => {
+const src = computed<WidgetSource>(() => {
 	const value = widgetProps.src;
-	return sources.includes(value as TimelineSource) ? (value as TimelineSource) : "home";
+	if (value === "antenna" && antennaId.value != null) return "antenna";
+	return sources.includes(value as TimelineSource)
+		? (value as TimelineSource)
+		: "home";
 });
+
+const antennaId = computed<string | null>(() => {
+	const value = widgetProps.antennaId;
+	return typeof value === "string" && value !== "" ? value : null;
+});
+
+const antennaName = computed<string | null>(() => {
+	const value = widgetProps.antennaName;
+	return typeof value === "string" && value !== "" ? value : null;
+});
+
+const title = computed(() =>
+	src.value === "antenna"
+		? (antennaName.value ?? t("antennas"))
+		: t(`_timelines.${src.value}`),
+);
+
+const timelineKey = computed(() =>
+	src.value === "antenna" ? `antenna:${antennaId.value}` : src.value,
+);
 
 const height = computed(() => {
 	const value = widgetProps.height;
 	return typeof value === "number" ? value : 300;
 });
 
-function iconFor(source: TimelineSource): string {
+function iconFor(source: WidgetSource): string {
 	switch (source) {
 		case "local":
 			return "ph-bold ph-users";
@@ -76,24 +109,47 @@ function iconFor(source: TimelineSource): string {
 			return "ph-bold ph-handshake";
 		case "global":
 			return "ph-bold ph-planet";
+		case "antenna":
+			return "ph-bold ph-flying-saucer";
 		case "home":
 		default:
 			return "ph-bold ph-house";
 	}
 }
 
-function setSrc(next: TimelineSource): void {
+function setSrc(next: WidgetSource): void {
 	widgetProps.src = next;
 	save();
 }
 
-function choose(event: MouseEvent): void {
+async function choose(event: MouseEvent): Promise<void> {
 	const items: MenuItem[] = sources.map((source) => ({
 		text: t(`_timelines.${source}`),
 		icon: iconFor(source),
 		active: source === src.value,
 		action: () => setSrc(source),
 	}));
+
+	try {
+		const antennas = await api(ENDPOINTS.antennasList, {});
+		if (antennas.length > 0) {
+			items.push({ type: "label", text: t("antennas") });
+			for (const antenna of antennas) {
+				items.push({
+					text: antenna.name,
+					icon: "ph-bold ph-flying-saucer",
+					action: () => {
+						widgetProps.antennaId = antenna.id;
+						widgetProps.antennaName = antenna.name;
+						setSrc("antenna");
+					},
+				});
+			}
+		}
+	} catch {
+		items.push({ type: "label", text: t("somethingHappened") });
+	}
+
 	void popupMenu(items, event);
 }
 

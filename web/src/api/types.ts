@@ -283,6 +283,42 @@ export interface Clip {
 	notesCount?: number;
 }
 
+/**
+ * The antenna source values the backend implements. Firefish also has `group`
+ * and `instances`; neither exists in the Misskey contract (`antennas/create`),
+ * so the editor must not offer them.
+ */
+export type AntennaSrc =
+	| "home"
+	| "all"
+	| "users"
+	| "list"
+	| "users_blacklist";
+
+/** One packed antenna (`antennas/show`, `antennas/list`). */
+export interface Antenna {
+	id: string;
+	createdAt: string;
+	name: string;
+	/** Each inner array is an AND-group; the outer array is OR. */
+	keywords: string[][];
+	excludeKeywords: string[][];
+	src: AntennaSrc;
+	userListId: string | null;
+	users: string[];
+	caseSensitive: boolean;
+	localOnly: boolean;
+	excludeBots: boolean;
+	withReplies: boolean;
+	withFile: boolean;
+	isActive: boolean;
+	/** Packed as false until the backend tracks unread state. */
+	hasUnreadNote: boolean;
+	/** Packed as false; notification delivery is not implemented yet. */
+	notify: boolean;
+	excludeNotesInSensitiveChannel: boolean;
+}
+
 export interface NoteFavorite {
 	id: string;
 	createdAt: string;

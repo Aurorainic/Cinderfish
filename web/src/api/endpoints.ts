@@ -19,6 +19,8 @@ import type {
 	AuthorizedApp,
 	BlockingRecord,
 	AllowlistResponse,
+	Antenna,
+	AntennaSrc,
 	Clip,
 	DriveFile,
 	DriveUsage,
@@ -229,6 +231,15 @@ export const ENDPOINTS = {
 	notesClips: "notes/clips",
 	usersClips: "users/clips",
 
+	// antennas
+	antennasCreate: "antennas/create",
+	antennasUpdate: "antennas/update",
+	antennasDelete: "antennas/delete",
+	antennasList: "antennas/list",
+	antennasShow: "antennas/show",
+	antennasNotes: "antennas/notes",
+	antennasRemoveNote: "antennas/remove-note",
+
 	// timelines
 	notesTimeline: "notes/timeline",
 	notesLocalTimeline: "notes/local-timeline",
@@ -316,6 +327,26 @@ export interface PaginationParams {
 	untilId?: string;
 	sinceDate?: number;
 	untilDate?: number;
+}
+
+/**
+ * Writable antenna fields. `antennas/create` requires every non-optional field;
+ * `antennas/update` accepts any subset, and an omitted field stays unchanged.
+ * `userListId` is required when `src` is `"list"`.
+ */
+export interface AntennaInput {
+	name: string;
+	src: AntennaSrc;
+	keywords: string[][];
+	excludeKeywords: string[][];
+	users: string[];
+	caseSensitive: boolean;
+	withReplies: boolean;
+	withFile: boolean;
+	userListId?: string | null;
+	localOnly?: boolean;
+	excludeBots?: boolean;
+	excludeNotesInSensitiveChannel?: boolean;
 }
 
 export interface NotesSearchParams {
@@ -876,6 +907,30 @@ export interface EndpointMap {
 		res: Clip[];
 	};
 
+	// antennas
+	[ENDPOINTS.antennasCreate]: { req: AntennaInput; res: Antenna };
+	[ENDPOINTS.antennasUpdate]: {
+		req: Partial<AntennaInput> & { antennaId: string };
+		res: Antenna;
+	};
+	[ENDPOINTS.antennasDelete]: {
+		req: { antennaId: string };
+		res: EmptyResponse;
+	};
+	[ENDPOINTS.antennasList]: { req: Record<string, never>; res: Antenna[] };
+	[ENDPOINTS.antennasShow]: {
+		req: { antennaId: string };
+		res: Antenna;
+	};
+	[ENDPOINTS.antennasNotes]: {
+		req: PaginationParams & { antennaId: string };
+		res: NoteDetailed[];
+	};
+	[ENDPOINTS.antennasRemoveNote]: {
+		req: { antennaId: string; noteId: string };
+		res: EmptyResponse;
+	};
+
 	[ENDPOINTS.registrySet]: { req: RegistryParams; res: EmptyResponse };
 	[ENDPOINTS.registryGet]: { req: RegistryGetParams; res: unknown };
 	[ENDPOINTS.registryGetDetail]: {
@@ -1423,4 +1478,5 @@ export type PagingEndpoint =
 	| typeof ENDPOINTS.clipsList
 	| typeof ENDPOINTS.clipsNotes
 	| typeof ENDPOINTS.usersClips
+	| typeof ENDPOINTS.antennasNotes
 	| typeof ENDPOINTS.adminEmojiList;

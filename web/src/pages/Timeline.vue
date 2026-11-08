@@ -29,15 +29,16 @@
 
 <script setup lang="ts">
 // Firefish's timeline page branches into swiper/tutorial/antenna/list menus and
-// a fixed PostForm. Cinderfish drops the swiper, tutorial and antennas (no
-// endpoints) and keeps the user-list menu as a header action:
+// a fixed PostForm. Cinderfish drops the swiper and tutorial and keeps the
+// user-list and antenna menus as header actions:
 //   * no swiper — only the selected tab's MkTimeline is rendered;
-//   * no antenna or recommended timeline (no endpoints);
+//   * antenna and list timelines are reached through their menus and never
+//     persisted as the selected tab;
 //   * the fixed PostForm is ported as-is (top of the column, gated by
 //     defaultStore.state.showFixedPostForm). Like Firefish, `posted` is not
 //     handled here: MkTimeline prepends the new note from Streaming.
 // `src` stays persisted in defaultStore.state.tl, exactly like Firefish; a
-// list timeline is reached through /timeline/list/:listId and never persisted.
+// list/antenna timeline is reached through its own route and never persisted.
 import { computed } from "vue";
 import MkTimeline from "@/components/MkTimeline.vue";
 import MkPostForm from "@/components/MkPostForm.vue";
@@ -176,6 +177,42 @@ async function openListsMenu(ev: MouseEvent): Promise<void> {
 	void os.popupMenu(items, ev);
 }
 
+// Same lazy pattern for antennas: `antennas/list` is fetched only when the
+// action is pressed. Only antennas owned by the caller are listed, which is
+// exactly what the endpoint returns.
+async function openAntennasMenu(ev: MouseEvent): Promise<void> {
+	const items: MenuItem[] = [];
+	try {
+		const antennas = await api(ENDPOINTS.antennasList, {});
+		if (antennas.length === 0) {
+			items.push({ type: "label", text: t("nothing") });
+		} else {
+			for (const antenna of antennas) {
+				items.push({
+					icon: "ph-flying-saucer ph-bold ph-lg",
+					text: antenna.name,
+					action: () => {
+						void router.push(`/timeline/antenna/${antenna.id}`);
+					},
+				});
+			}
+		}
+	} catch {
+		items.push({ type: "label", text: t("somethingHappened") });
+	}
+	items.push(
+		{ separator: true },
+		{
+			icon: "ph-sliders-horizontal ph-bold ph-lg",
+			text: t("manageAntennas"),
+			action: () => {
+				void router.push("/my/antennas");
+			},
+		},
+	);
+	void os.popupMenu(items, ev);
+}
+
 const headerActions = computed<
 	{
 		text: string;
@@ -191,6 +228,13 @@ const headerActions = computed<
 					icon: "ph-list-bullets ph-bold ph-lg",
 					handler: (ev: MouseEvent) => {
 						void openListsMenu(ev);
+					},
+				},
+				{
+					text: t("antennas"),
+					icon: "ph-flying-saucer ph-bold ph-lg",
+					handler: (ev: MouseEvent) => {
+						void openAntennasMenu(ev);
 					},
 				},
 			],
