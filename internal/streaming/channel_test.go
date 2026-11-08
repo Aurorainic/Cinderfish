@@ -135,6 +135,8 @@ func TestChannelRegistry(t *testing.T) {
 		"clip": {false, false},
 		// antenna is owner-only, as upstream's init existence check.
 		"antenna": {true, false},
+		// channel boards accept anonymous watchers, no existence check.
+		"channel": {false, false},
 	}
 	for name, w := range want {
 		spec, ok := channelSpecs[name]
@@ -823,5 +825,46 @@ func TestAntennaChannelRejects(t *testing.T) {
 	h3.conn.antennaLoader = stubAntennaLoader{owned: true}
 	if channelSpecs["antenna"].New(h3.conn, "a3").Init(nil) {
 		t.Error("missing antennaId must reject")
+	}
+}
+
+func TestChannelBoardStreamFilter(t *testing.T) {
+	h := newTestConnection(t, Viewer{UserID: "alice", Following: map[string]Follow{}})
+
+	boardID, _ := json.Marshal("board1")
+	ch := newChannel(h, "channel", "b1", map[string]json.RawMessage{"channelId": boardID})
+	if ch.Name() != "channel" {
+		t.Fatalf("channel name = %q", ch.Name())
+	}
+
+	// A note of the board passes; another board's does not.
+	in := noteFor("n1", "bob", "public", func(n map[string]any) {
+		n["channelId"] = "board1"
+		n["channel"] = map[string]any{"id": "board1", "name": "board"}
+	})
+	out := noteFor("n2", "bob", "public", func(n map[string]any) {
+		n["channelId"] = "board2"
+	})
+	ch.HandleNote(in)
+	ch.HandleNote(out)
+	// An ordinary note has no channel and never enters a board.
+	ch.HandleNote(noteFor("n3", "bob", "public"))
+
+	var col collector
+	col.drain(h.ws)
+	if len(col.events) != 1 || col.events[0].Type != "note" {
+		t.Fatalf("events = %+v, want one note", col.events)
+	}
+}
+
+func TestChannelBoardStreamRejects(t *testing.T) {
+	h := newTestConnection(t, Viewer{UserID: "alice"})
+	if channelSpecs["channel"].New(h.conn, "b1").Init(nil) {
+		t.Error("missing channelId must reject")
+	}
+	h2 := newTestConnection(t, Viewer{UserID: "alice"})
+	bad, _ := json.Marshal(42)
+	if channelSpecs["channel"].New(h2.conn, "b2").Init(map[string]json.RawMessage{"channelId": bad}) {
+		t.Error("non-string channelId must reject")
 	}
 }

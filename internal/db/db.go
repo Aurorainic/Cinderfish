@@ -787,6 +787,63 @@ CREATE TABLE IF NOT EXISTS antenna_notes (
     PRIMARY KEY (antenna_id, note_id)
 );
 `,
+	33: `
+-- Channels (Misskey's channels/* family): local-only themed boards any
+-- local user can post to. Mirrors the Channel/ChannelFavorite/
+-- ChannelFollowing/ChannelMuting models of packages/backend/src/models;
+-- created_at runs explicit as in v30-v32. Channel notes never federate
+-- (upstream forces visibility = public, localOnly = true), so the inbound
+-- INSERT stays untouched.
+CREATE TABLE IF NOT EXISTS channels (
+    id            TEXT PRIMARY KEY,
+    user_id       TEXT REFERENCES users (id) ON DELETE SET NULL,
+    name          VARCHAR(128) NOT NULL,
+    description   VARCHAR(2048),
+    banner_id     TEXT REFERENCES drive_files (id) ON DELETE SET NULL,
+    pinned_note_ids JSONB NOT NULL DEFAULT '[]',
+    color         VARCHAR(16) NOT NULL DEFAULT '#86b300',
+    is_archived   BOOLEAN NOT NULL DEFAULT false,
+    notes_count   INTEGER NOT NULL DEFAULT 0,
+    users_count   INTEGER NOT NULL DEFAULT 0,
+    is_sensitive  BOOLEAN NOT NULL DEFAULT false,
+    allow_renote_to_external BOOLEAN NOT NULL DEFAULT true,
+    last_noted_at TIMESTAMPTZ,
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_channels_last_noted ON channels (last_noted_at DESC);
+
+CREATE TABLE IF NOT EXISTS channel_followings (
+    follower_id TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    followee_id TEXT NOT NULL REFERENCES channels (id) ON DELETE CASCADE,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (follower_id, followee_id)
+);
+CREATE INDEX IF NOT EXISTS idx_channel_followings_channel ON channel_followings (followee_id);
+
+CREATE TABLE IF NOT EXISTS channel_favorites (
+    id      TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    channel_id TEXT NOT NULL REFERENCES channels (id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (user_id, channel_id)
+);
+
+CREATE TABLE IF NOT EXISTS channel_mutings (
+    id         TEXT PRIMARY KEY,
+    user_id    TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    channel_id TEXT NOT NULL REFERENCES channels (id) ON DELETE CASCADE,
+    expires_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_channel_mutings_user ON channel_mutings (user_id, channel_id);
+
+-- Notes carry their channel; renote_channel_id is the denormalised
+-- channel of the renoted note, which the home-timeline channel-mute
+-- filter reads.
+ALTER TABLE notes ADD COLUMN IF NOT EXISTS channel_id TEXT REFERENCES channels (id) ON DELETE SET NULL;
+ALTER TABLE notes ADD COLUMN IF NOT EXISTS renote_channel_id TEXT;
+CREATE INDEX IF NOT EXISTS idx_notes_channel ON notes (channel_id, id DESC);
+`,
 }
 
 // Migrate applies pending migrations in order and returns the version

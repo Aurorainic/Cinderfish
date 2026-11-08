@@ -52,6 +52,7 @@ func (s *Server) handleNotesCreate(w http.ResponseWriter, r *http.Request) {
 		MediaIDs       []string `json:"mediaIds"`
 		ReplyID        *string  `json:"replyId"`
 		RenoteID       *string  `json:"renoteId"`
+		ChannelID      *string  `json:"channelId"`
 		Poll           *struct {
 			Choices      []string `json:"choices"`
 			Multiple     bool     `json:"multiple"`
@@ -89,6 +90,7 @@ func (s *Server) handleNotesCreate(w http.ResponseWriter, r *http.Request) {
 		VisibleUserIDs: body.VisibleUserIDs,
 		ReplyID:        body.ReplyID,
 		RenoteID:       body.RenoteID,
+		ChannelID:      body.ChannelID,
 	}
 	if body.Poll != nil {
 		poll := &note.PollParams{
@@ -241,6 +243,16 @@ func (s *Server) writeNoteError(w http.ResponseWriter, err error) {
 		writeAPIError(w, &APIError{
 			Message: "You can not Renote due to target visibility.", Code: "CANNOT_RENOTE_DUE_TO_VISIBILITY",
 			ID: errIDCannotRenoteVis, Kind: "client", Status: http.StatusBadRequest,
+		})
+	case errors.Is(err, note.ErrNoSuchChannel):
+		writeAPIError(w, &APIError{
+			Message: "No such channel.", Code: "NO_SUCH_CHANNEL",
+			ID: errIDNoteNoSuchChannel, Kind: "client", Status: http.StatusBadRequest,
+		})
+	case errors.Is(err, note.ErrCannotRenoteOutsideChannel):
+		writeAPIError(w, &APIError{
+			Message: "You can not Renote outside of the channel.", Code: "CANNOT_RENOTE_OUTSIDE_OF_CHANNEL",
+			ID: errIDCannotRenoteOutsideOfChannel, Kind: "client", Status: http.StatusBadRequest,
 		})
 	case errors.Is(err, note.ErrTextTooLong):
 		writeAPIError(w, &APIError{

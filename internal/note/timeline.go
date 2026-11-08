@@ -172,21 +172,41 @@ func (s *TimelineService) Timeline(ctx context.Context, p TimelineParams) ([]*No
 
 	switch p.Kind {
 	case TimelineLocal:
-		// The local timeline holds public notes of local accounts only.
-		q.conds = append(q.conds, "n.visibility = 'public'", "n.user_host IS NULL")
+		// The local timeline holds public notes of local accounts only,
+		// excluding channel notes (local-timeline.ts:153).
+		q.conds = append(q.conds, "n.visibility = 'public'", "n.user_host IS NULL", "n.channel_id IS NULL")
 
 	case TimelineGlobal:
-		q.conds = append(q.conds, "n.visibility = 'public'")
+		// global-timeline.ts:74 excludes channel notes.
+		q.conds = append(q.conds, "n.visibility = 'public'", "n.channel_id IS NULL")
 
 	case TimelineHome:
+		// notes/timeline.ts L161-204 ports the four-way channel bracket:
+		// followed channels' notes join the home timeline, everything else
+		// excludes channel notes; the two dimension flags decide which
+		// arm applies, exactly as upstream branches on hasFollowing &&
+		// hasChannelFollowing.
 		me := q.viewerArg(p.ViewerID)
+		usersCond := fmt.Sprintf("(n.user_id = %s OR n.user_id IN (SELECT followee_id FROM followings WHERE follower_id = %s))", me, me)
+		chansCond := fmt.Sprintf("n.channel_id IN (SELECT followee_id FROM channel_followings WHERE follower_id = %s)", me)
+		hasUsers := fmt.Sprintf("EXISTS (SELECT 1 FROM followings WHERE follower_id = %s)", me)
+		hasChans := fmt.Sprintf("EXISTS (SELECT 1 FROM channel_followings WHERE follower_id = %s)", me)
 		q.conds = append(q.conds, fmt.Sprintf(
-			"(n.user_id = %s OR n.user_id IN (SELECT followee_id FROM followings WHERE follower_id = %s))", me, me))
+			"(%s AND %s AND ((((%s) AND n.channel_id IS NULL) OR %s)))"+
+				" OR (%s AND NOT %s AND (n.user_id = %s OR %s))"+
+				" OR (NOT %s AND %s AND ((%s) AND n.channel_id IS NULL))"+
+				" OR (NOT %s AND NOT %s AND (n.user_id = %s AND n.channel_id IS NULL))",
+			hasChans, hasUsers, usersCond, chansCond,
+			hasChans, hasUsers, me, chansCond,
+			hasChans, hasUsers, usersCond,
+			hasChans, hasUsers, me))
 
 	case TimelineSocial:
 		me := q.viewerArg(p.ViewerID)
+		// hybrid-timeline.ts L226-232: a followed channel's notes join the
+		// social timeline, every other channel note stays out.
 		q.conds = append(q.conds, fmt.Sprintf(
-			"(n.user_id = %s OR n.user_id IN (SELECT followee_id FROM followings WHERE follower_id = %s) OR (n.visibility = 'public' AND n.user_host IS NULL))", me, me))
+			"((n.user_id = %s OR n.user_id IN (SELECT followee_id FROM followings WHERE follower_id = %s) OR (n.visibility = 'public' AND n.user_host IS NULL AND n.channel_id IS NULL)) OR n.channel_id IN (SELECT followee_id FROM channel_followings WHERE follower_id = %s))", me, me, me))
 
 	case TimelineList:
 		// notes/user-list-timeline: members of one list. The reply rule
@@ -200,6 +220,8 @@ func (s *TimelineService) Timeline(ctx context.Context, p TimelineParams) ([]*No
 			replyOK += fmt.Sprintf(" OR n.reply_user_id = %s", q.viewerArg(p.ViewerID))
 		}
 		replyOK += ")"
+		// user-list-timeline.ts:167 excludes channel notes.
+		q.conds = append(q.conds, "n.channel_id IS NULL")
 		q.conds = append(q.conds, fmt.Sprintf(
 			"EXISTS (SELECT 1 FROM user_list_memberships ulm WHERE ulm.user_list_id = %s AND ulm.user_id = n.user_id AND (ulm.with_replies OR %s))",
 			listID, replyOK))
@@ -477,6 +499,54 @@ func (s *TimelineService) AntennaNotes(ctx context.Context, antennaID, viewerID 
 	rows, err := s.pool.Query(ctx, query, q.args...)
 	if err != nil {
 		return nil, fmt.Errorf("note: antenna notes query: %w", err)
+	}
+	defer rows.Close()
+
+	out := []*Note{}
+	for rows.Next() {
+		n, err := scanNote(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, n)
+	}
+	return out, rows.Err()
+}
+
+// ChannelNotes returns the notes of one channel, newest first unless a
+// sinceId is given without untilId. This is channels/timeline: a channel
+// note is always public and local, so the only further filters are the
+// viewer's channel mutes (on both the note's channel and the renote's,
+// never the subscribed one) and the soft-delete exclusion.
+func (s *TimelineService) ChannelNotes(ctx context.Context, channelID, viewerID string, limit int, sinceID, untilID string, mutedChannelIDs []string) ([]*Note, error) {
+	if limit <= 0 {
+		limit = 10
+	}
+	if limit > 100 {
+		limit = 100
+	}
+
+	q := &queryBuilder{}
+	q.add("n.channel_id = %s", channelID)
+	q.conds = append(q.conds, "n.deleted_at IS NULL")
+	if len(mutedChannelIDs) > 0 {
+		// Upstream excludes muted channels on both channelId and
+		// renoteChannelId; the subscribed channel's own id is excluded from
+		// the mute set by the caller, and every note here has the
+		// subscribed channel, so the mute check only bites through the
+		// renote.
+		q.args = append(q.args, mutedChannelIDs)
+		ph := fmt.Sprintf("$%d", len(q.args))
+		q.conds = append(q.conds, "(n.renote_channel_id IS NULL OR n.renote_channel_id NOT IN ("+ph+"))")
+	}
+	q.addPageCursors(sinceID, untilID)
+
+	query := noteSelect + " WHERE " + strings.Join(q.conds, " AND ") +
+		" ORDER BY n.id " + paginationOrder(sinceID, untilID) + " LIMIT " + strconv.Itoa(limit)
+
+	rows, err := s.pool.Query(ctx, query, q.args...)
+	if err != nil {
+		return nil, fmt.Errorf("note: channel notes query: %w", err)
 	}
 	defer rows.Close()
 

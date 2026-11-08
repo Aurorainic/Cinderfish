@@ -25,6 +25,8 @@ type notePackContext struct {
 	Files []*media.File
 	// ReactionEmojiURLs maps custom reaction shortcodes to their images.
 	ReactionEmojiURLs map[string]string
+	// Channel is the packed channel reference of a channel note.
+	Channel map[string]any
 }
 
 // packNote renders a note in Misskey's Note schema.
@@ -66,7 +68,11 @@ func packNote(n *note.Note, pc notePackContext) map[string]any {
 		"tags":           n.Tags,
 		"uri":            n.URI,
 		"url":            n.URL,
+		"channelId":      n.ChannelID,
 	}
+	// The embedded channel reference travels with the note, as upstream's
+	// NoteEntityService attaches it.
+	packed["channel"] = pc.Channel
 
 	if n.Visibility == note.VisibilitySpecified {
 		packed["visibleUserIds"] = pc.VisibleUserIDs
@@ -166,6 +172,12 @@ func (s *Server) notePackContext(ctx context.Context, n *note.Note, viewerID str
 
 	if n.Visibility == note.VisibilitySpecified {
 		pc.VisibleUserIDs = s.notes.VisibleUserIDs(ctx, n.ID)
+	}
+
+	if n.ChannelID != nil && s.accounts != nil {
+		if ch, err := s.accounts.GetChannel(ctx, *n.ChannelID); err == nil {
+			pc.Channel = packChannelRef(ch)
+		}
 	}
 
 	if len(n.FileIDs) > 0 && s.drive != nil {

@@ -60,6 +60,13 @@ func newConnection(ctx context.Context, ws *wsConn, bus *Bus, v Viewer) *Connect
 	}
 }
 
+// setFollowedChannels replaces the viewer's followed-channel set.
+func (c *Connection) setFollowedChannels(channels map[string]bool) {
+	c.viewerMu.Lock()
+	defer c.viewerMu.Unlock()
+	c.viewer.FollowingChannels = channels
+}
+
 func (c *Connection) viewerSnapshot() Viewer {
 	c.viewerMu.RLock()
 	defer c.viewerMu.RUnlock()

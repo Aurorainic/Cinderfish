@@ -15,22 +15,22 @@ import (
 // carries a different id per endpoint and antennas/remove-note shares the
 // notes id, as upstream does.
 const (
-	errIDNoSuchAntennaUpdate     = "10c673ac-8852-48eb-aa1f-f5b67f069290"
-	errIDNoSuchUserListUpdate    = "1c6b35c9-943e-48c2-81e4-2844989407f7"
-	errIDEmptyKeywordUpdate      = "721aaff6-4e1b-4d88-8de6-877fae9f68c4"
-	errIDNoSuchAntennaDelete     = "b34dcf9d-348f-44bb-99d0-6c9314cfe2df"
-	errIDNoSuchAntennaShow       = "c06569fb-b025-4f23-b22d-1fcd20d2816b"
-	errIDNoSuchAntennaNotes      = "850926e0-fd3b-49b6-b69a-b28a5dbd82fe"
-	errIDNoSuchUserListCreate    = "95063e93-a283-4b8b-9aa5-bcdb8df69a7f"
-	errIDTooManyAntennas         = "faf47050-e8b5-438c-913c-db2b1576fde4"
-	errIDEmptyKeywordCreate      = "53ee222e-1ddd-4f9a-92e5-9fb82ddb463a"
+	errIDNoSuchAntennaUpdate  = "10c673ac-8852-48eb-aa1f-f5b67f069290"
+	errIDNoSuchUserListUpdate = "1c6b35c9-943e-48c2-81e4-2844989407f7"
+	errIDEmptyKeywordUpdate   = "721aaff6-4e1b-4d88-8de6-877fae9f68c4"
+	errIDNoSuchAntennaDelete  = "b34dcf9d-348f-44bb-99d0-6c9314cfe2df"
+	errIDNoSuchAntennaShow    = "c06569fb-b025-4f23-b22d-1fcd20d2816b"
+	errIDNoSuchAntennaNotes   = "850926e0-fd3b-49b6-b69a-b28a5dbd82fe"
+	errIDNoSuchUserListCreate = "95063e93-a283-4b8b-9aa5-bcdb8df69a7f"
+	errIDTooManyAntennas      = "faf47050-e8b5-438c-913c-db2b1576fde4"
+	errIDEmptyKeywordCreate   = "53ee222e-1ddd-4f9a-92e5-9fb82ddb463a"
 )
 
 // antennaErrorIDs carries the per-endpoint error ids of the antenna family.
 type antennaErrorIDs struct {
-	noSuchAntenna   string
-	noSuchUserList  string
-	emptyKeyword    string
+	noSuchAntenna  string
+	noSuchUserList string
+	emptyKeyword   string
 }
 
 // packAntenna renders Misskey's Antenna schema. hasUnreadNote and notify
@@ -53,23 +53,23 @@ func (s *Server) packAntenna(a *account.Antenna) map[string]any {
 		users = []string{}
 	}
 	return map[string]any{
-		"id":                               a.ID,
-		"createdAt":                        a.CreatedAt.UTC().Format(time.RFC3339Nano),
-		"name":                             a.Name,
-		"keywords":                         keywords,
-		"excludeKeywords":                  exclude,
-		"src":                              a.Src,
-		"userListId":                       userListID,
-		"users":                            users,
-		"caseSensitive":                    a.CaseSensitive,
-		"localOnly":                        a.LocalOnly,
-		"excludeBots":                      a.ExcludeBots,
-		"withReplies":                      a.WithReplies,
-		"withFile":                         a.WithFile,
-		"isActive":                         a.IsActive,
-		"hasUnreadNote":                    false,
-		"notify":                           false,
-		"excludeNotesInSensitiveChannel":   a.ExcludeSensitiveChannel,
+		"id":                             a.ID,
+		"createdAt":                      a.CreatedAt.UTC().Format(time.RFC3339Nano),
+		"name":                           a.Name,
+		"keywords":                       keywords,
+		"excludeKeywords":                exclude,
+		"src":                            a.Src,
+		"userListId":                     userListID,
+		"users":                          users,
+		"caseSensitive":                  a.CaseSensitive,
+		"localOnly":                      a.LocalOnly,
+		"excludeBots":                    a.ExcludeBots,
+		"withReplies":                    a.WithReplies,
+		"withFile":                       a.WithFile,
+		"isActive":                       a.IsActive,
+		"hasUnreadNote":                  false,
+		"notify":                         false,
+		"excludeNotesInSensitiveChannel": a.ExcludeSensitiveChannel,
 	}
 }
 
@@ -155,18 +155,18 @@ func decodeKeywordGroupsFromRequest(raw map[string]any, key string) ([][]string,
 // handleAntennasCreate implements POST /api/antennas/create.
 func (s *Server) handleAntennasCreate(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		Name                    string   `json:"name"`
-		Src                     string   `json:"src"`
-		UserListID              *string  `json:"userListId"`
-		Users                   []string `json:"users"`
+		Name                    string     `json:"name"`
+		Src                     string     `json:"src"`
+		UserListID              *string    `json:"userListId"`
+		Users                   []string   `json:"users"`
 		Keywords                [][]string `json:"keywords"`
 		ExcludeKeywords         [][]string `json:"excludeKeywords"`
-		CaseSensitive           bool     `json:"caseSensitive"`
-		ExcludeBots             bool     `json:"excludeBots"`
-		WithReplies             bool     `json:"withReplies"`
-		WithFile                bool     `json:"withFile"`
-		LocalOnly               bool     `json:"localOnly"`
-		ExcludeSensitiveChannel bool     `json:"excludeNotesInSensitiveChannel"`
+		CaseSensitive           bool       `json:"caseSensitive"`
+		ExcludeBots             bool       `json:"excludeBots"`
+		WithReplies             bool       `json:"withReplies"`
+		WithFile                bool       `json:"withFile"`
+		LocalOnly               bool       `json:"localOnly"`
+		ExcludeSensitiveChannel bool       `json:"excludeNotesInSensitiveChannel"`
 	}
 	if err := decodeOptionalJSON(r, &body); err != nil {
 		writeAPIError(w, err)
@@ -441,18 +441,27 @@ func (s *Server) ingestAntennas(ctx context.Context, n *note.Note, authorID stri
 		return
 	}
 	an := account.AntennaNote{
-		ID:         n.ID,
-		AuthorID:   n.UserID,
-		AuthorAcct: authorAcct(author),
+		ID:          n.ID,
+		AuthorID:    n.UserID,
+		AuthorAcct:  authorAcct(author),
 		AuthorIsBot: isBot,
-		Visibility: n.Visibility,
-		ReplyID:    n.ReplyID,
-		Text:       n.Text,
-		CW:         n.CW,
-		FileIDs:    n.FileIDs,
+		Visibility:  n.Visibility,
+		ReplyID:     n.ReplyID,
+		Text:        n.Text,
+		CW:          n.CW,
+		FileIDs:     n.FileIDs,
 	}
 	if an.Visibility == "specified" {
 		an.VisibleUsers = s.notes.VisibleUserIDs(ctx, n.ID)
+	}
+	// The channel-sensitivity exclusion is real now that channels exist:
+	// a sensitive channel's notes are dropped by antennas that ask for it.
+	if n.ChannelID != nil {
+		var sensitive bool
+		if err := s.pool.QueryRow(ctx,
+			`SELECT is_sensitive FROM channels WHERE id = $1`, *n.ChannelID).Scan(&sensitive); err == nil {
+			an.InSensitiveChannel = sensitive
+		}
 	}
 	matched, err := s.accounts.IngestNote(ctx, an)
 	if err != nil || len(matched) == 0 {

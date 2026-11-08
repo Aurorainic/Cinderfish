@@ -17,12 +17,14 @@ func (s *Server) AttachStreaming(logf func(string, ...any)) *streaming.Bus {
 	var lists streaming.ListLoader
 	var clips streaming.ClipLoader
 	var antennas streaming.AntennaLoader
+	var channels streaming.ChannelFollowLoader
 	if s.pool != nil {
 		followers = s
 		if s.accounts != nil {
 			lists = s
 			clips = s
 			antennas = s
+			channels = s
 		}
 	}
 
@@ -48,6 +50,7 @@ func (s *Server) AttachStreaming(logf func(string, ...any)) *streaming.Bus {
 		Lists:     lists,
 		Clips:     clips,
 		Antennas:  antennas,
+		Channels:  channels,
 		Logger:    logf,
 		MarkRead:  markRead,
 	})

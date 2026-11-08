@@ -319,6 +319,26 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("POST /api/antennas/notes", s.handleAntennasNotes)
 	s.mux.HandleFunc("POST /api/antennas/remove-note", s.handleAntennasRemoveNote)
 
+	// Channels (schema v33), the channels/* family upstream defines in
+	// packages/backend/src/server/api/endpoints/channels/. There is no
+	// channels/delete: archiving through update is the deletion.
+	s.mux.HandleFunc("POST /api/channels/create", s.handleChannelsCreate)
+	s.mux.HandleFunc("POST /api/channels/update", s.handleChannelsUpdate)
+	s.mux.HandleFunc("POST /api/channels/show", s.handleChannelsShow)
+	s.mux.HandleFunc("POST /api/channels/timeline", s.handleChannelsTimeline)
+	s.mux.HandleFunc("POST /api/channels/favorite", s.handleChannelsFavorite)
+	s.mux.HandleFunc("POST /api/channels/unfavorite", s.handleChannelsUnfavorite)
+	s.mux.HandleFunc("POST /api/channels/follow", s.handleChannelsFollow)
+	s.mux.HandleFunc("POST /api/channels/unfollow", s.handleChannelsUnfollow)
+	s.mux.HandleFunc("POST /api/channels/followed", s.handleChannelsFollowed)
+	s.mux.HandleFunc("POST /api/channels/owned", s.handleChannelsOwned)
+	s.mux.HandleFunc("POST /api/channels/my-favorites", s.handleChannelsMyFavorites)
+	s.mux.HandleFunc("POST /api/channels/featured", s.handleChannelsFeatured)
+	s.mux.HandleFunc("POST /api/channels/search", s.handleChannelsSearch)
+	s.mux.HandleFunc("POST /api/channels/mute/create", s.handleChannelsMuteCreate)
+	s.mux.HandleFunc("POST /api/channels/mute/delete", s.handleChannelsMuteDelete)
+	s.mux.HandleFunc("POST /api/channels/mute/list", s.handleChannelsMuted)
+
 	// Mutes and blocks. Both tables exist since schema v1; these endpoints
 	// are what the settings page and the timeline filter read.
 	s.mux.HandleFunc("POST /api/mute/create", s.handleMuteCreate)

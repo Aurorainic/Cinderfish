@@ -67,6 +67,7 @@ type Options struct {
 	Lists     ListLoader
 	Clips     ClipLoader
 	Antennas  AntennaLoader
+	Channels  ChannelFollowLoader
 	Logger    func(string, ...any)
 	// MarkRead is called for the "readNotification" client frame: an empty
 	// id list means "mark everything read", which is what a frame without any
@@ -85,6 +86,7 @@ type Server struct {
 	lists       ListLoader
 	clipsLoader ClipLoader
 	antennas    AntennaLoader
+	channels    ChannelFollowLoader
 	logf        func(string, ...any)
 	markRead    func(ctx context.Context, userID string, notificationIDs []string) error
 
@@ -100,6 +102,7 @@ func New(opts Options) *Server {
 		lists:       opts.Lists,
 		clipsLoader: opts.Clips,
 		antennas:    opts.Antennas,
+		channels:    opts.Channels,
 		logf:        logfOr(opts.Logger),
 		markRead:    opts.MarkRead,
 		// Misskey performs no origin check on the streaming endpoint.
@@ -158,6 +161,11 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				viewer.Following = f
 			}
 		}
+		if s.channels != nil {
+			if chans, err := s.channels.LoadFollowedChannels(r.Context(), user.ID); err == nil {
+				viewer.FollowingChannels = chans
+			}
+		}
 	}
 
 	conn := newConnection(r.Context(), newWSConn(ws), s.bus, viewer)
@@ -175,6 +183,11 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			f, err := s.followers.LoadFollows(context.Background(), uid)
 			if err != nil {
 				return
+			}
+			if s.channels != nil {
+				if chans, cerr := s.channels.LoadFollowedChannels(context.Background(), uid); cerr == nil {
+					c.setFollowedChannels(chans)
+				}
 			}
 			c.setFollowing(f)
 		}

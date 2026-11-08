@@ -1,6 +1,7 @@
 package streaming
 
 import (
+	"context"
 	"encoding/json"
 	"sync"
 )
@@ -26,6 +27,9 @@ type Viewer struct {
 	UserID string
 	// Following maps followee id to the viewer's follow settings.
 	Following map[string]Follow
+	// FollowingChannels lists the ids of the channels the viewer follows,
+	// which decide whether a channel note may enter home/hybrid.
+	FollowingChannels map[string]bool
 }
 
 // follows reports whether the viewer follows the given user.
@@ -34,11 +38,23 @@ func (v Viewer) follows(userID string) bool {
 	return ok
 }
 
+// followsChannel reports whether the viewer follows the given channel.
+func (v Viewer) followsChannel(channelID string) bool {
+	return v.FollowingChannels[channelID]
+}
+
 // followsWithReplies reports the viewer's "show replies" setting for the
 // given user, false when the viewer does not follow them.
 func (v Viewer) followsWithReplies(userID string) bool {
 	f, ok := v.Following[userID]
 	return ok && f.WithReplies
+}
+
+// ChannelFollowLoader loads the viewer's followed channels, which the
+// home and hybrid timelines need to admit channel notes.
+type ChannelFollowLoader interface {
+	// LoadFollowedChannels returns the channel ids userID follows.
+	LoadFollowedChannels(ctx context.Context, userID string) (map[string]bool, error)
 }
 
 // Channel is one subscription on a connection.

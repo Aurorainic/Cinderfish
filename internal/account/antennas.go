@@ -435,11 +435,12 @@ func groupsMatchText(groups [][]string, haystack string) bool {
 // followsOwner reports whether the antenna owner follows or is the author
 // (the followers-visibility rule), and ownerInVisibleUsers whether the
 // owner stands in a specified note's audience.
-//
-// Known divergences from upstream, both recorded in docs/HANDOVER.md:
-//   - channels do not exist here, so the sensitive-channel check reads a
-//     precomputed flag that is always false today.
 func (s *Service) NoteMatchesAntenna(a *Antenna, n *AntennaNote, followsOwner, ownerInVisibleUsers bool) bool {
+	// The sensitive-channel exclusion upstream checks first
+	// (AntennaService.ts L118).
+	if a.ExcludeSensitiveChannel && n.InSensitiveChannel {
+		return false
+	}
 	if a.ExcludeBots && n.AuthorIsBot {
 		return false
 	}

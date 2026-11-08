@@ -79,6 +79,11 @@ type Note struct {
 	ClippedCount       int
 	IsSensitive        bool
 	ReactionAcceptance *string
+	// ChannelID names the local-only board the note was posted to; never
+	// set for federated inbound notes. RenoteChannelID is the denormalised
+	// channel of the renoted note, which channel-mute filters read.
+	ChannelID     *string
+	RenoteChannelID *string
 	CreatedAt          time.Time
 	UpdatedAt          *time.Time
 	DeletedAt          *time.Time
@@ -104,6 +109,9 @@ type CreateParams struct {
 	ReplyID        *string
 	RenoteID       *string
 	Poll           *PollParams
+	// ChannelID attaches the note to a local channel. Upstream then forces
+	// visibility = public and localOnly = true.
+	ChannelID     *string
 }
 
 // PollParams describes a poll to create.
@@ -175,6 +183,11 @@ var (
 	ErrInvalidPoll       = errors.New("note: invalid poll")
 	ErrTextTooLong       = errors.New("note: text is too long")
 	ErrInvalidVisibility = errors.New("note: invalid visibility")
+	// Mirrors Misskey's NO_SUCH_CHANNEL on notes/create with an unknown or
+	// archived channel, and the renote policy of a channel that forbids
+	// renotes leaving it.
+	ErrNoSuchChannel             = errors.New("note: no such channel")
+	ErrCannotRenoteOutsideChannel = errors.New("note: cannot renote outside the channel")
 	ErrPollExpired       = errors.New("note: poll is already expired")
 	ErrNoPoll            = errors.New("note: the note has no poll")
 	ErrAlreadyVoted      = errors.New("note: already voted in this poll")
@@ -255,6 +268,7 @@ func (s *Service) Create(ctx context.Context, p CreateParams) (*Note, error) {
 	defer tx.Rollback(ctx)
 
 	var replyUserID *string
+	var replyParentChannel *string
 	if p.ReplyID != nil {
 		parent, err := getNoteTx(ctx, tx, *p.ReplyID)
 		if err != nil {
@@ -297,10 +311,15 @@ func (s *Service) Create(ctx context.Context, p CreateParams) (*Note, error) {
 			p.LocalOnly = true
 		}
 		replyUserID = &parent.UserID
+		replyParentChannel = parent.ChannelID
 	}
 
 	var renoteUserID *string
 	var renoteUserHost *string
+	// The denormalised channel of the renoted note, which channel-mute
+	// filters read; every note carrying a renote mirrors the target's
+	// channel here.
+	var notesRenoteChannelID *string
 	if p.RenoteID != nil {
 		target, err := getNoteTx(ctx, tx, *p.RenoteID)
 		if err != nil {
@@ -337,6 +356,52 @@ func (s *Service) Create(ctx context.Context, p CreateParams) (*Note, error) {
 		}
 		renoteUserID = &target.UserID
 		renoteUserHost = target.UserHost
+		notesRenoteChannelID = target.ChannelID
+	}
+
+	// Channel notes (core/NoteCreateService.ts L360-471): any local user
+	// may post to any non-archived channel; the note is forced public and
+	// local-only, so it never federates. A renote pointing at another
+	// channel's note checks that channel's renote policy. A reply joins
+	// the parent's channel — or leaves the channel system when the parent
+	// is not a channel note.
+	var chanID *string
+	if p.ReplyID != nil && replyParentChannel != nil {
+		chanID = replyParentChannel
+	} else if p.ChannelID != nil {
+		chanID = p.ChannelID
+	}
+	if chanID != nil {
+		row := tx.QueryRow(ctx, `
+SELECT id FROM channels WHERE id = $1 AND is_archived = false
+`, *chanID)
+		var storedID string
+		if err := row.Scan(&storedID); err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return nil, ErrNoSuchChannel
+			}
+			return nil, fmt.Errorf("note: channel lookup: %w", err)
+		}
+		p.Visibility = VisibilityPublic
+		p.LocalOnly = true
+		p.VisibleUserIDs = nil
+	}
+	// Renote across channels needs the source channel's policy. The
+	// renote block above already loaded the target; re-read its channel
+	// policy here only when both sides have channels and differ.
+	if notesRenoteChannelID != nil && (chanID == nil || *notesRenoteChannelID != *chanID) {
+		var allowExternal bool
+		if err := tx.QueryRow(ctx, `
+SELECT allow_renote_to_external FROM channels WHERE id = $1
+`, *notesRenoteChannelID).Scan(&allowExternal); err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return nil, ErrNoSuchChannel
+			}
+			return nil, fmt.Errorf("note: renote channel policy: %w", err)
+		}
+		if !allowExternal {
+			return nil, ErrCannotRenoteOutsideChannel
+		}
 	}
 
 	// Resolve the users the text mentions. Local ones go into mentions[] as
@@ -410,22 +475,26 @@ UPDATE drive_files SET id = id WHERE id = $1 AND user_id = $2
 		RenoteID:       p.RenoteID,
 		RenoteUserID:   renoteUserID,
 		RenoteUserHost: renoteUserHost,
+		ChannelID:      chanID,
 		Tags:           tags,
 		Mentions:       mentions,
 		RemoteMentions: remoteMentions,
 		Emojis:         []Emoji{},
 		CreatedAt:      now,
 	}
+	n.RenoteChannelID = notesRenoteChannelID
 
 	if _, err := tx.Exec(ctx, `
 INSERT INTO notes (id, user_id, visibility, local_only, cw, text, file_ids,
                    reply_id, reply_user_id, renote_id, renote_user_id, renote_user_host,
+                   channel_id, renote_channel_id,
                    tags, mentions, remote_mentions, emojis, created_at)
 VALUES ($1,$2,$3,$4,$5,$6,
         COALESCE($7::text[], '{}'::text[]),
-        $8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+        $8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
 `, n.ID, n.UserID, n.Visibility, n.LocalOnly, n.CW, n.Text, n.FileIDs,
 		n.ReplyID, n.ReplyUserID, n.RenoteID, n.RenoteUserID, n.RenoteUserHost,
+		n.ChannelID, n.RenoteChannelID,
 		mustJSON(n.Tags), mustJSON(n.Mentions), mustJSON(n.RemoteMentions), mustJSON(n.Emojis), n.CreatedAt); err != nil {
 		return nil, fmt.Errorf("note: insert: %w", err)
 	}
@@ -458,6 +527,24 @@ INSERT INTO polls (id, choices, multiple, expires_at) VALUES ($1,$2,$3,$4)
 	if p.RenoteID != nil {
 		if _, err := tx.Exec(ctx, `UPDATE notes SET renote_count = renote_count + 1 WHERE id = $1`, *p.RenoteID); err != nil {
 			return nil, fmt.Errorf("note: bump renotes: %w", err)
+		}
+	}
+	if n.ChannelID != nil {
+		// channels/notesCount, lastNotedAt and the first-note usersCount
+		// increment ride the same transaction (core/NoteCreateService.ts
+		// L935-947). The count subquery includes the note just inserted,
+		// so 1 means the author's first note in this channel.
+		if _, err := tx.Exec(ctx, `
+UPDATE channels SET
+    notes_count = notes_count + 1,
+    last_noted_at = now(),
+    users_count = users_count + CASE WHEN (
+        SELECT count(*) FROM notes n2
+        WHERE n2.channel_id = $1 AND n2.user_id = $2
+    ) <= 1 THEN 1 ELSE 0 END
+WHERE id = $1
+`, *n.ChannelID, n.UserID); err != nil {
+			return nil, fmt.Errorf("note: channel bookkeeping: %w", err)
 		}
 	}
 
@@ -546,6 +633,7 @@ SELECT n.id, n.user_id, n.user_host, n.visibility, n.local_only, n.cw, n.text, n
        n.reply_id, n.reply_user_id, n.renote_id, n.renote_user_id, n.renote_user_host,
        n.name, n.url, n.uri, n.ap_id, n.tags, n.mentions, n.remote_mentions, n.emojis,
        n.renote_count, n.replies_count, n.clipped_count, n.is_sensitive, n.reaction_acceptance,
+       n.channel_id, n.renote_channel_id,
        n.created_at, n.updated_at, n.deleted_at
 FROM notes n`
 
@@ -556,6 +644,7 @@ func scanNote(row pgx.Row) (*Note, error) {
 		&n.FileIDs, &n.PollID, &n.ReplyID, &n.ReplyUserID, &n.RenoteID, &n.RenoteUserID, &n.RenoteUserHost,
 		&n.Name, &n.URL, &n.URI, &n.APID, &tags, &mentions, &remoteMentions, &emojis,
 		&n.RenoteCount, &n.RepliesCount, &n.ClippedCount, &n.IsSensitive, &n.ReactionAcceptance,
+		&n.ChannelID, &n.RenoteChannelID,
 		&n.CreatedAt, &n.UpdatedAt, &n.DeletedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrNotFound

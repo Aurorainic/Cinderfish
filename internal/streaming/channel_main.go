@@ -25,11 +25,14 @@ var channelSpecs = map[string]channelSpec{
 	// Upstream declares requireCredential = false on userList but its
 	// init then dereferences the viewer unconditionally, so an anonymous
 	// subscriber crashes; requiring the credential here is the intent.
-	"userList":       {Name: "userList", RequireCredential: true, New: newUserListChannel},
+	"userList": {Name: "userList", RequireCredential: true, New: newUserListChannel},
 	// clip accepts anonymous watchers of a public clip, as upstream.
-	"clip":           {Name: "clip", New: newClipChannel},
+	"clip": {Name: "clip", New: newClipChannel},
 	// antenna is owner-only, as upstream's init existence check.
-	"antenna":        {Name: "antenna", RequireCredential: true, New: newAntennaChannel},
+	"antenna": {Name: "antenna", RequireCredential: true, New: newAntennaChannel},
+	// channel boards accept anonymous watchers and no existence check,
+	// exactly as upstream's channel.ts.
+	"channel": {Name: "channel", New: newChannelStreamChannel},
 }
 
 // newMainChannel builds the main channel.

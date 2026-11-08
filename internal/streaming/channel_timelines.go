@@ -40,9 +40,14 @@ func (h *homeTimelineChannel) onNote(note PackedNote) {
 		return
 	}
 
-	// A channel post is only visible to followers of that channel, which
-	// Cinderfish does not model yet.
+	// A channel post reaches the home timeline only when the viewer
+	// follows that channel (upstream home-timeline.ts L50-56's
+	// followingChannels filter).
 	if hasChannelID(note) {
+		if !v.followsChannel(noteChannelID(note)) {
+			return
+		}
+		h.admitChannelNote(note)
 		return
 	}
 	if !isMe && !v.follows(authorID) {
@@ -199,8 +204,19 @@ func (h *hybridTimelineChannel) onNote(note PackedNote) {
 		return
 	}
 
-	// Channel posts require following the channel, not modelled yet.
+	// Channel posts require following the channel
+	// (hybrid-timeline.ts L60-76 admits followed channels).
 	if hasChannelID(note) {
+		if !v.followsChannel(noteChannelID(note)) {
+			return
+		}
+		if !isNoteVisibleForMe(note, v) || h.isNoteMutedOrBlocked(note) {
+			return
+		}
+		if !h.renoteAllowed(note) {
+			return
+		}
+		h.emitNote(note)
 		return
 	}
 
@@ -230,4 +246,22 @@ func (h *hybridTimelineChannel) onNote(note PackedNote) {
 func noteAuthorID(note PackedNote) string {
 	id, _ := note["userId"].(string)
 	return id
+}
+
+// admitChannelNote is the reduced filter a channel note passes through in
+// the home and hybrid timelines: the visibility, renote and file checks
+// apply, and the reply rule uses the channel timeline's always-on
+// replies. The membership/author checks are skipped — a followed channel
+// cardinally owns the note's admission.
+func (h *homeTimelineChannel) admitChannelNote(note PackedNote) {
+	if !isNoteVisibleForMe(note, h.viewer()) {
+		return
+	}
+	if !h.renoteAllowed(note) {
+		return
+	}
+	if h.isNoteMutedOrBlocked(note) {
+		return
+	}
+	h.emitNote(note)
 }

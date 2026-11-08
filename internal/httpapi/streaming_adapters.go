@@ -86,6 +86,23 @@ func (s *Server) LoadListMembers(ctx context.Context, listID, userID string) (ma
 	return out, true, nil
 }
 
+// LoadFollowedChannels implements streaming.ChannelFollowLoader for the
+// Server, feeding the home/hybrid channel-note admission.
+func (s *Server) LoadFollowedChannels(ctx context.Context, userID string) (map[string]bool, error) {
+	if s.accounts == nil {
+		return map[string]bool{}, nil
+	}
+	ids, err := s.accounts.FollowedChannelIDsOf(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[string]bool, len(ids))
+	for _, id := range ids {
+		out[id] = true
+	}
+	return out, nil
+}
+
 // AntennaOwned implements streaming.AntennaLoader for the Server.
 func (s *Server) AntennaOwned(ctx context.Context, antennaID, viewerID string) (bool, error) {
 	if s.accounts == nil {
