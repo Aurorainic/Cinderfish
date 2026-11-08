@@ -46,6 +46,7 @@ export const menuOptions = [
 	"explore",
 	"favorites",
 	"channels",
+	"pages",
 	"gallery",
 	"search",
 ] as const;

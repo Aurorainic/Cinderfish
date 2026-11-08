@@ -27,7 +27,7 @@ export function newerCursor(firstItemId: string): Cursor {
 	return { untilId: firstItemId };
 }
 
-export interface Page<T> {
+export interface CursorPage<T> {
 	items: T[];
 	hasMore: boolean;
 	cursor: Cursor;
@@ -47,7 +47,7 @@ export async function fetchPage<T extends Identifiable>(
 	limit: number,
 	cursor: Cursor,
 	token?: string | null,
-): Promise<Page<T>> {
+): Promise<CursorPage<T>> {
 	const requestLimit = Math.max(1, limit) + 1;
 	const response = await api<T[]>(
 		endpoint,

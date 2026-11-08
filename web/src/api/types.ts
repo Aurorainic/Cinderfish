@@ -69,8 +69,10 @@ export interface UserDetailed extends UserLite {
 	notesCount: number;
 	pinnedNoteIds: string[];
 	pinnedNotes: Note[];
-	pinnedPageId: null;
-	pinnedPage: null;
+	/** The profile's pinned page id, or null when nothing is pinned. */
+	pinnedPageId: string | null;
+	/** The packed pinned page, or null when nothing is pinned. */
+	pinnedPage: Page | null;
 	publicReactions: boolean;
 	followersVisibility: FollowVisibility;
 	followingVisibility: FollowVisibility;
@@ -342,6 +344,86 @@ export interface GalleryPost {
 export interface GalleryLike {
 	id: string;
 	post: GalleryPost;
+}
+
+/** The two font families a page may select. */
+export type PageFont = "serif" | "sans-serif";
+
+/**
+ * One content block of a page document.
+ *
+ * The type is deliberately open: at the pinned upstream commit (c05e844) the
+ * client only renders `text`, `section`, `image` and `note`; every other block
+ * type round-trips through the backend untouched and is painted as a
+ * placeholder by the viewer. The index signature keeps those dynamic blocks
+ * representable without enumerating their arbitrary fields.
+ */
+export interface PageBlock {
+	type: string;
+	[key: string]: unknown;
+}
+
+/** The four block types the client's editor offers and the viewer renders. */
+export type PageBlockType = "text" | "section" | "image" | "note";
+
+/** The four statically rendered block shapes, for narrow helper types. */
+export interface TextPageBlock extends PageBlock {
+	type: "text";
+	text: string;
+}
+
+export interface SectionPageBlock extends PageBlock {
+	type: "section";
+	title?: string;
+	children: PageBlock[];
+}
+
+export interface ImagePageBlock extends PageBlock {
+	type: "image";
+	fileId: string;
+}
+
+export interface NotePageBlock extends PageBlock {
+	type: "note";
+	note: string;
+	detailed?: boolean;
+}
+
+/**
+ * One authored page (`pages/*`).
+ *
+ * Visibility is always public: upstream exposes no visibility parameter, so
+ * there is no `isPublic` field to mirror. `isLiked` is packed only when the
+ * request carries a credential.
+ */
+export interface Page {
+	id: string;
+	createdAt: string;
+	updatedAt: string;
+	userId: string;
+	user: UserLite;
+	title: string;
+	name: string;
+	summary: string | null;
+	content: PageBlock[];
+	variables: unknown[];
+	script: string;
+	hideTitleWhenPinned: boolean;
+	alignCenter: boolean;
+	font: PageFont;
+	eyeCatchingImageId: string | null;
+	eyeCatchingImage: DriveFile | null;
+	/** Drive files referenced by image blocks, resolved from the content tree. */
+	attachedFiles: DriveFile[];
+	likedCount: number;
+	/** Present only when the request carries a credential. */
+	isLiked?: boolean;
+}
+
+/** One entry of `i/page-likes`: the like record and its page. */
+export interface PageLike {
+	id: string;
+	page: Page;
 }
 
 /**

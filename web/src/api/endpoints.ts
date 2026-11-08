@@ -64,6 +64,10 @@ import type {
 	Notification,
 	NoteVisibility,
 	ObjectStorageInfo,
+	Page,
+	PageBlock,
+	PageFont,
+	PageLike,
 	PingResponse,
 	RegistryDetail,
 	SigninHistoryEntry,
@@ -285,6 +289,18 @@ export const ENDPOINTS = {
 	iGalleryLikes: "i/gallery/likes",
 	usersGalleryPosts: "users/gallery/posts",
 
+	// pages (schema v36)
+	pagesCreate: "pages/create",
+	pagesUpdate: "pages/update",
+	pagesDelete: "pages/delete",
+	pagesShow: "pages/show",
+	pagesFeatured: "pages/featured",
+	pagesLike: "pages/like",
+	pagesUnlike: "pages/unlike",
+	iPages: "i/pages",
+	iPageLikes: "i/page-likes",
+	usersPages: "users/pages",
+
 	// timelines
 	notesTimeline: "notes/timeline",
 	notesLocalTimeline: "notes/local-timeline",
@@ -496,6 +512,8 @@ export interface IUpdateParams {
 	followersVisibility?: "public" | "followers" | "private";
 	followingVisibility?: "public" | "followers" | "private";
 	mutedInstances?: string[] | null;
+	/** Pins a page to the profile; null unpins. Foreign pages answer NO_SUCH_PAGE. */
+	pinnedPageId?: string | null;
 }
 
 export interface AppEntity {
@@ -1163,6 +1181,64 @@ export interface EndpointMap {
 	[ENDPOINTS.usersGalleryPosts]: {
 		req: PaginationParams & { userId: string };
 		res: GalleryPost[];
+	};
+
+	// pages
+	[ENDPOINTS.pagesCreate]: {
+		req: {
+			title: string;
+			/** The slug; unique per author. */
+			name: string;
+			summary?: string | null;
+			eyeCatchingImageId?: string | null;
+			font?: PageFont;
+			alignCenter?: boolean;
+			hideTitleWhenPinned?: boolean;
+			content: PageBlock[];
+			/** Opaque; upstream's editor always sends an empty array. */
+			variables: unknown[];
+			/** Opaque; upstream's editor always sends an empty string. */
+			script: string;
+		};
+		res: Page;
+	};
+	[ENDPOINTS.pagesUpdate]: {
+		req: {
+			pageId: string;
+			title?: string;
+			name?: string;
+			/** Omitted keeps the stored summary; null clears it. */
+			summary?: string | null;
+			/** Omitted keeps the stored banner; null clears it. */
+			eyeCatchingImageId?: string | null;
+			font?: PageFont;
+			alignCenter?: boolean;
+			hideTitleWhenPinned?: boolean;
+			content?: PageBlock[];
+			variables?: unknown[];
+			script?: string;
+		};
+		/** The endpoint answers with an empty body. */
+		res: EmptyResponse;
+	};
+	[ENDPOINTS.pagesDelete]: { req: { pageId: string }; res: EmptyResponse };
+	[ENDPOINTS.pagesShow]: {
+		/** Either `pageId`, or the pair `name` + `username`. */
+		req: { pageId?: string; name?: string; username?: string };
+		res: Page;
+	};
+	[ENDPOINTS.pagesFeatured]: {
+		/** No parameters; the endpoint always answers the top ten. */
+		req: Record<string, never>;
+		res: Page[];
+	};
+	[ENDPOINTS.pagesLike]: { req: { pageId: string }; res: EmptyResponse };
+	[ENDPOINTS.pagesUnlike]: { req: { pageId: string }; res: EmptyResponse };
+	[ENDPOINTS.iPages]: { req: PaginationParams; res: Page[] };
+	[ENDPOINTS.iPageLikes]: { req: PaginationParams; res: PageLike[] };
+	[ENDPOINTS.usersPages]: {
+		req: PaginationParams & { userId: string };
+		res: Page[];
 	};
 
 	[ENDPOINTS.registrySet]: { req: RegistryParams; res: EmptyResponse };

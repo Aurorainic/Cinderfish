@@ -33,6 +33,9 @@
 					<MkSpacer v-else-if="tab === 'clips'" :content-max="800">
 						<UserClips :user="user" />
 					</MkSpacer>
+					<MkSpacer v-else-if="tab === 'pages'" :content-max="800">
+						<UserPages :user="user" />
+					</MkSpacer>
 					<MkSpacer v-else-if="tab === 'gallery'" :content-max="800">
 						<UserGallery :user="user" />
 					</MkSpacer>
@@ -46,15 +49,16 @@
 
 <script lang="ts" setup>
 // Firefish's tab set is home / reactions / clips / pages / gallery, gated on
-// `publicReactions` and on the user being local. Cinderfish has no pages
-// endpoint, so the tabs here are the ones the API can feed:
+// `publicReactions` and on the user being local. The tabs here are the ones the
+// API can feed:
 //   notes      users/notes { withReplies: false }  + pinned notes block
 //   replies    users/notes { withReplies: true }   (backend has no reply-only filter)
 //   media      users/notes { withFiles: true }
 //   activity   no charts/user/notes endpoint -> stated as unavailable
 //   reactions  no users/reactions endpoint     -> stated as unavailable
-//   clips      users/clips (public clips only)  -- local users only, as upstream
-//   gallery    users/gallery/posts              -- local users only, as upstream
+//   clips      users/clips (public clips only)   -- local users only, as upstream
+//   pages      users/pages (public pages only)   -- local users only, as upstream
+//   gallery    users/gallery/posts               -- local users only, as upstream
 import { computed, ref, watch } from "vue";
 import type { UserDetailed } from "@/api/types";
 import { api } from "@/api/client";
@@ -64,6 +68,7 @@ import UserClips from "@/components/user/UserClips.vue";
 import UserGallery from "@/components/user/UserGallery.vue";
 import UserHome from "@/components/user/UserHome.vue";
 import UserNotes from "@/components/user/UserNotes.vue";
+import UserPages from "@/components/user/UserPages.vue";
 import UserPhotos from "@/components/user/UserPhotos.vue";
 import UserReactions from "@/components/user/UserReactions.vue";
 import { acct as formatAcct, parseAcct } from "@/filters/user";
@@ -80,6 +85,7 @@ type TabKey =
 	| "activity"
 	| "reactions"
 	| "clips"
+	| "pages"
 	| "gallery";
 
 interface TabDefinition {
@@ -95,6 +101,7 @@ const TAB_KEYS: readonly TabKey[] = [
 	"activity",
 	"reactions",
 	"clips",
+	"pages",
 	"gallery",
 ];
 
@@ -145,6 +152,11 @@ const headerTabs = computed<TabDefinition[]>(() => {
 	// are resolved through users/show, where `host` is set.
 	if (user.value != null && user.value.host == null) {
 		tabs.push({ key: "clips", title: t("clips"), icon: "ph-paperclip ph-bold ph-lg" });
+		tabs.push({
+			key: "pages",
+			title: t("pages"),
+			icon: "ph-file-text ph-bold ph-lg",
+		});
 		tabs.push({
 			key: "gallery",
 			title: t("gallery"),
