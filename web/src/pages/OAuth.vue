@@ -196,7 +196,7 @@ definePageMetadata({
 
 	.description {
 		margin: 0 0 12px;
-		opacity: 0.85;
+		color: var(--fgTransparentWeak);
 	}
 
 	.permissions {

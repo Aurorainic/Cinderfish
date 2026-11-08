@@ -4,7 +4,7 @@
 		<CfInfo v-if="me == null">{{ t("signinRequired") }}</CfInfo>
 		<template v-else>
 			<section class="_formBlock">
-				<h2 class="sectionTitle">{{ t("moveTo") }}</h2>
+				<h2 class="_sectionTitle">{{ t("moveTo") }}</h2>
 				<CfInfo warn class="note">{{ t("moveAccountDescription") }}</CfInfo>
 				<CfInfo v-if="me.movedToUri" warn class="note">
 					此账号已经迁移到
@@ -37,7 +37,7 @@
 			</section>
 
 			<section class="_formBlock">
-				<h2 class="sectionTitle">{{ t("moveFrom") }}</h2>
+				<h2 class="_sectionTitle">{{ t("moveFrom") }}</h2>
 				<CfInfo warn class="note">{{ t("moveFromDescription") }}</CfInfo>
 				<CfInput
 					v-for="(_, i) in aliases"
@@ -49,7 +49,7 @@
 						>#{{ i + 1 }} {{ t("moveFromLabel") }}</template
 					>
 				</CfInput>
-				<div class="row">
+				<div class="_row">
 					<CfButton
 						inline
 						:disabled="savingAliases || aliases.length >= 10"
@@ -191,24 +191,12 @@ definePageMetadata({
 
 <style lang="scss" scoped>
 .cf-settings-migration {
-	.sectionTitle {
-		font-size: 1.05em;
-		font-weight: 700;
-		margin: 0 0 12px;
-	}
-
 	.note {
 		margin-bottom: 12px;
 	}
 
 	.field {
 		margin-bottom: 12px;
-	}
-
-	.row {
-		display: flex;
-		gap: 8px;
-		flex-wrap: wrap;
 	}
 }
 </style>

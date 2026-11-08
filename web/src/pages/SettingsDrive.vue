@@ -2,7 +2,7 @@
 <template>
 	<div class="_formRoot cf-settings-drive">
 		<section class="_formBlock">
-			<h2 class="sectionTitle">{{ t("usageAmount") }}</h2>
+			<h2 class="_sectionTitle">{{ t("usageAmount") }}</h2>
 
 			<div v-if="loading" class="state"><CfLoading /></div>
 			<div v-else-if="errorText != null" class="state">
@@ -30,7 +30,7 @@
 					<template #key>{{ t("driveFilesCount") }}</template>
 					<template #value>{{ fileCount }}</template>
 				</CfKeyValue>
-				<CfInfo class="note">
+				<CfInfo class="_note">
 					数据来自 <code>drive</code> 端点。容量为 0 表示本实例没有配置配额，
 					上传只受单文件大小限制。
 				</CfInfo>
@@ -38,8 +38,8 @@
 		</section>
 
 		<section class="_formBlock">
-			<h2 class="sectionTitle">{{ t("uploadFolder") }}</h2>
-			<div class="row">
+			<h2 class="_sectionTitle">{{ t("uploadFolder") }}</h2>
+			<div class="_row">
 				<CfButton @click="openFolderPicker()">
 					<i class="ph-folder-notch-open ph-bold ph-lg"></i>
 					{{ folderLoading ? "…" : folderName ?? t("none") }}
@@ -48,16 +48,16 @@
 					{{ t("remove") }}
 				</CfButton>
 			</div>
-			<p class="caption">
+			<p class="caption _caption">
 				上传文件与新建文件夹会默认落在这个文件夹；留空则使用网盘根目录。
 			</p>
-			<CfInfo v-if="folderErrorText != null" class="note" :warn="true">
+			<CfInfo v-if="folderErrorText != null" class="_note" :warn="true">
 				{{ folderErrorText }}
 			</CfInfo>
 		</section>
 
 		<section class="_formBlock">
-			<h2 class="sectionTitle">{{ t("clientSettings") }}</h2>
+			<h2 class="_sectionTitle">{{ t("clientSettings") }}</h2>
 			<CfSwitch v-model="keepOriginalUploading" class="_formBlock">
 				{{ t("keepOriginalUploading") }}
 				<template #caption>
@@ -69,7 +69,7 @@
 		</section>
 
 		<section class="_formBlock">
-			<h2 class="sectionTitle">{{ t("drive") }}</h2>
+			<h2 class="_sectionTitle">{{ t("drive") }}</h2>
 			<div class="kvRow">
 				<span class="kvKey">{{ t("alwaysMarkSensitive") }}</span>
 				<CfSwitch
@@ -84,10 +84,10 @@
 					@update:model-value="saveAutoSensitive"
 				/>
 			</div>
-			<CfInfo v-if="profileErrorText != null" class="note" warn>
+			<CfInfo v-if="profileErrorText != null" class="_note" warn>
 				{{ profileErrorText }}
 			</CfInfo>
-			<CfInfo v-else class="note">
+			<CfInfo v-else class="_note">
 				这两项由 <code>i/update</code> 写入个人资料；网盘统计图表
 				（<code>MkChart</code> / chart.js）仍未提供。
 			</CfInfo>
@@ -260,13 +260,6 @@ definePageMetadata({ title: t("drive"), icon: "ph-cloud ph-bold ph-lg" });
 
 <style lang="scss" scoped>
 .cf-settings-drive {
-	.sectionTitle {
-		margin: 0 0 4px;
-		color: var(--fg);
-		font-size: 1em;
-		opacity: 0.85;
-	}
-
 	.state {
 		display: flex;
 		flex-direction: column;
@@ -302,26 +295,12 @@ definePageMetadata({ title: t("drive"), icon: "ph-cloud ph-bold ph-lg" });
 		}
 	}
 
-	.row {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 8px;
-		margin-block-start: 12px;
-	}
-
 	.caption {
 		margin: 8px 0 0;
-		color: var(--fgTransparentWeak);
-		font-size: 0.85em;
 	}
 
-	.note {
-		margin-block-start: 12px;
-		font-size: 0.85em;
-
-		code {
-			word-break: break-all;
-		}
+	._note code {
+		word-break: break-all;
 	}
 
 	.picker {

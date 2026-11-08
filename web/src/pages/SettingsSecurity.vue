@@ -11,7 +11,7 @@
 		</div>
 		<template v-else>
 			<section class="_formBlock">
-				<h2 class="sectionTitle">会话信息</h2>
+				<h2 class="_sectionTitle">会话信息</h2>
 				<CfKeyValue class="kv">
 					<template #key>{{ t("username") }}</template>
 					<template #value>@{{ me.username }}</template>
@@ -47,14 +47,14 @@
 						<template v-else>普通用户</template>
 					</template>
 				</CfKeyValue>
-				<CfInfo class="note">
+				<CfInfo class="_note">
 					会话凭据由账号层保管（<code>@/account</code>），页面不读取也不显示 token。
 					登录信息只反映当前会话的账号资料，服务端没有会话列表端点。
 				</CfInfo>
 			</section>
 
 			<section class="_formBlock">
-				<h2 class="sectionTitle">{{ t("password") }}</h2>
+				<h2 class="_sectionTitle">{{ t("password") }}</h2>
 				<CfInput
 					v-model="currentPassword"
 					class="field"
@@ -79,7 +79,7 @@
 				>
 					<template #label>{{ t("newPasswordRetype") }}</template>
 				</CfInput>
-				<div class="row">
+				<div class="_row">
 					<CfButton
 						primary
 						:disabled="passwordBusy || !canChangePassword"
@@ -89,19 +89,19 @@
 						{{ t("changePassword") }}
 					</CfButton>
 				</div>
-				<CfInfo v-if="passwordError != null" warn class="note">
+				<CfInfo v-if="passwordError != null" warn class="_note">
 					{{ passwordError }}
 				</CfInfo>
-				<CfInfo v-if="passwordNotice != null" class="note">
+				<CfInfo v-if="passwordNotice != null" class="_note">
 					{{ passwordNotice }}
 				</CfInfo>
 
-				<h2 class="sectionTitle spaced">{{ t("regenerateLoginToken") }}</h2>
-				<CfInfo class="note">
+				<h2 class="_sectionTitle spaced">{{ t("regenerateLoginToken") }}</h2>
+				<CfInfo class="_note">
 					{{ t("regenerateLoginTokenDescription") }}
 					新令牌会替换当前浏览器保存的凭据；其它设备上已保存的旧令牌将立即失效。
 				</CfInfo>
-				<div class="row">
+				<div class="_row">
 					<CfButton
 						danger
 						:disabled="passwordBusy || currentPassword === ''"
@@ -111,14 +111,14 @@
 						{{ t("regenerateLoginToken") }}
 					</CfButton>
 				</div>
-				<CfInfo v-if="freshToken != null" class="note">
+				<CfInfo v-if="freshToken != null" class="_note">
 					新令牌：<code class="_monospace">{{ freshToken }}</code>
 					（已保存到本浏览器）
 				</CfInfo>
 			</section>
 
 			<section class="_formBlock">
-				<h2 class="sectionTitle">{{ t("signinHistory") }}</h2>
+				<h2 class="_sectionTitle">{{ t("signinHistory") }}</h2>
 				<div v-if="historyLoading" class="empty">加载中…</div>
 				<div v-else-if="history.length === 0" class="empty">
 					还没有登录记录。
@@ -134,7 +134,7 @@
 							<CfTime class="historyTime" :time="entry.createdAt" mode="absolute" />
 						</li>
 					</ul>
-					<div v-if="historyMore" class="row">
+					<div v-if="historyMore" class="_row">
 						<CfButton :disabled="historyLoading" @click="loadHistory(true)">
 							加载更多
 						</CfButton>
@@ -143,13 +143,13 @@
 			</section>
 
 			<section class="_formBlock">
-				<h2 class="sectionTitle">两步验证</h2>
+				<h2 class="_sectionTitle">两步验证</h2>
 				<template v-if="me.twoFactorEnabled">
 					<CfKeyValue class="kv">
 						<template #key>身份验证器应用</template>
 						<template #value><span class="badge">已启用</span></template>
 					</CfKeyValue>
-					<CfInfo class="note">
+					<CfInfo class="_note">
 						登录时需要在密码之后输入身份验证器应用生成的 6 位验证码。
 						停用需要再次确认当前密码。
 					</CfInfo>
@@ -162,7 +162,7 @@
 					>
 						<template #label>{{ t("currentPassword") }}</template>
 					</CfInput>
-					<div class="row">
+					<div class="_row">
 						<CfButton
 							v-if="!confirmingDisable"
 							danger
@@ -182,7 +182,7 @@
 				</template>
 
 				<template v-else-if="registration == null">
-					<CfInfo class="note">
+					<CfInfo class="_note">
 						尚未启用两步验证。安装任意 TOTP 身份验证器应用（如 Aegis、1Password、
 						Google Authenticator）后，在下方向导中手动输入密钥即可完成绑定。
 					</CfInfo>
@@ -194,7 +194,7 @@
 					>
 						<template #label>{{ t("currentPassword") }}</template>
 					</CfInput>
-					<div class="row">
+					<div class="_row">
 						<CfButton
 							primary
 							:disabled="busy || password === ''"
@@ -206,7 +206,7 @@
 				</template>
 
 				<template v-else>
-					<CfInfo class="note">
+					<CfInfo class="_note">
 						{{ t("_2fa.step1", { a: "Aegis", b: "1Password" }) }}
 						{{ t("_2fa.step2Url") }}
 					</CfInfo>
@@ -231,8 +231,8 @@
 					>
 						<template #label>{{ t("_2fa.token") }}</template>
 					</CfInput>
-					<CfInfo class="note">{{ t("_2fa.step3") }}</CfInfo>
-					<div class="row">
+					<CfInfo class="_note">{{ t("_2fa.step3") }}</CfInfo>
+					<div class="_row">
 						<CfButton primary :disabled="busy || code === ''" @click="finishRegistration()">
 							完成设置
 						</CfButton>
@@ -240,7 +240,7 @@
 					</div>
 				</template>
 
-				<CfInfo v-if="twoFactorError != null" warn class="note">
+				<CfInfo v-if="twoFactorError != null" warn class="_note">
 					{{ twoFactorError }}
 				</CfInfo>
 			</section>
@@ -474,13 +474,6 @@ definePageMetadata({ title: t("security"), icon: "ph-lock ph-bold ph-lg" });
 
 <style lang="scss" scoped>
 .cf-settings-security {
-	.sectionTitle {
-		margin: 0 0 4px;
-		color: var(--fg);
-		font-size: 1em;
-		opacity: 0.85;
-	}
-
 	.state {
 		display: flex;
 		flex-direction: column;
@@ -501,26 +494,14 @@ definePageMetadata({ title: t("security"), icon: "ph-lock ph-bold ph-lg" });
 		font-size: 0.8em;
 	}
 
-	.row {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 8px;
-		margin-block-start: 12px;
-	}
-
 	.empty {
 		margin-block-start: 8px;
 		color: var(--fgTransparentWeak);
 		font-size: 0.9em;
 	}
 
-	.note {
-		margin-block-start: 12px;
-		font-size: 0.85em;
-
-		code {
-			word-break: break-all;
-		}
+	._note code {
+		word-break: break-all;
 	}
 
 	.field {
@@ -567,7 +548,7 @@ definePageMetadata({ title: t("security"), icon: "ph-lock ph-bold ph-lg" });
 
 	.historyTime {
 		margin-inline-start: auto;
-		opacity: 0.7;
+		color: var(--fgTransparentWeak);
 	}
 
 	.secret,

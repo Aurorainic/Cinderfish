@@ -118,7 +118,7 @@ function stringProp(
 			flex-shrink: 0;
 			padding: 0 10px;
 			font-weight: 700;
-			opacity: 0.8;
+			color: var(--fgTransparentWeak);
 		}
 
 		.body {
@@ -129,7 +129,7 @@ function stringProp(
 
 		.unknown {
 			font-size: 0.85em;
-			opacity: 0.6;
+			color: var(--fgTransparentWeak);
 			padding-inline-start: 10px;
 		}
 	}

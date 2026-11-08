@@ -152,7 +152,7 @@ definePageMetadata(
 
 	.queryText {
 		font-size: 0.92em;
-		opacity: 0.8;
+		color: var(--fgTransparentWeak);
 		overflow-wrap: anywhere;
 	}
 

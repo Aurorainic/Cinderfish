@@ -105,7 +105,7 @@ function onChangeSelection(files: DriveFile[] | DriveFolder[]): void {
 <style lang="scss" scoped>
 .count {
 	margin-left: 8px;
-	opacity: 0.5;
+	color: var(--fgTransparentWeak);
 }
 
 .body {

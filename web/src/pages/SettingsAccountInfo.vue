@@ -26,7 +26,7 @@
 			</section>
 
 			<section class="_formBlock">
-				<h2 class="sectionTitle">{{ t("statistics") }}</h2>
+				<h2 class="_sectionTitle">{{ t("statistics") }}</h2>
 				<CfKeyValue oneline>
 					<template #key>{{ t("notesCount") }}</template>
 					<template #value>{{ number(account.notesCount) }}</template>
@@ -68,7 +68,7 @@
 			</section>
 
 			<section class="_formBlock">
-				<h2 class="sectionTitle">{{ t("other") }}</h2>
+				<h2 class="_sectionTitle">{{ t("other") }}</h2>
 				<CfKeyValue oneline>
 					<template #key>{{ t("administrator") }}</template>
 					<template #value>{{
@@ -173,13 +173,6 @@ definePageMetadata({ title: t("accountInfo"), icon: "ph-info ph-bold ph-lg" });
 	.monospace {
 		font-family: monospace;
 		overflow-wrap: anywhere;
-	}
-
-	.sectionTitle {
-		margin: 0 0 4px;
-		color: var(--fg);
-		font-size: 1em;
-		opacity: 0.85;
 	}
 
 	.errorText {

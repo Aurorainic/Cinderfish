@@ -2,7 +2,7 @@
 <template>
 	<div class="_formRoot cf-settings-sounds">
 		<section class="_formBlock">
-			<h2 class="sectionTitle">{{ t("masterVolume") }}</h2>
+			<h2 class="_sectionTitle">{{ t("masterVolume") }}</h2>
 
 			<div class="rangeField">
 				<span class="label">
@@ -24,14 +24,14 @@
 				</div>
 			</div>
 
-			<CfInfo class="note">
+			<CfInfo class="_note">
 				音量设为 0 即静音，播放时会直接跳过（<code>scripts/sound.ts</code> 的
 				<code>playFile</code>）。
 			</CfInfo>
 		</section>
 
 		<section class="_formBlock">
-			<h2 class="sectionTitle">{{ t("sounds") }}</h2>
+			<h2 class="_sectionTitle">{{ t("sounds") }}</h2>
 
 			<ul class="sounds">
 				<li v-for="key in soundKeys" :key="key.key" class="sound">
@@ -66,7 +66,7 @@
 				</li>
 			</ul>
 
-			<div class="row">
+			<div class="_row">
 				<CfButton danger @click="reset()">
 					<i class="ph-arrow-clockwise ph-bold ph-lg"></i>
 					{{ t("default") }}
@@ -74,7 +74,7 @@
 			</div>
 		</section>
 
-		<CfInfo class="note">
+		<CfInfo class="_note">
 			音色来自 <code>get-sounds</code>（服务器扫描
 			<code>static-assets/sounds/</code> 下的 mp3），试听按钮即时播放。自动播放受浏览器策略
 			限制时首次点击后才会有声音。自定义音效（插件/上传）未实现。
@@ -201,13 +201,6 @@ definePageMetadata({
 
 <style lang="scss" scoped>
 .cf-settings-sounds {
-	.sectionTitle {
-		margin: 0 0 4px;
-		color: var(--fg);
-		font-size: 1em;
-		opacity: 0.85;
-	}
-
 	.rangeField {
 		display: block;
 		margin-block-start: 12px;
@@ -286,20 +279,8 @@ definePageMetadata({
 		}
 	}
 
-	.row {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 8px;
-		margin-block-start: 16px;
-	}
-
-	.note {
-		margin-block-start: 12px;
-		font-size: 0.85em;
-
-		code {
-			word-break: break-all;
-		}
+	._note code {
+		word-break: break-all;
 	}
 }
 </style>

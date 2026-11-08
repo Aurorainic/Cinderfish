@@ -119,7 +119,7 @@ const maxDay = computed(() => Math.max(1, ...days.value.map((day) => day.total))
 	gap: 10px;
 	margin-top: 6px;
 	font-size: 0.75em;
-	opacity: 0.75;
+	color: var(--fgTransparentWeak);
 
 	> .entry::before {
 		content: "";

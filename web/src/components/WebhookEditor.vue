@@ -148,14 +148,14 @@ function submit(): void {
 	legend {
 		padding: 0 6px;
 		font-size: 0.85em;
-		opacity: 0.75;
+		color: var(--fgTransparentWeak);
 	}
 }
 
 .hint {
 	margin: 0;
 	font-size: 0.82em;
-	opacity: 0.65;
+	color: var(--fgTransparentWeak);
 }
 
 .actions {

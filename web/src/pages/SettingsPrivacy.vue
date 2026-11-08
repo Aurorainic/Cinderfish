@@ -5,7 +5,7 @@
 
 		<template v-else>
 			<section class="_formBlock">
-				<h2 class="sectionTitle">{{ t("ffVisibility") }}</h2>
+				<h2 class="_sectionTitle">{{ t("ffVisibility") }}</h2>
 				<CfSelect
 					:model-value="followersVisibility"
 					:disabled="saving"
@@ -43,7 +43,7 @@
 			</section>
 
 			<section class="_formBlock">
-				<h2 class="sectionTitle">{{ t("note") }}</h2>
+				<h2 class="_sectionTitle">{{ t("note") }}</h2>
 				<CfSwitch v-model="rememberNoteVisibility" class="_formBlock">
 					{{ t("rememberNoteVisibility") }}
 				</CfSwitch>
@@ -74,7 +74,7 @@
 			</section>
 
 			<section class="_formBlock">
-				<h2 class="sectionTitle">{{ t("other") }}</h2>
+				<h2 class="_sectionTitle">{{ t("other") }}</h2>
 
 				<CfSwitch
 					:model-value="me.isLocked"
@@ -294,13 +294,6 @@ definePageMetadata({ title: t("privacy"), icon: "ph-keyhole ph-bold ph-lg" });
 
 <style lang="scss" scoped>
 .cf-settings-privacy {
-	.sectionTitle {
-		margin: 0 0 12px;
-		color: var(--fg);
-		font-size: 1em;
-		opacity: 0.85;
-	}
-
 	.field {
 		margin-block-start: 12px;
 	}

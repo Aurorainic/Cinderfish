@@ -393,7 +393,7 @@ onBeforeUnmount(() => {
 					display: inline-block;
 					margin-right: 16px;
 					line-height: 20px;
-					opacity: 0.8;
+					color: var(--fgTransparentWeak);
 
 					&.username {
 						font-weight: bold;
@@ -441,7 +441,7 @@ onBeforeUnmount(() => {
 
 				> .empty {
 					margin: 0;
-					opacity: 0.5;
+					color: var(--fgTransparentWeak);
 				}
 			}
 

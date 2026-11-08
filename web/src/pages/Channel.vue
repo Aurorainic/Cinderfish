@@ -12,6 +12,6 @@ defineOptions({ name: "CfPageChannel" });
 .cf-page-placeholder {
   padding: 32px;
   text-align: center;
-  opacity: 0.7;
+  color: var(--fgTransparentWeak);
 }
 </style>

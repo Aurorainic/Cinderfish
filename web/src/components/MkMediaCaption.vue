@@ -204,7 +204,7 @@ function onInputKeydown(ev: KeyboardEvent): void {
 		}
 
 		> .text-count {
-			opacity: 0.7;
+			color: var(--fgTransparentWeak);
 			position: absolute;
 			right: 0;
 		}
@@ -276,7 +276,7 @@ function onInputKeydown(ev: KeyboardEvent): void {
 
 	> footer {
 		margin-top: 8px;
-		opacity: 0.8;
+		color: var(--fgTransparentWeak);
 
 		> span + span {
 			margin-left: 0.5em;

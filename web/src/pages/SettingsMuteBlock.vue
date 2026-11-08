@@ -17,7 +17,7 @@
 				</CfRadios>
 
 				<section class="_formBlock">
-					<h2 class="sectionTitle">添加</h2>
+					<h2 class="_sectionTitle">添加</h2>
 					<div class="addRow">
 						<CfInput
 							v-model="username"
@@ -213,12 +213,6 @@ onMounted(() => {
 </script>
 
 <style lang="scss" scoped>
-.sectionTitle {
-	margin: 0 0 8px;
-	font-size: 0.95em;
-	opacity: 0.8;
-}
-
 .addRow {
 	display: flex;
 	gap: 8px;
@@ -233,7 +227,7 @@ onMounted(() => {
 .hint {
 	margin: 6px 0 0;
 	font-size: 0.85em;
-	opacity: 0.7;
+	color: var(--fgTransparentWeak);
 }
 
 .entries {
@@ -276,12 +270,12 @@ onMounted(() => {
 
 	.acct {
 		font-size: 0.82em;
-		opacity: 0.7;
+		color: var(--fgTransparentWeak);
 	}
 
 	.date {
 		font-size: 0.78em;
-		opacity: 0.55;
+		color: var(--fgTransparentWeak);
 	}
 }
 </style>

@@ -80,7 +80,7 @@ const suspended = computed<boolean>(
 			display: block;
 			width: 100%;
 			font-size: 95%;
-			opacity: 0.7;
+			color: var(--fgTransparentWeak);
 			line-height: 16px;
 			white-space: nowrap;
 			overflow: hidden;

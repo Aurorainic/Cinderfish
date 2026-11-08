@@ -11,7 +11,7 @@
 				</CfInfo>
 
 				<section class="_formBlock">
-					<h2 class="sectionTitle">动画</h2>
+					<h2 class="_sectionTitle">动画</h2>
 					<CfSwitch v-model="animation" class="_formBlock">
 						启用界面动画
 						<template #caption>
@@ -33,7 +33,7 @@
 				</section>
 
 				<section class="_formBlock">
-					<h2 class="sectionTitle">排版</h2>
+					<h2 class="_sectionTitle">排版</h2>
 					<CfSwitch v-model="showGapBetweenNotesInTimeline" class="_formBlock">
 						时间线中显示帖子间距
 						<template #caption>
@@ -95,11 +95,3 @@ const showGapBetweenNotesInTimeline = storeRef("showGapBetweenNotesInTimeline");
 const squareAvatars = storeRef("squareAvatars");
 const squareCatAvatars = storeRef("squareCatAvatars");
 </script>
-
-<style lang="scss" scoped>
-.sectionTitle {
-	margin: 0 0 8px;
-	font-size: 0.95em;
-	opacity: 0.8;
-}
-</style>

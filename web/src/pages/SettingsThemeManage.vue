@@ -251,9 +251,8 @@ definePageMetadata({
 			}
 
 			> .author {
-				color: var(--fg);
+				color: var(--fgTransparentWeak);
 				font-size: 0.9em;
-				opacity: 0.8;
 				overflow-wrap: anywhere;
 			}
 

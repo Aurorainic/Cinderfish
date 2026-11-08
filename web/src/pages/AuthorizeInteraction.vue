@@ -156,7 +156,7 @@ definePageMetadata({
 		}
 
 		.acct {
-			opacity: 0.75;
+			color: var(--fgTransparentWeak);
 			font-size: 0.92em;
 		}
 	}
@@ -164,7 +164,7 @@ definePageMetadata({
 	.hint {
 		margin: 12px 0 0;
 		font-size: 0.92em;
-		opacity: 0.8;
+		color: var(--fgTransparentWeak);
 	}
 
 	.loading {

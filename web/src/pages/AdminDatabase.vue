@@ -15,7 +15,7 @@
 				<div class="toolbar">
 					<div class="summary">
 						<span class="value">{{ formatSize(totalSize) }}</span>
-						<span class="caption"
+						<span class="_caption"
 							>{{ tables.length }} 张表 · {{ indexes.length }} 个索引</span
 						>
 					</div>
@@ -29,7 +29,7 @@
 				<MkError v-else-if="error !== null && tables.length === 0" @retry="load" />
 				<template v-else>
 					<section class="_formBlock">
-						<h2 class="sectionTitle">表</h2>
+						<h2 class="_sectionTitle">表</h2>
 						<ul class="tables">
 							<li v-for="table in sortedTables" :key="table.name" class="table">
 								<div class="row">
@@ -48,7 +48,7 @@
 					</section>
 
 					<section class="_formBlock">
-						<h2 class="sectionTitle">索引（{{ indexes.length }}）</h2>
+						<h2 class="_sectionTitle">索引（{{ indexes.length }}）</h2>
 						<ul class="indexes">
 							<li
 								v-for="index in indexes"
@@ -188,18 +188,7 @@ definePageMetadata({
 			font-size: 1.3em;
 			font-weight: 700;
 		}
-
-		.caption {
-			font-size: 0.8em;
-			opacity: 0.65;
-		}
 	}
-}
-
-.sectionTitle {
-	margin: 0 0 8px;
-	font-size: 0.95em;
-	opacity: 0.8;
 }
 
 .tables,
@@ -232,7 +221,7 @@ definePageMetadata({
 		.count,
 		.size {
 			font-size: 0.82em;
-			opacity: 0.7;
+			color: var(--fgTransparentWeak);
 			white-space: nowrap;
 		}
 	}
@@ -262,7 +251,7 @@ definePageMetadata({
 	}
 
 	.indexTable {
-		opacity: 0.6;
+		color: var(--fgTransparentWeak);
 	}
 
 	details {
@@ -270,7 +259,7 @@ definePageMetadata({
 
 		summary {
 			cursor: pointer;
-			opacity: 0.65;
+			color: var(--fgTransparentWeak);
 		}
 	}
 

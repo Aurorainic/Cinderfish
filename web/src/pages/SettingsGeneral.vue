@@ -46,7 +46,7 @@
 		</CfRadios>
 
 		<section class="_formBlock">
-			<h2 class="sectionTitle">{{ t("behavior") }}</h2>
+			<h2 class="_sectionTitle">{{ t("behavior") }}</h2>
 			<CfSwitch v-model="imageNewTab" class="_formBlock">
 				{{ t("openImageInNewTab") }}
 			</CfSwitch>
@@ -105,7 +105,7 @@
 		</section>
 
 		<section class="_formBlock">
-			<h2 class="sectionTitle">{{ t("accessibility") }}</h2>
+			<h2 class="_sectionTitle">{{ t("accessibility") }}</h2>
 			<CfSwitch v-model="expandOnNoteClick" class="_formBlock">
 				{{ t("expandOnNoteClick") }}
 				<template #caption>{{ t("expandOnNoteClickDesc") }}</template>
@@ -127,7 +127,7 @@
 		</section>
 
 		<section class="_formBlock">
-			<h2 class="sectionTitle">{{ t("appearance") }}</h2>
+			<h2 class="_sectionTitle">{{ t("appearance") }}</h2>
 			<CfSwitch v-model="showAds" class="_formBlock">
 				{{ t("showAds") }}
 			</CfSwitch>
@@ -189,7 +189,7 @@
 		</section>
 
 		<section class="_formBlock">
-			<h2 class="sectionTitle">{{ t("other") }}</h2>
+			<h2 class="_sectionTitle">{{ t("other") }}</h2>
 			<label class="rangeField">
 				<span class="label">{{ t("numberOfPageCache") }}</span>
 				<span class="rangeRow">
@@ -202,7 +202,7 @@
 					/>
 					<span class="rangeValue">{{ numberOfPageCache }}</span>
 				</span>
-				<span class="caption">{{ t("numberOfPageCacheDescription") }}</span>
+				<span class="caption _caption">{{ t("numberOfPageCacheDescription") }}</span>
 			</label>
 
 			<div class="_formLinks">
@@ -373,13 +373,6 @@ definePageMetadata({ title: t("general"), icon: "ph-gear-six ph-bold ph-lg" });
 
 <style lang="scss" scoped>
 .cf-settings-general {
-	.sectionTitle {
-		margin: 0 0 4px;
-		color: var(--fg);
-		font-size: 1em;
-		opacity: 0.85;
-	}
-
 	.field {
 		margin-block-start: 12px;
 	}
@@ -417,8 +410,6 @@ definePageMetadata({ title: t("general"), icon: "ph-gear-six ph-bold ph-lg" });
 		.caption {
 			display: block;
 			margin-block-start: 6px;
-			color: var(--fgTransparentWeak);
-			font-size: 0.85em;
 		}
 	}
 

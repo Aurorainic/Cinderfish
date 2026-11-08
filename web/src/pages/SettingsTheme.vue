@@ -292,9 +292,8 @@ definePageMetadata({ title: t("theme"), icon: "ph-palette ph-bold ph-lg" });
 			}
 
 			> .activeAuthor {
-				color: var(--fg);
+				color: var(--fgTransparentWeak);
 				font-size: 0.9em;
-				opacity: 0.8;
 			}
 
 			> .activeCaption {

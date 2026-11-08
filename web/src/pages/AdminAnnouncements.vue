@@ -43,7 +43,7 @@
 							type="datetime-local"
 							:disabled="saving"
 						/>
-						<span class="caption"
+						<span class="_caption"
 							>留空表示永久；到期后公开列表自动隐藏，管理端仍可见。</span
 						>
 					</label>
@@ -301,12 +301,7 @@ onMounted(() => {
 
 		.label {
 			font-size: 0.85em;
-			opacity: 0.8;
-		}
-
-		.caption {
-			font-size: 0.78em;
-			opacity: 0.6;
+			color: var(--fgTransparentWeak);
 		}
 	}
 
@@ -376,7 +371,7 @@ onMounted(() => {
 	.meta {
 		margin-top: 6px;
 		font-size: 0.78em;
-		opacity: 0.6;
+		color: var(--fgTransparentWeak);
 		display: flex;
 		gap: 6px;
 		flex-wrap: wrap;

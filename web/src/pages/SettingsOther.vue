@@ -2,7 +2,7 @@
 <template>
 	<div class="_formRoot cf-settings-other">
 		<section class="_formBlock">
-			<h2 class="sectionTitle">{{ t("otherSettings") }}</h2>
+			<h2 class="_sectionTitle">{{ t("otherSettings") }}</h2>
 
 			<CfSwitch
 				:model-value="injectFeatured"
@@ -15,13 +15,13 @@
 					<code>i/update { injectFeaturedNote }</code>，保存在个人资料里。
 				</template>
 			</CfSwitch>
-			<CfInfo v-if="featuredError != null" class="note" warn>
+			<CfInfo v-if="featuredError != null" class="_note" warn>
 				{{ featuredError }}
 			</CfInfo>
 		</section>
 
 		<section class="_formBlock">
-			<h2 class="sectionTitle">{{ t("clientSettings") }}</h2>
+			<h2 class="_sectionTitle">{{ t("clientSettings") }}</h2>
 
 			<CfSwitch v-model="showFullAcct" class="_formBlock">
 				显示完整的 @user@host
@@ -60,7 +60,7 @@
 		</section>
 
 		<section class="_formBlock">
-			<h2 class="sectionTitle">{{ t("accountInfo") }}</h2>
+			<h2 class="_sectionTitle">{{ t("accountInfo") }}</h2>
 			<div class="_formLinks">
 				<CfA class="linkRow" to="/settings/account-info">
 					<i class="ph-identification-card ph-bold ph-lg"></i>
@@ -75,7 +75,7 @@
 					{{ t("closeAccount") }}
 				</CfA>
 			</div>
-			<CfInfo class="note">
+			<CfInfo class="_note">
 				<code>registry</code> 与注销账号页仍由各自的移植任务负责；这里只做入口聚合。
 			</CfInfo>
 		</section>
@@ -138,13 +138,6 @@ definePageMetadata({
 
 <style lang="scss" scoped>
 .cf-settings-other {
-	.sectionTitle {
-		margin: 0 0 4px;
-		color: var(--fg);
-		font-size: 1em;
-		opacity: 0.85;
-	}
-
 	.kvRow {
 		display: flex;
 		align-items: baseline;
@@ -162,13 +155,8 @@ definePageMetadata({
 		}
 	}
 
-	.note {
-		margin-block-start: 12px;
-		font-size: 0.85em;
-
-		code {
-			word-break: break-all;
-		}
+	._note code {
+		word-break: break-all;
 	}
 
 	._formLinks {

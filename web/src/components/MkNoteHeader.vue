@@ -91,7 +91,7 @@ const editedTitle = computed(() => {
 	text-shadow: 0 2px 2px var(--shadow);
 	.edited {
 		margin-inline-start: 0.4rem;
-		opacity: 0.6;
+		color: var(--fgTransparentWeak);
 		font-size: 0.9em;
 	}
 

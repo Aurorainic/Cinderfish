@@ -192,7 +192,7 @@ const vote = async (id: number): Promise<void> => {
 
 				> .votes {
 					margin-left: 4px;
-					opacity: 0.7;
+					color: var(--fgTransparentWeak);
 				}
 			}
 		}

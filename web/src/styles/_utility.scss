@@ -367,6 +367,32 @@
 	}
 }
 
+// Settings/Admin page section heading. Pages used to copy this rule with
+// drifted values; keep the majority variant here so they stay consistent.
+._sectionTitle {
+	margin: 0 0 4px;
+	color: var(--fg);
+	font-size: var(--fontSizeMd);
+	opacity: 0.85;
+}
+
+// Horizontal group of controls that wraps instead of overflowing.
+._row {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin-block-start: 12px;
+}
+
+// Secondary/dimmed text: descriptions, metadata, hints. The transparency is
+// encoded by `--fgTransparentWeak` (alpha 0.75 of the foreground colour), so
+// do not add a separate `opacity` on top of it.
+._note {
+	margin-block-start: 12px;
+	color: var(--fgTransparentWeak);
+	font-size: var(--fontSizeSm);
+}
+
 ._flexList {
 	display: flex;
 	flex-wrap: wrap;
@@ -396,7 +422,7 @@
 
 			> ._label {
 				font-size: 80%;
-				opacity: 0.7;
+				color: var(--fgTransparentWeak);
 
 				> ._icon {
 					margin-right: 4px;

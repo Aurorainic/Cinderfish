@@ -18,7 +18,7 @@
 
 				<form v-if="addOpen" class="addCard" @submit.prevent="addAccount">
 					<h2 class="title">用另一个账号登录</h2>
-					<p class="caption">
+					<p class="caption _caption">
 						只支持本实例账号。登录成功后，原来的账号会保留在下面的列表里。
 					</p>
 					<CfInput
@@ -287,8 +287,6 @@ onMounted(() => {
 
 	.caption {
 		margin: 0 0 12px;
-		font-size: 0.85em;
-		opacity: 0.7;
 	}
 
 	.field {
@@ -351,7 +349,7 @@ onMounted(() => {
 
 	.acct {
 		font-size: 0.82em;
-		opacity: 0.7;
+		color: var(--fgTransparentWeak);
 	}
 
 	.buttons {

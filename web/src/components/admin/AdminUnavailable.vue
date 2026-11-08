@@ -113,7 +113,7 @@ defineOptions({ name: "CfAdminUnavailable" });
 
 			.note {
 				font-size: 0.82em;
-				opacity: 0.7;
+				color: var(--fgTransparentWeak);
 			}
 		}
 

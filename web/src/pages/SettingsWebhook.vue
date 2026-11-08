@@ -183,7 +183,7 @@ onMounted(() => {
 	.url {
 		margin-top: 4px;
 		font-size: 0.82em;
-		opacity: 0.75;
+		color: var(--fgTransparentWeak);
 		overflow-wrap: anywhere;
 	}
 
@@ -193,7 +193,7 @@ onMounted(() => {
 		gap: 4px 14px;
 		margin-top: 6px;
 		font-size: 0.78em;
-		opacity: 0.65;
+		color: var(--fgTransparentWeak);
 	}
 
 	.buttons {

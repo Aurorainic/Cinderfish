@@ -61,7 +61,7 @@
 					</CfInfo>
 
 					<section class="_formBlock">
-						<h2 class="sectionTitle">生效方式</h2>
+						<h2 class="_sectionTitle">生效方式</h2>
 						<ul class="notes">
 							<li>
 								保存在 <code>instance_meta</code> 的 <code>customCss</code> 键，
@@ -191,7 +191,7 @@ definePageMetadata({ title: "实例 CSS", icon: "ph-code ph-bold ph-lg" });
 
 	.status {
 		font-size: 0.85em;
-		opacity: 0.7;
+		color: var(--fgTransparentWeak);
 	}
 
 	.notes {
@@ -199,7 +199,7 @@ definePageMetadata({ title: "实例 CSS", icon: "ph-code ph-bold ph-lg" });
 		padding-inline-start: 20px;
 		font-size: 0.85em;
 		line-height: 1.7;
-		opacity: 0.8;
+		color: var(--fgTransparentWeak);
 
 		code {
 			font-family: monospace;

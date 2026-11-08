@@ -26,7 +26,7 @@
 				</div>
 
 				<section v-if="activeTab === 'invites'" class="invites">
-					<h2 class="sectionTitle">邀请码</h2>
+					<h2 class="_sectionTitle">邀请码</h2>
 					<p class="sectionNote">
 						注册模式为「仅限邀请」时，新用户必须凭这里的邀请码注册。切到
 						<RouterLink class="_link" to="/admin/settings">实例设置</RouterLink>
@@ -53,7 +53,7 @@
 								type="datetime-local"
 								:disabled="creating"
 							/>
-							<span class="caption">留空表示永久有效。</span>
+							<span class="_caption">留空表示永久有效。</span>
 						</label>
 						<CfInfo v-if="formError !== null" warn class="field">
 							{{ formError }}
@@ -146,7 +146,7 @@
 				</section>
 
 				<section v-if="activeTab === 'audit'" class="signinAudit">
-					<h2 class="sectionTitle">登录审计</h2>
+					<h2 class="_sectionTitle">登录审计</h2>
 					<p class="sectionNote">
 						所有账号的登录记录，含失败尝试。成功登录也会出现在账号自己的设置页里。
 					</p>
@@ -182,7 +182,7 @@
 				</section>
 
 				<section v-if="activeTab === 'bans'" class="ipBans">
-					<h2 class="sectionTitle">IP 封禁</h2>
+					<h2 class="_sectionTitle">IP 封禁</h2>
 					<p class="sectionNote">
 						被封锁的地址无法登录或注册（浏览不受影响）。规则可以是单个 IP 或 CIDR
 						网段；到期后自动失效。
@@ -215,7 +215,7 @@
 								type="datetime-local"
 								:disabled="banCreating"
 							/>
-							<span class="caption">留空表示永久封禁。</span>
+							<span class="_caption">留空表示永久封禁。</span>
 						</label>
 						<CfInfo v-if="banFormError !== null" warn class="field">
 							{{ banFormError }}
@@ -270,7 +270,7 @@
 				</section>
 
 				<section v-if="activeTab === 'protection'" class="protection">
-					<h2 class="sectionTitle">机器人防护（Captcha）</h2>
+					<h2 class="_sectionTitle">机器人防护（Captcha）</h2>
 					<p class="sectionNote">
 						开启后，注册必须先通过所选服务的人机验证。Site Key 会公开给浏览器，Secret
 						只保存在服务端、接口不回传。
@@ -284,7 +284,7 @@
 								<option value="recaptcha">reCAPTCHA</option>
 								<option value="turnstile">Cloudflare Turnstile</option>
 							</CfSelect>
-							<span class="caption">
+							<span class="_caption">
 								当前状态：{{ captchaStatusText }}
 							</span>
 						</label>
@@ -313,7 +313,7 @@
 						</div>
 					</form>
 
-					<h2 class="sectionTitle autoBanTitle">重复失败自动封禁</h2>
+					<h2 class="_sectionTitle autoBanTitle">重复失败自动封禁</h2>
 					<p class="sectionNote">
 						同一地址在窗口期内登录失败达到阈值后，自动写入一条有时限的 IP
 						封禁；规则在「IP 封禁」分栏里可查看和删除。
@@ -351,7 +351,7 @@
 				</section>
 
 				<section class="related">
-					<h2 class="sectionTitle">相关设置</h2>
+					<h2 class="_sectionTitle">相关设置</h2>
 					<ul class="list">
 						<li class="item">
 							<div class="body"><span class="label">注册模式</span><span class="note">open / invite / admin 三档，运行期可切换</span></div>
@@ -868,7 +868,7 @@ definePageMetadata({ title: "安全设置", icon: "ph-shield-check ph-bold ph-lg
 
 	.note {
 		font-size: 0.82em;
-		opacity: 0.7;
+		color: var(--fgTransparentWeak);
 	}
 }
 
@@ -902,15 +902,10 @@ definePageMetadata({ title: "安全设置", icon: "ph-shield-check ph-bold ph-lg
 	font-weight: 600;
 }
 
-.sectionTitle {
-	margin: 0 0 4px;
-	font-size: 1.05em;
-}
-
 .sectionNote {
 	margin: 0 0 12px;
 	font-size: 0.85em;
-	opacity: 0.7;
+	color: var(--fgTransparentWeak);
 }
 
 .createCard {
@@ -927,12 +922,7 @@ definePageMetadata({ title: "安全设置", icon: "ph-shield-check ph-bold ph-lg
 
 		.label {
 			font-size: 0.85em;
-			opacity: 0.8;
-		}
-
-		.caption {
-			font-size: 0.78em;
-			opacity: 0.6;
+			color: var(--fgTransparentWeak);
 		}
 	}
 
@@ -1055,7 +1045,7 @@ definePageMetadata({ title: "安全设置", icon: "ph-shield-check ph-bold ph-lg
 	.meta {
 		margin-top: 6px;
 		font-size: 0.78em;
-		opacity: 0.6;
+		color: var(--fgTransparentWeak);
 		display: flex;
 		gap: 6px;
 		flex-wrap: wrap;

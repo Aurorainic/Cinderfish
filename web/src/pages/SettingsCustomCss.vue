@@ -31,7 +31,7 @@
 		</div>
 
 		<section class="_formBlock">
-			<h2 class="sectionTitle">生效方式</h2>
+			<h2 class="_sectionTitle">生效方式</h2>
 			<ul class="notes">
 				<li>
 					保存后样式<strong>立即生效</strong>，不需要刷新页面：值写入
@@ -118,13 +118,6 @@ definePageMetadata({
 
 <style lang="scss" scoped>
 .cf-settings-custom-css {
-	.sectionTitle {
-		margin: 0 0 4px;
-		color: var(--fg);
-		font-size: 1em;
-		opacity: 0.85;
-	}
-
 	.cssField :deep(textarea) {
 		min-block-size: 360px;
 		tab-size: 2;

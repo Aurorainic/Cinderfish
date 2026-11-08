@@ -411,7 +411,7 @@ onUnmounted(() => {
 			text-overflow: ellipsis;
 
 			> span:first-child {
-				opacity: 0.7;
+				color: var(--fgTransparentWeak);
 				&::after {
 					content: ": ";
 				}

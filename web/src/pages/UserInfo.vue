@@ -188,7 +188,7 @@ definePageMetadata(
 
 			> .sub {
 				font-size: 0.85em;
-				opacity: 0.7;
+				color: var(--fgTransparentWeak);
 			}
 
 			> .state {

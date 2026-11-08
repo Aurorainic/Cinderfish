@@ -93,7 +93,7 @@ function onToggle(event: Event): void {
 
 		> .right {
 			margin-inline-start: auto;
-			opacity: 0.7;
+			color: var(--fgTransparentWeak);
 			white-space: nowrap;
 
 			> .suffix:not(:empty) {

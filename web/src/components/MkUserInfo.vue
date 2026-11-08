@@ -212,9 +212,8 @@ const collapsed = ref(isLong.value);
 			display: block;
 			margin: 4px 0 0;
 			font-size: 0.8em;
-			color: var(--fg);
+			color: var(--fgTransparentWeak);
 			font-weight: 500;
-			opacity: 0.7;
 			line-height: 1;
 		}
 
@@ -248,7 +247,7 @@ const collapsed = ref(isLong.value);
 		}
 
 		> .empty {
-			opacity: 0.7;
+			color: var(--fgTransparentWeak);
 		}
 	}
 

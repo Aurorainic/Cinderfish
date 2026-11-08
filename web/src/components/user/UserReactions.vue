@@ -144,7 +144,7 @@ watch(() => props.user.id, () => load(true));
 
 			> .created-at {
 				font-size: 0.8em;
-				opacity: 0.7;
+				color: var(--fgTransparentWeak);
 			}
 		}
 	}

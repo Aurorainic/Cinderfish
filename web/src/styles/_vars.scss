@@ -10,6 +10,12 @@
 	--marginHalf: 10px;
 	--avatarSize: 48px;
 
+	// Font-size scale for shared utility classes. Section titles use md;
+	// secondary text (`_note`, `_caption`) uses sm.
+	--fontSizeSm: 0.85em;
+	--fontSizeMd: 1em;
+	--fontSizeLg: 1.15em;
+
 	--margin: var(--marginFull);
 
 	// Set by the host from user preferences (Firefish resets these in init.ts).

@@ -143,7 +143,7 @@ definePageMetadata({
 		margin-block-start: 16px;
 		font-family: var(--monospace, monospace);
 		font-size: 0.8em;
-		opacity: 0.7;
+		color: var(--fgTransparentWeak);
 		word-break: break-word;
 	}
 }

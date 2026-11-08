@@ -804,7 +804,7 @@ onMounted(() => {
 				padding: 16px;
 				text-align: center;
 				pointer-events: none;
-				opacity: 0.5;
+				color: var(--fgTransparentWeak);
 
 				> p {
 					margin: 0;

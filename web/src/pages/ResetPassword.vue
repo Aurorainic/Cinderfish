@@ -157,7 +157,7 @@ definePageMetadata({ title: t("resetPassword"), icon: "ph-lock-key ph-bold ph-lg
 	.lead {
 		margin: 0 0 16px;
 		font-size: 0.9em;
-		opacity: 0.8;
+		color: var(--fgTransparentWeak);
 	}
 
 	.field {
@@ -177,7 +177,7 @@ definePageMetadata({ title: t("resetPassword"), icon: "ph-lock-key ph-bold ph-lg
 	.hint {
 		margin-top: 16px;
 		font-size: 0.8em;
-		opacity: 0.6;
+		color: var(--fgTransparentWeak);
 	}
 }
 </style>

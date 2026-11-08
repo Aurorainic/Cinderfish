@@ -293,7 +293,7 @@ definePageMetadata({
 		gap: 4px 12px;
 		margin-top: 2px;
 		font-size: 0.8em;
-		opacity: 0.7;
+		color: var(--fgTransparentWeak);
 	}
 }
 

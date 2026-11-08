@@ -1006,7 +1006,7 @@ watch(text, () => {
 			padding-inline-end: 16px;
 
 			> .text-count {
-				opacity: 0.7;
+				color: var(--fgTransparentWeak);
 
 				&.over {
 					color: var(--error);
@@ -1022,7 +1022,7 @@ watch(text, () => {
 
 			> .local-only {
 				margin-inline-start: 12px;
-				opacity: 0.7;
+				color: var(--fgTransparentWeak);
 			}
 
 			> .preview {

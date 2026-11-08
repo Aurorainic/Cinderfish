@@ -159,7 +159,7 @@ definePageMetadata(
 				> .acct {
 					font-size: 15px;
 					line-height: 16px;
-					opacity: 0.7;
+					color: var(--fgTransparentWeak);
 				}
 			}
 

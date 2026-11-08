@@ -8,11 +8,11 @@
 			<div class="_formRoot cf-settings-import-export">
 				<section class="_formBlock card">
 					<h2 class="title">导出账号数据</h2>
-					<p class="caption">
+					<p class="caption _caption">
 						下载一个 JSON 文件，包含你的资料、全部帖子（含私密与关注者可见）、关注与粉丝列表、
 						收藏以及网盘文件的元数据。文件里不含别人的帖子，也不含登录 token。
 					</p>
-					<p class="caption">
+					<p class="caption _caption">
 						这是 Cinderfish 自己的备份格式（<code>cinderfish-account-export@1</code>），
 						不是 Misskey/Firefish 的 zip；同一格式可以从本页导入。
 					</p>
@@ -36,7 +36,7 @@
 
 				<section class="_formBlock card">
 					<h2 class="title">导入账号数据</h2>
-					<p class="caption">
+					<p class="caption _caption">
 						选择一份之前导出的 JSON。文件会先上传到你的云盘，再解析导入；
 						建议在空账号或测试账号上使用。
 					</p>
@@ -165,8 +165,6 @@ async function exportData(): Promise<void> {
 
 	.caption {
 		margin: 0 0 10px;
-		font-size: 0.88em;
-		opacity: 0.8;
 	}
 
 	.feedback {

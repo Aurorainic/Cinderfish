@@ -7,7 +7,7 @@
 
 		<template v-else>
 			<section class="_formBlock">
-				<h2 class="sectionTitle">{{ t("token") }}</h2>
+				<h2 class="_sectionTitle">{{ t("token") }}</h2>
 
 				<p class="account">
 					当前账号：
@@ -48,7 +48,7 @@
 			</section>
 
 			<section class="_formBlock">
-				<h2 class="sectionTitle">API 控制台</h2>
+				<h2 class="_sectionTitle">API 控制台</h2>
 				<p class="hint">
 					在控制台里手写端点名与 JSON 参数，直接以当前账号身份调用
 					<code>/api</code>；返回的 JSON 会原样显示。
@@ -60,7 +60,7 @@
 			</section>
 
 			<section class="_formBlock">
-				<h2 class="sectionTitle">与上游的差异</h2>
+				<h2 class="_sectionTitle">与上游的差异</h2>
 				<ul class="notes">
 					<li>
 						上游这一页是「生成访问令牌」按钮与「管理访问令牌」链接，分别依赖
@@ -129,13 +129,6 @@ definePageMetadata({
 
 <style lang="scss" scoped>
 .cf-settings-api {
-	.sectionTitle {
-		margin: 0 0 4px;
-		color: var(--fg);
-		font-size: 1em;
-		opacity: 0.85;
-	}
-
 	.account {
 		margin: 0 0 12px;
 		color: var(--fgTransparentWeak);

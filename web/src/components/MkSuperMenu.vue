@@ -98,7 +98,7 @@ withDefaults(
 			}
 
 			> .title {
-				opacity: 0.7;
+				color: var(--fgTransparentWeak);
 				margin: 0 12px 8px;
 				font-size: 0.9em;
 			}
@@ -111,7 +111,7 @@ withDefaults(
 		}
 
 		> .title {
-			opacity: 0.7;
+			color: var(--fgTransparentWeak);
 			margin: 0 4px 8px;
 			font-size: 0.85em;
 		}

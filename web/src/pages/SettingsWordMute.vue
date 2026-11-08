@@ -13,7 +13,7 @@
 		</CfInfo>
 
 		<section class="_formBlock">
-			<h2 class="sectionTitle">
+			<h2 class="_sectionTitle titleRow">
 				过滤词
 				<span class="count">共 {{ entries.length }} 条</span>
 			</h2>
@@ -55,7 +55,7 @@
 		</section>
 
 		<section class="_formBlock addForm">
-			<h2 class="sectionTitle">添加条目</h2>
+			<h2 class="_sectionTitle">添加条目</h2>
 
 			<CfRadios
 				class="_formBlock"
@@ -128,7 +128,7 @@
 		</section>
 
 		<section class="_formBlock">
-			<h2 class="sectionTitle">两种条目格式</h2>
+			<h2 class="_sectionTitle">两种条目格式</h2>
 			<ul class="notes">
 				<li>
 					<strong>正则</strong>：直接是字符串，必须写成
@@ -301,14 +301,10 @@ definePageMetadata({
 
 <style lang="scss" scoped>
 .cf-settings-word-mute {
-	.sectionTitle {
+	.titleRow {
 		display: flex;
 		align-items: baseline;
 		gap: 8px;
-		margin: 0 0 8px;
-		color: var(--fg);
-		font-size: 1em;
-		opacity: 0.85;
 	}
 
 	.count {

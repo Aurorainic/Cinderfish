@@ -8,13 +8,13 @@
 		</CfInfo>
 
 		<section class="_formBlock">
-			<h2 class="sectionTitle">这里已经有</h2>
+			<h2 class="_sectionTitle">这里已经有</h2>
 			<ul class="list">
 				<li class="item ok">
 					<i class="ph-check-circle ph-bold"></i>
 					<div class="body">
 						<span class="label">第三方应用授权（MiAuth）</span>
-						<span class="note"
+						<span class="_caption"
 							>应用用 MiAuth 链接申请访问令牌，用户在授权页确认权限</span
 						>
 					</div>
@@ -24,7 +24,7 @@
 					<i class="ph-check-circle ph-bold"></i>
 					<div class="body">
 						<span class="label">ActivityPub 联邦登录不了，但可以关注</span>
-						<span class="note"
+						<span class="_caption"
 							>Fediverse 账号之间通过关注互通，不需要把账号绑定到本站</span
 						>
 					</div>
@@ -33,7 +33,7 @@
 		</section>
 
 		<section class="_formBlock">
-			<h2 class="sectionTitle">上游有、这里没有</h2>
+			<h2 class="_sectionTitle">上游有、这里没有</h2>
 			<ul class="list">
 				<li v-for="item in missing" :key="item" class="item">
 					<i class="ph-x-circle ph-bold"></i>
@@ -78,12 +78,6 @@ definePageMetadata({
 		margin-bottom: 12px;
 	}
 
-	.sectionTitle {
-		font-size: 1.05em;
-		font-weight: 700;
-		margin: 0 0 12px;
-	}
-
 	.list {
 		list-style: none;
 		margin: 0;
@@ -119,11 +113,6 @@ definePageMetadata({
 
 		.label {
 			font-weight: 600;
-		}
-
-		.note {
-			opacity: 0.8;
-			font-size: 0.92em;
 		}
 
 		.link {

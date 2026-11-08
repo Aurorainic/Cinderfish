@@ -772,7 +772,7 @@ defineExpose({
 				flex-wrap: wrap;
 				gap: 0.7em;
 				margin-top: 16px;
-				opacity: 0.7;
+				color: var(--fgTransparentWeak);
 				font-size: 0.9em;
 			}
 			> .footer {
@@ -826,7 +826,7 @@ defineExpose({
 					> .count {
 						display: inline;
 						margin: 0 0 0 8px;
-						opacity: 0.7;
+						color: var(--fgTransparentWeak);
 					}
 
 					&.reacted {
@@ -879,7 +879,7 @@ defineExpose({
 .muted {
 	padding: 8px;
 	text-align: center;
-	opacity: 0.7;
+	color: var(--fgTransparentWeak);
 	width: 100%;
 
 	._blur_text {

@@ -149,7 +149,7 @@ function close(): void {
 				}
 
 				> .description {
-					opacity: 0.7;
+					color: var(--fgTransparentWeak);
 					line-height: 1.5;
 				}
 			}

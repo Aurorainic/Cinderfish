@@ -110,7 +110,7 @@ watch(() => props.user.id, load);
 
 			> span {
 				font-size: 0.8em;
-				opacity: 0.7;
+				color: var(--fgTransparentWeak);
 			}
 		}
 	}

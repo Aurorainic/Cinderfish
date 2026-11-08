@@ -2,7 +2,7 @@
 <template>
 	<div class="_formRoot cf-settings-deck">
 		<section class="_formBlock">
-			<h2 class="sectionTitle">{{ t("defaultNavigationBehaviour") }}</h2>
+			<h2 class="_sectionTitle">{{ t("defaultNavigationBehaviour") }}</h2>
 			<CfSwitch v-model="navWindow" class="_formBlock">
 				{{ t("openInWindow") }}
 			</CfSwitch>
@@ -17,7 +17,7 @@
 		</section>
 
 		<section class="_formBlock">
-			<h2 class="sectionTitle">{{ t("_deck.profile") }}</h2>
+			<h2 class="_sectionTitle">{{ t("_deck.profile") }}</h2>
 
 			<div v-if="phase === 'loading'" class="state"><CfLoading /></div>
 			<div v-else-if="phase === 'error'" class="state">
@@ -80,7 +80,7 @@
 					</li>
 				</ul>
 
-				<CfInfo class="note">
+				<CfInfo class="_note">
 					Deck 的列布局保存在账号 registry 的 <code>["client", "deck", "profiles"]</code>
 					下，键是当前工作区名。这里可以调整列宽、左右顺序并删除列；
 					添加列与列内小部件需要 Deck 界面的列菜单，本页<strong>未提供</strong>。
@@ -224,13 +224,6 @@ definePageMetadata({ title: t("deck"), icon: "ph-layout ph-bold ph-lg" });
 
 <style lang="scss" scoped>
 .cf-settings-deck {
-	.sectionTitle {
-		margin: 0 0 4px;
-		color: var(--fg);
-		font-size: 1em;
-		opacity: 0.85;
-	}
-
 	.state {
 		display: flex;
 		flex-direction: column;
@@ -335,13 +328,8 @@ definePageMetadata({ title: t("deck"), icon: "ph-layout ph-bold ph-lg" });
 		}
 	}
 
-	.note {
-		margin-block-start: 12px;
-		font-size: 0.85em;
-
-		code {
-			word-break: break-all;
-		}
+	._note code {
+		word-break: break-all;
 	}
 }
 </style>

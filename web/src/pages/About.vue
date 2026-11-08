@@ -320,7 +320,7 @@ definePageMetadata({
 
 	.label {
 		font-size: 0.78em;
-		opacity: 0.65;
+		color: var(--fgTransparentWeak);
 	}
 }
 

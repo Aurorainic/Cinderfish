@@ -108,7 +108,7 @@
 							{{ addingHost ? "添加中…" : "添加主机" }}
 						</CfButton>
 					</form>
-					<p class="caption">
+					<p class="caption _caption">
 						只填写主机名：全小写，不带
 						<code>https://</code>
 						前缀和路径；需要非标准端口时写成
@@ -121,7 +121,7 @@
 
 				<section class="panel _panel">
 					<h2>已收录实例</h2>
-					<p class="caption">
+					<p class="caption _caption">
 						只统计本库已经出现的远端主机；软件与投递状态没有在线校验，因此不显示。
 					</p>
 					<MkLoading v-if="instancesLoading" />
@@ -580,8 +580,6 @@ definePageMetadata({
 
 		> .caption {
 			margin: 0;
-			font-size: 0.85em;
-			color: var(--fgTransparentWeak);
 			line-height: 1.5;
 		}
 	}

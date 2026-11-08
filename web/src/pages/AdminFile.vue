@@ -46,7 +46,7 @@
 					</div>
 
 					<section class="_formBlock">
-						<h2 class="sectionTitle">文件</h2>
+						<h2 class="_sectionTitle">文件</h2>
 						<CfKeyValue :copy="file.name">
 							<template #key>{{ t("name") }}</template>
 							<template #value>{{ file.name }}</template>
@@ -97,7 +97,7 @@
 					</section>
 
 					<section class="_formBlock">
-						<h2 class="sectionTitle">上传者</h2>
+						<h2 class="_sectionTitle">上传者</h2>
 						<template v-if="file.user != null">
 							<CfKeyValue oneline>
 								<template #key>{{ t("username") }}</template>

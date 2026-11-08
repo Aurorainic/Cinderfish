@@ -452,7 +452,7 @@ definePageMetadata({ title: t("themeEditor"), icon: "ph-palette ph-bold ph-lg" }
 
 				> div > .previewAuthor {
 					font-size: 0.85em;
-					opacity: 0.75;
+					color: var(--fgTransparentWeak);
 				}
 			}
 

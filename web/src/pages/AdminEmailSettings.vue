@@ -16,7 +16,7 @@
 				<MkError v-else-if="loadError !== null" @retry="load" />
 				<form v-else class="_formRoot" @submit.prevent="save">
 					<section class="_formBlock">
-						<h2 class="sectionTitle">{{ t("emailServer") }}</h2>
+						<h2 class="_sectionTitle">{{ t("emailServer") }}</h2>
 						<p class="sectionNote">
 							当前状态：
 							<span v-if="configured" class="badge on">已配置</span>
@@ -73,7 +73,7 @@
 				</form>
 
 				<section class="_formBlock">
-					<h2 class="sectionTitle">可用的邮件流程</h2>
+					<h2 class="_sectionTitle">可用的邮件流程</h2>
 					<ul class="flows">
 						<li>
 							<strong>邮箱验证</strong>：<code>i/update-email</code> 改地址后发送验证链接，
@@ -223,12 +223,7 @@ definePageMetadata({ title: t("emailServer"), icon: "ph-envelope-simple ph-bold 
 	.source {
 		margin-inline-start: 6px;
 		font-size: 0.85em;
-		opacity: 0.65;
-	}
-
-	.sectionTitle {
-		margin: 0 0 8px;
-		font-size: 1.05em;
+		color: var(--fgTransparentWeak);
 	}
 
 	.sectionNote {

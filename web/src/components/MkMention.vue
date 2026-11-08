@@ -87,7 +87,7 @@ const isMe = computed<boolean>(() => {
 	}
 
 	> .main > .host {
-		opacity: 0.5;
+		color: var(--fgTransparentWeak);
 	}
 }
 </style>

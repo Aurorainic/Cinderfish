@@ -7,7 +7,7 @@
 
 		<template v-if="enableEmojiReactions">
 			<section class="_formBlock">
-				<h2 class="sectionTitle">{{ t("reactionSetting") }}</h2>
+				<h2 class="_sectionTitle">{{ t("reactionSetting") }}</h2>
 
 				<div class="picker">
 					<div v-if="reactions.length === 0" class="empty">
@@ -29,10 +29,10 @@
 					</button>
 				</div>
 
-				<p class="caption">
+				<p class="caption _caption">
 					{{ t("reactionSettingDescription2") }}
 				</p>
-				<div class="row">
+				<div class="_row">
 					<CfButton inline @click="preview($event)">
 						<i class="ph-eye ph-bold ph-lg"></i>
 						{{ t("preview") }}
@@ -42,14 +42,14 @@
 						{{ t("default") }}
 					</CfButton>
 				</div>
-				<CfInfo class="note">
+				<CfInfo class="_note">
 					拖拽排序需要 <code>vue-draggable-plus</code>，本波不引入：点击图标后在菜单中选择
 					「上移 / 下移 / 删除」完成同样的调整。
 				</CfInfo>
 			</section>
 
 			<section class="_formBlock">
-				<h2 class="sectionTitle">最近使用</h2>
+				<h2 class="_sectionTitle">最近使用</h2>
 				<div v-if="recentlyUsed.length === 0" class="empty">
 					最近还没有用过回应；发出一次回应后会出现在这里。
 				</div>
@@ -64,7 +64,7 @@
 						<MkEmoji :emoji="item" class="emoji" />
 					</button>
 				</div>
-				<div v-if="recentlyUsed.length > 0" class="row">
+				<div v-if="recentlyUsed.length > 0" class="_row">
 					<CfButton inline @click="clearRecentlyUsed()">
 						{{ t("clear") }}
 					</CfButton>
@@ -120,7 +120,7 @@
 			</CfSelect>
 		</div>
 
-		<CfInfo class="note">
+		<CfInfo class="_note">
 			尺寸/列数/高度会实时作用到回应选择器；默认肤色是「人物」分类打开时的初始肤色，
 			选择器顶部仍可临时切换。自定义 MFM 主题与声音未实现。
 		</CfInfo>
@@ -318,13 +318,6 @@ definePageMetadata({ title: t("reaction"), icon: "ph-smiley ph-bold ph-lg" });
 
 <style lang="scss" scoped>
 .cf-settings-reaction {
-	.sectionTitle {
-		margin: 0 0 4px;
-		color: var(--fg);
-		font-size: 1em;
-		opacity: 0.85;
-	}
-
 	.picker {
 		display: flex;
 		flex-wrap: wrap;
@@ -363,20 +356,11 @@ definePageMetadata({ title: t("reaction"), icon: "ph-smiley ph-bold ph-lg" });
 
 	.caption {
 		margin: 8px 0 0;
-		color: var(--fgTransparentWeak);
-		font-size: 0.85em;
 	}
 
 	.empty {
 		color: var(--fgTransparentWeak);
 		font-size: 0.9em;
-	}
-
-	.row {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 8px;
-		margin-block-start: 12px;
 	}
 
 	.pickerPrefs {
@@ -386,13 +370,8 @@ definePageMetadata({ title: t("reaction"), icon: "ph-smiley ph-bold ph-lg" });
 		margin-block-start: 12px;
 	}
 
-	.note {
-		margin-block-start: 16px;
-		font-size: 0.85em;
-
-		code {
-			word-break: break-all;
-		}
+	._note code {
+		word-break: break-all;
 	}
 }
 </style>

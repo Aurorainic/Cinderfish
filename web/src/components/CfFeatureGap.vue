@@ -117,7 +117,7 @@ withDefaults(
 		}
 
 		.note {
-			opacity: 0.8;
+			color: var(--fgTransparentWeak);
 			font-size: 0.92em;
 		}
 

@@ -74,7 +74,7 @@ const sitename = computed(() => {
 
 		p {
 			font-size: 0.8em;
-			opacity: 0.8;
+			color: var(--fgTransparentWeak);
 		}
 
 		&:hover,

@@ -34,7 +34,7 @@ const showFullAcct = computed<boolean>(() => defaultStore.state.showFullAcct);
 <style lang="scss" scoped>
 .mk-acct {
 	> .host {
-		opacity: 0.5;
+		color: var(--fgTransparentWeak);
 	}
 }
 </style>

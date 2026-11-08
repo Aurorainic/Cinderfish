@@ -10,7 +10,7 @@
 		</CfInfo>
 
 		<section class="_formBlock">
-			<h2 class="sectionTitle">导出</h2>
+			<h2 class="_sectionTitle">导出</h2>
 			<p class="hint">
 				下载一个 JSON 文件，内含
 				<code>&#123; type: "cinderfish.preferences", version: 1, base: { … } &#125;</code>
@@ -23,7 +23,7 @@
 		</section>
 
 		<section class="_formBlock">
-			<h2 class="sectionTitle">导入</h2>
+			<h2 class="_sectionTitle">导入</h2>
 			<p class="hint">
 				选择一个之前导出的 JSON 文件。只写入本页面认识的键，未知键会被忽略并在下方列出；
 				写入前会再确认一次。导入不会删除备份里没有的键。
@@ -58,7 +58,7 @@
 		</section>
 
 		<section class="_formBlock">
-			<h2 class="sectionTitle">重置</h2>
+			<h2 class="_sectionTitle">重置</h2>
 			<p class="hint">
 				把上述每个键写回定义里的默认值（<code>defaultStore.reset(key)</code>）。
 				相当于在新设备上第一次登录的状态，不会影响服务器上的账号数据。
@@ -70,7 +70,7 @@
 		</section>
 
 		<section class="_formBlock">
-			<h2 class="sectionTitle">与上游的差异</h2>
+			<h2 class="_sectionTitle">与上游的差异</h2>
 			<ul class="notes">
 				<li>
 					上游维护「命名配置档列表」，把多份配置存在服务器注册表
@@ -269,13 +269,6 @@ definePageMetadata({
 
 <style lang="scss" scoped>
 .cf-settings-preferences-backups {
-	.sectionTitle {
-		margin: 0 0 4px;
-		color: var(--fg);
-		font-size: 1em;
-		opacity: 0.85;
-	}
-
 	.hint {
 		margin: 0 0 12px;
 		color: var(--fgTransparentWeak);

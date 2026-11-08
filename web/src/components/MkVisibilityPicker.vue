@@ -175,7 +175,7 @@ function choose(value: ItemValue): void {
 			}
 
 			> .itemDescription {
-				opacity: 0.6;
+				color: var(--fgTransparentWeak);
 				display: block;
 				line-height: 1.5;
 			}

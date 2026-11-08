@@ -205,7 +205,7 @@ definePageMetadata({
 	.date {
 		flex: none;
 		font-size: 0.8em;
-		opacity: 0.6;
+		color: var(--fgTransparentWeak);
 	}
 
 	.image {
@@ -224,7 +224,7 @@ definePageMetadata({
 	.expiry {
 		margin: 8px 0 0;
 		font-size: 0.8em;
-		opacity: 0.6;
+		color: var(--fgTransparentWeak);
 	}
 }
 

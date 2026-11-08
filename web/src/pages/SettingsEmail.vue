@@ -4,7 +4,7 @@
 		<CfInfo v-if="me == null">{{ t("signinRequired") }}</CfInfo>
 		<template v-else>
 			<section class="_formBlock">
-				<h2 class="sectionTitle">{{ t("emailAddress") }}</h2>
+				<h2 class="_sectionTitle">{{ t("emailAddress") }}</h2>
 				<CfKeyValue v-if="hasEmail">
 					<template #key>当前地址</template>
 					<template #value>
@@ -31,7 +31,7 @@
 						hasEmail ? "更换为其它地址" : "填写邮箱地址"
 					}}</template>
 				</CfInput>
-				<div class="row">
+				<div class="_row">
 					<CfButton primary :disabled="busy || !canSave" @click="save()">
 						<i class="ph-floppy-disk ph-bold ph-lg"></i>
 						{{ t("save") }}
@@ -50,7 +50,7 @@
 			</section>
 
 			<section class="_formBlock">
-				<h2 class="sectionTitle">{{ t("emailNotification") }}</h2>
+				<h2 class="_sectionTitle">{{ t("emailNotification") }}</h2>
 				<CfInfo v-if="!me.emailVerified" warn class="note">
 					邮箱还没验证，下面的开关不会发出任何邮件。请先完成验证。
 				</CfInfo>
@@ -84,7 +84,7 @@
 			</section>
 
 			<section class="_formBlock">
-				<h2 class="sectionTitle">{{ t("password") }}</h2>
+				<h2 class="_sectionTitle">{{ t("password") }}</h2>
 				<CfInfo class="note">
 					{{ t("_forgotPassword.enterEmail") }}
 					忘记密码可以在登录页发起重置，见
@@ -246,13 +246,6 @@ definePageMetadata({ title: t("email"), icon: "ph-envelope-simple-open ph-bold p
 	.badge.verified {
 		color: var(--success, #3ba55d);
 		opacity: 1;
-	}
-
-	.row {
-		display: flex;
-		gap: 8px;
-		flex-wrap: wrap;
-		margin-top: 12px;
 	}
 
 	.note {

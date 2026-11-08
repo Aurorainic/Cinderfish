@@ -573,7 +573,7 @@ defineExpose({ focus, reset });
 			> .empty {
 				padding: 16px 8px;
 				font-size: 0.85em;
-				opacity: 0.7;
+				color: var(--fgTransparentWeak);
 				text-align: center;
 			}
 		}

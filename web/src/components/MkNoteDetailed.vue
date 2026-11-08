@@ -623,7 +623,7 @@ onUnmounted(() => {
 .muted {
 	padding: 8px;
 	text-align: center;
-	opacity: 0.7;
+	color: var(--fgTransparentWeak);
 }
 
 .tab-message {

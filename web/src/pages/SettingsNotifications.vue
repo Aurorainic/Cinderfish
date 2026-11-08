@@ -2,7 +2,7 @@
 <template>
 	<div class="_formRoot cf-settings-notifications">
 		<section class="_formBlock">
-			<h2 class="sectionTitle">{{ t("notificationSetting") }}</h2>
+			<h2 class="_sectionTitle">{{ t("notificationSetting") }}</h2>
 
 			<div v-if="loading" class="state"><CfLoading /></div>
 			<div v-else-if="me == null" class="state">
@@ -27,10 +27,10 @@
 						</CfSwitch>
 					</li>
 				</ul>
-				<CfInfo v-if="typeError != null" class="note" warn>
+				<CfInfo v-if="typeError != null" class="_note" warn>
 					{{ typeError }}
 				</CfInfo>
-				<CfInfo v-else class="note">
+				<CfInfo v-else class="_note">
 					关闭某一类通知后，服务端不再在 <code>notifications</code> 列表中返回它，
 					未读角标也不再计入。设置写入 <code>i/update { mutingNotificationTypes }</code>。
 				</CfInfo>
@@ -38,7 +38,7 @@
 		</section>
 
 		<section class="_formBlock">
-			<h2 class="sectionTitle">{{ t("markAllAsRead") }}</h2>
+			<h2 class="_sectionTitle">{{ t("markAllAsRead") }}</h2>
 			<div class="actions">
 				<CfButton
 					primary
@@ -56,10 +56,10 @@
 					{{ t("markAsReadAllTalkMessages") }}
 				</CfButton>
 			</div>
-			<CfInfo v-if="actionErrorText != null" class="note" :warn="true">
+			<CfInfo v-if="actionErrorText != null" class="_note" :warn="true">
 				{{ actionErrorText }}
 			</CfInfo>
-			<CfInfo v-else class="note">
+			<CfInfo v-else class="_note">
 				「{{ t("markAsReadAllUnreadNotes") }}」与「{{ t("markAsReadAllTalkMessages") }}」
 				所需的 <code>i/read-all-unread-notes</code> / <code>i/read-all-messaging-messages</code>
 				端点<strong>未提供</strong>，因此保持禁用。
@@ -67,7 +67,7 @@
 		</section>
 
 		<section class="_formBlock">
-			<h2 class="sectionTitle">{{ t("clientSettings") }}</h2>
+			<h2 class="_sectionTitle">{{ t("clientSettings") }}</h2>
 			<CfSwitch v-model="foldNotification" class="_formBlock">
 				合并重复通知
 				<template #caption>
@@ -77,7 +77,7 @@
 					视口时会把整组标记已读。
 				</template>
 			</CfSwitch>
-			<CfInfo class="note">
+			<CfInfo class="_note">
 				推送通知（<code>sw/update-registration</code>、<code>sw/*</code>）在本实例
 				<strong>未提供</strong>，所以没有推送开关；通知设置窗口
 				（<code>MkNotificationSettingWindow</code>）保存的也是同一个服务端字段，同样不可写。
@@ -209,13 +209,6 @@ definePageMetadata({
 
 <style lang="scss" scoped>
 .cf-settings-notifications {
-	.sectionTitle {
-		margin: 0 0 4px;
-		color: var(--fg);
-		font-size: 1em;
-		opacity: 0.85;
-	}
-
 	.desc {
 		margin: 8px 0;
 		color: var(--fgTransparentWeak);
@@ -260,13 +253,8 @@ definePageMetadata({
 		margin-block-start: 12px;
 	}
 
-	.note {
-		margin-block-start: 12px;
-		font-size: 0.85em;
-
-		code {
-			word-break: break-all;
-		}
+	._note code {
+		word-break: break-all;
 	}
 }
 </style>

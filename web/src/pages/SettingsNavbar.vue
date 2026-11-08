@@ -2,7 +2,7 @@
 <template>
 	<div class="_formRoot cf-settings-navbar">
 		<section class="_formBlock">
-			<h2 class="sectionTitle">{{ t("navbar") }}</h2>
+			<h2 class="_sectionTitle">{{ t("navbar") }}</h2>
 
 			<div v-if="menu.length === 0" class="empty">
 				导航栏里没有任何项目，从下面的「未启用」列表添加。
@@ -58,7 +58,7 @@
 				</ul>
 			</template>
 
-			<div class="row">
+			<div class="_row">
 				<CfButton danger @click="reset()">
 					<i class="ph-arrow-clockwise ph-bold ph-lg"></i>
 					{{ t("default") }}
@@ -66,7 +66,7 @@
 				<CfButton @click="reload()">刷新页面</CfButton>
 			</div>
 
-			<CfInfo class="note">
+			<CfInfo class="_note">
 				顺序与显隐立即写入 <code>defaultStore.state.menu</code>；<code>MkNavbar</code>
 				读取的是非响应式的 <code>store.state</code>，所以点「刷新页面」后才会反映到侧栏。
 				Firefish 的「分割线」（<code>-</code>）在 Cinderfish 的菜单类型里<strong>未提供</strong>，
@@ -75,12 +75,12 @@
 		</section>
 
 		<section class="_formBlock">
-			<h2 class="sectionTitle">{{ t("display") }}</h2>
+			<h2 class="_sectionTitle">{{ t("display") }}</h2>
 			<CfRadios :model-value="menuDisplay" @update:model-value="onMenuDisplay">
 				<CfRadio value="sideFull">{{ t("_menuDisplay.sideFull") }}</CfRadio>
 				<CfRadio value="sideIcon">{{ t("_menuDisplay.sideIcon") }}</CfRadio>
 			</CfRadios>
-			<CfInfo class="note">
+			<CfInfo class="_note">
 				显示模式在侧栏重新挂载后才生效；仓库里没有 <code>unisonReload</code>，
 				这里用页面刷新代替。
 			</CfInfo>
@@ -204,13 +204,6 @@ definePageMetadata({ title: t("navbar"), icon: "ph-list-bullets ph-bold ph-lg" }
 
 <style lang="scss" scoped>
 .cf-settings-navbar {
-	.sectionTitle {
-		margin: 0 0 4px;
-		color: var(--fg);
-		font-size: 1em;
-		opacity: 0.85;
-	}
-
 	.subTitle {
 		margin: 16px 0 4px;
 		color: var(--fgTransparentWeak);
@@ -274,20 +267,8 @@ definePageMetadata({ title: t("navbar"), icon: "ph-list-bullets ph-bold ph-lg" }
 		}
 	}
 
-	.row {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 8px;
-		margin-block-start: 16px;
-	}
-
-	.note {
-		margin-block-start: 12px;
-		font-size: 0.85em;
-
-		code {
-			word-break: break-all;
-		}
+	._note code {
+		word-break: break-all;
 	}
 }
 </style>

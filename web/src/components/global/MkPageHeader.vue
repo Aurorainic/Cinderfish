@@ -552,7 +552,7 @@ onUnmounted(() => {
 				line-height: 1.1;
 
 				> .subtitle {
-					opacity: 0.6;
+					color: var(--fgTransparentWeak);
 					font-size: 0.8em;
 					font-weight: normal;
 					white-space: nowrap;

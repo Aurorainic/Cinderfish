@@ -438,7 +438,7 @@ export default defineComponent({
 								}
 								case "small": {
 									return [
-										h("small", { style: "opacity: 0.7;" }, children),
+										h("small", { style: "color: var(--fgTransparentWeak);" }, children),
 									];
 								}
 								case "center": {
@@ -477,7 +477,7 @@ export default defineComponent({
 							return [
 								h(
 									"small",
-									{ style: "opacity: 0.7;" },
+									{ style: "color: var(--fgTransparentWeak);" },
 									genEl(token.children),
 								),
 							];

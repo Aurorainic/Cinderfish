@@ -16,15 +16,15 @@
 					<div class="counters">
 						<div class="counter">
 							<span class="value">{{ info?.pending ?? "-" }}</span>
-							<span class="caption">待投递</span>
+							<span class="_caption">待投递</span>
 						</div>
 						<div class="counter">
 							<span class="value">{{ info?.dueNow ?? "-" }}</span>
-							<span class="caption">已到期</span>
+							<span class="_caption">已到期</span>
 						</div>
 						<div class="counter" :class="{ bad: (info?.failed ?? 0) > 0 }">
 							<span class="value">{{ info?.failed ?? "-" }}</span>
-							<span class="caption">超过重试上限</span>
+							<span class="_caption">超过重试上限</span>
 						</div>
 					</div>
 					<CfButton :disabled="loading" @click="load">
@@ -147,11 +147,6 @@ definePageMetadata({
 		font-weight: 700;
 	}
 
-	.caption {
-		font-size: 0.78em;
-		opacity: 0.65;
-	}
-
 	&.bad .value {
 		color: var(--error, #c33);
 	}
@@ -160,7 +155,7 @@ definePageMetadata({
 .oldest {
 	margin: 0 0 12px;
 	font-size: 0.85em;
-	opacity: 0.7;
+	color: var(--fgTransparentWeak);
 }
 
 .entries {
@@ -193,7 +188,7 @@ definePageMetadata({
 
 	.attempts,
 	.next {
-		opacity: 0.65;
+		color: var(--fgTransparentWeak);
 		white-space: nowrap;
 	}
 
@@ -205,7 +200,7 @@ definePageMetadata({
 	.error {
 		margin: 4px 0 0;
 		font-size: 0.78em;
-		opacity: 0.7;
+		color: var(--fgTransparentWeak);
 		overflow-wrap: anywhere;
 	}
 }

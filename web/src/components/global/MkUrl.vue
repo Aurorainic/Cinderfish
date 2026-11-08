@@ -111,7 +111,7 @@ const hash = computed<string>(() => decode(parsed.value?.hash ?? ""));
 	}
 
 	> .schema {
-		opacity: 0.5;
+		color: var(--fgTransparentWeak);
 	}
 
 	> .hostname {
@@ -119,11 +119,11 @@ const hash = computed<string>(() => decode(parsed.value?.hash ?? ""));
 	}
 
 	> .pathname {
-		opacity: 0.8;
+		color: var(--fgTransparentWeak);
 	}
 
 	> .query {
-		opacity: 0.5;
+		color: var(--fgTransparentWeak);
 	}
 
 	> .hash {

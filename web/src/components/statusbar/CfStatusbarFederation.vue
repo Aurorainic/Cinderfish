@@ -115,7 +115,7 @@ onBeforeUnmount(() => {
 
 	.state {
 		font-size: 0.85em;
-		opacity: 0.6;
+		color: var(--fgTransparentWeak);
 		padding-inline-start: 8px;
 	}
 

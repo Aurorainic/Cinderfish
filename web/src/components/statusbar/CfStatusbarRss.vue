@@ -141,7 +141,7 @@ watch(
 	> .state {
 		padding-inline: 10px;
 		font-size: 0.85em;
-		opacity: 0.6;
+		color: var(--fgTransparentWeak);
 	}
 
 	> .track {

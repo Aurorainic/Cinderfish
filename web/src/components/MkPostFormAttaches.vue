@@ -118,7 +118,7 @@ function detach(file: DriveFile): void {
 		margin: 0;
 		padding: 0;
 		font-size: 0.75em;
-		opacity: 0.7;
+		color: var(--fgTransparentWeak);
 	}
 }
 

@@ -76,7 +76,7 @@
 					@submit.prevent="submitCreate"
 				>
 					<h2 class="title">创建本地账号</h2>
-					<p class="caption">
+					<p class="caption _caption">
 						注册模式为「管理员创建」时，这是添加用户的唯一入口。
 					</p>
 					<CfInput
@@ -427,8 +427,6 @@ definePageMetadata({
 
 		> .caption {
 			margin: 0 0 12px;
-			font-size: 0.85em;
-			color: var(--fgTransparentWeak);
 		}
 
 		> .field {

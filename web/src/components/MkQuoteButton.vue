@@ -54,7 +54,7 @@ function quote(): void {
 	> .count {
 		display: inline;
 		margin-left: 8px;
-		opacity: 0.7;
+		color: var(--fgTransparentWeak);
 	}
 }
 </style>

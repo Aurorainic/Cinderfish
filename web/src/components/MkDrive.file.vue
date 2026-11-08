@@ -297,7 +297,7 @@ async function deleteFile() {
 		overflow: hidden;
 
 		> .ext {
-			opacity: 0.5;
+			color: var(--fgTransparentWeak);
 		}
 	}
 

@@ -190,7 +190,7 @@ onMounted(() => {
 	.description {
 		margin: 4px 0 0;
 		font-size: 0.88em;
-		opacity: 0.8;
+		color: var(--fgTransparentWeak);
 		overflow-wrap: anywhere;
 	}
 
@@ -208,7 +208,7 @@ onMounted(() => {
 		}
 
 		dt {
-			opacity: 0.6;
+			color: var(--fgTransparentWeak);
 			margin-right: 6px;
 		}
 	}
@@ -219,13 +219,13 @@ onMounted(() => {
 
 		summary {
 			cursor: pointer;
-			opacity: 0.75;
+			color: var(--fgTransparentWeak);
 		}
 
 		ul {
 			margin: 6px 0 0;
 			padding-left: 20px;
-			opacity: 0.8;
+			color: var(--fgTransparentWeak);
 		}
 	}
 

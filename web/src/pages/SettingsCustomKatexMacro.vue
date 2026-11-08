@@ -22,7 +22,7 @@
 			但展开后的内容会随笔记发出去，Misskey / Firefish 客户端能看到排版后的公式。
 		</CfInfo>
 
-		<div class="row">
+		<div class="_row">
 			<CfButton :disabled="!dirty" primary @click="apply()">
 				<i class="ph-floppy-disk ph-bold ph-lg"></i>
 				{{ t("save") }}
@@ -106,13 +106,6 @@ definePageMetadata({
 
 	.field {
 		margin-bottom: 12px;
-	}
-
-	.row {
-		display: flex;
-		gap: 8px;
-		flex-wrap: wrap;
-		margin-top: 12px;
 	}
 }
 </style>

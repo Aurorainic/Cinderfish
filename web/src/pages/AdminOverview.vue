@@ -160,7 +160,7 @@
 									</div>
 								</CfA>
 							</div>
-							<p class="caption">
+							<p class="caption _caption">
 								后端按「管理员优先、注册时间升序」返回，没有总数与排序参数，
 								所以这里是列表的前 5 位，不是「最新 5 位」。
 							</p>
@@ -384,7 +384,7 @@ definePageMetadata({
 				}
 
 				> .code {
-					opacity: 0.6;
+					color: var(--fgTransparentWeak);
 					font-size: 0.85em;
 				}
 			}
@@ -473,8 +473,6 @@ definePageMetadata({
 
 .caption {
 	margin: 0;
-	font-size: 0.8em;
-	color: var(--fgTransparentWeak);
 }
 
 .errorText {

@@ -318,7 +318,7 @@ definePageMetadata({
 
 	.verb {
 		font-size: 0.85em;
-		opacity: 0.65;
+		color: var(--fgTransparentWeak);
 	}
 
 	.badge {
@@ -331,7 +331,7 @@ definePageMetadata({
 	.date {
 		margin-left: auto;
 		font-size: 0.78em;
-		opacity: 0.6;
+		color: var(--fgTransparentWeak);
 	}
 
 	.comment {
