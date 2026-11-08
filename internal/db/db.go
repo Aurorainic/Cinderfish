@@ -862,6 +862,34 @@ CREATE INDEX IF NOT EXISTS idx_messaging_user ON messaging_messages (user_id, id
 CREATE INDEX IF NOT EXISTS idx_messaging_recipient ON messaging_messages (recipient_id, is_read);
 CREATE INDEX IF NOT EXISTS idx_messaging_recipient_id ON messaging_messages (recipient_id, id DESC);
 `,
+	35: `
+-- Gallery (Misskey's gallery/* family): posts of drive images with a
+-- title and description. No AiScript, no federation, no notifications —
+-- the upstream model. created_at/updated_at are explicit columns as in
+-- v30-v32 (upstream derives createdAt from the id).
+CREATE TABLE IF NOT EXISTS gallery_posts (
+    id           TEXT PRIMARY KEY,
+    user_id      TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    title        VARCHAR(256) NOT NULL,
+    description  VARCHAR(2048),
+    file_ids     JSONB NOT NULL DEFAULT '[]',
+    is_sensitive BOOLEAN NOT NULL DEFAULT false,
+    liked_count  INTEGER NOT NULL DEFAULT 0,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at   TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS idx_gallery_posts_user ON gallery_posts (user_id, id);
+CREATE INDEX IF NOT EXISTS idx_gallery_posts_liked ON gallery_posts (liked_count DESC);
+
+CREATE TABLE IF NOT EXISTS gallery_likes (
+    id      TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    post_id TEXT NOT NULL REFERENCES gallery_posts (id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (user_id, post_id)
+);
+CREATE INDEX IF NOT EXISTS idx_gallery_likes_post ON gallery_likes (post_id);
+`,
 }
 
 // Migrate applies pending migrations in order and returns the version

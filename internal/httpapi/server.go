@@ -349,6 +349,21 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("POST /api/messaging/messages/read", s.handleMessagingMessagesRead)
 	s.mux.HandleFunc("POST /api/i/read-all-messaging-messages", s.handleIReadAllMessagingMessages)
 
+	// Gallery (schema v35), the gallery/* family upstream defines in
+	// packages/backend/src/server/api/endpoints/gallery/.
+	s.mux.HandleFunc("POST /api/gallery/posts", s.handleGalleryPosts)
+	s.mux.HandleFunc("POST /api/gallery/featured", s.handleGalleryFeatured)
+	s.mux.HandleFunc("POST /api/gallery/popular", s.handleGalleryPopular)
+	s.mux.HandleFunc("POST /api/gallery/posts/create", s.handleGalleryPostsCreate)
+	s.mux.HandleFunc("POST /api/gallery/posts/update", s.handleGalleryPostsUpdate)
+	s.mux.HandleFunc("POST /api/gallery/posts/delete", s.handleGalleryPostsDelete)
+	s.mux.HandleFunc("POST /api/gallery/posts/show", s.handleGalleryPostsShow)
+	s.mux.HandleFunc("POST /api/gallery/posts/like", s.handleGalleryPostsLike)
+	s.mux.HandleFunc("POST /api/gallery/posts/unlike", s.handleGalleryPostsUnlike)
+	s.mux.HandleFunc("POST /api/i/gallery/posts", s.handleIGalleryPosts)
+	s.mux.HandleFunc("POST /api/i/gallery/likes", s.handleIGalleryLikes)
+	s.mux.HandleFunc("POST /api/users/gallery/posts", s.handleUsersGalleryPosts)
+
 	// Mutes and blocks. Both tables exist since schema v1; these endpoints
 	// are what the settings page and the timeline filter read.
 	s.mux.HandleFunc("POST /api/mute/create", s.handleMuteCreate)
