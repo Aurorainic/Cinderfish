@@ -8099,15 +8099,24 @@ IP 封禁的 API 或数据表，所以这一项**不是移植**，是 Cinderfish
 用户列表、剪藏、天线、频道、私信五个家族；relay 按 AGENTS.md 明确不做。
 
 **提交**：`3525420`+`3b968ae`（lists，v30）、`a1278d5`+`a0ee645`（clips，v31）、
-`4f8f9e1`+`c1d1301`（antennas，v32）、`c8d9983`+`461874e`+`c79d62b`（channels，v33），
-`9984dd4`（messaging 后端，v34）。全部 `go vet`/`go test ./...` 绿；
+`4f8f9e1`+`c1d1301`（antennas，v32）、`c8d9983`+`461874e`+`c79d62b`（channels，v33）、
+`9984dd4`+`e48f0a3`（messaging，v34）、`37e6420`+`fc40bf4`（gallery，v35）、
+`974040a`（pages 后端，v36）。全部 `go vet`/`go test ./...` 绿；
 前端各批次 `vue-tsc --noEmit` 干净。
 
-**契约来源**：lists/clips/antennas/channels 逐端点对照 Misskey `c05e844` 的
-paramDef/res/错误码（id 逐字复制）。messaging 的契约**不在 c05e844**——上游已整体移除
-messaging/*（由 chat/* 取代），契约保存在两个本地授权参考树
+**契约来源**：lists/clips/antennas/channels/gallery/pages 逐端点对照 Misskey
+`c05e844` 的 paramDef/res/错误码（id 逐字复制）。messaging 的契约**不在 c05e844**——
+上游已整体移除 messaging/*（由 chat/* 取代），契约保存在两个本地授权参考树
 （Iceshrimp Vue fork 快照与 jclaudan Firefish 镜像，二者 `endpoints/messaging/` 逐字节一致），
 采用其为 Firefish 客户端目标契约。
+
+**gallery/pages 的前提修正**：能力矩阵把 pages/gallery 归因于"AiScript 整体 drop"，
+但核实后发现 gallery 从不依赖 AiScript，而 c05e844 的 Misskey 客户端自己也已把
+Page 渲染改为纯静态四积木（text/section/image/note），动态积木路由到占位符，
+编辑器只出四种积木并恒送 `script: ''`/`variables: []`。因此 Cinderfish 的静态
+Pages 实现**与上游 Misskey 行为一致而非偏离**；content/variables/script 原样
+存储与回传（Firefish 客户端指向本实例时仍可自行执行）。pages/featured 的
+Redis 排名近似为 SQL 窗口（gallery/featured 同理，3 天窗口按 liked_count 排序）。
 
 **已记录的实现取舍**（有意偏离上游处）：
 
@@ -8140,7 +8149,11 @@ userList、clip、antenna、channel、messaging、messagingIndex。Schemas v30�
 
 **前端**：占位页全部替换——MyLists{Index,List}、UserListTimeline、MyClips、Clip、
 MyAntennas{Index,Create,Edit}、AntennaTimeline、Channels、Channel、ChannelEditor、
-Messaging 系（messaging 前端接线进行中，完成后补充本节）；时间线组件新增非持久化的
-"list"/"antenna"/"channel" src（不会成为 `tl.src` 偏好）；发帖组件支持频道目标
-（强制本地公开）。不在 Misskey 契约内的 Firefish 字段（antenna 的 instances/group、
-post 的 typingOnChannel）未实现，UI 已按契约收窄。
+Messaging 系、Gallery{Index,Post,Edit}、Pages/Page/PageEditor（static 积木 + 动态积木
+占位符 + view-source 只读模式）；个人页恢复 gallery/pages tab；导航恢复
+messaging/gallery/pages 入口；时间线组件新增非持久化的"list"/"antenna"/"channel" src
+（不会成为 `tl.src` 偏好）；发帖组件支持频道目标（强制本地公开）。不在 Misskey
+契约内的 Firefish 字段（antenna 的 instances/group、post 的 typingOnChannel、
+page 的 isPublic 开关）未实现，UI 已按契约收窄。资料卡新增
+`pinnedPageId`/`pinnedPage`（i/update 校验所有权，删页经 FK SET NULL 清 pin）；
+`/api/i` 全部收编到共享 `meDetailed` 路径。Schemas v30–v36。
