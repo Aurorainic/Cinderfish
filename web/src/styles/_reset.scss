@@ -120,6 +120,13 @@ a {
 	}
 }
 
+a._button,
+a.button,
+._button a,
+.button a {
+	text-decoration: none;
+}
+
 :focus-visible {
 	outline: auto;
 }

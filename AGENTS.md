@@ -17,11 +17,7 @@ The intended product is a personal or very small-user federated social instance:
 - Media storage must support both local filesystem storage and S3-compatible object storage.
 - The private Go reimplementation and its benchmark table are not public source material. Its measurements are feasibility references, not this project's acceptance criteria unless explicitly adopted later.
 
-**Scope change (2026-11-04):** the frontend port has been handed to a separate workflow outside this
-repository session. Work in this repository is now **backend API and federation only**: Misskey-compatible
-endpoints under `internal/httpapi`, ActivityPub in `internal/federation`, their stores and tests. Progress is
-tracked against `docs/research/2026-11-04-misskey-api-coverage.md` (implemented / missing endpoint register).
-Do not resume frontend work here; the direction below is recorded for the receiving workflow.
+**Project scope (updated 2026-11-08):** frontend and backend are both active parts of this repository and may be changed as project work requires. Frontend implementation follows the Firefish port baseline and its source, licence and runtime contracts below; backend API and federation work follows the Misskey contracts and coverage register. Progress across both areas is tracked in `docs/HANDOVER.md` and the relevant research/spec documents.
 
 **Frontend direction (settled 2026-11-01, frozen here):** the frontend is a whole-port of the Firefish client structure onto
 Cinderfish, not an incremental restyling of the current pages. The new baseline supersedes the earlier

@@ -923,7 +923,16 @@ watch(text, () => {
 
 	&.max-width_500px {
 		> header {
-			block-size: 50px;
+			block-size: auto;
+			min-block-size: 50px;
+
+			> .right {
+				flex: 1 1 180px;
+				min-inline-size: 0;
+				flex-wrap: wrap;
+				justify-content: flex-end;
+				gap: 4px;
+			}
 
 			> .cancel {
 				inline-size: 50px;

@@ -3,6 +3,7 @@
 	<transition name="cf-tooltip" appear @after-leave="emit('closed')">
 		<div
 			v-if="showing"
+			ref="tooltipEl"
 			class="cf-tooltip"
 			:class="direction"
 			:style="{ top: `${top}px`, left: `${left}px`, zIndex }"
@@ -18,7 +19,7 @@
 // below the source. This version does the same with plain text: fixed
 // positioning, clamped to the viewport, pointer-events none so the bubble can
 // never capture the hover that keeps it open.
-import { onMounted, ref } from "vue";
+import { nextTick, onMounted, ref } from "vue";
 import { claimZIndex } from "@/os/state";
 
 const props = withDefaults(
@@ -33,25 +34,36 @@ const props = withDefaults(
 
 const emit = defineEmits<{ closed: [] }>();
 
-const zIndex = claimZIndex("middle");
+const zIndex = claimZIndex("high");
 const top = ref(0);
 const left = ref(0);
+const tooltipEl = ref<HTMLElement | null>(null);
 
 onMounted(() => {
-	const rect = props.source.getBoundingClientRect();
-	const half = 130; // the bubble is at most 250px wide
+	const sourceRect = props.source.getBoundingClientRect();
+	const half = 130;
 	left.value = Math.min(
-		Math.max(rect.left + rect.width / 2, half + 8),
+		Math.max(sourceRect.left + sourceRect.width / 2, half + 8),
 		window.innerWidth - half - 8,
 	);
-	top.value = props.direction === "bottom" ? rect.bottom + 6 : rect.top - 6;
+	top.value = props.direction === "bottom" ? sourceRect.bottom + 6 : sourceRect.top - 6;
+
+	void nextTick(() => {
+		const tooltip = tooltipEl.value;
+		if (tooltip == null) return;
+		const rect = tooltip.getBoundingClientRect();
+		const shiftX = Math.max(8 - rect.left, Math.min(0, window.innerWidth - rect.right - 8));
+		const shiftY = Math.max(8 - rect.top, Math.min(0, window.innerHeight - rect.bottom - 8));
+		left.value += shiftX;
+		top.value += shiftY;
+	});
 });
 </script>
 
 <style lang="scss" scoped>
 .cf-tooltip {
 	position: fixed;
-	max-width: 250px;
+	max-width: min(250px, calc(100dvw - 16px));
 	padding: 4px 10px;
 	border-radius: 6px;
 	background: rgb(20 20 24 / 92%);

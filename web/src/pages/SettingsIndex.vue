@@ -3,7 +3,7 @@
 	<MkSpacer :content-max="900" :margin-min="20" :margin-max="32">
 		<div ref="el" class="vvcocwet" :class="{ wide: !narrow }">
 			<div class="body">
-				<div v-if="!narrow || !hasChild" class="nav">
+				<div class="nav">
 					<MkSuperMenu :def="menuDef" :grid="narrow" />
 					<CfInfo class="missing">
 						菜单只列出已有页面与端点的设置。插件与 KaTeX 自定义宏仍缺运行时，未列入。
@@ -266,7 +266,7 @@ function measure(): void {
 }
 
 function redirectIfNeeded(): void {
-	if (narrow.value || hasChild.value) return;
+	if (hasChild.value) return;
 	void router.replace("/settings/profile");
 }
 
@@ -298,7 +298,7 @@ onBeforeUnmount(() => {
 });
 
 watch(
-	() => route.path,
+	() => [route.path, narrow.value],
 	() => {
 		redirectIfNeeded();
 	},

@@ -7,7 +7,7 @@
 		@contextmenu.prevent.stop
 	>
 		<template v-for="(item, index) in items" :key="index">
-			<div v-if="item.type === 'label'" class="label">{{ item.text }}</div>
+			<div v-if="item.type === 'label'" class="menu-label">{{ item.text }}</div>
 			<div v-else-if="item.separator" class="separator"></div>
 			<button
 				v-else
@@ -133,7 +133,7 @@ onBeforeUnmount(() => {
 	}
 }
 
-.label {
+.menu-label {
 	padding: 8px 12px 4px;
 	font-size: 0.75em;
 	color: var(--fgTransparentWeak);
@@ -151,11 +151,18 @@ onBeforeUnmount(() => {
 	align-items: center;
 	gap: 10px;
 	inline-size: 100%;
+	min-block-size: 44px;
 	padding: 9px 12px;
 	border-radius: 6px;
 	color: var(--fg);
 	text-align: start;
-	font-size: 0.95em;
+	font-size: 1rem;
+
+	> i {
+		flex: 0 0 22px;
+		font-size: 20px;
+		text-align: center;
+	}
 
 	&:hover {
 		background: var(--listItemHoverBg);
