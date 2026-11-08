@@ -1,6 +1,6 @@
 <template>
-	<label class="novjtctn" :class="{ disabled, checked }">
-		<input type="radio" :disabled="disabled" :checked="checked" @change="toggle" />
+	<label class="novjtctn" :class="{ disabled: isDisabled, checked }">
+		<input type="radio" :disabled="isDisabled" :checked="checked" @change="toggle" />
 		<span class="button"><span></span></span>
 		<span class="label"><slot></slot></span>
 	</label>
@@ -33,9 +33,10 @@ const current = computed<RadioValue>(() =>
 );
 
 const checked = computed(() => current.value === props.value);
+const isDisabled = computed(() => props.disabled || (group?.disabled.value ?? false));
 
 function toggle(): void {
-	if (props.disabled) return;
+	if (isDisabled.value) return;
 	if (group != null) group.select(props.value);
 	else emit("update:modelValue", props.value);
 }

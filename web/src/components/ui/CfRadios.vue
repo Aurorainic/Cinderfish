@@ -13,9 +13,11 @@ import { RADIOS_KEY, type RadioValue } from "./radios-key";
 const props = withDefaults(
 	defineProps<{
 		modelValue: RadioValue;
+		disabled?: boolean;
 	}>(),
 	{
 		modelValue: null,
+		disabled: false,
 	},
 );
 
@@ -24,14 +26,16 @@ const emit = defineEmits<{
 }>();
 
 const model = computed<RadioValue>(() => props.modelValue);
+const groupDisabled = computed(() => props.disabled);
 
 function select(value: RadioValue): void {
+	if (props.disabled) return;
 	emit("update:modelValue", value);
 }
 
 // Children read the group model through injection; this mirrors Firefish's
 // clone-vnode approach without needing to introspect slot VNodes.
-provide(RADIOS_KEY, { model, select });
+provide(RADIOS_KEY, { model, select, disabled: groupDisabled });
 </script>
 
 <style lang="scss" scoped>
