@@ -316,18 +316,41 @@ func (s *Server) handleActorByAcct(w http.ResponseWriter, r *http.Request) {
 
 // renderLocalActor builds the actor document, creating the keypair on
 // first use.
+//
+// The whole public profile goes in: peers render the avatar and banner from
+// icon/image and the profile fields from attachment, so leaving them out
+// made every remote copy look empty. Avatar and banner URLs are stored as
+// local paths by the filesystem backend, hence MediaURL.
 func (s *Server) renderLocalActor(ctx context.Context, u *account.User) (federation.Object, error) {
 	kp, err := s.federationStore.EnsureLocalKey(ctx, u.ID)
 	if err != nil {
 		return nil, err
 	}
-	var name, desc string
-	_ = s.pool.QueryRow(ctx, "SELECT COALESCE(name, ''), COALESCE(description, '') FROM user_profiles WHERE user_id = $1", u.ID).Scan(&name, &desc)
+	prof := &account.Profile{}
+	if s.accounts != nil {
+		loaded, err := s.accounts.GetProfile(ctx, u.ID)
+		if err != nil {
+			return nil, err
+		}
+		prof = loaded
+	}
+	var isBot bool
+	_ = s.pool.QueryRow(ctx, "SELECT is_bot FROM users WHERE id = $1", u.ID).Scan(&isBot)
+
+	fields := make([]federation.ProfileField, 0, len(prof.Fields))
+	for _, f := range prof.Fields {
+		fields = append(fields, federation.ProfileField{Name: f.Name, Value: f.Value})
+	}
 	return s.fedRenderer.RenderPerson(federation.Profile{
 		ID:          u.ID,
 		Username:    u.Username,
-		Name:        name,
-		Description: desc,
+		Name:        prof.Name,
+		Description: prof.Description,
+		AvatarURL:   s.fedRenderer.MediaURL(prof.AvatarURL),
+		BannerURL:   s.fedRenderer.MediaURL(prof.BannerURL),
+		Fields:      fields,
+		IsBot:       isBot,
+		IsLocked:    prof.IsLocked,
 		PublicKey:   kp.PublicPEM,
 		CreatedAt:   u.CreatedAt,
 		MovedToURI:  u.MovedToURI,

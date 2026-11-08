@@ -8033,3 +8033,41 @@ IP 封禁的 API 或数据表，所以这一项**不是移植**，是 Cinderfish
 - `signin_failures` 目前不清理，个人实例规模下可接受；量大时需要定期裁剪。
 - secret 仍以明文存于 `instance_meta`（与 §12GW 同一信任边界说明）。
 
+## 12GY. 本地资料变更的联邦广播：Update(Person)（2026-11-08）
+
+**问题**：本站用户改了头像或昵称后，远端实例上的副本不更新。排查出两处缺口：
+
+1. `GET /users/{id}` 返回的 actor 文档只带 `name` / `summary` / 公钥，`icon`、`image`、
+   `attachment` 恒为空。远端第一次抓取就看不到头像和资料字段；而且本地文件存储写进
+   `user_profiles.avatar_url` 的是 `/media/...` 相对路径，原样放进 actor 文档远端也无法解析。
+2. `i/update` 成功后不向任何远端投递活动，远端只能等下一次主动抓取（多数实现不会主动重抓）。
+
+**修复**（对齐 Misskey 的 `i/update` → `AccountUpdateService.publishToFollowers`）：
+
+- `renderLocalActor` 读取完整 profile（头像、横幅、资料字段、`isLocked`、`isBot`）；
+  新增 `Renderer.MediaURL`，把 `/media/...` 补成 `https://<domain>/media/...`，
+  S3 等绝对 URL 原样返回。
+- 新增 `Renderer.RenderUpdatePerson`：`Update` 活动，id 为 `<actor>#updates/<unix毫秒>`，
+  `to` 为公共集合，与上游 `renderUpdate` 的形状一致；embedded object 是 actor 文档。
+- 新增 `Server.DeliverPersonUpdate`：向该用户的远端关注者 inbox 投递，复用
+  `InboxesForUser` 和 `deliver_queue`，失败重试策略与笔记投递相同。
+- `i/update` 在所有字段写完后调用 `DeliverPersonUpdate`；上游同样无条件发布。
+
+### 12GY.1 验证证据
+
+- `TestRenderUpdatePerson`（type/id/actor/to/object）、`TestMediaURL`（相对路径、绝对 URL、空值）。
+- `TestTwoInstancePersonUpdate`：两实例真实 HTTP。beta 先通过 alice 的公开笔记缓存她的旧昵称
+  （此时头像为空），alice 上传头像并 `i/update` 改名/改简介；beta 的 `users/show` 随后返回新昵称、
+  `https://alpha.example/media/...` 头像和新简介，并且 beta 日志出现
+  `inbox Update ...: ok: actor updated`。`users/show` 对已知远端账号直接读缓存、不重新抓取，
+  所以断言通过只能来自 Update 被应用。同时断言 alpha 的 actor 文档 `icon.url` 是绝对地址。
+- 全量 `go test ./...` 13 包绿。
+
+### 12GY.2 边界
+
+- 只投递给远端关注者。Misskey 还会发给 relay，本实现没有 relay（第一版范围外）。
+- 与上游一致，`i/update` 成功即发布，包括只改通知偏好这类不影响 actor 文档的调用；
+  此时投递的 actor 内容不变，接收端按 no-op 处理。
+- 清空头像/横幅时对应字段为 `null`，本站的 `upsertActor` 与 Misskey 都按空值处理。
+
+

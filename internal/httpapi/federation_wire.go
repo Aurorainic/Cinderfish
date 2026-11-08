@@ -398,6 +398,44 @@ func (s *Server) DeliverUpdate(ctx context.Context, n *note.Note) {
 	}
 }
 
+// DeliverPersonUpdate tells a local user's remote followers that their
+// profile changed. Misskey's i/update publishes the same Update(Person)
+// through AccountUpdateService. Without it a peer keeps the actor document
+// it cached on first resolve, so a new avatar, display name or profile
+// field never reaches it until something else forces a refetch.
+func (s *Server) DeliverPersonUpdate(ctx context.Context, userID string) {
+	if s.federationDeliver == nil || s.fedRenderer == nil || s.federationStore == nil {
+		return
+	}
+	u, err := s.accounts.GetByID(ctx, userID)
+	if err != nil || u == nil || u.Host != nil {
+		return
+	}
+	person, err := s.renderLocalActor(ctx, u)
+	if err != nil {
+		log.Printf("httpapi: render actor for update: %v", err)
+		return
+	}
+	activity := s.fedRenderer.RenderUpdatePerson(person, u.ID, time.Now())
+	activityID := activity.String("id")
+
+	inboxes, err := s.federationStore.InboxesForUser(ctx, u.ID, false)
+	if err != nil {
+		log.Printf("httpapi: person update inboxes: %v", err)
+		return
+	}
+	seen := map[string]bool{}
+	for _, inbox := range inboxes {
+		if seen[inbox] {
+			continue
+		}
+		seen[inbox] = true
+		if err := s.federationDeliver.Enqueue(ctx, inbox, activityID, s.fedRenderer.KeyID(u.ID), u.ID, activity); err != nil {
+			log.Printf("httpapi: enqueue person update to %s: %v", inbox, err)
+		}
+	}
+}
+
 // DeliverDelete withdraws a note from its remote audience: a Delete for a
 // note, an Undo of the Announce for a pure renote.
 func (s *Server) DeliverDelete(ctx context.Context, n *note.Note) {

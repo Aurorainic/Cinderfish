@@ -237,6 +237,11 @@ func (s *Server) handleIUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Remote instances cache the actor document, so the change has to be
+	// pushed to followers. Misskey's i/update calls AccountUpdateService
+	// unconditionally after a successful save.
+	s.DeliverPersonUpdate(r.Context(), info.User.ID)
+
 	packed := packMeDetailed(info.User, info.User.CreatedAt, info.Token == nil, loadProfile(r.Context(), s, info.User.ID))
 	s.applyUserCounts(r.Context(), info.User.ID, packed)
 	s.applyUnreadNotifications(r.Context(), info.User.ID, packed)

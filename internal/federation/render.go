@@ -41,6 +41,22 @@ func (r *Renderer) ActivityRef(noteID string) string {
 	return r.NoteRef(noteID) + "/activity"
 }
 
+// MediaURL turns a stored media URL into an absolute one. The local storage
+// backend keeps paths like /media/<key>, which a remote instance cannot
+// resolve; S3 backends already store absolute URLs.
+func (r *Renderer) MediaURL(url string) string {
+	if url == "" {
+		return ""
+	}
+	if strings.HasPrefix(url, "https://") || strings.HasPrefix(url, "http://") {
+		return url
+	}
+	if !strings.HasPrefix(url, "/") {
+		url = "/" + url
+	}
+	return r.BaseURL + url
+}
+
 // Profile is the data RenderPerson needs. It mirrors the columns rather
 // than the account/note types so the federation package does not depend
 // on them.
@@ -361,6 +377,24 @@ func (r *Renderer) RenderUpdate(note Object, noteID string, actorRef string, pub
 		activity["cc"] = cc
 	}
 	return withContext(activity)
+}
+
+// RenderUpdatePerson wraps a rendered actor in an Update activity, the way
+// Misskey's AccountUpdateService announces a profile change to followers.
+//
+// The id carries the timestamp so successive edits stay distinct, and the
+// audience is the public collection as upstream sets it. Without this
+// activity peers keep the actor document they cached on first resolve, so a
+// new avatar or display name never reaches them.
+func (r *Renderer) RenderUpdatePerson(person Object, userID string, published time.Time) Object {
+	return withContext(Object{
+		"id":        fmt.Sprintf("%s#updates/%d", r.ActorRef(userID), published.UnixMilli()),
+		"type":      "Update",
+		"actor":     r.ActorRef(userID),
+		"published": published.UTC().Format(time.RFC3339),
+		"to":        []any{Public},
+		"object":    person,
+	})
 }
 
 // RenderDelete builds a Delete activity. object may be an id string or the

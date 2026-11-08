@@ -2,6 +2,7 @@ package federation
 
 import (
 	"encoding/json"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -259,6 +260,51 @@ func TestMFMToHTMLFencedCode(t *testing.T) {
 	}
 	if !strings.Contains(got, "fmt.Println(") {
 		t.Errorf("code body lost: %q", got)
+	}
+}
+
+// TestRenderUpdatePerson pins the shape Misskey's AccountUpdateService
+// sends: an Update of the actor document, addressed to the public
+// collection, with a timestamped activity id.
+func TestRenderUpdatePerson(t *testing.T) {
+	r := NewRenderer("https://b.example")
+	person := r.RenderPerson(Profile{ID: "abc", Username: "alice", Name: "Alice"})
+	published := time.Unix(1700000000, 0)
+	o := r.RenderUpdatePerson(person, "abc", published)
+
+	if o["type"] != "Update" {
+		t.Errorf("type = %v", o["type"])
+	}
+	if want := "https://b.example/users/abc#updates/1700000000000"; o["id"] != want {
+		t.Errorf("id = %v, want %s", o["id"], want)
+	}
+	if o["actor"] != "https://b.example/users/abc" {
+		t.Errorf("actor = %v", o["actor"])
+	}
+	if o["published"] != published.UTC().Format(time.RFC3339) {
+		t.Errorf("published = %v", o["published"])
+	}
+	to, _ := o["to"].([]any)
+	if len(to) != 1 || to[0] != Public {
+		t.Errorf("to = %v, want [%s]", o["to"], Public)
+	}
+	if !reflect.DeepEqual(o["object"], person) {
+		t.Error("object is not the rendered actor document")
+	}
+}
+
+func TestMediaURL(t *testing.T) {
+	r := NewRenderer("https://b.example/")
+	cases := map[string]string{
+		"/media/ab/cd":              "https://b.example/media/ab/cd",
+		"media/ab":                  "https://b.example/media/ab",
+		"https://cdn.example/x.png": "https://cdn.example/x.png",
+		"":                          "",
+	}
+	for in, want := range cases {
+		if got := r.MediaURL(in); got != want {
+			t.Errorf("MediaURL(%q) = %q, want %q", in, got, want)
+		}
 	}
 }
 
