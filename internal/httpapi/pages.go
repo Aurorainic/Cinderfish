@@ -13,22 +13,22 @@ import (
 // Misskey error ids for the pages endpoints, copied from
 // packages/backend/src/server/api/endpoints/pages/*.ts.
 const (
-	errIDPageNoSuchFileCreate  = "b7b97489-0f66-4b12-a5ff-b21bd63f6e1c"
-	errIDPageNameTakenCreate   = "4650348e-301c-499a-83c9-6aa988c66bc1"
-	errIDNoSuchPageUpdate      = "21149b9e-3616-4778-9592-c4ce89f5a864"
-	errIDPageAccessDenied      = "3c15cd52-3b4b-4274-967d-6456fc4f792b"
-	errIDPageNoSuchFileUpdate  = "cfc23c7c-3887-490e-af30-0ed576703c82"
-	errIDPageNameTakenUpdate   = "2298a392-d4a1-44c5-9ebb-ac1aeaa5a9ab"
-	errIDNoSuchPageDelete      = "eb0c6e1d-d519-4764-9486-52a7e1c6392a"
-	errIDPageAccessDeniedDel   = "8b741b3e-2c22-44b3-a15f-29949aa1601e"
-	errIDNoSuchPageShow        = "222120c0-3ead-4528-811b-b96f233388d7"
-	errIDNoSuchPageLike        = "cc98a8a2-0dc3-4123-b198-62c71df18ed3"
-	errIDPageYourPage          = "28800466-e6db-40f2-8fae-bf9e82aa92b8"
-	errIDPageAlreadyLiked      = "d4c1edbe-7da2-4eae-8714-1acfd2d63941"
-	errIDNoSuchPageUnlike      = "a0d41e20-1993-40bd-890e-f6e560ae648e"
-	errIDPageNotLiked          = "f5e586b0-ce93-4050-b0e3-7f31af5259ee"
+	errIDPageNoSuchFileCreate = "b7b97489-0f66-4b12-a5ff-b21bd63f6e1c"
+	errIDPageNameTakenCreate  = "4650348e-301c-499a-83c9-6aa988c66bc1"
+	errIDNoSuchPageUpdate     = "21149b9e-3616-4778-9592-c4ce89f5a864"
+	errIDPageAccessDenied     = "3c15cd52-3b4b-4274-967d-6456fc4f792b"
+	errIDPageNoSuchFileUpdate = "cfc23c7c-3887-490e-af30-0ed576703c82"
+	errIDPageNameTakenUpdate  = "2298a392-d4a1-44c5-9ebb-ac1aeaa5a9ab"
+	errIDNoSuchPageDelete     = "eb0c6e1d-d519-4764-9486-52a7e1c6392a"
+	errIDPageAccessDeniedDel  = "8b741b3e-2c22-44b3-a15f-29949aa1601e"
+	errIDNoSuchPageShow       = "222120c0-3ead-4528-811b-b96f233388d7"
+	errIDNoSuchPageLike       = "cc98a8a2-0dc3-4123-b198-62c71df18ed3"
+	errIDPageYourPage         = "28800466-e6db-40f2-8fae-bf9e82aa92b8"
+	errIDPageAlreadyLiked     = "d4c1edbe-7da2-4eae-8714-1acfd2d63941"
+	errIDNoSuchPageUnlike     = "a0d41e20-1993-40bd-890e-f6e560ae648e"
+	errIDPageNotLiked         = "f5e586b0-ce93-4050-b0e3-7f31af5259ee"
 	// i/update's pinnedPageId ownership error.
-	errIDPageOtherProfile      = "8e01b590-7eb9-431b-a239-860e086c408e"
+	errIDPageOtherProfile = "8e01b590-7eb9-431b-a239-860e086c408e"
 )
 
 // limitPagesCreate is Misskey's pages/create rate cap.
@@ -219,16 +219,16 @@ func (s *Server) requirePageCaller(w http.ResponseWriter, r *http.Request, prohi
 // handlePagesCreate implements POST /api/pages/create.
 func (s *Server) handlePagesCreate(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		Title              string          `json:"title"`
-		Name               string          `json:"name"`
-		Summary            *string         `json:"summary"`
-		AlignCenter        bool            `json:"alignCenter"`
-		HideTitleWhenPinned bool           `json:"hideTitleWhenPinned"`
-		Font               string          `json:"font"`
-		EyeCatchingImageID *string         `json:"eyeCatchingImageId"`
-		Content            json.RawMessage `json:"content"`
-		Variables          json.RawMessage `json:"variables"`
-		Script             *string         `json:"script"`
+		Title               string          `json:"title"`
+		Name                string          `json:"name"`
+		Summary             *string         `json:"summary"`
+		AlignCenter         bool            `json:"alignCenter"`
+		HideTitleWhenPinned bool            `json:"hideTitleWhenPinned"`
+		Font                string          `json:"font"`
+		EyeCatchingImageID  *string         `json:"eyeCatchingImageId"`
+		Content             json.RawMessage `json:"content"`
+		Variables           json.RawMessage `json:"variables"`
+		Script              *string         `json:"script"`
 	}
 	if err := decodeOptionalJSON(r, &body); err != nil {
 		writeAPIError(w, err)
@@ -334,7 +334,8 @@ func (s *Server) handlePagesUpdate(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	writeJSON(w, http.StatusOK, nil)
+	// Upstream's handler returns nothing, so ApiCallService answers 204.
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // handlePagesDelete implements POST /api/pages/delete.

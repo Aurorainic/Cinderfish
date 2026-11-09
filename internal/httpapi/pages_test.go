@@ -103,12 +103,11 @@ func TestPagesCRUDShowAndLikes(t *testing.T) {
 		t.Fatalf("show unknown: %d %v", resp.StatusCode, out)
 	}
 
-	// update merges; an unknown slug collides.
-	resp, out = postWithToken(t, f.ts, "/api/pages/update", aliceToken, map[string]any{
+	// update merges; upstream returns nothing, so the status is 204.
+	if code := postNoContentToken(t, f.ts, "/api/pages/update", aliceToken, map[string]any{
 		"pageId": pageID, "summary": nil, "title": "My Page 2",
-	})
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("update: %d %v", resp.StatusCode, out)
+	}); code != http.StatusNoContent {
+		t.Fatalf("update: %d", code)
 	}
 	// A name change to the same slug is allowed (it is the owner's own);
 	// the uniqueness collision is tested above. Foreign update answers
