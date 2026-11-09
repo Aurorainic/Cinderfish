@@ -8202,3 +8202,37 @@ v30–v36 迁移在既有库上的升级路径。开发库 `instance_meta.regist
 
 **仍未覆盖**：没有跑真实浏览器（只有类型检查、构建与外部协议走查）；分页游标
 （sinceId/untilId）只做了单元测试级别覆盖，走查侧重主路径；S3 后端仍无真实服务端。
+
+### 12HB.1 第二遍：边界路径（2026-11-09）
+
+活服务端继续走查，覆盖主路径之外的行为：
+
+- **游标语义**（limit/untilId/sinceId）：`notes/user-list-timeline`、
+  `clips/notes`、`antennas/notes`、`channels/timeline`、`gallery/posts`、
+  `messaging/messages` 六个列表全部按 Misskey 的 makePaginationQuery 验证——
+  untilId 降序、游标排除；仅 sinceId 时升序。
+  **发现并修复真实 bug**：共享的 `Timeline()` 查询把 `ORDER BY n.id DESC` 写死，
+  没有走 `paginationOrder`，所以 user-list-timeline（以及 home/local/global/hybrid）
+  在仅给 sinceId 时返回降序页；其余列表当时已经正确。修复见 `65e76a7`，
+  回归用例加在 `TestUserListCRUDAndTimeline`（三帖列表先降后升翻页断言）。
+- **可见性/所有权**：私有剪藏的 show/notes/add-note/favorite 对他人一律 404
+  NO_SUCH_CLIP，转公开后可见；天线 show/notes/update/delete 对非所有者 404
+  NO_SUCH_ANTENNA；频道 update 对非所有者 403 ACCESS_DENIED。
+- **频道策略**：归档频道拒收笔记（NO_SUCH_CHANNEL）；`allowRenoteToExternal=false`
+  时跨频道/频道外转发 400 CANNOT_RENOTE_OUTSIDE_OF_CHANNEL，频道内转发放行，
+  置 true 后频道外转发放行。
+- **屏蔽**：被屏蔽方向私信返回 400 YOU_HAVE_BEEN_BLOCKED；列表 push 同样拒绝。
+- **画廊**：他人帖子 update/delete 404 NO_SUCH_POST（上游同型）。
+- **Pages**：slug 唯一性是**按用户**（上游 `@Index(['userId','name'])`），
+  同用户重名 400 NAME_ALREADY_EXISTS，不同用户可同名；含 `/` 的 slug 400；
+  他人 update/delete 404 NO_SUCH_PAGE。
+- **校验与路由**：clips 空名、channels 名 >128（上游 maxLength=128）、
+  antennas 空关键词分别得到 INVALID_PARAM/INVALID_PARAM/EMPTY_KEYWORD；
+  GET 到 POST 端点回 404/405。
+- **CORS**：`OPTIONS /api/clips/create` 预检带 Origin 得到 2xx 与
+  `Access-Control-Allow-Origin`、`Access-Control-Allow-Methods`；
+  实际 POST 响应同样带 ACAO（AGENTS.md 要求的第三方 Web 客户端前提）。
+
+**环境限制已确认**：本机没有 chromium/firefox/playwright/puppeteer，也没有
+minio/mc 二进制，因此"真实浏览器走查"与"S3 后端真实服务端验证"在本环境不可执行；
+两者仍为未覆盖项。开发库 `registrationMode` 在走查前已改回 `"admin"`。
