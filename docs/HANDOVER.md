@@ -162,7 +162,7 @@ pnpm build          # 产出 web/dist，由 Go 二进制静态托管
 以及**模板里用到但未 import/未全局注册的组件**（第二波踩过：`pages/Note.vue` 漏 import `MkNoteDetailed`，`vue-tsc` 不报错、页面静默空白），
 外加 `t()` 引用了 zh-CN 词典里不存在的键。
 
-数据库迁移在启动时自动执行（不可变的版本化脚本）。当前 schema 版本为 **29**（`internal/db/db.go` 的 `migrations` 1–29）。
+数据库迁移在启动时自动执行（不可变的版本化脚本）。当前 schema 版本为 **36**（`internal/db/db.go` 的 `migrations` 1–36）。
 
 数据库测试包（`internal/account`、`internal/httpapi`）都会 TRUNCATE 同一批表，因此每个包用 `internal/testdb` 在 `TestMain` 里持有 PostgreSQL advisory lock，直到该包的测试二进制退出——这样 `go test ./...` 并行跑包时不会互相清表（不加锁时会随机出现"找不到用户"之类的假失败）。
 
@@ -8157,3 +8157,48 @@ messaging/gallery/pages 入口；时间线组件新增非持久化的"list"/"ant
 page 的 isPublic 开关）未实现，UI 已按契约收窄。资料卡新增
 `pinnedPageId`/`pinnedPage`（i/update 校验所有权，删页经 FK SET NULL 清 pin）；
 `/api/i` 全部收编到共享 `meDetailed` 路径。Schemas v30–v36。
+
+## 12HB. 实测波次：12HA 七个子系统的活服务端验证（2026-11-09）
+
+**方法**：不是 httptest 夹具，而是构建真实二进制、连开发库 `cinderfish` 起服务
+（`127.0.0.1:3999`，federation=none，媒体本地盘），用两个脚本从外部走 HTTP 与
+WebSocket：
+
+- HTTP 走查：注册 3 个账号 → user lists（create/push/get-memberships/show/list/
+  user-list-timeline/favorite/create-from-public/pull）→ clips（create/add-note/
+  notes/notes-clips/users-clips/favorite/my-favorites/remove-note）→ antennas
+  （create/匹配命中与漏配/notes/remove-note/list）→ channels（create/follow/笔记
+  强制 public+localOnly/timeline/search/favorite/my-favorites/mute list/owned）→
+  messaging（create→`i.hasUnreadMessagingMessage`→messages 已读→history→重复已读
+  与自读拒绝→delete→read-all）→ gallery（multipart 上传/create/list/show/
+  i.gallery.posts/users.gallery.posts/like→ALREADY_LIKED/featured/i.gallery.likes/
+  unlike→NOT_LIKED/update）→ pages（create 含 section 嵌套/按 id 与 {name,username}
+  show/like→ALREADY_LIKED→featured/i.page-likes/YOUR_PAGE/update/pin→users/show
+  回显 pinnedPageId+pinnedPage/删页 FK 清 pin/删后 404）。全部通过。
+- Streaming 走查：Alice 一条连接订阅 main、userList、clip、antenna、channel、
+  messaging、messagingIndex 七个频道；Bob 发帖 → userList 与 antenna 各自收到
+  `note`；加入剪藏 → clip 收到 `updated`（与上游 clip 频道一致，不发 note 本体）；
+  Bob 发频道帖 → channel 收到 `note`；Bob 私信 → main 收到 `messagingMessage`、
+  messaging 与 messagingIndex 各收到 `message`；Alice 发 `typingOnMessaging` →
+  5 秒聚合 tick 后 messaging 收到 `typers`（体内是 alice 的 packed user）。全部通过。
+
+**走查发现并修掉的真实缺陷**：
+
+- `pages/update` 返回 `200 "null"`；上游 handler 无返回值，ApiCallService 因此回
+  **204**（其余 update 端点上游都 `return pack(...)`，本实现 200+实体是对的）。
+  已改为 204，测试改为断言状态码（`95fe389`）。
+- **`typingOnMessaging` 帧没有被分发**：回调 `onTypingOnMessaging` 一路接好
+  （AttachStreaming → publishMessagingTyping → 会话 subject），但帧循环 switch 没有
+  该 case，事件被解析后丢弃，typer 永远不出现。补上 case（鉴权连接 + partner 非空），
+  新增 `TestTypingOnMessagingFrameDispatches`（`6cf5862`）。
+- gofmt 对齐遗留（messages/gallery/pages/note service），单独 chore 提交（`94dc994`）。
+
+**环境细节**：开发库从 schema 29 升到 36 由服务启动时自动完成，等于顺带验证了
+v30–v36 迁移在既有库上的升级路径。开发库 `instance_meta.registrationMode` 原本是
+`"admin"`，走查前临时改为 `"open"` 以便 API 注册，**走查后已改回 `"admin"`**。
+
+**验证**：`go vet ./...` 干净、`gofmt -l internal/ cmd/` 空、带 DB+Redis 的
+`go test ./...` 573 个用例全绿（含新增的 typing 用例）；两个外部走查脚本全部通过。
+
+**仍未覆盖**：没有跑真实浏览器（只有类型检查、构建与外部协议走查）；分页游标
+（sinceId/untilId）只做了单元测试级别覆盖，走查侧重主路径；S3 后端仍无真实服务端。
