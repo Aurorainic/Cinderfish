@@ -8233,6 +8233,34 @@ v30–v36 迁移在既有库上的升级路径。开发库 `instance_meta.regist
   `Access-Control-Allow-Origin`、`Access-Control-Allow-Methods`；
   实际 POST 响应同样带 ACAO（AGENTS.md 要求的第三方 Web 客户端前提）。
 
-**环境限制已确认**：本机没有 chromium/firefox/playwright/puppeteer，也没有
-minio/mc 二进制，因此"真实浏览器走查"与"S3 后端真实服务端验证"在本环境不可执行；
-两者仍为未覆盖项。开发库 `registrationMode` 在走查前已改回 `"admin"`。
+**环境限制**：本机没有 minio/mc 二进制，S3 后端真实服务端验证仍不可执行，是未覆盖项。
+浏览器侧可用 `/usr/bin/helium`（0.20.1.1，Chromium 156），真实浏览器走查见 §12HB.2。
+开发库 `registrationMode` 在走查前已改回 `"admin"`。
+
+### 12HB.2 真实浏览器走查（2026-11-09，Helium + CDP）
+
+本机有 `/usr/bin/helium`（Helium 0.20.1.1，Chromium 156），用
+`--headless=new --remote-debugging-port=9222` 起浏览器，Python + websockets 直连
+CDP（`Page.navigate` / `Runtime.evaluate` / `Page.captureScreenshot`），无
+playwright/puppeteer 依赖。脚本：`tmp/e2e/e2e_browser.py`，截图在 `tmp/e2e/shots/`。
+
+**准备**：`vite build` 产出 `web/dist`，Go 服务以 `web_dir=web/dist` 静态托管；
+脚本用 `POST /api/signin` + `POST /api/i` 拿 token，按客户端自己的存储格式写入
+`localStorage`（`account` / `accounts` / `cinderfish.token`）后重载页面登录。
+
+**24 个页面全部渲染，零 runtime exception、零 console error**：
+- 时间线、/my/lists、列表详情、列表时间线；
+- /my/clips、剪藏页（公开徽标、添加到书签）；
+- /my/antennas、天线时间线（频道笔记命中天线属预期）、天线新建/编辑（表单载入已存值）；
+- /channels、频道页（横幅、参与数、频道 composer）、频道新建/编辑；
+- /my/messaging、私信房间（气泡、输入区）；
+- /gallery（三 tab）、画廊帖子页；/pages（My pages tab）、页面阅读页、页面新建/编辑；
+- 个人页（tab、计数、置顶提示）。
+
+**两个真实 UI 变更链路**（表单 → API → 路由/渲染）：
+- `/channels/new` 填名 → 点"创建频道" → 跳到新频道页，名称正确；
+- 私信房间 textarea 输入 → 点发送 → 气泡立即出现在对话框。
+
+**观察（非缺陷）**：画廊缩略图显示破图是脚本上传的假 PNG 字节，不是渲染问题；
+帖子/页面页底部"最新发布"为空是因为该作者只有一条内容（当前条已排除）；
+本地账号在详情页显示 `@user@domain` 与 Firefish `MkAcct` 的 `detail` 行为一致。
