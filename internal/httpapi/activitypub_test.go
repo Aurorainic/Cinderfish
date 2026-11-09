@@ -268,8 +268,8 @@ func TestNodeInfo(t *testing.T) {
 		t.Errorf("version = %v", doc["version"])
 	}
 	software, _ := doc["software"].(map[string]any)
-	if software["version"] != "0.1.5" {
-		t.Errorf("NodeInfo software.version = %v, want 0.1.5", software["version"])
+	if software["version"] != "0.2.0" {
+		t.Errorf("NodeInfo software.version = %v, want 0.2.0", software["version"])
 	}
 	protocols, _ := doc["protocols"].([]any)
 	if len(protocols) != 1 || protocols[0] != "activitypub" {

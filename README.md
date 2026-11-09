@@ -1,7 +1,8 @@
 # Cinderfish
 
-**v0.1.5** — 单二进制的个人 / 极小规模联邦社交实例。后端按 Misskey 的 API 契约实现，前端是
-Firefish 客户端结构的整体移植（Vue 3 + TypeScript）。
+**v0.2.0** — 单二进制的个人 / 极小规模联邦社交实例。后端按 Misskey 的 API 契约实现，前端是
+Firefish 客户端结构的整体移植（Vue 3 + TypeScript）。本版补齐了用户列表、剪藏、天线、频道、
+1:1 私信、画廊与 Pages 七个子系统（schema v30–v36）。
 
 - **API 契约**：Misskey 原生 RPC（`POST /api/<endpoint>`）+ Streaming WebSocket
 - **联邦**：ActivityPub（WebFinger / Actor / Inbox / Outbox / HTTP Signatures），
@@ -18,9 +19,15 @@ Firefish 客户端结构的整体移植（Vue 3 + TypeScript）。
 | 账户 | 开放 / 邀请码 / 管理员建号三种注册模式、登录、MiAuth、OAuth 2.0 + PKCE、TOTP 两步验证、邮箱验证、密码重置、会话与访问令牌管理、账号迁移导出 |
 | 笔记 | 发布 / 编辑 / 删除、内容警告、投票、附件、可见性（公开 / 首页 / 关注者 / 指定）、引用与转贴、表情回应（含自定义 emoji）、书签、置顶、编辑历史、按正文与用户搜索 |
 | 时间线 | 首页、本地、全局、社交、标签、用户页与详情页；流式新帖提示与实时插入 |
+| 列表与剪藏 | 用户列表（成员、公开复制、收藏、列表时间线）、剪藏（收录笔记、公开 / 私有、书签） |
+| 天线 | 关键词与来源过滤、排除词、仅本地 / 排除 bot / 仅附件，数据库连接表，命中后实时推送 |
+| 频道 | 创建 / 编辑 / 归档、关注与收藏、静音、频道时间线；频道笔记强制本地公开且不可联邦 |
+| 私信 | 1:1 私信：会话索引、已读 / 未读、实时推送与 typing；群组与消息联邦为延后项 |
+| 画廊 | 图片帖子、点赞、featured / popular、个人与收藏列表 |
+| Pages | 静态积木（text / section / image / note）、按用户唯一的 slug、点赞与 featured、资料卡置顶 |
 | 通知 | 类型筛选、同类通知合并、批量已读、未读徽标，经 Streaming 实时送达 |
 | 网盘 | 本地上传与 S3 兼容后端、文件夹、附件反查笔记、浏览器端压缩、从 URL 上传、容量配额 |
-| Streaming | WebSocket 多频道（`main` / `homeTimeline` / `localTimeline` / `hybridTimeline` / `globalTimeline` / `note` / `drive` / `notifications` 等）；进程内 fanout，可选 Redis Pub/Sub 跨进程中继 |
+| Streaming | WebSocket 多频道（`main` / 各时间线 / `note` / `drive` / `notifications`，以及 `userList` / `clip` / `antenna` / `channel` / `messaging` / `messagingIndex`）；进程内 fanout，可选 Redis Pub/Sub 跨进程中继 |
 | 管理台 | 概览、用户、文件、举报（含备注与 ActivityPub `Flag` 转发）、公告、联邦模式与白名单、投递队列、emoji、标签、数据库、邮件、安全、对象存储、实例屏蔽、代理账号 |
 | 联邦 | WebFinger、Actor、Inbox 验签、Outbox、HTTP Signatures（含 `hs2019` 与 digest）、投递队列与重试、远端媒体代理、实例信息与用户目录 |
 
@@ -31,7 +38,7 @@ Firefish 客户端结构的整体移植（Vue 3 + TypeScript）。
 ### 明确不做
 
 - **Mastodon API**：不提供任何 Mastodon 端点。
-- **聊天 / 频道 / 剪贴 / 分组 / 画廊 / 页面 / 天线 / 列表**：Firefish 有、本实例不做，相关页面按契约降级或隐藏。
+- **聊天群组与消息联邦**：私信仅支持本机 1:1；`users/groups/*`、群组私信与跨实例消息不做。
 - **Relay**：首个版本不做。
 - **数据迁移**：不导入其它实例的数据，实例从空库开始。
 
