@@ -140,6 +140,39 @@ func TestWriteLoopStopsAfterClose(t *testing.T) {
 	}
 }
 
+// TestTypingOnMessagingFrameDispatches is the regression test for the frame
+// the messaging room sends. Before the dispatch case existed the frame was
+// parsed and dropped, so no typer event ever reached the other side.
+func TestTypingOnMessagingFrameDispatches(t *testing.T) {
+	h := newTestConnection(t, Viewer{UserID: "alice"})
+	type call struct{ user, partner string }
+	calls := make(chan call, 3)
+	h.conn.onTypingOnMessaging = func(userID, partner string) {
+		calls <- call{userID, partner}
+	}
+
+	h.conn.onMessage([]byte(`{"type":"typingOnMessaging","body":{"partner":"bob"}}`))
+	select {
+	case got := <-calls:
+		if got != (call{"alice", "bob"}) {
+			t.Fatalf("typing callback = %+v", got)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("typingOnMessaging did not reach the callback")
+	}
+
+	// A frame without a partner, and one from an anonymous connection, are
+	// both ignored rather than broadcast.
+	h.conn.onMessage([]byte(`{"type":"typingOnMessaging","body":{}}`))
+	h.conn.setViewer(Viewer{})
+	h.conn.onMessage([]byte(`{"type":"typingOnMessaging","body":{"partner":"bob"}}`))
+	select {
+	case got := <-calls:
+		t.Fatalf("unexpected typing dispatch: %+v", got)
+	case <-time.After(100 * time.Millisecond):
+	}
+}
+
 // waitFor blocks until cond holds or the deadline passes.
 func waitFor(t *testing.T, what string, cond func() bool) {
 	t.Helper()

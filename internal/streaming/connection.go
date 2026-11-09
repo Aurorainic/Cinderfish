@@ -186,6 +186,21 @@ func (c *Connection) onMessage(data []byte) {
 				c.onReadNotification(uid, ids)
 			}
 		}
+	case "typingOnMessaging":
+		// The fork-preserved messaging surface: the client announces that
+		// its user is typing to `partner`, and the server republishes the
+		// packed typer on the conversation subject. Groups are a recorded
+		// deferral, so a group-only frame is ignored.
+		if c.onTypingOnMessaging != nil {
+			if uid := c.viewerSnapshot().UserID; uid != "" {
+				var b struct {
+					Partner string `json:"partner"`
+				}
+				if err := json.Unmarshal(env.Body, &b); err == nil && b.Partner != "" {
+					c.onTypingOnMessaging(uid, b.Partner)
+				}
+			}
+		}
 	}
 }
 
