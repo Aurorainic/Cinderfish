@@ -143,7 +143,9 @@ func paginationOrder(sinceID, untilID string) string {
 	return "DESC"
 }
 
-// Timeline returns the notes of a timeline, newest first.
+// Timeline returns the notes of a timeline, newest first. A sinceId without
+// untilId pages upward instead, the direction a "load newer" cursor expects
+// (paginationOrder mirrors Misskey's makePaginationQuery for every kind).
 //
 // The visibility rules mirror Misskey's generateVisibilityQuery: a note
 // is visible to the viewer when it is public or home, or the viewer is
@@ -282,7 +284,8 @@ func (s *TimelineService) Timeline(ctx context.Context, p TimelineParams) ([]*No
 	}
 
 	query := noteSelect + ` WHERE ` + strings.Join(q.conds, " AND ") +
-		` AND n.deleted_at IS NULL ORDER BY n.id DESC LIMIT ` + strconv.Itoa(p.Limit)
+		` AND n.deleted_at IS NULL ORDER BY n.id ` + paginationOrder(p.SinceID, p.UntilID) +
+		` LIMIT ` + strconv.Itoa(p.Limit)
 
 	rows, err := s.pool.Query(ctx, query, q.args...)
 	if err != nil {

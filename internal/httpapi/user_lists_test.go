@@ -133,6 +133,36 @@ func TestUserListCRUDAndTimeline(t *testing.T) {
 		t.Errorf("list timeline = %v, want only the member's note", texts)
 	}
 
+	// Cursor semantics: Misskey's makePaginationQuery flips to ascending
+	// when only sinceId is given. The timeline query used to hardcode DESC
+	// for every kind, so a "load newer" cursor returned a descending page.
+	for _, text := range []string{"bob note 2", "bob note 3"} {
+		resp, created = postWithToken(t, f.ts, "/api/notes/create", bobToken, map[string]any{"text": text})
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("%s: %d %v", text, resp.StatusCode, created)
+		}
+	}
+	page := postListWithToken(t, f.ts, "/api/notes/user-list-timeline", aliceToken, map[string]any{"listId": listID})
+	movement := make([]string, len(page))
+	for i, item := range page {
+		n, _ := item.(map[string]any)
+		movement[i], _ = n["id"].(string)
+	}
+	if len(movement) != 3 || !(movement[0] > movement[1] && movement[1] > movement[2]) {
+		t.Fatalf("list timeline ids = %v, want three descending", movement)
+	}
+	ascending := postListWithToken(t, f.ts, "/api/notes/user-list-timeline", aliceToken, map[string]any{
+		"listId": listID, "sinceId": movement[2], "limit": 10,
+	})
+	ascendingIDs := make([]string, len(ascending))
+	for i, item := range ascending {
+		n, _ := item.(map[string]any)
+		ascendingIDs[i], _ = n["id"].(string)
+	}
+	if len(ascendingIDs) != 2 || ascendingIDs[0] != movement[1] || ascendingIDs[1] != movement[0] {
+		t.Errorf("sinceId page = %v, want %v (ascending)", ascendingIDs, []string{movement[1], movement[0]})
+	}
+
 	// Deleting the list clears it everywhere.
 	if code := postNoContentToken(t, f.ts, "/api/users/lists/delete", aliceToken, map[string]any{"listId": listID}); code != http.StatusNoContent {
 		t.Fatalf("delete: %d", code)
