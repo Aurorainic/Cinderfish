@@ -82,11 +82,11 @@ type Note struct {
 	// ChannelID names the local-only board the note was posted to; never
 	// set for federated inbound notes. RenoteChannelID is the denormalised
 	// channel of the renoted note, which channel-mute filters read.
-	ChannelID     *string
+	ChannelID       *string
 	RenoteChannelID *string
-	CreatedAt          time.Time
-	UpdatedAt          *time.Time
-	DeletedAt          *time.Time
+	CreatedAt       time.Time
+	UpdatedAt       *time.Time
+	DeletedAt       *time.Time
 }
 
 // Poll is the poll attached to a note.
@@ -111,7 +111,7 @@ type CreateParams struct {
 	Poll           *PollParams
 	// ChannelID attaches the note to a local channel. Upstream then forces
 	// visibility = public and localOnly = true.
-	ChannelID     *string
+	ChannelID *string
 }
 
 // PollParams describes a poll to create.
@@ -186,12 +186,12 @@ var (
 	// Mirrors Misskey's NO_SUCH_CHANNEL on notes/create with an unknown or
 	// archived channel, and the renote policy of a channel that forbids
 	// renotes leaving it.
-	ErrNoSuchChannel             = errors.New("note: no such channel")
+	ErrNoSuchChannel              = errors.New("note: no such channel")
 	ErrCannotRenoteOutsideChannel = errors.New("note: cannot renote outside the channel")
-	ErrPollExpired       = errors.New("note: poll is already expired")
-	ErrNoPoll            = errors.New("note: the note has no poll")
-	ErrAlreadyVoted      = errors.New("note: already voted in this poll")
-	ErrChoiceOutOfRange  = errors.New("note: poll choice is out of range")
+	ErrPollExpired                = errors.New("note: poll is already expired")
+	ErrNoPoll                     = errors.New("note: the note has no poll")
+	ErrAlreadyVoted               = errors.New("note: already voted in this poll")
+	ErrChoiceOutOfRange           = errors.New("note: poll choice is out of range")
 )
 
 // validatePollParam enforces notes/create's poll schema: 2–10 distinct

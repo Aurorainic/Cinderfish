@@ -28,9 +28,9 @@ type MessagingMessage struct {
 
 // Sentinels the handlers map onto Misskey's error codes.
 var (
-	ErrNoSuchMessage      = errors.New("account: no such message")
+	ErrNoSuchMessage       = errors.New("account: no such message")
 	ErrRecipientIsYourself = errors.New("account: recipient is yourself")
-	ErrMessageNoContent   = errors.New("account: message needs text or a file")
+	ErrMessageNoContent    = errors.New("account: message needs text or a file")
 	ErrMessageFileNotFound = errors.New("account: no such file")
 	ErrRecipientBlockedYou = errors.New("account: recipient blocks the caller")
 	ErrMessageTextTooLong  = errors.New("account: message text too long")

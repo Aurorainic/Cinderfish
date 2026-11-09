@@ -13,13 +13,13 @@ import (
 // Misskey error ids for the gallery endpoints, copied from
 // packages/backend/src/server/api/endpoints/gallery/*.ts.
 const (
-	errIDNoSuchGalleryPostDelete  = "ae52f367-4bd7-4ecd-afc6-5672fff427f5"
-	errIDNoSuchGalleryPostShow    = "1137bf14-c5b0-4604-85bb-5b5371b1cd45"
-	errIDNoSuchGalleryPostLike    = "56c06af3-1287-442f-9701-c93f7c4a62ff"
-	errIDGalleryYourPost          = "f78f1511-5ebc-4478-a888-1198d752da68"
-	errIDGalleryAlreadyLiked      = "40e9ed56-a59c-473a-bf3f-f289c54fb5a7"
-	errIDNoSuchGalleryPostUnlike  = "c32e6dd0-b555-4413-925e-b3757d19ed84"
-	errIDGalleryNotLiked          = "e3e8e06e-be37-41f7-a5b4-87a8250288f0"
+	errIDNoSuchGalleryPostDelete = "ae52f367-4bd7-4ecd-afc6-5672fff427f5"
+	errIDNoSuchGalleryPostShow   = "1137bf14-c5b0-4604-85bb-5b5371b1cd45"
+	errIDNoSuchGalleryPostLike   = "56c06af3-1287-442f-9701-c93f7c4a62ff"
+	errIDGalleryYourPost         = "f78f1511-5ebc-4478-a888-1198d752da68"
+	errIDGalleryAlreadyLiked     = "40e9ed56-a59c-473a-bf3f-f289c54fb5a7"
+	errIDNoSuchGalleryPostUnlike = "c32e6dd0-b555-4413-925e-b3757d19ed84"
+	errIDGalleryNotLiked         = "e3e8e06e-be37-41f7-a5b4-87a8250288f0"
 )
 
 // channelErrorIDs-style carrier for the gallery family.
